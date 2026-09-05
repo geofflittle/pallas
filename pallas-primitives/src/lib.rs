@@ -70,6 +70,8 @@ pub mod babbage;
 pub mod byron;
 /// Ledger primitives for the Conway era (governance).
 pub mod conway;
+/// Ledger primitives for the Dijkstra era (inline transactions, Leios).
+pub mod dijkstra;
 pub use plutus_data::*;
 
 pub use framework::*;
