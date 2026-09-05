@@ -95,6 +95,9 @@ pub mod hashes;
 pub mod header;
 /// Helpers for transaction inputs across eras.
 pub mod input;
+/// The Leios endorsement layer: endorser block bodies and the certification
+/// rule a follower reads off the ranking chain.
+pub mod leios;
 /// Helpers for transaction metadata.
 pub mod meta;
 /// Helpers for transaction outputs across eras.
