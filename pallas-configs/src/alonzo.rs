@@ -2,10 +2,18 @@ use num_rational::Ratio;
 use serde::Deserialize;
 use std::{collections::HashMap, ops::Deref};
 
+/// Execution unit prices from the Alonzo genesis file.
+///
+/// The ledger writes these as `priceSteps` and `priceMemory` and reads either
+/// those or the older `prSteps` and `prMem`, so both spellings have to be
+/// accepted here. A genesis written by a current node uses the first pair, and
+/// refusing it stops the node from starting at all.
 #[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ExecutionPrices {
+    #[serde(alias = "priceSteps")]
     pub pr_steps: Fraction,
+    #[serde(alias = "priceMemory")]
     pub pr_mem: Fraction,
 }
 
@@ -299,5 +307,42 @@ mod tests {
     #[test]
     fn test_mainnet_json_loads() {
         load_test_data_config("mainnet");
+    }
+
+    /// `priceMemory` and `priceSteps` are the names the ledger writes today.
+    /// `prMem` and `prSteps` are the older ones it still reads. A genesis
+    /// written by a current node uses the first pair.
+    #[test]
+    fn current_execution_price_names_parse() {
+        let config = load_test_data_config("musashi");
+
+        let prices: pallas_primitives::alonzo::ExUnitPrices = config.execution_prices.into();
+
+        assert_eq!(prices.mem_price.numerator, 577);
+        assert_eq!(prices.mem_price.denominator, 10000);
+        assert_eq!(prices.step_price.numerator, 721);
+        assert_eq!(prices.step_price.denominator, 10000000);
+    }
+
+    /// The must-not case for the one above. Accepting the current names must
+    /// not stop the older names from parsing, since every genesis file already
+    /// on disk uses them.
+    #[test]
+    fn legacy_execution_price_names_still_parse() {
+        let config = load_test_data_config("mainnet");
+
+        let prices: pallas_primitives::alonzo::ExUnitPrices = config.execution_prices.into();
+
+        assert_eq!(prices.mem_price.numerator, 577);
+        assert_eq!(prices.mem_price.denominator, 10000);
+        assert_eq!(prices.step_price.numerator, 721);
+        assert_eq!(prices.step_price.denominator, 10000000);
+    }
+
+    /// A genesis that spells the prices neither way must fail loudly rather
+    /// than default to a free execution unit.
+    #[test]
+    fn a_genesis_with_no_execution_prices_is_refused() {
+        assert!(serde_json::from_str::<ExecutionPrices>(r#"{ "priceWrong": 1 }"#).is_err());
     }
 }
