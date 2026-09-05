@@ -94,6 +94,15 @@ pub enum Error {
          of its own, which the chain inclusion rule forbids"
     )]
     CertifiesAndCarries { slot: u64, count: usize },
+
+    #[error("the block at slot {slot} certifies no endorser block, so there is nothing to resolve")]
+    NotCertifying { slot: u64 },
+
+    #[error("a {era} block cannot certify an endorser block")]
+    NotLeiosEra { era: Era },
+
+    #[error("the block cbor is not a ranking block: {0}")]
+    InvalidBlock(String),
 }
 
 /// One entry of an endorser block body.
@@ -369,6 +378,78 @@ impl CertificationTracker {
     }
 }
 
+/// Rewrites a certifying ranking block so its transaction list is the
+/// transactions of the endorser block it certifies.
+///
+/// A Cardano node already serves this shape to its local clients: the node to
+/// client chainsync server resolves the certificate and hands over a block
+/// whose body carries the endorsed transactions inline, and CIP-0164 names
+/// serving a modified block with inline endorser block transactions over
+/// LocalChainSync as the recommended presentation. A follower reading node to
+/// node gets the unresolved block and has to do the same resolution itself.
+///
+/// The transaction list is replaced rather than extended. A certifying ranking
+/// block carries no transactions of its own, so there is no order to choose
+/// between two sets and no `invalid_transactions` index to shift, and a block
+/// that carried both is refused rather than guessed at.
+///
+/// `txs` are the transactions of the certified endorser block in body order,
+/// already unwrapped from their leios-fetch byte string envelopes. The header
+/// is left byte identical, so the block keeps its hash and its slot.
+pub fn resolve_certified_block(block_cbor: &[u8], txs: &[&[u8]]) -> Result<Vec<u8>, Error> {
+    let block =
+        crate::MultiEraBlock::decode(block_cbor).map_err(|e| Error::InvalidBlock(e.to_string()))?;
+
+    if block.era() != Era::Dijkstra {
+        return Err(Error::NotLeiosEra { era: block.era() });
+    }
+
+    if block.header().leios_certified() != Some(true) {
+        return Err(Error::NotCertifying { slot: block.slot() });
+    }
+
+    refuse_certifying_block_with_own_txs(block.slot(), true, block.tx_count())?;
+
+    let (start, end) = transaction_list_span(block_cbor)?;
+
+    let mut out = Vec::with_capacity(block_cbor.len() + txs.iter().map(|t| t.len()).sum::<usize>());
+    out.extend_from_slice(&block_cbor[..start]);
+
+    let mut e = Encoder::new(&mut out);
+    e.array(txs.len() as u64).expect("write to a vec");
+    for tx in txs {
+        out.extend_from_slice(tx);
+    }
+
+    out.extend_from_slice(&block_cbor[end..]);
+
+    Ok(out)
+}
+
+/// The byte span of a ranking block's transaction list within the block cbor.
+///
+/// The wire block is `[era_tag, [header, block_body]]` and the body is
+/// `[invalid_transactions, transactions, leios_certificate, peras_certificate]`.
+fn transaction_list_span(block_cbor: &[u8]) -> Result<(usize, usize), Error> {
+    let mut d = Decoder::new(block_cbor);
+    let bad = |what: &'static str| {
+        move |e: pallas_codec::minicbor::decode::Error| Error::InvalidBlock(format!("{what}: {e}"))
+    };
+
+    d.array().map_err(bad("era envelope"))?;
+    d.u16().map_err(bad("era tag"))?;
+    d.array().map_err(bad("block array"))?;
+    d.skip().map_err(bad("header"))?;
+    d.array().map_err(bad("block body array"))?;
+    d.skip().map_err(bad("invalid transactions"))?;
+
+    let start = d.position();
+    d.skip().map_err(bad("transaction list"))?;
+    let end = d.position();
+
+    Ok((start, end))
+}
+
 /// Refuses a block that both certifies an endorser block and carries
 /// transactions of its own.
 ///
@@ -458,6 +539,16 @@ mod tests {
                 announced_eb_size: self.announced_size,
             }
         }
+    }
+
+    /// The decoded body and the wire transactions of one fixture, for the tests
+    /// in this module and the ones that resolve a block with them.
+    pub(super) fn fixture(index: usize) -> (EndorserBlockBody, Vec<Vec<u8>>) {
+        let f = &FIXTURES[index];
+        let body = EndorserBlockBody::decode_announced(&f.body_bytes(), &f.announcement())
+            .unwrap_or_else(|e| panic!("{}: {e}", f.name));
+
+        (body, f.wire_txs())
     }
 
     /// MUST FIRE: each body decodes to exactly the transactions the wire named,
@@ -782,5 +873,105 @@ mod tests {
             }
             other => panic!("wrong refusal: {other}"),
         }
+    }
+}
+
+#[cfg(test)]
+mod resolve_tests {
+    use super::tests::fixture;
+    use super::*;
+    use crate::MultiEraBlock;
+
+    /// MUST FIRE: a certifying block resolves to a block carrying the endorser
+    /// block's transactions, with its header and therefore its hash untouched.
+    #[test]
+    fn a_certifying_block_resolves_to_the_endorser_blocks_transactions() {
+        let raw = hex::decode(include_str!("../../test_data/dijkstra1.block").trim()).unwrap();
+        let before = MultiEraBlock::decode(&raw).unwrap();
+        assert_eq!(before.header().leios_certified(), Some(true));
+        assert_eq!(before.tx_count(), 0, "fixture precondition");
+
+        let (body, wire) = fixture(2);
+        let txs = body.transactions(&wire).unwrap();
+        let inner: Vec<&[u8]> = wire.iter().map(|w| unwrap_tx(w).unwrap()).collect();
+
+        let resolved_cbor = resolve_certified_block(&raw, &inner).expect("must resolve");
+        let after = MultiEraBlock::decode(&resolved_cbor).expect("resolved block must decode");
+
+        assert_eq!(after.tx_count(), 425);
+        assert_eq!(after.era(), Era::Dijkstra);
+
+        // the header, and so the block hash and slot, are untouched
+        assert_eq!(after.header().cbor(), before.header().cbor());
+        assert_eq!(after.hash(), before.hash());
+        assert_eq!(after.slot(), before.slot());
+
+        // and the transactions are the endorser block's, in its order
+        let after_txs = after.txs();
+        assert_eq!(after_txs.len(), txs.len());
+        for (i, (a, b)) in after_txs.iter().zip(txs.iter()).enumerate() {
+            assert_eq!(a.hash(), b.hash(), "transaction {i}");
+        }
+        assert_eq!(
+            after_txs[391].hash().to_string(),
+            "fffa4361c5251f57f4840c94dcbd05164cdce9b2bcf9bbf75e2fa4baaf30cf87"
+        );
+    }
+
+    /// MUST FIRE: the one transaction case, so the array header width is not
+    /// only ever exercised at one size.
+    #[test]
+    fn a_single_transaction_endorser_block_resolves() {
+        let raw = hex::decode(include_str!("../../test_data/dijkstra1.block").trim()).unwrap();
+        let (_, wire) = fixture(0);
+        let inner: Vec<&[u8]> = wire.iter().map(|w| unwrap_tx(w).unwrap()).collect();
+
+        let resolved_cbor = resolve_certified_block(&raw, &inner).unwrap();
+        let after = MultiEraBlock::decode(&resolved_cbor).unwrap();
+
+        assert_eq!(after.tx_count(), 1);
+        assert_eq!(after.txs()[0].inputs().len(), 1);
+    }
+
+    /// MUST NOT FIRE: a block that certifies nothing is refused rather than
+    /// silently given somebody else's transactions.
+    #[test]
+    fn a_block_that_certifies_nothing_is_refused() {
+        let raw = hex::decode(include_str!("../../test_data/dijkstra7.block").trim()).unwrap();
+        let block = MultiEraBlock::decode(&raw).unwrap();
+        assert_eq!(block.header().leios_certified(), Some(false));
+        assert_eq!(block.tx_count(), 426, "fixture precondition");
+
+        let (_, wire) = fixture(0);
+        let inner: Vec<&[u8]> = wire.iter().map(|w| unwrap_tx(w).unwrap()).collect();
+
+        let err = resolve_certified_block(&raw, &inner)
+            .expect_err("a non-certifying block must be refused");
+
+        assert!(matches!(err, Error::NotCertifying { .. }), "{err}");
+    }
+
+    /// MUST NOT FIRE: a pre-Leios block is refused by era rather than having
+    /// its body rewritten.
+    #[test]
+    fn a_pre_leios_block_is_refused() {
+        let raw = hex::decode(include_str!("../../test_data/conway1.block").trim()).unwrap();
+
+        let err =
+            resolve_certified_block(&raw, &[]).expect_err("a Conway block must not be resolved");
+
+        assert!(matches!(err, Error::NotLeiosEra { .. }), "{err}");
+    }
+
+    /// MUST FIRE: resolving with no transactions gives an empty block rather
+    /// than an error, because an endorser block genuinely may commit to none,
+    /// and the refusal that protects against a missing one is the announced
+    /// size check at fetch time, not this.
+    #[test]
+    fn resolving_with_no_transactions_gives_an_empty_block() {
+        let raw = hex::decode(include_str!("../../test_data/dijkstra1.block").trim()).unwrap();
+        let resolved_cbor = resolve_certified_block(&raw, &[]).unwrap();
+        let after = MultiEraBlock::decode(&resolved_cbor).unwrap();
+        assert_eq!(after.tx_count(), 0);
     }
 }
