@@ -444,6 +444,66 @@ impl<C> minicbor::encode::Encode<C> for RationalNumber {
     }
 }
 
+impl<'b, C> minicbor::decode::Decode<'b, C> for DijkstraProtocolParam {
+    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+        // The ledger writes one entry per protocol parameter and its own
+        // decoder checks the count, so a different count is a different era or
+        // a different ledger and reading it positionally would put every value
+        // after the difference under the wrong name.
+        match d.array()? {
+            Some(DIJKSTRA_PROTOCOL_PARAM_FIELDS) => (),
+            Some(found) => {
+                return Err(decode::Error::message(format!(
+                    "expected {DIJKSTRA_PROTOCOL_PARAM_FIELDS} Dijkstra protocol parameters, found an array of {found}"
+                )));
+            }
+            None => {
+                return Err(decode::Error::message(format!(
+                    "expected a definite array of {DIJKSTRA_PROTOCOL_PARAM_FIELDS} Dijkstra protocol parameters, found an indefinite array"
+                )));
+            }
+        }
+
+        Ok(DijkstraProtocolParam {
+            minfee_a: d.decode_with(ctx)?,
+            minfee_b: d.decode_with(ctx)?,
+            max_block_body_size: d.decode_with(ctx)?,
+            max_transaction_size: d.decode_with(ctx)?,
+            max_block_header_size: d.decode_with(ctx)?,
+            key_deposit: d.decode_with(ctx)?,
+            pool_deposit: d.decode_with(ctx)?,
+            maximum_epoch: d.decode_with(ctx)?,
+            desired_number_of_stake_pools: d.decode_with(ctx)?,
+            pool_pledge_influence: d.decode_with(ctx)?,
+            expansion_rate: d.decode_with(ctx)?,
+            treasury_growth_rate: d.decode_with(ctx)?,
+            protocol_version: d.decode_with(ctx)?,
+            min_pool_cost: d.decode_with(ctx)?,
+            ada_per_utxo_byte: d.decode_with(ctx)?,
+            cost_models_for_script_languages: d.decode_with(ctx)?,
+            execution_costs: d.decode_with(ctx)?,
+            max_tx_ex_units: d.decode_with(ctx)?,
+            max_block_ex_units: d.decode_with(ctx)?,
+            max_value_size: d.decode_with(ctx)?,
+            collateral_percentage: d.decode_with(ctx)?,
+            max_collateral_inputs: d.decode_with(ctx)?,
+            pool_voting_thresholds: d.decode_with(ctx)?,
+            drep_voting_thresholds: d.decode_with(ctx)?,
+            min_committee_size: d.decode_with(ctx)?,
+            committee_term_limit: d.decode_with(ctx)?,
+            governance_action_validity_period: d.decode_with(ctx)?,
+            governance_action_deposit: d.decode_with(ctx)?,
+            drep_deposit: d.decode_with(ctx)?,
+            drep_inactivity_period: d.decode_with(ctx)?,
+            minfee_refscript_cost_per_byte: d.decode_with(ctx)?,
+            max_ref_script_size_per_block: d.decode_with(ctx)?,
+            max_ref_script_size_per_tx: d.decode_with(ctx)?,
+            ref_script_cost_stride: d.decode_with(ctx)?,
+            ref_script_cost_multiplier: d.decode_with(ctx)?,
+        })
+    }
+}
+
 impl<'b, C> minicbor::decode::Decode<'b, C> for TransactionOutput {
     fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
         match d.datatype()? {
@@ -970,6 +1030,157 @@ pub mod tests {
         )))
         .unwrap();
         assert_eq!(hex::encode(bytes), "821827d9010280");
+    }
+
+    /// A Dijkstra protocol parameter value carrying, at the four positions
+    /// Dijkstra appends, the values the Musashi testnet reports for them.
+    fn dijkstra_protocol_param_sample()
+    -> crate::miniprotocols::localstate::queries_v16::DijkstraProtocolParam {
+        use crate::miniprotocols::localstate::queries_v16::*;
+        use pallas_codec::utils::AnyUInt;
+
+        let ratio = |numerator, denominator| RationalNumber {
+            numerator,
+            denominator,
+        };
+
+        DijkstraProtocolParam {
+            minfee_a: 44,
+            minfee_b: 155381,
+            max_block_body_size: 90112,
+            max_transaction_size: 16384,
+            max_block_header_size: 1100,
+            key_deposit: AnyUInt::U32(2000000),
+            pool_deposit: AnyUInt::U32(500000000),
+            maximum_epoch: 18,
+            desired_number_of_stake_pools: 150,
+            pool_pledge_influence: ratio(3, 10),
+            expansion_rate: ratio(3, 1000),
+            treasury_growth_rate: ratio(1, 5),
+            protocol_version: (12, 0),
+            min_pool_cost: AnyUInt::U32(170000000),
+            ada_per_utxo_byte: AnyUInt::U16(4310),
+            cost_models_for_script_languages: CostModels {
+                plutus_v1: Some(vec![100788, 420]),
+                plutus_v2: None,
+                plutus_v3: Some(vec![100788]),
+                unknown: Vec::new().into(),
+            },
+            execution_costs: ExUnitPrices {
+                mem_price: ratio(577, 10000),
+                step_price: ratio(721, 10000000),
+            },
+            max_tx_ex_units: ExUnits {
+                mem: 16500000,
+                steps: 10000000000,
+            },
+            max_block_ex_units: ExUnits {
+                mem: 72000000,
+                steps: 20000000000,
+            },
+            max_value_size: 5000,
+            collateral_percentage: 150,
+            max_collateral_inputs: 3,
+            pool_voting_thresholds: PoolVotingThresholds {
+                motion_no_confidence: ratio(51, 100),
+                committee_normal: ratio(51, 100),
+                committee_no_confidence: ratio(51, 100),
+                hard_fork_initiation: ratio(51, 100),
+                pp_security_group: ratio(51, 100),
+            },
+            drep_voting_thresholds: DRepVotingThresholds {
+                motion_no_confidence: ratio(67, 100),
+                committee_normal: ratio(67, 100),
+                committee_no_confidence: ratio(3, 5),
+                update_to_constitution: ratio(3, 4),
+                hard_fork_initiation: ratio(3, 5),
+                pp_network_group: ratio(67, 100),
+                pp_economic_group: ratio(67, 100),
+                pp_technical_group: ratio(67, 100),
+                pp_gov_group: ratio(3, 4),
+                treasury_withdrawal: ratio(67, 100),
+            },
+            min_committee_size: 3,
+            committee_term_limit: 293,
+            governance_action_validity_period: 120,
+            governance_action_deposit: AnyUInt::U64(100000000000),
+            drep_deposit: AnyUInt::U32(500000000),
+            drep_inactivity_period: 20,
+            minfee_refscript_cost_per_byte: ratio(15, 1),
+            max_ref_script_size_per_block: 1048576,
+            max_ref_script_size_per_tx: 204800,
+            ref_script_cost_stride: 25600,
+            ref_script_cost_multiplier: ratio(6, 5),
+        }
+    }
+
+    /// The thirty five entries go out as one definite array and come back
+    /// carrying the same values, including the four Dijkstra appends, which are
+    /// named here by value so the test says what the last four positions mean.
+    #[test]
+    fn test_dijkstra_protocol_param_roundtrip() {
+        let sample = dijkstra_protocol_param_sample();
+        let bytes = minicbor::to_vec(&sample).expect("encode");
+
+        // 0x98 0x23 is array(35), the header the ledger's own encoder writes
+        // for `encodeListLen (length (eraPParams @DijkstraEra))`.
+        assert_eq!(&bytes[..2], &[0x98, 0x23]);
+
+        let decoded: crate::miniprotocols::localstate::queries_v16::DijkstraProtocolParam =
+            minicbor::decode(&bytes).expect("decode");
+        assert_eq!(decoded, sample);
+        assert_eq!(decoded.max_ref_script_size_per_block, 1048576);
+        assert_eq!(decoded.max_ref_script_size_per_tx, 204800);
+        assert_eq!(decoded.ref_script_cost_stride, 25600);
+        assert_eq!(decoded.ref_script_cost_multiplier.numerator, 6);
+        assert_eq!(decoded.ref_script_cost_multiplier.denominator, 5);
+    }
+
+    /// Any array that is not thirty five entries long is refused, and the
+    /// refusal names the length that arrived. Conway's 31 is the length that
+    /// actually turns up in practice, from a decoder pointed at the wrong era.
+    #[test]
+    fn test_dijkstra_protocol_param_refuses_other_lengths() {
+        type Params = crate::miniprotocols::localstate::queries_v16::DijkstraProtocolParam;
+
+        let good = minicbor::to_vec(dijkstra_protocol_param_sample()).expect("encode");
+        let entries = &good[2..];
+
+        let refusal = |bytes: &[u8]| match minicbor::decode::<Params>(bytes) {
+            Ok(value) => panic!(
+                "decoded {} bytes that are not 35 entries: {value:?}",
+                bytes.len()
+            ),
+            Err(e) => e.to_string(),
+        };
+
+        // Conway's length, which is what a Conway node's answer looks like.
+        let mut conway = vec![0x98, 0x1f];
+        conway.extend_from_slice(entries);
+        let said = refusal(&conway);
+        assert!(said.contains("35"), "refusal does not name 35: {said}");
+        assert!(said.contains("31"), "refusal does not name 31: {said}");
+
+        // One entry too many.
+        let mut long = vec![0x98, 0x24];
+        long.extend_from_slice(entries);
+        long.push(0x00);
+        let said = refusal(&long);
+        assert!(said.contains("36"), "refusal does not name 36: {said}");
+
+        // A short array, refused on the header before any entry is read.
+        let said = refusal(&[0x82, 0x00, 0x00]);
+        assert!(said.contains('2'), "refusal does not name 2: {said}");
+
+        // An indefinite array has no length to check, so it is refused too.
+        let mut indefinite = vec![0x9f];
+        indefinite.extend_from_slice(entries);
+        indefinite.push(0xff);
+        let said = refusal(&indefinite);
+        assert!(
+            said.contains("indefinite"),
+            "refusal does not say indefinite: {said}"
+        );
     }
 
     // TODO: DRY with other decode/encode roundtripss
