@@ -33,6 +33,7 @@ impl TryFrom<u16> for Era {
             5 => Ok(Era::Alonzo),
             6 => Ok(Era::Babbage),
             7 => Ok(Era::Conway),
+            8 => Ok(Era::Dijkstra),
             x => Err(crate::Error::UnknownEra(x)),
         }
     }
@@ -48,6 +49,7 @@ impl From<Era> for u16 {
             Era::Alonzo => 5,
             Era::Babbage => 6,
             Era::Conway => 7,
+            Era::Dijkstra => 8,
         }
     }
 }
@@ -62,6 +64,61 @@ impl Display for Era {
             Era::Alonzo => write!(f, "Alonzo"),
             Era::Babbage => write!(f, "Babbage"),
             Era::Conway => write!(f, "Conway"),
+            Era::Dijkstra => write!(f, "Dijkstra"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `TryFrom<u16>` ends in a binding catch-all, so adding an era to the
+    /// enum does not make it fail to compile and an era can end up encodable
+    /// to a tag but not decodable from one. Every era is walked here so that
+    /// the asymmetry is a test failure rather than a silent gap.
+    #[test]
+    fn every_era_round_trips_through_its_tag() {
+        let eras = [
+            Era::Byron,
+            Era::Shelley,
+            Era::Allegra,
+            Era::Mary,
+            Era::Alonzo,
+            Era::Babbage,
+            Era::Conway,
+            Era::Dijkstra,
+        ];
+
+        for era in eras {
+            let tag: u16 = era.into();
+            let back = Era::try_from(tag)
+                .unwrap_or_else(|e| panic!("{era} encodes to tag {tag} but does not decode: {e}"));
+            assert_eq!(back, era, "tag {tag} did not round trip");
+        }
+    }
+
+    /// MUST NOT FIRE: a tag no era claims is still refused, so the arm added
+    /// above did not turn the decoder into one that accepts anything.
+    #[test]
+    fn unknown_era_tags_are_still_refused() {
+        for tag in [9u16, 10, 4242] {
+            assert!(Era::try_from(tag).is_err(), "tag {tag} must be refused");
+        }
+    }
+
+    /// `has_feature` is answered by `Ord` over declaration order, so a variant
+    /// declared anywhere but the end changes other eras' answers with no
+    /// diagnostic at all. This pins the ordering.
+    #[test]
+    fn dijkstra_sorts_after_conway_and_inherits_its_features() {
+        assert!(Era::Dijkstra > Era::Conway);
+        assert!(Era::Dijkstra.has_feature(crate::Feature::CIP1694));
+        assert!(Era::Dijkstra.has_feature(crate::Feature::SmartContracts));
+        assert!(Era::Dijkstra.has_feature(crate::Feature::MultiAssets));
+        assert!(Era::Dijkstra.has_feature(crate::Feature::CIP31));
+        // and the eras before it are unmoved
+        assert!(!Era::Babbage.has_feature(crate::Feature::CIP1694));
+        assert!(!Era::Byron.has_feature(crate::Feature::Staking));
     }
 }

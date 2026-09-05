@@ -31,6 +31,7 @@ pub fn block_era(cbor: &[u8]) -> Outcome {
             5 => Outcome::Matched(Era::Alonzo),
             6 => Outcome::Matched(Era::Babbage),
             7 => Outcome::Matched(Era::Conway),
+            8 => Outcome::Matched(Era::Dijkstra),
             _ => Outcome::Inconclusive,
         },
         _ => Outcome::Inconclusive,
@@ -119,5 +120,33 @@ mod tests {
         let inference = block_era(bytes.as_slice());
 
         assert!(matches!(inference, Outcome::Matched(Era::Conway)));
+    }
+
+    #[test]
+    fn dijkstra_block_detected() {
+        let block_str = include_str!("../../test_data/dijkstra1.block");
+        let bytes = hex::decode(block_str).unwrap();
+
+        let inference = block_era(bytes.as_slice());
+
+        assert!(matches!(inference, Outcome::Matched(Era::Dijkstra)));
+    }
+
+    /// MUST NOT FIRE: a Dijkstra block must not probe as Conway, and a Conway
+    /// block must not probe as Dijkstra. The two wrapper tags are adjacent and
+    /// this is the pair that keeps them apart.
+    #[test]
+    fn dijkstra_and_conway_are_not_confused() {
+        let dijkstra = hex::decode(include_str!("../../test_data/dijkstra1.block")).unwrap();
+        let conway = hex::decode(include_str!("../../test_data/conway1.block")).unwrap();
+
+        assert!(!matches!(
+            block_era(dijkstra.as_slice()),
+            Outcome::Matched(Era::Conway)
+        ));
+        assert!(!matches!(
+            block_era(conway.as_slice()),
+            Outcome::Matched(Era::Dijkstra)
+        ));
     }
 }

@@ -2,7 +2,7 @@ use pallas_codec::minicbor;
 use paste::paste;
 use std::{borrow::Cow, ops::Deref};
 
-use pallas_primitives::{alonzo, babbage, byron, conway};
+use pallas_primitives::{alonzo, babbage, byron, conway, dijkstra};
 
 macro_rules! param_boilerplate {
     ($name:ident: $type_:ty, [$($variant:tt)*]) => {
@@ -51,6 +51,7 @@ pub type ExUnits = alonzo::ExUnits;
 pub type AlonzoCostModels = alonzo::CostModels;
 pub type BabbageCostModels = babbage::CostModels;
 pub type ConwayCostModels = conway::CostModels;
+pub type DijkstraCostModels = dijkstra::CostModels;
 pub type ProtocolVersion = alonzo::ProtocolVersion;
 pub type PoolVotingThresholds = conway::PoolVotingThresholds;
 pub type DRepVotingThresholds = conway::DRepVotingThresholds;
@@ -80,6 +81,11 @@ impl<'b> MultiEraUpdate<'b> {
                 let up = Box::new(Cow::Owned(up));
                 Ok(MultiEraUpdate::Conway(up))
             }
+            Era::Dijkstra => {
+                let up = minicbor::decode(cbor)?;
+                let up = Box::new(Cow::Owned(up));
+                Ok(MultiEraUpdate::Dijkstra(up))
+            }
         }
     }
 
@@ -90,6 +96,7 @@ impl<'b> MultiEraUpdate<'b> {
             MultiEraUpdate::AlonzoCompatible(x) => minicbor::to_vec(x).unwrap(),
             MultiEraUpdate::Babbage(x) => minicbor::to_vec(x).unwrap(),
             MultiEraUpdate::Byron(a, b) => minicbor::to_vec((a, b)).unwrap(),
+            MultiEraUpdate::Dijkstra(x) => minicbor::to_vec(x).unwrap(),
         }
     }
 
@@ -107,6 +114,17 @@ impl<'b> MultiEraUpdate<'b> {
 
     pub fn from_conway(update: &'b conway::Update) -> Self {
         Self::Conway(Box::new(Cow::Borrowed(update)))
+    }
+
+    pub fn from_dijkstra(update: &'b dijkstra::Update) -> Self {
+        Self::Dijkstra(Box::new(Cow::Borrowed(update)))
+    }
+
+    pub fn as_dijkstra(&self) -> Option<&dijkstra::Update> {
+        match self {
+            Self::Dijkstra(x) => Some(x),
+            _ => None,
+        }
     }
 
     pub fn as_byron(&self) -> Option<&byron::UpProp> {
@@ -136,6 +154,7 @@ impl<'b> MultiEraUpdate<'b> {
             MultiEraUpdate::AlonzoCompatible(x) => x.epoch,
             MultiEraUpdate::Babbage(x) => x.epoch,
             MultiEraUpdate::Conway(x) => x.epoch,
+            MultiEraUpdate::Dijkstra(x) => x.epoch,
         }
     }
 
@@ -201,6 +220,22 @@ impl<'b> MultiEraUpdate<'b> {
         }
     }
 
+    /// Dijkstra cost models are their own type because the map gains a named
+    /// PlutusV4 key at index 3, which Conway's type folds into its unknown
+    /// bucket.
+    pub fn dijkstra_first_proposed_cost_models_for_script_languages(
+        &self,
+    ) -> Option<DijkstraCostModels> {
+        match self {
+            MultiEraUpdate::Dijkstra(x) => x
+                .proposed_protocol_parameter_updates
+                .values()
+                .next()
+                .and_then(|x| x.cost_models_for_script_languages.clone()),
+            _ => None,
+        }
+    }
+
     // remaining params are mostly boilerplate code, so we can just generate them
 
     param_boilerplate!(minfee_a: u32, [AlonzoCompatible Babbage]);
@@ -249,21 +284,30 @@ impl<'b> MultiEraUpdate<'b> {
 
     param_boilerplate!(max_collateral_inputs: u32, [AlonzoCompatible Babbage]);
 
-    param_boilerplate!(pool_voting_thresholds: PoolVotingThresholds, [Conway]);
+    param_boilerplate!(pool_voting_thresholds: PoolVotingThresholds, [Conway Dijkstra]);
 
-    param_boilerplate!(drep_voting_thresholds: DRepVotingThresholds, [Conway]);
+    param_boilerplate!(drep_voting_thresholds: DRepVotingThresholds, [Conway Dijkstra]);
 
-    param_boilerplate!(min_committee_size: u64, [Conway]);
+    param_boilerplate!(min_committee_size: u64, [Conway Dijkstra]);
 
-    param_boilerplate!(committee_term_limit: u64, [Conway]);
+    param_boilerplate!(committee_term_limit: u64, [Conway Dijkstra]);
 
-    param_boilerplate!(governance_action_validity_period: u64, [Conway]);
+    param_boilerplate!(governance_action_validity_period: u64, [Conway Dijkstra]);
 
-    param_boilerplate!(governance_action_deposit: u64, [Conway]);
+    param_boilerplate!(governance_action_deposit: u64, [Conway Dijkstra]);
 
-    param_boilerplate!(drep_deposit: u64, [Conway]);
+    param_boilerplate!(drep_deposit: u64, [Conway Dijkstra]);
 
-    param_boilerplate!(drep_inactivity_period: u64, [Conway]);
+    param_boilerplate!(drep_inactivity_period: u64, [Conway Dijkstra]);
 
-    param_boilerplate!(minfee_refscript_cost_per_byte: UnitInterval, [Conway]);
+    param_boilerplate!(minfee_refscript_cost_per_byte: UnitInterval, [Conway Dijkstra]);
+
+    // -- NEW IN DIJKSTRA: the four reference script parameters at keys 34..37
+    param_boilerplate!(max_ref_script_size_per_block: u64, [Dijkstra]);
+
+    param_boilerplate!(max_ref_script_size_per_tx: u64, [Dijkstra]);
+
+    param_boilerplate!(ref_script_cost_stride: u64, [Dijkstra]);
+
+    param_boilerplate!(ref_script_cost_multiplier: RationalNumber, [Dijkstra]);
 }

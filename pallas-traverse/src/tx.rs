@@ -6,7 +6,7 @@ use pallas_crypto::hash::Hash;
 use pallas_primitives::{
     alonzo,
     babbage::{self, NetworkId},
-    byron, conway,
+    byron, conway, dijkstra,
 };
 
 use crate::{
@@ -32,6 +32,16 @@ impl<'b> MultiEraTx<'b> {
         Self::Conway(Box::new(Cow::Borrowed(tx)))
     }
 
+    /// Build from a standalone Dijkstra transaction.
+    ///
+    /// A Dijkstra transaction carries no `is_valid` flag, so on its own it
+    /// cannot say whether it was accepted: that lives in the block body's
+    /// invalid transaction set. Use [`crate::MultiEraBlock::txs`] when the
+    /// block is in hand and the answer matters.
+    pub fn from_dijkstra(tx: &'b dijkstra::Tx<'b>) -> Self {
+        Self::Dijkstra(Box::new(Cow::Borrowed(tx)), true)
+    }
+
     pub fn encode(&self) -> Vec<u8> {
         // to_vec is infallible
         match self {
@@ -39,6 +49,7 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => minicbor::to_vec(x).unwrap(),
             MultiEraTx::Byron(x) => minicbor::to_vec(x).unwrap(),
             MultiEraTx::Conway(x) => minicbor::to_vec(x).unwrap(),
+            MultiEraTx::Dijkstra(x, _) => minicbor::to_vec(x).unwrap(),
         }
     }
 
@@ -64,13 +75,27 @@ impl<'b> MultiEraTx<'b> {
                 let tx = Box::new(Cow::Owned(tx));
                 Ok(MultiEraTx::Conway(tx))
             }
+            Era::Dijkstra => {
+                let tx = minicbor::decode(cbor)?;
+                let tx = Box::new(Cow::Owned(tx));
+                Ok(MultiEraTx::Dijkstra(tx, true))
+            }
         }
     }
 
     /// Try decode a transaction via every era's encoding format, starting with
     /// the most recent and returning on first success, or None if none are
     /// successful
+    ///
+    /// This is shape driven rather than tag driven, so it is the one decode
+    /// path in this crate that a new era cannot be added to by the compiler.
+    /// Dijkstra is tried first because it is the most recent, and because its
+    /// three element transaction is the narrower shape: Conway wants four.
     pub fn decode(cbor: &'b [u8]) -> Result<Self, Error> {
+        if let Ok(tx) = minicbor::decode(cbor) {
+            return Ok(MultiEraTx::Dijkstra(Box::new(Cow::Owned(tx)), true));
+        }
+
         if let Ok(tx) = minicbor::decode(cbor) {
             return Ok(MultiEraTx::Conway(Box::new(Cow::Owned(tx))));
         }
@@ -100,6 +125,7 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(_) => Era::Babbage,
             MultiEraTx::Byron(_) => Era::Byron,
             MultiEraTx::Conway(_) => Era::Conway,
+            MultiEraTx::Dijkstra(..) => Era::Dijkstra,
         }
     }
 
@@ -109,6 +135,7 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => x.transaction_body.original_hash(),
             MultiEraTx::Byron(x) => x.transaction.original_hash(),
             MultiEraTx::Conway(x) => x.transaction_body.original_hash(),
+            MultiEraTx::Dijkstra(x, _) => x.transaction_body.original_hash(),
         }
     }
 
@@ -139,6 +166,12 @@ impl<'b> MultiEraTx<'b> {
                 .iter()
                 .map(MultiEraOutput::from_conway)
                 .collect(),
+            MultiEraTx::Dijkstra(x, _) => x
+                .transaction_body
+                .outputs
+                .iter()
+                .map(MultiEraOutput::from_dijkstra)
+                .collect(),
         }
     }
 
@@ -165,6 +198,11 @@ impl<'b> MultiEraTx<'b> {
                 .outputs
                 .get(index)
                 .map(MultiEraOutput::from_conway),
+            MultiEraTx::Dijkstra(x, _) => x
+                .transaction_body
+                .outputs
+                .get(index)
+                .map(MultiEraOutput::from_dijkstra),
         }
     }
 
@@ -192,6 +230,12 @@ impl<'b> MultiEraTx<'b> {
                 .map(MultiEraInput::from_byron)
                 .collect(),
             MultiEraTx::Conway(x) => x
+                .transaction_body
+                .inputs
+                .iter()
+                .map(MultiEraInput::from_alonzo_compatible)
+                .collect(),
+            MultiEraTx::Dijkstra(x, _) => x
                 .transaction_body
                 .inputs
                 .iter()
@@ -259,7 +303,16 @@ impl<'b> MultiEraTx<'b> {
                 .flatten()
                 .map(MultiEraInput::from_alonzo_compatible)
                 .collect(),
-            _ => vec![],
+            MultiEraTx::Dijkstra(x, _) => x
+                .transaction_body
+                .reference_inputs
+                .iter()
+                .flatten()
+                .map(MultiEraInput::from_alonzo_compatible)
+                .collect(),
+            // Byron and the Alonzo-compatible eras have no reference inputs
+            // field at all, so an empty list is the whole truth for them.
+            MultiEraTx::Byron(_) | MultiEraTx::AlonzoCompatible(..) => vec![],
         }
     }
 
@@ -287,6 +340,13 @@ impl<'b> MultiEraTx<'b> {
                 .flat_map(|c| c.iter())
                 .map(|c| MultiEraCert::Conway(Box::new(Cow::Borrowed(c))))
                 .collect(),
+            MultiEraTx::Dijkstra(x, _) => x
+                .transaction_body
+                .certificates
+                .iter()
+                .flat_map(|c| c.iter())
+                .map(|c| MultiEraCert::Dijkstra(Box::new(Cow::Borrowed(c))))
+                .collect(),
         }
     }
 
@@ -303,7 +363,10 @@ impl<'b> MultiEraTx<'b> {
                 .as_ref()
                 .map(MultiEraUpdate::from_babbage),
             MultiEraTx::Byron(_) => None,
+            // Conway and Dijkstra carry parameter changes as governance
+            // actions rather than as a transaction body update field.
             MultiEraTx::Conway(_) => None,
+            MultiEraTx::Dijkstra(..) => None,
         }
     }
 
@@ -325,6 +388,13 @@ impl<'b> MultiEraTx<'b> {
                 .map(|(k, v)| MultiEraPolicyAssets::AlonzoCompatibleMint(k, v))
                 .collect(),
             MultiEraTx::Conway(x) => x
+                .transaction_body
+                .mint
+                .iter()
+                .flat_map(|x| x.iter())
+                .map(|(k, v)| MultiEraPolicyAssets::ConwayMint(k, v))
+                .collect(),
+            MultiEraTx::Dijkstra(x, _) => x
                 .transaction_body
                 .mint
                 .iter()
@@ -362,6 +432,13 @@ impl<'b> MultiEraTx<'b> {
                 .flat_map(|x| x.iter())
                 .map(MultiEraInput::from_alonzo_compatible)
                 .collect(),
+            MultiEraTx::Dijkstra(x, _) => x
+                .transaction_body
+                .collateral
+                .iter()
+                .flat_map(|x| x.iter())
+                .map(MultiEraInput::from_alonzo_compatible)
+                .collect(),
         }
     }
 
@@ -377,7 +454,12 @@ impl<'b> MultiEraTx<'b> {
                 .collateral_return
                 .as_ref()
                 .map(MultiEraOutput::from_conway),
-            _ => None,
+            MultiEraTx::Dijkstra(x, _) => x
+                .transaction_body
+                .collateral_return
+                .as_ref()
+                .map(MultiEraOutput::from_dijkstra),
+            MultiEraTx::Byron(_) | MultiEraTx::AlonzoCompatible(..) => None,
         }
     }
 
@@ -385,7 +467,8 @@ impl<'b> MultiEraTx<'b> {
         match self {
             MultiEraTx::Babbage(x) => x.transaction_body.total_collateral,
             MultiEraTx::Conway(x) => x.transaction_body.total_collateral,
-            _ => None,
+            MultiEraTx::Dijkstra(x, _) => x.transaction_body.total_collateral,
+            MultiEraTx::Byron(_) | MultiEraTx::AlonzoCompatible(..) => None,
         }
     }
 
@@ -398,7 +481,18 @@ impl<'b> MultiEraTx<'b> {
                 .flatten()
                 .map(MultiEraProposal::from_conway)
                 .collect(),
-            _ => vec![],
+            // `dijkstra::ProposalProcedure` is a re-export of Conway's, so the
+            // same variant carries it.
+            MultiEraTx::Dijkstra(x, _) => x
+                .transaction_body
+                .proposal_procedures
+                .iter()
+                .flatten()
+                .map(MultiEraProposal::from_conway)
+                .collect(),
+            MultiEraTx::Byron(_) | MultiEraTx::AlonzoCompatible(..) | MultiEraTx::Babbage(_) => {
+                vec![]
+            }
         }
     }
 
@@ -488,6 +582,11 @@ impl<'b> MultiEraTx<'b> {
                 Some(x) => MultiEraWithdrawals::Conway(x),
                 None => MultiEraWithdrawals::Empty,
             },
+            // `dijkstra::Withdrawals` is a re-export of Conway's.
+            MultiEraTx::Dijkstra(x, _) => match &x.transaction_body.withdrawals {
+                Some(x) => MultiEraWithdrawals::Conway(x),
+                None => MultiEraWithdrawals::Empty,
+            },
         }
     }
 
@@ -497,6 +596,7 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => Some(x.transaction_body.fee),
             MultiEraTx::Byron(_) => None,
             MultiEraTx::Conway(x) => Some(x.transaction_body.fee),
+            MultiEraTx::Dijkstra(x, _) => Some(x.transaction_body.fee),
         }
     }
 
@@ -506,6 +606,7 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => x.transaction_body.ttl,
             MultiEraTx::Byron(_) => None,
             MultiEraTx::Conway(x) => x.transaction_body.ttl,
+            MultiEraTx::Dijkstra(x, _) => x.transaction_body.ttl,
         }
     }
 
@@ -521,9 +622,16 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => x.transaction_body.fee,
             MultiEraTx::Byron(x) => crate::fees::compute_byron_fee(x, None),
             MultiEraTx::Conway(x) => x.transaction_body.fee,
+            MultiEraTx::Dijkstra(x, _) => x.transaction_body.fee,
         }
     }
 
+    /// Auxiliary data for every era whose auxiliary data type is Alonzo's.
+    ///
+    /// Dijkstra is deliberately not one of them: its auxiliary data map gains
+    /// a PlutusV4 script key, so it has its own type and its own accessor
+    /// below. Returning `None` here for a Dijkstra transaction would be
+    /// indistinguishable from a transaction that carries none.
     pub(crate) fn aux_data(&self) -> Option<&KeepRaw<'_, alonzo::AuxiliaryData>> {
         match self {
             MultiEraTx::AlonzoCompatible(x, _) => match &x.auxiliary_data {
@@ -542,10 +650,41 @@ impl<'b> MultiEraTx<'b> {
                 pallas_codec::utils::Nullable::Null => None,
                 pallas_codec::utils::Nullable::Undefined => None,
             },
+            MultiEraTx::Dijkstra(..) => None,
+        }
+    }
+
+    /// Auxiliary data for a Dijkstra transaction, whose type differs from
+    /// every earlier era's by a PlutusV4 script key.
+    pub(crate) fn dijkstra_aux_data(&self) -> Option<&KeepRaw<'_, dijkstra::AuxiliaryData>> {
+        match self {
+            MultiEraTx::Dijkstra(x, _) => match &x.auxiliary_data {
+                pallas_codec::utils::Nullable::Some(x) => Some(x),
+                pallas_codec::utils::Nullable::Null => None,
+                pallas_codec::utils::Nullable::Undefined => None,
+            },
+            _ => None,
         }
     }
 
     pub fn metadata(&self) -> MultiEraMeta<'_> {
+        if let MultiEraTx::Dijkstra(..) = self {
+            return match self.dijkstra_aux_data() {
+                Some(x) => match x.deref() {
+                    dijkstra::AuxiliaryData::Shelley(x) => MultiEraMeta::AlonzoCompatible(x),
+                    dijkstra::AuxiliaryData::ShelleyMa(x) => {
+                        MultiEraMeta::AlonzoCompatible(&x.transaction_metadata)
+                    }
+                    dijkstra::AuxiliaryData::PostAlonzo(x) => x
+                        .metadata
+                        .as_ref()
+                        .map(MultiEraMeta::AlonzoCompatible)
+                        .unwrap_or_default(),
+                },
+                None => MultiEraMeta::Empty,
+            };
+        }
+
         match self.aux_data() {
             Some(x) => match x.deref() {
                 alonzo::AuxiliaryData::Shelley(x) => MultiEraMeta::AlonzoCompatible(x),
@@ -583,6 +722,16 @@ impl<'b> MultiEraTx<'b> {
                 .as_ref()
                 .map(|x| MultiEraSigners::AlonzoCompatible(x.deref()))
                 .unwrap_or_default(),
+            // Dijkstra renamed key 14 to `guards` and widened it to admit
+            // credentials as well as key hashes, so it cannot be reported
+            // through the `AlonzoCompatible` variant without losing the
+            // credential arm.
+            MultiEraTx::Dijkstra(x, _) => x
+                .transaction_body
+                .guards
+                .as_ref()
+                .map(MultiEraSigners::Dijkstra)
+                .unwrap_or_default(),
         }
     }
 
@@ -592,6 +741,7 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => x.transaction_body.validity_interval_start,
             MultiEraTx::Byron(_) => None,
             MultiEraTx::Conway(x) => x.transaction_body.validity_interval_start,
+            MultiEraTx::Dijkstra(x, _) => x.transaction_body.validity_interval_start,
         }
     }
 
@@ -601,6 +751,7 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => x.transaction_body.network_id,
             MultiEraTx::Byron(_) => None,
             MultiEraTx::Conway(x) => x.transaction_body.network_id,
+            MultiEraTx::Dijkstra(x, _) => x.transaction_body.network_id,
         }
     }
 
@@ -610,6 +761,24 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => x.success,
             MultiEraTx::Byron(_) => true,
             MultiEraTx::Conway(x) => x.success,
+            // Dijkstra strips the flag from the transaction and records the
+            // invalid ones on the block body, so this is what the block said
+            // when the transaction was taken out of it.
+            MultiEraTx::Dijkstra(_, valid) => *valid,
+        }
+    }
+
+    /// The sub transactions carried at body key 23, new in Dijkstra. Empty for
+    /// every earlier era, none of which has the field.
+    pub fn sub_transactions(&self) -> Vec<&dijkstra::SubTransaction<'_>> {
+        match self {
+            MultiEraTx::Dijkstra(x, _) => x
+                .transaction_body
+                .sub_transactions
+                .iter()
+                .flat_map(|x| x.iter())
+                .collect(),
+            _ => vec![],
         }
     }
 
@@ -637,6 +806,13 @@ impl<'b> MultiEraTx<'b> {
     pub fn as_conway(&self) -> Option<&conway::Tx<'_>> {
         match self {
             MultiEraTx::Conway(x) => Some(x),
+            _ => None,
+        }
+    }
+
+    pub fn as_dijkstra(&self) -> Option<&dijkstra::Tx<'_>> {
+        match self {
+            MultiEraTx::Dijkstra(x, _) => Some(x),
             _ => None,
         }
     }

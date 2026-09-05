@@ -134,6 +134,9 @@ impl MultiEraBlock<'_> {
             MultiEraBlock::Conway(x) => {
                 genesis.absolute_slot_to_relative(x.header.header_body.slot)
             }
+            MultiEraBlock::Dijkstra(x) => {
+                genesis.absolute_slot_to_relative(x.header.header_body.slot)
+            }
         }
     }
 

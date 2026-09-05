@@ -51,16 +51,20 @@ macro_rules! impl_cardano_mapper_shared {
         impl<C: $crate::LedgerContext> Mapper<C> {
             pub fn map_purpose(
                 &self,
-                x: &pallas_primitives::conway::RedeemerTag,
+                x: &pallas_primitives::dijkstra::RedeemerTag,
             ) -> u5c::RedeemerPurpose {
-                use pallas_primitives::conway;
+                use pallas_primitives::dijkstra;
                 match x {
-                    conway::RedeemerTag::Spend => u5c::RedeemerPurpose::Spend,
-                    conway::RedeemerTag::Mint => u5c::RedeemerPurpose::Mint,
-                    conway::RedeemerTag::Cert => u5c::RedeemerPurpose::Cert,
-                    conway::RedeemerTag::Reward => u5c::RedeemerPurpose::Reward,
-                    conway::RedeemerTag::Vote => u5c::RedeemerPurpose::Vote,
-                    conway::RedeemerTag::Propose => u5c::RedeemerPurpose::Propose,
+                    dijkstra::RedeemerTag::Spend => u5c::RedeemerPurpose::Spend,
+                    dijkstra::RedeemerTag::Mint => u5c::RedeemerPurpose::Mint,
+                    dijkstra::RedeemerTag::Cert => u5c::RedeemerPurpose::Cert,
+                    dijkstra::RedeemerTag::Reward => u5c::RedeemerPurpose::Reward,
+                    dijkstra::RedeemerTag::Vote => u5c::RedeemerPurpose::Vote,
+                    dijkstra::RedeemerTag::Propose => u5c::RedeemerPurpose::Propose,
+                    // The u5c schema has no purpose for Dijkstra's guarding
+                    // redeemer yet, so it is reported as unspecified rather
+                    // than mapped onto an unrelated purpose.
+                    dijkstra::RedeemerTag::Guarding => u5c::RedeemerPurpose::Unspecified,
                 }
             }
 
@@ -138,20 +142,45 @@ macro_rules! impl_cardano_mapper_shared {
                 }
             }
 
-            pub fn map_any_script(&self, x: &pallas_primitives::conway::ScriptRef) -> u5c::Script {
-                use pallas_primitives::conway;
+            pub fn map_any_script(&self, x: &pallas_traverse::MultiEraScriptRef) -> u5c::Script {
+                use pallas_primitives::{conway, dijkstra};
+                use pallas_traverse::MultiEraScriptRef;
                 match x {
-                    conway::ScriptRef::NativeScript(x) => u5c::Script {
-                        script: u5c::script::Script::Native(Self::map_native_script(x)).into(),
+                    MultiEraScriptRef::Conway(x) => match x.as_ref() {
+                        conway::ScriptRef::NativeScript(x) => u5c::Script {
+                            script: u5c::script::Script::Native(Self::map_native_script(x)).into(),
+                        },
+                        conway::ScriptRef::PlutusV1Script(x) => u5c::Script {
+                            script: u5c::script::Script::PlutusV1(x.0.to_vec().into()).into(),
+                        },
+                        conway::ScriptRef::PlutusV2Script(x) => u5c::Script {
+                            script: u5c::script::Script::PlutusV2(x.0.to_vec().into()).into(),
+                        },
+                        conway::ScriptRef::PlutusV3Script(x) => u5c::Script {
+                            script: u5c::script::Script::PlutusV3(x.0.to_vec().into()).into(),
+                        },
                     },
-                    conway::ScriptRef::PlutusV1Script(x) => u5c::Script {
-                        script: u5c::script::Script::PlutusV1(x.0.to_vec().into()).into(),
-                    },
-                    conway::ScriptRef::PlutusV2Script(x) => u5c::Script {
-                        script: u5c::script::Script::PlutusV2(x.0.to_vec().into()).into(),
-                    },
-                    conway::ScriptRef::PlutusV3Script(x) => u5c::Script {
-                        script: u5c::script::Script::PlutusV3(x.0.to_vec().into()).into(),
+                    MultiEraScriptRef::Dijkstra(x) => match x.as_ref() {
+                        dijkstra::ScriptRef::NativeScript(x) => u5c::Script {
+                            script: u5c::script::Script::Native(Self::map_dijkstra_native_script(
+                                x,
+                            ))
+                            .into(),
+                        },
+                        dijkstra::ScriptRef::PlutusV1Script(x) => u5c::Script {
+                            script: u5c::script::Script::PlutusV1(x.0.to_vec().into()).into(),
+                        },
+                        dijkstra::ScriptRef::PlutusV2Script(x) => u5c::Script {
+                            script: u5c::script::Script::PlutusV2(x.0.to_vec().into()).into(),
+                        },
+                        dijkstra::ScriptRef::PlutusV3Script(x) => u5c::Script {
+                            script: u5c::script::Script::PlutusV3(x.0.to_vec().into()).into(),
+                        },
+                        // The u5c `script` oneof stops at PlutusV3, so there is
+                        // no field to carry a V4 script. Leaving the oneof unset
+                        // is the only thing this schema can say, and it is
+                        // reported rather than silently mapped onto V3.
+                        dijkstra::ScriptRef::PlutusV4Script(_) => u5c::Script { script: None },
                     },
                 }
             }

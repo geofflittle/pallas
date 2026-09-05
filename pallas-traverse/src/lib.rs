@@ -3,7 +3,7 @@
 //! Where [`pallas-primitives`] exposes the raw typed CBOR per era, this crate
 //! hides the era split behind `MultiEra*` enums so a single piece of
 //! indexing or analysis code can run against everything from Byron to
-//! Conway.
+//! Dijkstra.
 //!
 //! This is the read side of the ledger. For transaction construction see
 //! [`pallas-txbuilder`]; for ledger-rule validation see [`pallas-validate`].
@@ -71,7 +71,7 @@ use thiserror::Error;
 
 use pallas_codec::utils::KeepRaw;
 use pallas_crypto::hash::Hash;
-use pallas_primitives::{alonzo, babbage, byron, conway};
+use pallas_primitives::{alonzo, babbage, byron, conway, dijkstra};
 
 mod support;
 
@@ -142,6 +142,13 @@ pub enum Era {
     Babbage,
     /// Adds CIP-1694 on-chain governance.
     Conway,
+    /// Adds inline block transactions, sub transactions and the Leios fields.
+    ///
+    /// Declared last on purpose. `Era` derives `Ord` and [`Era::has_feature`]
+    /// answers every query by comparing with `ge`, so a variant inserted
+    /// anywhere but the end silently changes the answer to feature queries for
+    /// the eras it displaces.
+    Dijkstra,
 }
 
 /// Feature flags individual eras can be queried for.
@@ -177,6 +184,8 @@ pub enum MultiEraHeader<'b> {
     BabbageCompatible(Cow<'b, KeepRaw<'b, babbage::Header>>),
     /// Byron main block header.
     Byron(Cow<'b, KeepRaw<'b, byron::BlockHead>>),
+    /// Dijkstra header, whose body carries twelve fields rather than ten.
+    Dijkstra(Cow<'b, KeepRaw<'b, dijkstra::Header>>),
 }
 
 /// A block normalized across eras.
@@ -193,6 +202,8 @@ pub enum MultiEraBlock<'b> {
     Byron(Box<byron::Block<'b>>),
     /// Conway block.
     Conway(Box<conway::Block<'b>>),
+    /// Dijkstra block.
+    Dijkstra(Box<dijkstra::Block<'b>>),
 }
 
 /// A transaction normalized across eras.
@@ -207,6 +218,14 @@ pub enum MultiEraTx<'b> {
     Byron(Box<Cow<'b, byron::TxPayload<'b>>>),
     /// Conway transaction.
     Conway(Box<Cow<'b, conway::Tx<'b>>>),
+    /// Dijkstra transaction (three elements, no `is_valid` flag).
+    ///
+    /// The flag is carried alongside rather than inside, because Dijkstra
+    /// strips it when a transaction enters a block and records the invalid
+    /// ones on the block body instead. It is `true` for a transaction decoded
+    /// on its own, which is the only thing a standalone Dijkstra transaction
+    /// can say: its validity lives on the block it came from.
+    Dijkstra(Box<Cow<'b, dijkstra::Tx<'b>>>, bool),
 }
 
 /// Ada-plus-multi-asset value normalized across eras.
@@ -233,6 +252,8 @@ pub enum MultiEraOutput<'b> {
     Conway(Box<Cow<'b, conway::TransactionOutput<'b>>>),
     /// Byron output.
     Byron(Box<Cow<'b, byron::TxOut>>),
+    /// Dijkstra output, whose reference script may be PlutusV4.
+    Dijkstra(Box<Cow<'b, dijkstra::TransactionOutput<'b>>>),
 }
 
 /// Transaction input normalized across eras.
@@ -255,6 +276,9 @@ pub enum MultiEraCert<'b> {
     AlonzoCompatible(Box<Cow<'b, alonzo::Certificate>>),
     /// Conway-era certificate (adds governance-related variants).
     Conway(Box<Cow<'b, conway::Certificate>>),
+    /// Dijkstra certificate (drops two Conway variants, pool params may carry
+    /// a Leios key).
+    Dijkstra(Box<Cow<'b, dijkstra::Certificate>>),
 }
 
 /// Plutus redeemer normalized across eras.
@@ -267,6 +291,11 @@ pub enum MultiEraRedeemer<'b> {
     Conway(
         Box<Cow<'b, conway::RedeemersKey>>,
         Box<Cow<'b, conway::RedeemersValue>>,
+    ),
+    /// Dijkstra redeemer, whose tag space gains `Guarding`.
+    Dijkstra(
+        Box<Cow<'b, dijkstra::RedeemersKey>>,
+        Box<Cow<'b, dijkstra::RedeemersValue>>,
     ),
 }
 
@@ -343,6 +372,8 @@ pub enum MultiEraUpdate<'b> {
     Babbage(Box<Cow<'b, babbage::Update>>),
     /// Conway update.
     Conway(Box<Cow<'b, conway::Update>>),
+    /// Dijkstra update (four new reference script parameters).
+    Dijkstra(Box<Cow<'b, dijkstra::Update>>),
 }
 
 /// Conway-era governance proposal procedure.
@@ -372,6 +403,29 @@ pub enum MultiEraSigners<'b> {
     Empty,
     /// Required signers from any Alonzo-compatible or later transaction.
     AlonzoCompatible(&'b alonzo::RequiredSigners),
+    /// Dijkstra guards, which widen required signers to admit credentials as
+    /// well as key hashes.
+    Dijkstra(&'b dijkstra::Guards),
+}
+
+/// A reference script attached to an output, normalized across eras.
+///
+/// Conway and Dijkstra script references are structurally identical for
+/// variants 0 through 3, but Dijkstra adds a fourth, PlutusV4, which has no
+/// representation in the Conway type. Collapsing the two into one type would
+/// mean either dropping a V4 script or reporting it as absent, so the era is
+/// kept.
+/// Deliberately not `#[non_exhaustive]`, for the same reason
+/// [`MultiEraHeader`] is not: the attribute forces every downstream match to
+/// carry a catch-all, and a catch-all is exactly how a new era's script gets
+/// silently reported as absent. Making a new era a compile error here is the
+/// point.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MultiEraScriptRef<'b> {
+    /// Reference script from a Babbage or Conway output.
+    Conway(Cow<'b, conway::ScriptRef<'b>>),
+    /// Reference script from a Dijkstra output, which may be PlutusV4.
+    Dijkstra(Cow<'b, dijkstra::ScriptRef<'b>>),
 }
 
 /// Reference to a transaction output by transaction hash and output index.

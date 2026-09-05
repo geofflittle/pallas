@@ -79,7 +79,8 @@ async fn do_chainsync(
                                 None
                             }
                             MultiEraHeader::ShelleyCompatible(_)
-                            | MultiEraHeader::BabbageCompatible(_) => {
+                            | MultiEraHeader::BabbageCompatible(_)
+                            | MultiEraHeader::Dijkstra(_) => {
                                 if next_log.elapsed().as_secs() > 1 {
                                     tracing::info!("chainsync block header: {}", number);
                                     next_log = Instant::now();

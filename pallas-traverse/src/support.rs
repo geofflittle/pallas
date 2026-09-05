@@ -1,6 +1,6 @@
 //! Internal supporting utilities
 
-use pallas_primitives::{alonzo, babbage, byron, conway};
+use pallas_primitives::{alonzo, babbage, byron, conway, dijkstra};
 
 macro_rules! clone_tx_fn {
     ($fn_name:ident, $era:tt) => {
@@ -67,4 +67,26 @@ pub fn clone_conway_txs<'b>(block: &'b conway::Block) -> Vec<conway::Tx<'b>> {
 
 pub fn clone_byron_txs<'b>(block: &'b byron::Block) -> Vec<byron::TxPayload<'b>> {
     block.body.tx_payload.iter().cloned().collect()
+}
+
+/// Dijkstra transactions are already complete inside the block body, so there
+/// is nothing to reassemble from segregated witness and auxiliary data lists.
+///
+/// Validity is the one piece that is not in the transaction. Dijkstra strips
+/// the `is_valid` flag when a transaction enters a block and records the
+/// invalid ones as an index set on the block body instead, so it is paired
+/// back on here where the block is still in hand.
+pub fn clone_dijkstra_txs<'b>(block: &'b dijkstra::Block) -> Vec<(dijkstra::Tx<'b>, bool)> {
+    let invalid: &[u32] = match &block.block_body.invalid_transactions {
+        pallas_codec::utils::Nullable::Some(x) => x.as_slice(),
+        _ => &[],
+    };
+
+    block
+        .block_body
+        .transactions
+        .iter()
+        .enumerate()
+        .map(|(idx, tx)| (tx.clone(), !invalid.contains(&(idx as u32))))
+        .collect()
 }

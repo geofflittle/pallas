@@ -2,7 +2,7 @@ use std::{borrow::Cow, ops::Deref};
 
 use pallas_codec::minicbor;
 use pallas_crypto::hash::Hash;
-use pallas_primitives::{alonzo, babbage, byron, conway};
+use pallas_primitives::{alonzo, babbage, byron, conway, dijkstra};
 
 use crate::{
     Era, Error, MultiEraBlock, MultiEraHeader, MultiEraTx, MultiEraUpdate, probe, support,
@@ -67,6 +67,13 @@ impl<'b> MultiEraBlock<'b> {
         Ok(Self::Conway(Box::new(block)))
     }
 
+    pub fn decode_dijkstra(cbor: &'b [u8]) -> Result<Self, Error> {
+        let (_, block): BlockWrapper<dijkstra::Block> =
+            minicbor::decode(cbor).map_err(Error::invalid_cbor)?;
+
+        Ok(Self::Dijkstra(Box::new(block)))
+    }
+
     pub fn decode(cbor: &'b [u8]) -> Result<MultiEraBlock<'b>, Error> {
         match probe::block_era(cbor) {
             probe::Outcome::EpochBoundary => Self::decode_epoch_boundary(cbor),
@@ -78,6 +85,7 @@ impl<'b> MultiEraBlock<'b> {
                 Era::Alonzo => Self::decode_alonzo(cbor),
                 Era::Babbage => Self::decode_babbage(cbor),
                 Era::Conway => Self::decode_conway(cbor),
+                Era::Dijkstra => Self::decode_dijkstra(cbor),
             },
             probe::Outcome::Inconclusive => Err(Error::unknown_cbor(cbor)),
         }
@@ -96,6 +104,7 @@ impl<'b> MultiEraBlock<'b> {
                 MultiEraHeader::BabbageCompatible(Cow::Borrowed(&x.header))
             }
             MultiEraBlock::Conway(x) => MultiEraHeader::BabbageCompatible(Cow::Borrowed(&x.header)),
+            MultiEraBlock::Dijkstra(x) => MultiEraHeader::Dijkstra(Cow::Borrowed(&x.header)),
         }
     }
 
@@ -111,6 +120,7 @@ impl<'b> MultiEraBlock<'b> {
             MultiEraBlock::Babbage(_) => Era::Babbage,
             MultiEraBlock::Byron(_) => Era::Byron,
             MultiEraBlock::Conway(_) => Era::Conway,
+            MultiEraBlock::Dijkstra(_) => Era::Dijkstra,
         }
     }
 
@@ -141,6 +151,10 @@ impl<'b> MultiEraBlock<'b> {
                 .into_iter()
                 .map(|x| MultiEraTx::Conway(Box::new(Cow::Owned(x))))
                 .collect(),
+            MultiEraBlock::Dijkstra(x) => support::clone_dijkstra_txs(x)
+                .into_iter()
+                .map(|(tx, valid)| MultiEraTx::Dijkstra(Box::new(Cow::Owned(tx)), valid))
+                .collect(),
             MultiEraBlock::EpochBoundary(_) => vec![],
         }
     }
@@ -153,6 +167,7 @@ impl<'b> MultiEraBlock<'b> {
             MultiEraBlock::Babbage(x) => x.transaction_bodies.is_empty(),
             MultiEraBlock::Byron(x) => x.body.tx_payload.is_empty(),
             MultiEraBlock::Conway(x) => x.transaction_bodies.is_empty(),
+            MultiEraBlock::Dijkstra(x) => x.block_body.transactions.is_empty(),
         }
     }
 
@@ -164,6 +179,7 @@ impl<'b> MultiEraBlock<'b> {
             MultiEraBlock::Babbage(x) => x.transaction_bodies.len(),
             MultiEraBlock::Byron(x) => x.body.tx_payload.len(),
             MultiEraBlock::Conway(x) => x.transaction_bodies.len(),
+            MultiEraBlock::Dijkstra(x) => x.block_body.transactions.len(),
         }
     }
 
@@ -175,6 +191,14 @@ impl<'b> MultiEraBlock<'b> {
             MultiEraBlock::Babbage(x) => !x.auxiliary_data_set.is_empty(),
             MultiEraBlock::Byron(_) => false,
             MultiEraBlock::Conway(x) => !x.auxiliary_data_set.is_empty(),
+            // Dijkstra has no segregated auxiliary data set: each transaction
+            // carries its own auxiliary data inline, so this asks whether any
+            // of them does.
+            MultiEraBlock::Dijkstra(x) => x
+                .block_body
+                .transactions
+                .iter()
+                .any(|tx| !matches!(tx.auxiliary_data, pallas_primitives::Nullable::Null)),
         }
     }
 
@@ -224,6 +248,37 @@ impl<'b> MultiEraBlock<'b> {
         }
     }
 
+    pub fn as_dijkstra(&self) -> Option<&dijkstra::Block<'_>> {
+        match self {
+            MultiEraBlock::Dijkstra(x) => Some(x),
+            _ => None,
+        }
+    }
+
+    /// The Leios certificate carried by a Dijkstra block body, if it carries
+    /// one. `None` for every earlier era, which has no such field.
+    pub fn leios_certificate(&self) -> Option<&dijkstra::LeiosCertificate> {
+        match self {
+            MultiEraBlock::Dijkstra(x) => match &x.block_body.leios_certificate {
+                pallas_primitives::Nullable::Some(c) => Some(c),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// The Peras certificate carried by a Dijkstra block body, if it carries
+    /// one. `None` for every earlier era.
+    pub fn peras_certificate(&self) -> Option<&dijkstra::PerasCertificate> {
+        match self {
+            MultiEraBlock::Dijkstra(x) => match &x.block_body.peras_certificate {
+                pallas_primitives::Nullable::Some(c) => Some(c),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
     /// Return the size of the serialised block in bytes
     pub fn size(&self) -> usize {
         match self {
@@ -232,6 +287,7 @@ impl<'b> MultiEraBlock<'b> {
             MultiEraBlock::AlonzoCompatible(b, _) => minicbor::to_vec(b).unwrap().len(),
             MultiEraBlock::Babbage(b) => minicbor::to_vec(b).unwrap().len(),
             MultiEraBlock::Conway(b) => minicbor::to_vec(b).unwrap().len(),
+            MultiEraBlock::Dijkstra(b) => minicbor::to_vec(b).unwrap().len(),
         }
     }
 }

@@ -1,20 +1,34 @@
 use std::borrow::Cow;
 
 use pallas_codec::minicbor;
-use pallas_primitives::{alonzo, conway};
+use pallas_primitives::{alonzo, conway, dijkstra};
 
 use crate::MultiEraRedeemer;
 
 impl<'b> MultiEraRedeemer<'b> {
-    pub fn tag(&self) -> conway::RedeemerTag {
+    /// The redeemer's purpose tag.
+    ///
+    /// Reported in Dijkstra's tag space, which is a strict superset of every
+    /// earlier era's: Dijkstra adds `Guarding` at 6 and changes nothing else.
+    /// Widening rather than narrowing is what keeps a Dijkstra guarding
+    /// redeemer from having to be squeezed into one of the six Conway tags.
+    pub fn tag(&self) -> dijkstra::RedeemerTag {
         match &self {
             Self::AlonzoCompatible(x) => match x.tag {
-                alonzo::RedeemerTag::Cert => conway::RedeemerTag::Cert,
-                alonzo::RedeemerTag::Spend => conway::RedeemerTag::Spend,
-                alonzo::RedeemerTag::Mint => conway::RedeemerTag::Mint,
-                alonzo::RedeemerTag::Reward => conway::RedeemerTag::Reward,
+                alonzo::RedeemerTag::Cert => dijkstra::RedeemerTag::Cert,
+                alonzo::RedeemerTag::Spend => dijkstra::RedeemerTag::Spend,
+                alonzo::RedeemerTag::Mint => dijkstra::RedeemerTag::Mint,
+                alonzo::RedeemerTag::Reward => dijkstra::RedeemerTag::Reward,
             },
-            Self::Conway(x, _) => x.tag,
+            Self::Conway(x, _) => match x.tag {
+                conway::RedeemerTag::Cert => dijkstra::RedeemerTag::Cert,
+                conway::RedeemerTag::Spend => dijkstra::RedeemerTag::Spend,
+                conway::RedeemerTag::Mint => dijkstra::RedeemerTag::Mint,
+                conway::RedeemerTag::Reward => dijkstra::RedeemerTag::Reward,
+                conway::RedeemerTag::Vote => dijkstra::RedeemerTag::Vote,
+                conway::RedeemerTag::Propose => dijkstra::RedeemerTag::Propose,
+            },
+            Self::Dijkstra(x, _) => x.tag,
         }
     }
 
@@ -22,6 +36,7 @@ impl<'b> MultiEraRedeemer<'b> {
         match &self {
             Self::AlonzoCompatible(x) => &x.data,
             Self::Conway(_, x) => &x.data,
+            Self::Dijkstra(_, x) => &x.data,
         }
     }
 
@@ -29,6 +44,7 @@ impl<'b> MultiEraRedeemer<'b> {
         match &self {
             Self::AlonzoCompatible(x) => x.ex_units,
             Self::Conway(_, x) => x.ex_units,
+            Self::Dijkstra(_, x) => x.ex_units,
         }
     }
 
@@ -36,6 +52,7 @@ impl<'b> MultiEraRedeemer<'b> {
         match self {
             Self::AlonzoCompatible(x) => x.index,
             Self::Conway(x, _) => x.index,
+            Self::Dijkstra(x, _) => x.index,
         }
     }
 
@@ -43,6 +60,7 @@ impl<'b> MultiEraRedeemer<'b> {
         match self {
             Self::AlonzoCompatible(x) => Some(x),
             Self::Conway(..) => None,
+            Self::Dijkstra(..) => None,
         }
     }
 
@@ -50,7 +68,26 @@ impl<'b> MultiEraRedeemer<'b> {
         match self {
             Self::AlonzoCompatible(_) => None,
             Self::Conway(x, y) => Some((x, y)),
+            Self::Dijkstra(..) => None,
         }
+    }
+
+    pub fn as_dijkstra(&self) -> Option<(&dijkstra::RedeemersKey, &dijkstra::RedeemersValue)> {
+        match self {
+            Self::AlonzoCompatible(_) => None,
+            Self::Conway(..) => None,
+            Self::Dijkstra(x, y) => Some((x, y)),
+        }
+    }
+
+    pub fn from_dijkstra(
+        redeemers_key: &'b dijkstra::RedeemersKey,
+        redeemers_val: &'b dijkstra::RedeemersValue,
+    ) -> Self {
+        Self::Dijkstra(
+            Box::new(Cow::Borrowed(redeemers_key)),
+            Box::new(Cow::Borrowed(redeemers_val)),
+        )
     }
 
     pub fn into_conway_deprecated(&self) -> Option<conway::Redeemer> {
@@ -62,6 +99,7 @@ impl<'b> MultiEraRedeemer<'b> {
                 data: y.data.clone(),
                 ex_units: y.ex_units,
             }),
+            Self::Dijkstra(..) => None,
         }
     }
 
@@ -96,6 +134,7 @@ impl<'b> MultiEraRedeemer<'b> {
         match self {
             MultiEraRedeemer::AlonzoCompatible(x) => minicbor::to_vec(x).unwrap(),
             MultiEraRedeemer::Conway(k, v) => minicbor::to_vec((k, v)).unwrap(),
+            MultiEraRedeemer::Dijkstra(k, v) => minicbor::to_vec((k, v)).unwrap(),
         }
     }
 }

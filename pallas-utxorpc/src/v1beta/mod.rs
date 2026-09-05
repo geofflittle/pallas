@@ -72,6 +72,50 @@ impl<C: LedgerContext> Mapper<C> {
         }
     }
 
+    /// Dijkstra's native script type carries a seventh variant,
+    /// `script_require_guard`, which the u5c `native_script` oneof has no
+    /// field for. The six shared variants map exactly as they do for every
+    /// earlier era, and the seventh leaves the oneof unset rather than being
+    /// reported as one of the others.
+    pub fn map_dijkstra_native_script(
+        x: &pallas_primitives::dijkstra::NativeScript,
+    ) -> u5c::NativeScript {
+        use pallas_primitives::dijkstra;
+
+        let inner = match x {
+            dijkstra::NativeScript::ScriptPubkey(x) => Some(
+                u5c::native_script::NativeScript::ScriptPubkeyHash(x.to_vec().into()),
+            ),
+            dijkstra::NativeScript::ScriptAll(x) => Some(
+                u5c::native_script::NativeScript::ScriptAll(u5c::NativeScriptList {
+                    items: x.iter().map(Self::map_dijkstra_native_script).collect(),
+                }),
+            ),
+            dijkstra::NativeScript::ScriptAny(x) => Some(
+                u5c::native_script::NativeScript::ScriptAny(u5c::NativeScriptList {
+                    items: x.iter().map(Self::map_dijkstra_native_script).collect(),
+                }),
+            ),
+            dijkstra::NativeScript::ScriptNOfK(n, k) => Some(
+                u5c::native_script::NativeScript::ScriptNOfK(u5c::ScriptNOfK {
+                    k: *n,
+                    scripts: k.iter().map(Self::map_dijkstra_native_script).collect(),
+                }),
+            ),
+            dijkstra::NativeScript::InvalidBefore(s) => {
+                Some(u5c::native_script::NativeScript::InvalidBefore(*s))
+            }
+            dijkstra::NativeScript::InvalidHereafter(s) => {
+                Some(u5c::native_script::NativeScript::InvalidHereafter(*s))
+            }
+            dijkstra::NativeScript::ScriptRequireGuard(_) => None,
+        };
+
+        u5c::NativeScript {
+            native_script: inner,
+        }
+    }
+
     pub fn map_tx_datum(
         &self,
         x: &trv::MultiEraOutput,

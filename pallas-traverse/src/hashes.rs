@@ -4,7 +4,7 @@ use pallas_crypto::{
     hash::{Hash, Hasher},
     key::ed25519::PublicKey,
 };
-use pallas_primitives::{alonzo, babbage, byron, conway};
+use pallas_primitives::{alonzo, babbage, byron, conway, dijkstra};
 
 impl ComputeHash<32> for byron::EbbHead {
     fn compute_hash(&self) -> Hash<32> {
@@ -115,6 +115,42 @@ impl ComputeHash<32> for babbage::Header {
 impl OriginalHash<32> for KeepRaw<'_, babbage::Header> {
     fn original_hash(&self) -> pallas_crypto::hash::Hash<32> {
         Hasher::<256>::hash(self.raw_cbor())
+    }
+}
+
+impl ComputeHash<32> for dijkstra::Header {
+    fn compute_hash(&self) -> Hash<32> {
+        Hasher::<256>::hash_cbor(self)
+    }
+}
+
+impl OriginalHash<32> for KeepRaw<'_, dijkstra::Header> {
+    fn original_hash(&self) -> Hash<32> {
+        Hasher::<256>::hash(self.raw_cbor())
+    }
+}
+
+impl ComputeHash<32> for dijkstra::TransactionBody<'_> {
+    fn compute_hash(&self) -> Hash<32> {
+        Hasher::<256>::hash_cbor(self)
+    }
+}
+
+impl OriginalHash<32> for KeepRaw<'_, dijkstra::TransactionBody<'_>> {
+    fn original_hash(&self) -> Hash<32> {
+        Hasher::<256>::hash(self.raw_cbor())
+    }
+}
+
+impl ComputeHash<28> for dijkstra::NativeScript {
+    fn compute_hash(&self) -> Hash<28> {
+        Hasher::<224>::hash_tagged_cbor(self, 0)
+    }
+}
+
+impl OriginalHash<28> for KeepRaw<'_, dijkstra::NativeScript> {
+    fn original_hash(&self) -> Hash<28> {
+        Hasher::<224>::hash_tagged(self.raw_cbor(), 0)
     }
 }
 
