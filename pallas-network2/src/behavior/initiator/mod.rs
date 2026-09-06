@@ -529,6 +529,32 @@ impl InitiatorBehavior {
 
         self.move_discovered_into_promotion();
     }
+
+    /// Puts a queued leios-fetch request on the wire for one peer straight
+    /// away, rather than leaving it for the next housekeeping tick.
+    ///
+    /// leios-fetch serves one request per peer at a time, so fetching an
+    /// endorser block is a chain of round trips and nothing else. A request
+    /// that waits for the periodic tick costs that tick's whole period on every
+    /// round trip in the chain, and for a block of a thousand transactions that
+    /// is the entire cost of the fetch with none of it the peer's latency.
+    ///
+    /// Only the leios-fetch visitor runs. Housekeeping is the rest of the
+    /// behavior's clock, driving promotion, keepalives, peer discovery and the
+    /// chainsync and notify pull loops, and running all of it once per fetch
+    /// request would make time appear to pass once per round trip.
+    fn serve_leios_fetch(&mut self, pid: &PeerId) {
+        let Self {
+            leiosfetch,
+            peers,
+            outbound,
+            ..
+        } = self;
+
+        if let Some(state) = peers.get_mut(pid) {
+            leiosfetch.visit_housekeeping(pid, state, outbound);
+        }
+    }
 }
 
 impl Stream for InitiatorBehavior {
@@ -621,12 +647,14 @@ impl Behavior for InitiatorBehavior {
             InitiatorCommand::FetchEb(pid, point) => {
                 tracing::debug!("fetch eb command");
                 self.leiosfetch
-                    .enqueue(pid, leiosfetch::FetchRequest::Block(point));
+                    .enqueue(pid.clone(), leiosfetch::FetchRequest::Block(point));
+                self.serve_leios_fetch(&pid);
             }
             InitiatorCommand::FetchEbTxs(pid, point, bitmaps) => {
                 tracing::debug!("fetch eb txs command");
                 self.leiosfetch
-                    .enqueue(pid, leiosfetch::FetchRequest::BlockTxs(point, bitmaps));
+                    .enqueue(pid.clone(), leiosfetch::FetchRequest::BlockTxs(point, bitmaps));
+                self.serve_leios_fetch(&pid);
             }
         }
     }
@@ -1061,6 +1089,61 @@ mod tests {
         assert!(
             outputs.has_event(|e| matches!(e, InitiatorEvent::EbFetched(..))),
             "should surface the fetched EB body as an event"
+        );
+    }
+
+    /// MUST FIRE: a leios-fetch request reaches the wire when it is issued.
+    ///
+    /// leios-fetch serves one request per peer at a time, so an endorser block
+    /// of a thousand transactions is a chain of sixteen round trips at the
+    /// default window and more at a smaller one. A request that waits for the
+    /// next housekeeping tick costs that tick's period on each of them, so a
+    /// client on a one second tick spends sixteen seconds fetching a block the
+    /// peer could answer in a tenth of that.
+    ///
+    /// MUST NOT FIRE: issuing a fetch must not run the rest of housekeeping.
+    /// Housekeeping is the behavior's clock: it drives promotion, keepalives,
+    /// discovery and the chainsync and notify pull loops, all of which expect
+    /// one turn per tick. The notify pull loop is the one checked here because
+    /// it is the one a Leios negotiated peer produces on every tick, so its
+    /// absence is a real observation rather than the absence of anything at all.
+    #[tokio::test]
+    async fn issuing_a_fetch_sends_it_without_turning_the_whole_clock() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(21);
+        let eb = Point::new(7, vec![0xCD; 32]);
+
+        behavior.execute(InitiatorCommand::IncludePeer(pid.clone()));
+        behavior.execute(InitiatorCommand::Housekeeping);
+        drain_outputs(&mut behavior);
+
+        behavior.handle_io(InterfaceEvent::Connected(pid.clone()));
+        drain_outputs(&mut behavior);
+        complete_handshake_leios(&mut behavior, &pid);
+        drain_outputs(&mut behavior);
+
+        // A housekeeping tick on this peer produces a notify request, so that
+        // message is what running the clock looks like from out here.
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let ticked = drain_outputs(&mut behavior);
+        assert!(
+            ticked.has_send(|m| matches!(m, AnyMessage::LeiosNotify(ln::Message::RequestNext))),
+            "precondition: a tick drives the notify pull loop"
+        );
+
+        // Issuing a fetch, with no tick of any kind.
+        behavior.execute(InitiatorCommand::FetchEb(pid.clone(), eb.clone()));
+        let issued = drain_outputs(&mut behavior);
+
+        assert!(
+            issued.has_send(|m| matches!(m, AnyMessage::LeiosFetch(lf::Message::BlockRequest(_)))),
+            "the fetch request must be on the wire when it is issued"
+        );
+        assert!(
+            !issued.has_send(|m| matches!(m, AnyMessage::LeiosNotify(ln::Message::RequestNext))),
+            "issuing a fetch must not turn the rest of the clock"
         );
     }
 }
