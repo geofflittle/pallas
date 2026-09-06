@@ -90,6 +90,13 @@ pub enum Error {
     CertifiesNothing { slot: u64 },
 
     #[error(
+        "the header at slot {slot} certifies an endorser block and the walk cannot say which, \
+         because it resumed from a stored position without establishing whether an announcement \
+         was waiting"
+    )]
+    CertifiesUnknown { slot: u64 },
+
+    #[error(
         "the block at slot {slot} certifies an endorser block and carries {count} transactions \
          of its own, which the chain inclusion rule forbids"
     )]
@@ -325,23 +332,67 @@ pub struct HeaderOutcome {
     pub announced: Option<AnnouncedEndorserBlock>,
 }
 
+/// What a certification walk knows about an announcement waiting to be
+/// certified.
+///
+/// A follower walking from origin is only ever in the first two states. A
+/// follower resuming from a stored position can be in a third: it has not read
+/// the blocks that would tell it, so it does not know. Writing that third state
+/// as `None` makes it indistinguishable from knowing that nothing is pending,
+/// and the two demand opposite answers the moment a certificate arrives, so
+/// they are held apart here rather than collapsed into an absence.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum PendingAnnouncement {
+    /// Nothing is waiting. Either the most recent Leios event on the chain was
+    /// a certificate that consumed the announcement before it, or the chain has
+    /// carried no Leios event at all.
+    #[default]
+    Nothing,
+
+    /// This announcement is waiting for the certificate that will name it.
+    Waiting(AnnouncedEndorserBlock),
+
+    /// Whether an announcement is waiting could not be established, because the
+    /// walk started from a stored position and has not yet read a Leios event.
+    ///
+    /// This is not a permanent state. The next announcement the walk sees
+    /// settles it, because an announcement replaces whatever came before. Until
+    /// then a certificate cannot be answered and is refused.
+    Unknown,
+}
+
+impl PendingAnnouncement {
+    /// The announcement waiting for a certificate, if the walk both knows and
+    /// has one.
+    ///
+    /// A caller that needs to tell "nothing is waiting" from "cannot tell"
+    /// should match on the value instead, which is the whole reason this is not
+    /// an `Option`.
+    pub fn waiting(&self) -> Option<&AnnouncedEndorserBlock> {
+        match self {
+            Self::Waiting(eb) => Some(eb),
+            _ => None,
+        }
+    }
+}
+
 /// The walk over ranking chain headers that decides which endorser blocks a
 /// follower must fetch, and when.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CertificationTracker {
-    pending: Option<AnnouncedEndorserBlock>,
+    pending: PendingAnnouncement,
 }
 
 impl CertificationTracker {
-    /// Starts a walk with a carried announcement, for a follower resuming from
-    /// a stored position rather than from origin.
-    pub fn resume_from(pending: Option<AnnouncedEndorserBlock>) -> Self {
+    /// Starts a walk from a known state, for a follower resuming from a stored
+    /// position rather than from origin.
+    pub fn resume_from(pending: PendingAnnouncement) -> Self {
         Self { pending }
     }
 
-    /// The announcement waiting for a certificate, if any.
-    pub fn pending(&self) -> Option<&AnnouncedEndorserBlock> {
-        self.pending.as_ref()
+    /// What the walk currently knows about a waiting announcement.
+    pub fn pending(&self) -> &PendingAnnouncement {
+        &self.pending
     }
 
     /// Observes the next header of the ranking chain.
@@ -353,12 +404,28 @@ impl CertificationTracker {
         let mut outcome = HeaderOutcome::default();
 
         if header.leios_certified() == Some(true) {
-            match self.pending.take() {
-                Some(pending) => outcome.certified = Some(pending),
-                None => {
+            // The state is only consumed when it can answer. A refusal leaves
+            // the walk exactly as it was, so a caller that retries the same
+            // header gets the same answer rather than a different one.
+            match &self.pending {
+                PendingAnnouncement::Nothing => {
                     return Err(Error::CertifiesNothing {
                         slot: header.slot(),
                     });
+                }
+                PendingAnnouncement::Unknown => {
+                    return Err(Error::CertifiesUnknown {
+                        slot: header.slot(),
+                    });
+                }
+                PendingAnnouncement::Waiting(_) => {
+                    let taken = std::mem::take(&mut self.pending);
+
+                    let PendingAnnouncement::Waiting(pending) = taken else {
+                        unreachable!("just matched as waiting")
+                    };
+
+                    outcome.certified = Some(pending);
                 }
             }
         }
@@ -370,7 +437,7 @@ impl CertificationTracker {
                 size: announcement.announced_eb_size,
             };
 
-            self.pending = Some(announced.clone());
+            self.pending = PendingAnnouncement::Waiting(announced.clone());
             outcome.announced = Some(announced);
         }
 
@@ -783,7 +850,8 @@ mod tests {
             size: 1234,
         };
 
-        let mut tracker = CertificationTracker::resume_from(Some(earlier.clone()));
+        let mut tracker =
+            CertificationTracker::resume_from(PendingAnnouncement::Waiting(earlier.clone()));
 
         // block 110203, slot 2514319: certifies the carried announcement and
         // makes one of its own in the same header.
@@ -797,14 +865,14 @@ mod tests {
             "2baaaf7169be390e43ec401a12f664cc01c39bfe52c7ce7a13818a2d8922eac6"
         );
         assert_eq!(announced1.size, 28519);
-        assert_eq!(tracker.pending(), Some(&announced1));
+        assert_eq!(tracker.pending().waiting(), Some(&announced1));
 
         // block 110260, slot 2515420: neither certifies nor announces, and must
         // not disturb what is pending.
         let raw2 = header_of(include_str!("../../test_data/dijkstra2.block"));
         let out = tracker.observe(&dijkstra_header(&raw2)).unwrap();
         assert_eq!(out, HeaderOutcome::default());
-        assert_eq!(tracker.pending(), Some(&announced1));
+        assert_eq!(tracker.pending().waiting(), Some(&announced1));
 
         // block 110365, slot 2517946: announces without certifying, so 110203's
         // announcement is abandoned and never fetched.
@@ -816,7 +884,7 @@ mod tests {
             announced3.hash.to_string(),
             "70178a5a3a3b7b1d6169f84821c629811d1a473038535a62ac0e2d891e2b1fc7"
         );
-        assert_eq!(tracker.pending(), Some(&announced3));
+        assert_eq!(tracker.pending().waiting(), Some(&announced3));
 
         // block 110597, slot 2523265: announces again, so 110365's announcement
         // is abandoned in turn.
@@ -829,7 +897,7 @@ mod tests {
             "1783474fde6bcc46e11d1008ffe060048e3ff57df51ed323806ed6a42d932851"
         );
         assert_eq!(announced9.size, 74668);
-        assert_eq!(tracker.pending(), Some(&announced9));
+        assert_eq!(tracker.pending().waiting(), Some(&announced9));
     }
 
     /// MUST NOT FIRE: a pre-Leios header certifies nothing and announces
@@ -842,15 +910,103 @@ mod tests {
         let header = MultiEraHeader::decode(6, None, &raw).unwrap();
         assert_eq!(header.leios_certified(), None, "fixture precondition");
 
-        let mut tracker = CertificationTracker::resume_from(Some(AnnouncedEndorserBlock {
-            slot: 1,
-            hash: Hash::new([1; 32]),
-            size: 5,
-        }));
+        let mut tracker =
+            CertificationTracker::resume_from(PendingAnnouncement::Waiting(AnnouncedEndorserBlock {
+                slot: 1,
+                hash: Hash::new([1; 32]),
+                size: 5,
+            }));
 
         let out = tracker.observe(&header).unwrap();
         assert_eq!(out, HeaderOutcome::default());
-        assert!(tracker.pending().is_some(), "pending is left alone");
+        assert!(
+            tracker.pending().waiting().is_some(),
+            "pending is left alone"
+        );
+    }
+
+    /// MUST FIRE: a walk that resumed without establishing whether an
+    /// announcement was waiting refuses a certificate, and says that is why.
+    ///
+    /// MUST NOT FIRE: it must not be refused as certifying nothing. The two
+    /// refusals mean opposite things. Certifying nothing is a chain that broke
+    /// its own inclusion rule and the follower is right to stop for good.
+    /// Certifying while the walk cannot tell is the follower's own cold start,
+    /// which the next announcement repairs, and reporting it as the first would
+    /// send an operator looking for a chain fault that is not there.
+    #[test]
+    fn a_walk_that_cannot_tell_refuses_a_certificate_as_its_own_ignorance() {
+        let raw = header_of(include_str!("../../test_data/dijkstra1.block"));
+        let header = dijkstra_header(&raw);
+        assert_eq!(header.leios_certified(), Some(true), "fixture precondition");
+
+        let mut unknown = CertificationTracker::resume_from(PendingAnnouncement::Unknown);
+        let err = unknown
+            .observe(&header)
+            .expect_err("a walk that cannot tell must refuse");
+
+        match err {
+            Error::CertifiesUnknown { slot } => assert_eq!(slot, 2514319),
+            other => panic!("wrong refusal: {other}"),
+        }
+
+        let mut nothing = CertificationTracker::resume_from(PendingAnnouncement::Nothing);
+        let err = nothing
+            .observe(&header)
+            .expect_err("a walk that knows nothing is waiting must refuse");
+
+        assert!(
+            matches!(err, Error::CertifiesNothing { .. }),
+            "knowing nothing is waiting is a different refusal: {err}"
+        );
+    }
+
+    /// MUST FIRE: not knowing is temporary. An announcement settles the walk,
+    /// and the certificate that follows resolves to that announcement rather
+    /// than to a refusal.
+    ///
+    /// MUST NOT FIRE: the refusal must not survive the announcement, because a
+    /// follower that stayed refused after learning the answer could never
+    /// resume at all.
+    #[test]
+    fn an_announcement_settles_a_walk_that_could_not_tell() {
+        let mut tracker = CertificationTracker::resume_from(PendingAnnouncement::Unknown);
+
+        // block 110365, slot 2517946: announces without certifying.
+        let raw3 = header_of(include_str!("../../test_data/dijkstra3.block"));
+        let out = tracker.observe(&dijkstra_header(&raw3)).unwrap();
+        let announced = out.announced.expect("110365 announces");
+        assert_eq!(
+            tracker.pending(),
+            &PendingAnnouncement::Waiting(announced.clone()),
+            "the announcement replaces not knowing"
+        );
+
+        // block 110203, slot 2514319: certifies. Out of chain order, which the
+        // tracker neither knows nor needs to, because it is the announcement
+        // and not the slot that decides what a certificate resolves to.
+        let raw1 = header_of(include_str!("../../test_data/dijkstra1.block"));
+        let out = tracker.observe(&dijkstra_header(&raw1)).unwrap();
+        assert_eq!(out.certified, Some(announced));
+    }
+
+    /// MUST NOT FIRE: a refusal leaves the walk as it was, so the same header
+    /// observed again gives the same answer rather than a different one.
+    #[test]
+    fn a_refused_certificate_does_not_change_the_walk() {
+        let raw = header_of(include_str!("../../test_data/dijkstra1.block"));
+        let header = dijkstra_header(&raw);
+
+        let mut tracker = CertificationTracker::resume_from(PendingAnnouncement::Unknown);
+
+        assert!(tracker.observe(&header).is_err());
+        assert_eq!(tracker.pending(), &PendingAnnouncement::Unknown);
+
+        let err = tracker
+            .observe(&header)
+            .expect_err("the second look must refuse the same way");
+
+        assert!(matches!(err, Error::CertifiesUnknown { .. }), "{err}");
     }
 
     /// MUST FIRE on the one illegal combination, MUST NOT FIRE on the other
