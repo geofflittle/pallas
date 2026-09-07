@@ -477,6 +477,23 @@ pub fn resolve_certified_block(block_cbor: &[u8], txs: &[&[u8]]) -> Result<Vec<u
 
     refuse_certifying_block_with_own_txs(block.slot(), true, block.tx_count())?;
 
+    replace_transaction_list(block_cbor, txs)
+}
+
+/// Rewrites a Dijkstra block's transaction list and leaves every other byte of
+/// the block alone.
+///
+/// This is the splice on its own, without the certification checks
+/// [`resolve_certified_block`] makes before it, because a follower has a second
+/// reason to rewrite a list: an ordinary ranking block can carry a transaction
+/// the chain already applied, and applying it a second time spends an input
+/// that is already spent.
+///
+/// The header is untouched, so the block keeps its hash and its slot, and so
+/// the stored body no longer matches what the stored header commits to. That is
+/// the same trade [`resolve_certified_block`] already makes, and it is why a
+/// follower doing either of these must refuse to serve blocks onward.
+pub fn replace_transaction_list(block_cbor: &[u8], txs: &[&[u8]]) -> Result<Vec<u8>, Error> {
     let (start, end) = transaction_list_span(block_cbor)?;
 
     let mut out = Vec::with_capacity(block_cbor.len() + txs.iter().map(|t| t.len()).sum::<usize>());
