@@ -1410,6 +1410,27 @@ mod resolve_tests {
             "both certificate slots survive the splice"
         );
 
+        // Both slots are nil on every block of this chain, so the assertion
+        // above pins a value that a splice writing its own fresh nils would
+        // satisfy by accident. Give the Peras slot a value nothing would
+        // produce on its own and check it survives the same splice. The slot is
+        // a byte string, so replacing the body's trailing `f6` with one is the
+        // whole edit.
+        let mut with_peras = raw[..raw.len() - 1].to_vec();
+        with_peras.extend_from_slice(&[0x44, 0xde, 0xad, 0xbe, 0xef]);
+        assert!(
+            MultiEraBlock::decode(&with_peras).is_ok(),
+            "a block carrying a Peras certificate must still decode"
+        );
+
+        let kept = replace_transaction_list(&with_peras, &[]).expect("the splice must succeed");
+        MultiEraBlock::decode(&kept).expect("the spliced block must decode");
+        assert_eq!(
+            &kept[kept.len() - 5..],
+            &[0x44, 0xde, 0xad, 0xbe, 0xef],
+            "the Peras certificate comes through the splice byte for byte"
+        );
+
         // and the whole prefix through the body array header is untouched
         let (start, _) = transaction_list_span(&raw).unwrap();
         assert_eq!(&spliced[..start], &raw[..start]);
