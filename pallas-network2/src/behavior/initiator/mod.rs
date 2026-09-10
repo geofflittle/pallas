@@ -652,8 +652,10 @@ impl Behavior for InitiatorBehavior {
             }
             InitiatorCommand::FetchEbTxs(pid, point, bitmaps) => {
                 tracing::debug!("fetch eb txs command");
-                self.leiosfetch
-                    .enqueue(pid.clone(), leiosfetch::FetchRequest::BlockTxs(point, bitmaps));
+                self.leiosfetch.enqueue(
+                    pid.clone(),
+                    leiosfetch::FetchRequest::BlockTxs(point, bitmaps),
+                );
                 self.serve_leios_fetch(&pid);
             }
         }
