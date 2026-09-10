@@ -91,6 +91,18 @@ async fn do_chainsync(
                                 tracing::info!("ignoring byron header");
                                 None
                             }
+                            // MultiEraHeader is non_exhaustive, so a pallas
+                            // built after this example gained an era lands
+                            // here. Such a header still reports a slot and a
+                            // hash, so it still yields a point and the follower
+                            // keeps moving, and the era is named in the log
+                            // rather than the header being dropped in silence.
+                            other => {
+                                tracing::info!(
+                                    "header from an era this build does not name: {other:?}"
+                                );
+                                Some(Point::Specific(slot, hash))
+                            }
                         }
                     }
                     Some(_) => {
