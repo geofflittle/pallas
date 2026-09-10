@@ -1357,6 +1357,27 @@ pub struct MempoolTransaction<'b> {
     pub auxiliary_data: Nullable<KeepRaw<'b, AuxiliaryData>>,
 }
 
+impl<'b> MempoolTransaction<'b> {
+    /// The same transaction as a block carries it, with the validity flag the
+    /// block producer sets.
+    ///
+    /// The flag is `true` and cannot be anything else. The mempool rule admits
+    /// the field only as the literal `true`, which is why the decoder above
+    /// refuses `false` rather than recording it, so a mempool transaction has
+    /// no other verdict to carry into a block. This is the inverse of
+    /// [`BlockTransaction::to_mempool_transaction`], and the pair is what a
+    /// certified endorser block's closure travels through on its way into the
+    /// ranking block that certified it.
+    pub fn to_block_transaction(&self) -> BlockTransaction<'b> {
+        BlockTransaction {
+            transaction_body: self.transaction_body.clone(),
+            transaction_witness_set: self.transaction_witness_set.clone(),
+            auxiliary_data: self.auxiliary_data.clone(),
+            success: true,
+        }
+    }
+}
+
 impl<'b, C> minicbor::Decode<'b, C> for MempoolTransaction<'b> {
     fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
         let len = d.array()?;
@@ -1656,6 +1677,47 @@ mod tests {
         assert!(
             as_block.is_err(),
             "a mempool transaction must not decode as a block transaction"
+        );
+    }
+
+    /// MUST FIRE: the conversion back into a block's form gives the four
+    /// element shape and marks the transaction valid, which is the only verdict
+    /// the mempool form can carry.
+    ///
+    /// MUST NOT FIRE: it must change nothing else. A round trip out to the
+    /// mempool form and back has to land on the transaction the block started
+    /// with, byte for byte, or the splice that a certified endorser block goes
+    /// through would be rewriting transactions rather than moving them.
+    #[test]
+    fn a_mempool_transaction_becomes_a_valid_block_transaction() {
+        let bytes = hex::decode(TEST_BLOCKS[WITH_TRANSACTIONS].1).unwrap();
+        let (_, block): BlockWrapper = minicbor::decode(&bytes).unwrap();
+
+        let tx = block
+            .block_body
+            .transactions
+            .first()
+            .expect("this fixture must carry at least one transaction");
+
+        let three = minicbor::to_vec(tx.to_mempool_transaction()).unwrap();
+        let mempool: MempoolTransaction = minicbor::decode(&three).unwrap();
+
+        let rebuilt = mempool.to_block_transaction();
+        assert!(rebuilt.success, "the mempool form admits no other verdict");
+        assert_eq!(&rebuilt, tx, "nothing but the flag was restored");
+        assert_eq!(
+            minicbor::to_vec(&rebuilt).unwrap(),
+            minicbor::to_vec(tx).unwrap(),
+            "the round trip is byte for byte"
+        );
+
+        // MUST NOT FIRE: what comes back is four elements, not three, so it is
+        // the block's form and not the one it started this test in.
+        let four = minicbor::to_vec(&rebuilt).unwrap();
+        let round: Result<MempoolTransaction, _> = minicbor::decode(&four);
+        assert!(
+            round.is_err(),
+            "the rebuilt transaction must no longer read as a mempool one"
         );
     }
 

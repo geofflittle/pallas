@@ -17,8 +17,8 @@
 //! `leios-prototype` branch, `src/network/node-to-node/leios-fetch/messages.cddl`,
 //! quoted verbatim in the conformance test in
 //! `pallas-network2/src/protocol/leiosfetch.rs`. It is absent from the Dijkstra
-//! ledger CDDL, which carries only `leios_announcement`, `leios_certificate`
-//! and the two header fields.
+//! ledger CDDL, which carries only `eb_announcement`, `leios_certificate` and
+//! the two header fields.
 //!
 //! Three properties of that wire form each cost a follower its ledger if it
 //! guesses, so every one of them is carried in a type here rather than left to
@@ -27,9 +27,9 @@
 //! 1. The protocol has no not found reply. An endorser block the peer does not
 //!    hold comes back as `a0`, a well formed empty body, indistinguishable from
 //!    one that committed no transactions. The announcement commits the body
-//!    length before any fetch, so [`EndorserBlockBody::decode_announced`] is
-//!    the constructor that pairs the two and refuses a length the announcement
-//!    did not promise.
+//!    length before any fetch, so
+//!    [`crate::leios::EndorserBlockBody::decode_announced`] is the constructor
+//!    that pairs the two and refuses a length the announcement did not promise.
 //! 2. The body keys a transaction by the blake2b-256 of the whole transaction,
 //!    not by its transaction id, which is the blake2b-256 of the body alone. A
 //!    follower that looks for transaction ids finds nothing, with no error.
@@ -38,10 +38,15 @@
 //!
 //! The certification rule needs nothing but ranking chain headers. Walk them in
 //! order, carry the most recent announcement forward, and when a header sets
-//! `leios_certified` the carried announcement is the endorser block to fetch and
-//! apply at that header's block. An announcement superseded before any block
-//! certifies it is abandoned network wide. [`CertificationTracker`] is that
-//! walk.
+//! `block_body_contains_leios_cert` the carried announcement is the endorser
+//! block to fetch and apply at that header's block. An announcement superseded
+//! before any block certifies it is abandoned network wide.
+//! [`crate::leios::CertificationTracker`] is that walk.
+//!
+//! The links above are written in full because this module carries an inner
+//! doc block and `lib.rs` carries an outer one on its `mod` line. The two are
+//! merged, and a bare item name in the merged text is looked for in the crate
+//! root rather than here.
 
 use pallas_codec::minicbor::{Decoder, Encoder, data::Type};
 use pallas_crypto::hash::{Hash, Hasher};
@@ -192,11 +197,11 @@ impl EndorserBlockBody {
     /// whose length the announcement did not commit to.
     pub fn decode_announced(
         cbor: &[u8],
-        announcement: &dijkstra::LeiosAnnouncement,
+        announcement: &dijkstra::EbAnnouncement,
     ) -> Result<Self, Error> {
-        if cbor.len() as u64 != announcement.announced_eb_size as u64 {
+        if cbor.len() as u64 != announcement.eb_size as u64 {
             return Err(Error::BodySize {
-                announced: announcement.announced_eb_size,
+                announced: announcement.eb_size,
                 found: cbor.len(),
             });
         }
@@ -239,6 +244,15 @@ impl EndorserBlockBody {
     /// it, on count, length and hash, and then decoded as a Dijkstra
     /// transaction, so the returned list is either the whole endorser block or
     /// an error naming the transaction that failed.
+    ///
+    /// A closure transaction is the three element `mempool_transaction`, since
+    /// nothing has put it in a block yet, and what comes back here is the four
+    /// element `block_transaction` the certifying ranking block will carry.
+    /// Only the validity flag is added, and only as `true`, because the mempool
+    /// rule admits no other value for it. Reading a closure with the block form
+    /// directly is what the era remodel made impossible: it fails at the
+    /// missing fourth element rather than reading three fields and inventing a
+    /// verdict for the fourth.
     pub fn transactions<'b>(&self, wire: &'b [Vec<u8>]) -> Result<Vec<MultiEraTx<'b>>, Error> {
         if wire.len() != self.entries.len() {
             return Err(Error::TxCount {
@@ -269,13 +283,7 @@ impl EndorserBlockBody {
                 });
             }
 
-            let tx =
-                MultiEraTx::decode_for_era(Era::Dijkstra, inner).map_err(|e| Error::TxDecode {
-                    index,
-                    reason: e.to_string(),
-                })?;
-
-            out.push(tx);
+            out.push(decode_closure_transaction(index, inner)?);
         }
 
         Ok(out)
@@ -300,6 +308,33 @@ pub fn unwrap_tx(wire: &[u8]) -> Result<&[u8], String> {
     }
 
     Ok(inner)
+}
+
+/// Reads one unwrapped closure transaction and returns it in the form a block
+/// carries.
+///
+/// The bytes are `mempool_transaction`, three elements. The value returned is
+/// `block_transaction`, four, with the validity flag set to the only value the
+/// mempool rule admits. The two rules are separate types in this era precisely
+/// so that neither is read as the other, and this is the one place a follower
+/// crosses between them, because certification is what puts a closure
+/// transaction into a block.
+///
+/// A four element `mempool_transaction`, which the rule also allows on
+/// submission with the deprecated flag present and `true`, is accepted here
+/// too, and comes out with its fields in the block's order rather than the
+/// mempool's. A byte level splice would get that pair the wrong way round,
+/// which is why this decodes rather than editing an array header.
+fn decode_closure_transaction(index: usize, inner: &[u8]) -> Result<MultiEraTx<'_>, Error> {
+    let mempool: dijkstra::MempoolTransaction =
+        pallas_codec::minicbor::decode(inner).map_err(|e| Error::TxDecode {
+            index,
+            reason: e.to_string(),
+        })?;
+
+    Ok(MultiEraTx::Dijkstra(Box::new(std::borrow::Cow::Owned(
+        mempool.to_block_transaction(),
+    ))))
 }
 
 /// An announcement carried forward by [`CertificationTracker`], and the point a
@@ -398,12 +433,12 @@ impl CertificationTracker {
     /// Observes the next header of the ranking chain.
     ///
     /// Certification is settled before the header's own announcement is
-    /// recorded, because `leios_certified` names the announcement that precedes
-    /// this header, never the one this header makes.
+    /// recorded, because `block_body_contains_leios_cert` names the
+    /// announcement that precedes this header, never the one this header makes.
     pub fn observe(&mut self, header: &MultiEraHeader) -> Result<HeaderOutcome, Error> {
         let mut outcome = HeaderOutcome::default();
 
-        if header.leios_certified() == Some(true) {
+        if header.block_body_contains_leios_cert() == Some(true) {
             // The state is only consumed when it can answer. A refusal leaves
             // the walk exactly as it was, so a caller that retries the same
             // header gets the same answer rather than a different one.
@@ -430,11 +465,11 @@ impl CertificationTracker {
             }
         }
 
-        if let Some(announcement) = header.leios_announcement() {
+        if let Some(announcement) = header.eb_announcement() {
             let announced = AnnouncedEndorserBlock {
                 slot: header.slot(),
-                hash: announcement.announced_eb,
-                size: announcement.announced_eb_size,
+                hash: announcement.eb_hash,
+                size: announcement.eb_size,
             };
 
             self.pending = PendingAnnouncement::Waiting(announced.clone());
@@ -457,8 +492,8 @@ impl CertificationTracker {
 ///
 /// The transaction list is replaced rather than extended. A certifying ranking
 /// block carries no transactions of its own, so there is no order to choose
-/// between two sets and no `invalid_transactions` index to shift, and a block
-/// that carried both is refused rather than guessed at.
+/// between two sets, and a block that carried both is refused rather than
+/// guessed at.
 ///
 /// `txs` are the transactions of the certified endorser block in body order,
 /// already unwrapped from their leios-fetch byte string envelopes. The header
@@ -471,7 +506,7 @@ pub fn resolve_certified_block(block_cbor: &[u8], txs: &[&[u8]]) -> Result<Vec<u
         return Err(Error::NotLeiosEra { era: block.era() });
     }
 
-    if block.header().leios_certified() != Some(true) {
+    if block.header().block_body_contains_leios_cert() != Some(true) {
         return Err(Error::NotCertifying { slot: block.slot() });
     }
 
@@ -493,15 +528,35 @@ pub fn resolve_certified_block(block_cbor: &[u8], txs: &[&[u8]]) -> Result<Vec<u
 /// the stored body no longer matches what the stored header commits to. That is
 /// the same trade [`resolve_certified_block`] already makes, and it is why a
 /// follower doing either of these must refuse to serve blocks onward.
+///
+/// `txs` are `mempool_transaction` bytes, three elements, which is what an
+/// endorser block closure and a client submission both carry. A ranking block
+/// body carries `block_transaction`, four, so each one is decoded and written
+/// back in the block's form rather than copied through. Copying them through
+/// would build a block that no longer decodes as its own era.
 pub fn replace_transaction_list(block_cbor: &[u8], txs: &[&[u8]]) -> Result<Vec<u8>, Error> {
     let (start, end) = transaction_list_span(block_cbor)?;
 
-    let mut out = Vec::with_capacity(block_cbor.len() + txs.iter().map(|t| t.len()).sum::<usize>());
+    let mut encoded = Vec::with_capacity(txs.len());
+    for (index, tx) in txs.iter().enumerate() {
+        let mempool: dijkstra::MempoolTransaction =
+            pallas_codec::minicbor::decode(tx).map_err(|e| Error::TxDecode {
+                index,
+                reason: e.to_string(),
+            })?;
+
+        encoded.push(
+            pallas_codec::minicbor::to_vec(mempool.to_block_transaction()).expect("write to a vec"),
+        );
+    }
+
+    let mut out =
+        Vec::with_capacity(block_cbor.len() + encoded.iter().map(|t| t.len()).sum::<usize>());
     out.extend_from_slice(&block_cbor[..start]);
 
     let mut e = Encoder::new(&mut out);
-    e.array(txs.len() as u64).expect("write to a vec");
-    for tx in txs {
+    e.array(encoded.len() as u64).expect("write to a vec");
+    for tx in &encoded {
         out.extend_from_slice(tx);
     }
 
@@ -513,7 +568,16 @@ pub fn replace_transaction_list(block_cbor: &[u8], txs: &[&[u8]]) -> Result<Vec<
 /// The byte span of a ranking block's transaction list within the block cbor.
 ///
 /// The wire block is `[era_tag, [header, block_body]]` and the body is
-/// `[invalid_transactions, transactions, leios_certificate, peras_certificate]`.
+/// `[transactions, leios_certificate/ nil, peras_certificate/ nil]`. The
+/// transaction list is the body's first element.
+///
+/// The ledger revision this module was first written against led the body with
+/// an `invalid_transactions` index set, so the list was the second element and
+/// this walk skipped one element before reading it. The w36 ledger deletes that
+/// element. Skipping one here now would return the span of the Leios
+/// certificate instead, and the splice would overwrite a certificate with a
+/// transaction list and leave the real list in place, which decodes as a block
+/// with the wrong transactions rather than as an error.
 fn transaction_list_span(block_cbor: &[u8]) -> Result<(usize, usize), Error> {
     let mut d = Decoder::new(block_cbor);
     let bad = |what: &'static str| {
@@ -525,7 +589,6 @@ fn transaction_list_span(block_cbor: &[u8]) -> Result<(usize, usize), Error> {
     d.array().map_err(bad("block array"))?;
     d.skip().map_err(bad("header"))?;
     d.array().map_err(bad("block body array"))?;
-    d.skip().map_err(bad("invalid transactions"))?;
 
     let start = d.position();
     d.skip().map_err(bad("transaction list"))?;
@@ -576,8 +639,8 @@ mod tests {
         /// Transactions the body names, counted off the wire bytes before any
         /// of this module ran.
         count: usize,
-        /// The `announced_eb_size` of the ranking block header that announced
-        /// it, read out of the node's immutable database.
+        /// The `eb_size` of the ranking block header that announced it, read
+        /// out of the node's immutable database.
         announced_size: u32,
     }
 
@@ -617,10 +680,10 @@ mod tests {
                 .collect()
         }
 
-        fn announcement(&self) -> dijkstra::LeiosAnnouncement {
-            dijkstra::LeiosAnnouncement {
-                announced_eb: Hash::new([0; 32]),
-                announced_eb_size: self.announced_size,
+        fn announcement(&self) -> dijkstra::EbAnnouncement {
+            dijkstra::EbAnnouncement {
+                eb_hash: Hash::new([0; 32]),
+                eb_size: self.announced_size,
             }
         }
     }
@@ -693,9 +756,9 @@ mod tests {
     /// hash to size is refused as malformed rather than read as empty.
     #[test]
     fn a_body_of_the_right_length_but_the_wrong_shape_is_refused() {
-        let announcement = dijkstra::LeiosAnnouncement {
-            announced_eb: Hash::new([0; 32]),
-            announced_eb_size: 3,
+        let announcement = dijkstra::EbAnnouncement {
+            eb_hash: Hash::new([0; 32]),
+            eb_size: 3,
         };
 
         // a three byte cbor array, not a map
@@ -823,9 +886,97 @@ mod tests {
         assert!(matches!(err, Error::Envelope { index: 0, .. }), "{err}");
     }
 
-    fn header_of(block_str: &str) -> Vec<u8> {
+    /// The ten w36 block fixtures were cut from the Musashi immutable
+    /// database, and not one of them sets either Leios header field: every
+    /// Dijkstra fixture's header body ends `f4 f6`, a false certificate flag
+    /// and a null announcement. The chain carries no announcement and no
+    /// certificate anywhere, so a fixture that certifies or announces cannot
+    /// be cut from it and has to be built from one that does not.
+    ///
+    /// The build is a field set and a re-encode of a real header, so
+    /// everything except the two fields under test is the chain's own bytes:
+    /// the slot, the issuer, the vrf proof, the body hash and the block body
+    /// are untouched. What the resulting block is not is a block a node would
+    /// accept, because the header signature no longer covers the header body.
+    /// Nothing here checks a signature, and the two callers that would care
+    /// are named in the doc comment of [`resolve_certified_block`].
+    pub(super) fn with_leios_header_fields(
+        block_str: &str,
+        certifies: bool,
+        announcement: Option<dijkstra::EbAnnouncement>,
+    ) -> Vec<u8> {
         let cbor = hex::decode(block_str.trim()).unwrap();
-        let block = MultiEraBlock::decode(&cbor).unwrap();
+
+        let (start, end) = header_span(&cbor);
+
+        let mut header: dijkstra::Header =
+            pallas_codec::minicbor::decode(&cbor[start..end]).expect("fixture header decodes");
+
+        assert!(
+            !header.header_body.block_body_contains_leios_cert,
+            "the fixture must not already certify, or this helper hides what it changed"
+        );
+        assert!(
+            matches!(
+                header.header_body.eb_announcement,
+                pallas_codec::utils::Nullable::Null
+            ),
+            "the fixture must not already announce"
+        );
+
+        header.header_body.block_body_contains_leios_cert = certifies;
+        header.header_body.eb_announcement = match announcement {
+            Some(a) => pallas_codec::utils::Nullable::Some(a),
+            None => pallas_codec::utils::Nullable::Null,
+        };
+
+        let rebuilt = pallas_codec::minicbor::to_vec(&header).expect("write to a vec");
+
+        let mut out = Vec::with_capacity(cbor.len() + rebuilt.len());
+        out.extend_from_slice(&cbor[..start]);
+        out.extend_from_slice(&rebuilt);
+        out.extend_from_slice(&cbor[end..]);
+
+        out
+    }
+
+    /// The byte span of the header within a wire block, which is
+    /// `[era_tag, [header, block_body]]`.
+    fn header_span(block_cbor: &[u8]) -> (usize, usize) {
+        let mut d = Decoder::new(block_cbor);
+
+        d.array().expect("era envelope");
+        d.u16().expect("era tag");
+        d.array().expect("block array");
+
+        let start = d.position();
+        d.skip().expect("header");
+
+        (start, d.position())
+    }
+
+    /// A synthetic announcement, since the chain carries none. The size is
+    /// what a body fetched for it would have to weigh.
+    pub(super) fn announcement_of(hash: [u8; 32], size: u32) -> dijkstra::EbAnnouncement {
+        dijkstra::EbAnnouncement {
+            eb_hash: Hash::new(hash),
+            eb_size: size,
+        }
+    }
+
+    /// Musashi block 14935 at slot 311025, which carries no transactions of
+    /// its own, made to certify. A certifying ranking block carries none, so a
+    /// fixture with none is the only honest one to build this from.
+    pub(super) fn certifying_block() -> Vec<u8> {
+        with_leios_header_fields(
+            include_str!("../../test_data/dijkstra-w36-8.block"),
+            true,
+            None,
+        )
+    }
+
+    fn header_of(block_cbor: &[u8]) -> Vec<u8> {
+        let block = MultiEraBlock::decode(block_cbor).unwrap();
         block.header().cbor().to_vec()
     }
 
@@ -833,14 +984,72 @@ mod tests {
         MultiEraHeader::decode(7, None, raw).unwrap()
     }
 
+    /// MUST FIRE and MUST NOT FIRE: the helper above changes the two fields it
+    /// says it changes and no other byte of the block.
+    ///
+    /// Without this the synthetic fixtures underneath every certification test
+    /// are unexamined, and a helper that quietly rebuilt the whole header
+    /// would make those tests pass against bytes no chain ever carried.
+    #[test]
+    fn the_synthetic_header_changes_two_fields_and_nothing_else() {
+        let plain =
+            hex::decode(include_str!("../../test_data/dijkstra-w36-8.block").trim()).unwrap();
+        let built = with_leios_header_fields(
+            include_str!("../../test_data/dijkstra-w36-8.block"),
+            true,
+            Some(announcement_of([7; 32], 4096)),
+        );
+
+        // the tail of the header body is the only run of bytes that moved
+        let common = plain
+            .iter()
+            .zip(built.iter())
+            .take_while(|(a, b)| a == b)
+            .count();
+
+        assert_eq!(
+            &plain[common..common + 2],
+            &[0xf4, 0xf6],
+            "the fixture's own flag and null announcement are what changed"
+        );
+        assert_eq!(built[common], 0xf5, "the built block certifies");
+
+        // and everything after the header is byte identical
+        let (ps, pe) = header_span(&plain);
+        let (bs, be) = header_span(&built);
+        assert_eq!(ps, bs);
+        assert_eq!(&plain[pe..], &built[be..], "the block body is untouched");
+
+        // the accessors read what was set
+        let raw = header_of(&built);
+        let header = dijkstra_header(&raw);
+        assert_eq!(header.block_body_contains_leios_cert(), Some(true));
+        assert_eq!(header.eb_announcement().map(|a| a.eb_size), Some(4096));
+        assert_eq!(header.slot(), 311025, "the chain's own slot survives");
+
+        // MUST NOT FIRE: asking for neither field leaves a header that reads
+        // exactly as the chain wrote it
+        let neither = with_leios_header_fields(
+            include_str!("../../test_data/dijkstra-w36-8.block"),
+            false,
+            None,
+        );
+        assert_eq!(neither, plain, "a no-op build re-encodes byte for byte");
+    }
+
     /// MUST FIRE: a header that certifies with nothing pending is refused. A
     /// follower that answered this with "nothing to fetch" would skip a whole
     /// endorser block and never know.
     #[test]
     fn a_header_that_certifies_nothing_pending_is_refused() {
-        let raw = header_of(include_str!("../../test_data/dijkstra1.block"));
+        let block = certifying_block();
+        let raw = header_of(&block);
         let header = dijkstra_header(&raw);
-        assert_eq!(header.leios_certified(), Some(true), "fixture precondition");
+        assert_eq!(
+            header.block_body_contains_leios_cert(),
+            Some(true),
+            "fixture precondition"
+        );
 
         let mut tracker = CertificationTracker::default();
         let err = tracker
@@ -848,7 +1057,7 @@ mod tests {
             .expect_err("certifying with nothing pending must be refused");
 
         match err {
-            Error::CertifiesNothing { slot } => assert_eq!(slot, 2514319),
+            Error::CertifiesNothing { slot } => assert_eq!(slot, 311025),
             other => panic!("wrong refusal: {other}"),
         }
     }
@@ -858,11 +1067,13 @@ mod tests {
     /// certification and announcement together when one header does both, and
     /// abandons an announcement superseded before any block certified it.
     ///
-    /// The headers are four real Musashi blocks in chain order.
+    /// The headers are four real Musashi w36 blocks in chain order, each with
+    /// its Leios fields set as this walk needs them, since the chain itself
+    /// sets neither field on any block.
     #[test]
     fn certification_walks_the_headers_and_abandons_a_superseded_announcement() {
         let earlier = AnnouncedEndorserBlock {
-            slot: 2514000,
+            slot: 86000,
             hash: Hash::new([9; 32]),
             size: 1234,
         };
@@ -870,49 +1081,64 @@ mod tests {
         let mut tracker =
             CertificationTracker::resume_from(PendingAnnouncement::Waiting(earlier.clone()));
 
-        // block 110203, slot 2514319: certifies the carried announcement and
-        // makes one of its own in the same header.
-        let raw1 = header_of(include_str!("../../test_data/dijkstra1.block"));
-        let out = tracker.observe(&dijkstra_header(&raw1)).unwrap();
-        assert_eq!(out.certified.as_ref(), Some(&earlier));
-        let announced1 = out.announced.expect("110203 announces");
-        assert_eq!(announced1.slot, 2514319);
-        assert_eq!(
-            announced1.hash.to_string(),
-            "2baaaf7169be390e43ec401a12f664cc01c39bfe52c7ce7a13818a2d8922eac6"
+        // block 4255, slot 86463: certifies the carried announcement and makes
+        // one of its own in the same header.
+        let block2 = with_leios_header_fields(
+            include_str!("../../test_data/dijkstra-w36-2.block"),
+            true,
+            Some(announcement_of([0x2b; 32], 28519)),
         );
-        assert_eq!(announced1.size, 28519);
-        assert_eq!(tracker.pending().waiting(), Some(&announced1));
-
-        // block 110260, slot 2515420: neither certifies nor announces, and must
-        // not disturb what is pending.
-        let raw2 = header_of(include_str!("../../test_data/dijkstra2.block"));
+        let raw2 = header_of(&block2);
         let out = tracker.observe(&dijkstra_header(&raw2)).unwrap();
-        assert_eq!(out, HeaderOutcome::default());
-        assert_eq!(tracker.pending().waiting(), Some(&announced1));
-
-        // block 110365, slot 2517946: announces without certifying, so 110203's
-        // announcement is abandoned and never fetched.
-        let raw3 = header_of(include_str!("../../test_data/dijkstra3.block"));
-        let out = tracker.observe(&dijkstra_header(&raw3)).unwrap();
-        assert_eq!(out.certified, None, "110365 certifies nothing");
-        let announced3 = out.announced.expect("110365 announces");
+        assert_eq!(out.certified.as_ref(), Some(&earlier));
+        let announced2 = out.announced.expect("4255 announces");
+        assert_eq!(announced2.slot, 86463);
         assert_eq!(
-            announced3.hash.to_string(),
-            "70178a5a3a3b7b1d6169f84821c629811d1a473038535a62ac0e2d891e2b1fc7"
+            announced2.hash.to_string(),
+            "2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b"
         );
-        assert_eq!(tracker.pending().waiting(), Some(&announced3));
+        assert_eq!(announced2.size, 28519);
+        assert_eq!(tracker.pending().waiting(), Some(&announced2));
 
-        // block 110597, slot 2523265: announces again, so 110365's announcement
-        // is abandoned in turn.
-        let raw9 = header_of(include_str!("../../test_data/dijkstra9.block"));
+        // block 14212, slot 289441: neither certifies nor announces, and must
+        // not disturb what is pending. This one is the chain's own header,
+        // unmodified, so the walk is exercised against real bytes as well.
+        let raw5 = header_of(
+            &hex::decode(include_str!("../../test_data/dijkstra-w36-5.block").trim()).unwrap(),
+        );
+        let out = tracker.observe(&dijkstra_header(&raw5)).unwrap();
+        assert_eq!(out, HeaderOutcome::default());
+        assert_eq!(tracker.pending().waiting(), Some(&announced2));
+
+        // block 14278, slot 291625: announces without certifying, so 4255's
+        // announcement is abandoned and never fetched.
+        let block7 = with_leios_header_fields(
+            include_str!("../../test_data/dijkstra-w36-7.block"),
+            false,
+            Some(announcement_of([0x70; 32], 512)),
+        );
+        let raw7 = header_of(&block7);
+        let out = tracker.observe(&dijkstra_header(&raw7)).unwrap();
+        assert_eq!(out.certified, None, "14278 certifies nothing");
+        let announced7 = out.announced.expect("14278 announces");
+        assert_eq!(
+            announced7.hash.to_string(),
+            "7070707070707070707070707070707070707070707070707070707070707070"
+        );
+        assert_eq!(tracker.pending().waiting(), Some(&announced7));
+
+        // block 14936, slot 311104: announces again, so 14278's announcement is
+        // abandoned in turn.
+        let block9 = with_leios_header_fields(
+            include_str!("../../test_data/dijkstra-w36-9.block"),
+            false,
+            Some(announcement_of([0x17; 32], 74668)),
+        );
+        let raw9 = header_of(&block9);
         let out = tracker.observe(&dijkstra_header(&raw9)).unwrap();
         assert_eq!(out.certified, None);
-        let announced9 = out.announced.expect("110597 announces");
-        assert_eq!(
-            announced9.hash.to_string(),
-            "1783474fde6bcc46e11d1008ffe060048e3ff57df51ed323806ed6a42d932851"
-        );
+        let announced9 = out.announced.expect("14936 announces");
+        assert_eq!(announced9.slot, 311104);
         assert_eq!(announced9.size, 74668);
         assert_eq!(tracker.pending().waiting(), Some(&announced9));
     }
@@ -925,14 +1151,19 @@ mod tests {
         let block = MultiEraBlock::decode(&cbor).unwrap();
         let raw = block.header().cbor().to_vec();
         let header = MultiEraHeader::decode(6, None, &raw).unwrap();
-        assert_eq!(header.leios_certified(), None, "fixture precondition");
+        assert_eq!(
+            header.block_body_contains_leios_cert(),
+            None,
+            "fixture precondition"
+        );
 
-        let mut tracker =
-            CertificationTracker::resume_from(PendingAnnouncement::Waiting(AnnouncedEndorserBlock {
+        let mut tracker = CertificationTracker::resume_from(PendingAnnouncement::Waiting(
+            AnnouncedEndorserBlock {
                 slot: 1,
                 hash: Hash::new([1; 32]),
                 size: 5,
-            }));
+            },
+        ));
 
         let out = tracker.observe(&header).unwrap();
         assert_eq!(out, HeaderOutcome::default());
@@ -953,9 +1184,14 @@ mod tests {
     /// send an operator looking for a chain fault that is not there.
     #[test]
     fn a_walk_that_cannot_tell_refuses_a_certificate_as_its_own_ignorance() {
-        let raw = header_of(include_str!("../../test_data/dijkstra1.block"));
+        let block = certifying_block();
+        let raw = header_of(&block);
         let header = dijkstra_header(&raw);
-        assert_eq!(header.leios_certified(), Some(true), "fixture precondition");
+        assert_eq!(
+            header.block_body_contains_leios_cert(),
+            Some(true),
+            "fixture precondition"
+        );
 
         let mut unknown = CertificationTracker::resume_from(PendingAnnouncement::Unknown);
         let err = unknown
@@ -963,7 +1199,7 @@ mod tests {
             .expect_err("a walk that cannot tell must refuse");
 
         match err {
-            Error::CertifiesUnknown { slot } => assert_eq!(slot, 2514319),
+            Error::CertifiesUnknown { slot } => assert_eq!(slot, 311025),
             other => panic!("wrong refusal: {other}"),
         }
 
@@ -989,21 +1225,28 @@ mod tests {
     fn an_announcement_settles_a_walk_that_could_not_tell() {
         let mut tracker = CertificationTracker::resume_from(PendingAnnouncement::Unknown);
 
-        // block 110365, slot 2517946: announces without certifying.
-        let raw3 = header_of(include_str!("../../test_data/dijkstra3.block"));
-        let out = tracker.observe(&dijkstra_header(&raw3)).unwrap();
-        let announced = out.announced.expect("110365 announces");
+        // block 14278, slot 291625: announces without certifying.
+        let block7 = with_leios_header_fields(
+            include_str!("../../test_data/dijkstra-w36-7.block"),
+            false,
+            Some(announcement_of([0x70; 32], 512)),
+        );
+        let raw7 = header_of(&block7);
+        let out = tracker.observe(&dijkstra_header(&raw7)).unwrap();
+        let announced = out.announced.expect("14278 announces");
         assert_eq!(
             tracker.pending(),
             &PendingAnnouncement::Waiting(announced.clone()),
             "the announcement replaces not knowing"
         );
 
-        // block 110203, slot 2514319: certifies. Out of chain order, which the
-        // tracker neither knows nor needs to, because it is the announcement
-        // and not the slot that decides what a certificate resolves to.
-        let raw1 = header_of(include_str!("../../test_data/dijkstra1.block"));
-        let out = tracker.observe(&dijkstra_header(&raw1)).unwrap();
+        // block 14935, slot 311025: certifies. Out of chain order against the
+        // one above only in that it announces nothing, which the tracker
+        // neither knows nor needs to, because it is the announcement and not
+        // the slot that decides what a certificate resolves to.
+        let block8 = certifying_block();
+        let raw8 = header_of(&block8);
+        let out = tracker.observe(&dijkstra_header(&raw8)).unwrap();
         assert_eq!(out.certified, Some(announced));
     }
 
@@ -1011,7 +1254,8 @@ mod tests {
     /// observed again gives the same answer rather than a different one.
     #[test]
     fn a_refused_certificate_does_not_change_the_walk() {
-        let raw = header_of(include_str!("../../test_data/dijkstra1.block"));
+        let block = certifying_block();
+        let raw = header_of(&block);
         let header = dijkstra_header(&raw);
 
         let mut tracker = CertificationTracker::resume_from(PendingAnnouncement::Unknown);
@@ -1051,7 +1295,7 @@ mod tests {
 
 #[cfg(test)]
 mod resolve_tests {
-    use super::tests::fixture;
+    use super::tests::{certifying_block, fixture};
     use super::*;
     use crate::MultiEraBlock;
 
@@ -1059,9 +1303,9 @@ mod resolve_tests {
     /// block's transactions, with its header and therefore its hash untouched.
     #[test]
     fn a_certifying_block_resolves_to_the_endorser_blocks_transactions() {
-        let raw = hex::decode(include_str!("../../test_data/dijkstra1.block").trim()).unwrap();
+        let raw = certifying_block();
         let before = MultiEraBlock::decode(&raw).unwrap();
-        assert_eq!(before.header().leios_certified(), Some(true));
+        assert_eq!(before.header().block_body_contains_leios_cert(), Some(true));
         assert_eq!(before.tx_count(), 0, "fixture precondition");
 
         let (body, wire) = fixture(2);
@@ -1095,7 +1339,7 @@ mod resolve_tests {
     /// only ever exercised at one size.
     #[test]
     fn a_single_transaction_endorser_block_resolves() {
-        let raw = hex::decode(include_str!("../../test_data/dijkstra1.block").trim()).unwrap();
+        let raw = certifying_block();
         let (_, wire) = fixture(0);
         let inner: Vec<&[u8]> = wire.iter().map(|w| unwrap_tx(w).unwrap()).collect();
 
@@ -1110,10 +1354,10 @@ mod resolve_tests {
     /// silently given somebody else's transactions.
     #[test]
     fn a_block_that_certifies_nothing_is_refused() {
-        let raw = hex::decode(include_str!("../../test_data/dijkstra7.block").trim()).unwrap();
+        let raw = hex::decode(include_str!("../../test_data/dijkstra-w36-7.block").trim()).unwrap();
         let block = MultiEraBlock::decode(&raw).unwrap();
-        assert_eq!(block.header().leios_certified(), Some(false));
-        assert_eq!(block.tx_count(), 426, "fixture precondition");
+        assert_eq!(block.header().block_body_contains_leios_cert(), Some(false));
+        assert_eq!(block.tx_count(), 4, "fixture precondition");
 
         let (_, wire) = fixture(0);
         let inner: Vec<&[u8]> = wire.iter().map(|w| unwrap_tx(w).unwrap()).collect();
@@ -1122,6 +1366,94 @@ mod resolve_tests {
             .expect_err("a non-certifying block must be refused");
 
         assert!(matches!(err, Error::NotCertifying { .. }), "{err}");
+    }
+
+    /// MUST FIRE: the splice replaces the transaction list.
+    ///
+    /// MUST NOT FIRE: it replaces nothing else. The two certificate slots that
+    /// follow the list in a w36 block body have to come through byte for byte.
+    ///
+    /// This is the assertion the deleted `invalid_transactions` element costs.
+    /// The body led with that element until the w36 ledger removed it, so a
+    /// walk that still steps over one element before reading the list returns
+    /// the span of the Leios certificate instead, and the splice writes a
+    /// transaction list where a certificate belongs while leaving the real list
+    /// untouched. The count assertion alone would not settle it, since a wrong
+    /// span can still produce the count asked for, so the trailing bytes are
+    /// pinned here separately.
+    #[test]
+    fn the_splice_replaces_the_transaction_list_and_not_a_certificate_slot() {
+        let raw = hex::decode(include_str!("../../test_data/dijkstra-w36-7.block").trim()).unwrap();
+        let before = MultiEraBlock::decode(&raw).unwrap();
+        assert_eq!(before.tx_count(), 4, "fixture precondition");
+
+        // this fixture's body ends with a nil Leios certificate and a nil Peras
+        // certificate, which is what every block on this chain carries
+        assert_eq!(&raw[raw.len() - 2..], &[0xf6, 0xf6], "fixture precondition");
+
+        let spliced = replace_transaction_list(&raw, &[]).expect("the splice must succeed");
+        let after = MultiEraBlock::decode(&spliced).expect("the spliced block must decode");
+
+        assert_eq!(after.tx_count(), 0);
+        assert_eq!(after.era(), Era::Dijkstra);
+        assert_eq!(
+            after.header().cbor(),
+            before.header().cbor(),
+            "the header is untouched"
+        );
+
+        // the empty list is one byte, so everything the certificate slots hold
+        // sits at the same distance from the end as it did before
+        assert_eq!(
+            &spliced[spliced.len() - 2..],
+            &[0xf6, 0xf6],
+            "both certificate slots survive the splice"
+        );
+
+        // and the whole prefix through the body array header is untouched
+        let (start, _) = transaction_list_span(&raw).unwrap();
+        assert_eq!(&spliced[..start], &raw[..start]);
+        assert_eq!(
+            spliced.len(),
+            start + 3,
+            "an empty list plus the two nil certificate slots is three bytes"
+        );
+    }
+
+    /// MUST FIRE: what the splice writes is the block's four element
+    /// transaction form, not the three element form the closure arrived in.
+    ///
+    /// MUST NOT FIRE: the transaction body is not rewritten, so the
+    /// transaction keeps the hash the endorser block named it by.
+    #[test]
+    fn the_spliced_transactions_carry_the_blocks_validity_flag() {
+        let raw = certifying_block();
+        let (body, wire) = fixture(0);
+        let inner: Vec<&[u8]> = wire.iter().map(|w| unwrap_tx(w).unwrap()).collect();
+
+        let resolved = resolve_certified_block(&raw, &inner).unwrap();
+        let after = MultiEraBlock::decode(&resolved).unwrap();
+
+        let txs = after.txs();
+        assert_eq!(txs.len(), 1);
+        assert!(
+            txs[0].is_valid(),
+            "the mempool form admits no verdict but valid"
+        );
+        assert_eq!(
+            txs[0].hash(),
+            body.transactions(&wire).unwrap()[0].hash(),
+            "the body the endorser block named it by is unchanged"
+        );
+
+        // the wire form was three elements and what the block carries is four
+        assert_eq!(inner[0][0], 0x83, "the closure carries three elements");
+        let (start, _) = transaction_list_span(&resolved).unwrap();
+        assert_eq!(
+            resolved[start + 1],
+            0x84,
+            "the block carries four, the array header immediately after the list header"
+        );
     }
 
     /// MUST NOT FIRE: a pre-Leios block is refused by era rather than having
@@ -1142,7 +1474,7 @@ mod resolve_tests {
     /// size check at fetch time, not this.
     #[test]
     fn resolving_with_no_transactions_gives_an_empty_block() {
-        let raw = hex::decode(include_str!("../../test_data/dijkstra1.block").trim()).unwrap();
+        let raw = certifying_block();
         let resolved_cbor = resolve_certified_block(&raw, &[]).unwrap();
         let after = MultiEraBlock::decode(&resolved_cbor).unwrap();
         assert_eq!(after.tx_count(), 0);
