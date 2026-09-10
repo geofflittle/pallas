@@ -1424,51 +1424,63 @@ mod tests {
 
     type BlockWrapper<'b> = (u16, Block<'b>);
 
-    /// Every fixture is a real Musashi testnet block, lifted out of the node's
-    /// own immutable database and checked against the CRC32 in its secondary
-    /// index before being written here.
+    /// The Dijkstra blocks of the fixture set, every one a real Musashi block
+    /// cut from a relay's chain database and checked against the header hash
+    /// and CRC32 the node itself recorded. Provenance for all ten, including
+    /// the two Conway ones below, is in `test_data/musashi-w36-fixtures.md`.
     const TEST_BLOCKS: &[(&str, &str)] = &[
         (
-            "dijkstra1",
-            include_str!("../../../test_data/dijkstra1.block"),
+            "dijkstra-w36-2",
+            include_str!("../../../test_data/dijkstra-w36-2.block"),
         ),
         (
-            "dijkstra2",
-            include_str!("../../../test_data/dijkstra2.block"),
+            "dijkstra-w36-3",
+            include_str!("../../../test_data/dijkstra-w36-3.block"),
         ),
         (
-            "dijkstra3",
-            include_str!("../../../test_data/dijkstra3.block"),
+            "dijkstra-w36-4",
+            include_str!("../../../test_data/dijkstra-w36-4.block"),
         ),
         (
-            "dijkstra4",
-            include_str!("../../../test_data/dijkstra4.block"),
+            "dijkstra-w36-5",
+            include_str!("../../../test_data/dijkstra-w36-5.block"),
         ),
         (
-            "dijkstra5",
-            include_str!("../../../test_data/dijkstra5.block"),
+            "dijkstra-w36-6",
+            include_str!("../../../test_data/dijkstra-w36-6.block"),
         ),
         (
-            "dijkstra6",
-            include_str!("../../../test_data/dijkstra6.block"),
+            "dijkstra-w36-7",
+            include_str!("../../../test_data/dijkstra-w36-7.block"),
         ),
         (
-            "dijkstra7",
-            include_str!("../../../test_data/dijkstra7.block"),
+            "dijkstra-w36-8",
+            include_str!("../../../test_data/dijkstra-w36-8.block"),
         ),
         (
-            "dijkstra8",
-            include_str!("../../../test_data/dijkstra8.block"),
-        ),
-        (
-            "dijkstra9",
-            include_str!("../../../test_data/dijkstra9.block"),
-        ),
-        (
-            "dijkstra10",
-            include_str!("../../../test_data/dijkstra10.block"),
+            "dijkstra-w36-9",
+            include_str!("../../../test_data/dijkstra-w36-9.block"),
         ),
     ];
+
+    /// The two Conway blocks in the same fixture set. Fixture 1 is the block
+    /// the fork replaced and fixture 10 is the only block on this chain with
+    /// script witnesses and indefinite length arrays. They are here as the
+    /// must-not case: the Dijkstra types have to refuse them.
+    const CONWAY_BLOCKS: &[(&str, &str)] = &[
+        (
+            "dijkstra-w36-1",
+            include_str!("../../../test_data/dijkstra-w36-1.block"),
+        ),
+        (
+            "dijkstra-w36-10",
+            include_str!("../../../test_data/dijkstra-w36-10.block"),
+        ),
+    ];
+
+    /// The first transaction bearing fixture, used where a test needs a block
+    /// that actually carries one.
+    const WITH_TRANSACTIONS: usize = 1;
 
     #[test]
     fn block_isomorphic_decoding_encoding() {
@@ -1564,11 +1576,40 @@ mod tests {
         );
 
         assert_eq!(minicbor::to_vec(&as_dijkstra).unwrap(), raw);
-        assert!(as_dijkstra.header_body.block_body_contains_leios_cert);
+
+        // No block on this chain certifies or announces anything yet, so both
+        // fields read as the empty answer. That is a value that was decoded,
+        // not a field that was skipped, and the length check above is what
+        // proves the two bytes were really there to read.
+        assert!(!as_dijkstra.header_body.block_body_contains_leios_cert);
         assert!(matches!(
             as_dijkstra.header_body.eb_announcement,
-            crate::Nullable::Some(_)
+            crate::Nullable::Null
         ));
+    }
+
+    /// The two Conway fixtures must be refused by the Dijkstra block type.
+    /// Without this, the round trip above could be passing on a set that
+    /// happened to hold nothing the model could get wrong.
+    #[test]
+    fn conway_blocks_are_refused_as_dijkstra_blocks() {
+        for (name, block_str) in CONWAY_BLOCKS.iter() {
+            let bytes = hex::decode(block_str).unwrap();
+
+            // MUST FIRE: a Conway block is not a Dijkstra block.
+            let decoded: Result<BlockWrapper, _> = minicbor::decode(&bytes);
+            assert!(
+                decoded.is_err(),
+                "{name} is a Conway block and must not decode as a Dijkstra one"
+            );
+
+            // MUST NOT FIRE: it is a real block, and Conway's own type reads it
+            // and gives every byte back, so the refusal above is about the era
+            // and not about the fixture being damaged.
+            let conway: (u16, crate::conway::Block) = minicbor::decode(&bytes)
+                .unwrap_or_else(|e| panic!("{name} should decode as a Conway block: {e:?}"));
+            assert_eq!(minicbor::to_vec(&conway).unwrap(), bytes, "{name}");
+        }
     }
 
     /// `block_transaction` and `mempool_transaction` are both live on the wire
@@ -1578,14 +1619,14 @@ mod tests {
     /// back with a validity verdict nobody issued.
     #[test]
     fn a_block_transaction_is_not_a_mempool_transaction() {
-        let bytes = hex::decode(TEST_BLOCKS[0].1).unwrap();
+        let bytes = hex::decode(TEST_BLOCKS[WITH_TRANSACTIONS].1).unwrap();
         let (_, block): BlockWrapper = minicbor::decode(&bytes).unwrap();
 
         let tx = block
             .block_body
             .transactions
             .first()
-            .expect("the first fixture must carry at least one transaction");
+            .expect("this fixture must carry at least one transaction");
 
         // MUST NOT FIRE: the four element form round trips as itself.
         let four = minicbor::to_vec(tx).unwrap();

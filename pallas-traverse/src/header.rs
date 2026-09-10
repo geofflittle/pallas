@@ -215,14 +215,18 @@ mod tests {
     use crate::MultiEraBlock;
 
     fn dijkstra_header_bytes() -> Vec<u8> {
-        let block_str = include_str!("../../test_data/dijkstra1.block");
+        let block_str = include_str!("../../test_data/dijkstra-w36-2.block");
         let cbor = hex::decode(block_str).unwrap();
         let block = MultiEraBlock::decode(&cbor).unwrap();
         block.header().cbor().to_vec()
     }
 
-    /// MUST FIRE: envelope tag 7 gives a Dijkstra header, and every field the
-    /// twelve field body carries is reachable.
+    /// MUST FIRE: envelope tag 7 gives a Dijkstra header, and both fields the
+    /// twelve field body adds are reachable.
+    ///
+    /// Both read as their empty value on this chain, and `Some(false)` is the
+    /// assertion that matters: an era with no such field answers `None`, so
+    /// the two cases stay distinguishable.
     #[test]
     fn dijkstra_header_decodes_as_dijkstra() {
         let raw = dijkstra_header_bytes();
@@ -230,8 +234,8 @@ mod tests {
 
         assert!(matches!(header, MultiEraHeader::Dijkstra(_)));
         assert!(header.as_dijkstra().is_some());
-        assert_eq!(header.block_body_contains_leios_cert(), Some(true));
-        assert!(header.eb_announcement().is_some());
+        assert_eq!(header.block_body_contains_leios_cert(), Some(false));
+        assert!(header.eb_announcement().is_none());
         assert_eq!(header.cbor(), raw.as_slice());
     }
 

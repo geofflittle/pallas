@@ -124,7 +124,7 @@ mod tests {
 
     #[test]
     fn dijkstra_block_detected() {
-        let block_str = include_str!("../../test_data/dijkstra1.block");
+        let block_str = include_str!("../../test_data/dijkstra-w36-2.block");
         let bytes = hex::decode(block_str).unwrap();
 
         let inference = block_era(bytes.as_slice());
@@ -137,7 +137,7 @@ mod tests {
     /// this is the pair that keeps them apart.
     #[test]
     fn dijkstra_and_conway_are_not_confused() {
-        let dijkstra = hex::decode(include_str!("../../test_data/dijkstra1.block")).unwrap();
+        let dijkstra = hex::decode(include_str!("../../test_data/dijkstra-w36-2.block")).unwrap();
         let conway = hex::decode(include_str!("../../test_data/conway1.block")).unwrap();
 
         assert!(!matches!(

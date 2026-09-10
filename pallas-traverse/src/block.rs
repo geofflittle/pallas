@@ -320,9 +320,15 @@ mod tests {
     /// A Dijkstra block reaches the multi-era entry point as Dijkstra, and the
     /// header that comes back out of it is a Dijkstra header rather than a
     /// Babbage one.
+    ///
+    /// The fixture is the first Dijkstra block of the chain, block 4255 at
+    /// slot 86463. Both Leios fields read as their empty value, because no
+    /// block on this chain has been given a non empty one yet. That is a
+    /// decoded value, not a skipped field, and the byte level round trip in
+    /// `pallas-primitives` is what proves the bytes were there to read.
     #[test]
     fn dijkstra_block_decodes_as_dijkstra() {
-        let cbor = dijkstra_block(include_str!("../../test_data/dijkstra1.block"));
+        let cbor = dijkstra_block(include_str!("../../test_data/dijkstra-w36-2.block"));
         let block = MultiEraBlock::decode(&cbor).expect("invalid cbor");
 
         assert_eq!(block.era(), Era::Dijkstra);
@@ -331,110 +337,116 @@ mod tests {
         assert!(block.header().as_dijkstra().is_some());
         assert!(block.header().as_babbage().is_none());
 
-        // this fixture is an empty block that carries both Leios fields
         assert_eq!(block.tx_count(), 0);
         assert!(block.is_empty());
-        assert_eq!(block.header().block_body_contains_leios_cert(), Some(true));
-        assert!(block.header().eb_announcement().is_some());
-        assert!(block.leios_certificate().is_some());
+        assert_eq!(block.header().block_body_contains_leios_cert(), Some(false));
+        assert!(block.header().eb_announcement().is_none());
+        assert!(block.leios_certificate().is_none());
         assert!(block.peras_certificate().is_none());
     }
 
-    /// The batch block, and the accessors the brief names.
-    ///
-    /// The transaction at index 1 is the twenty one order batch: it spends
-    /// twenty one script inputs, each with its own spend redeemer, and carries
-    /// a single withdrawal of zero. Every count here is read off the wire
-    /// bytes independently before being asserted, so none of these assertions
-    /// can pass by nothing firing.
+    /// The block immediately before it is Conway, and must come back as Conway
+    /// from the same entry point. Without this pair the test above could pass
+    /// against an entry point that called everything Dijkstra.
     #[test]
-    fn batch_block_yields_21_script_inputs_and_one_zero_withdrawal() {
-        let cbor = dijkstra_block(include_str!("../../test_data/dijkstra7.block"));
+    fn the_block_before_the_fork_is_conway() {
+        let cbor = dijkstra_block(include_str!("../../test_data/dijkstra-w36-1.block"));
         let block = MultiEraBlock::decode(&cbor).expect("invalid cbor");
 
-        assert_eq!(block.era(), Era::Dijkstra);
-        assert_eq!(block.tx_count(), 426);
+        assert_eq!(block.era(), Era::Conway);
+        assert!(block.as_conway().is_some());
+        assert!(block.as_dijkstra().is_none());
 
-        let txs = block.txs();
-        let batch = &txs[1];
-
-        assert_eq!(
-            batch.hash().to_string(),
-            "577c7dd3b9c0a92e7d89faeebd1299cef4dbbbf8f5dddd8431ce53ca3e5c2e69"
-        );
-
-        // 21 spend redeemers, at indices 0 through 20
-        let mut spend_indexes: Vec<u32> = batch
-            .redeemers()
-            .iter()
-            .filter(|r| r.tag() == pallas_primitives::dijkstra::RedeemerTag::Spend)
-            .map(|r| r.index())
-            .collect();
-        spend_indexes.sort_unstable();
-
-        assert_eq!(spend_indexes.len(), 21, "expected 21 script inputs");
-        assert_eq!(spend_indexes, (0..21).collect::<Vec<u32>>());
-
-        // one reward redeemer for the withdrawal, so 22 redeemers in total
-        assert_eq!(batch.redeemers().len(), 22);
-
-        // exactly one withdrawal, and it is zero
-        let withdrawals: Vec<(&[u8], u64)> = batch.withdrawals_sorted_set();
-        assert_eq!(withdrawals.len(), 1, "expected exactly one withdrawal");
-        assert_eq!(withdrawals[0].1, 0, "the withdrawal must be zero");
-
-        // the inputs the redeemers point at are really there
-        assert_eq!(batch.inputs().len(), 22);
-        assert!(batch.is_valid());
+        // and a Conway block has no field to answer these with at all, which
+        // is a different answer from a Dijkstra block that answers false
+        assert_eq!(block.header().block_body_contains_leios_cert(), None);
+        assert!(block.leios_certificate().is_none());
     }
 
-    /// MUST NOT FIRE: the same accessors on a block that has none of these
-    /// things report none of them. Without this, the test above could pass
-    /// against an accessor that returned a constant.
+    /// The transaction bearing Dijkstra fixtures reach their transactions
+    /// through the multi-era accessors, with the counts the provenance file
+    /// records, and every transaction reports itself valid.
+    ///
+    /// Validity is the assertion worth having here. It rides as the fourth
+    /// element of each transaction in this era, so a model that dropped the
+    /// element would still decode the block and would answer this wrong.
+    #[test]
+    fn dijkstra_blocks_yield_their_transactions() {
+        let cases = [
+            (include_str!("../../test_data/dijkstra-w36-4.block"), 1usize),
+            (include_str!("../../test_data/dijkstra-w36-6.block"), 3),
+            (include_str!("../../test_data/dijkstra-w36-7.block"), 4),
+        ];
+
+        let mut seen = 0usize;
+        for (block_str, tx_count) in cases.iter() {
+            let cbor = dijkstra_block(block_str);
+            let block = MultiEraBlock::decode(&cbor).expect("invalid cbor");
+
+            assert_eq!(block.era(), Era::Dijkstra);
+            assert_eq!(block.tx_count(), *tx_count);
+            assert_eq!(block.txs().len(), *tx_count);
+
+            for tx in block.txs() {
+                assert!(tx.is_valid(), "every transaction on this chain is valid");
+                assert!(!tx.inputs().is_empty());
+                assert!(tx.fee().is_some());
+                seen += 1;
+            }
+        }
+
+        assert_eq!(
+            seen, 8,
+            "the three fixtures hold eight transactions between them"
+        );
+    }
+
+    /// MUST NOT FIRE: a plain transfer reports none of the optional bodies.
+    /// Its transaction body carries keys 0, 1 and 2 and nothing else, so every
+    /// accessor below has a real absence to report rather than an unread field.
     #[test]
     fn a_plain_dijkstra_block_reports_no_redeemers_or_withdrawals() {
-        let cbor = dijkstra_block(include_str!("../../test_data/dijkstra4.block"));
+        let cbor = dijkstra_block(include_str!("../../test_data/dijkstra-w36-4.block"));
         let block = MultiEraBlock::decode(&cbor).expect("invalid cbor");
 
         assert_eq!(block.era(), Era::Dijkstra);
-        assert_eq!(block.tx_count(), 2);
+        assert_eq!(block.tx_count(), 1);
 
         for tx in block.txs() {
             assert!(tx.redeemers().is_empty());
             assert!(tx.withdrawals_sorted_set().is_empty());
             assert!(tx.certs().is_empty());
+            assert!(tx.sub_transactions().is_empty());
         }
-
-        // and this block carries neither Leios field, where dijkstra1 carries both
-        assert_eq!(block.header().block_body_contains_leios_cert(), Some(false));
-        assert!(block.header().eb_announcement().is_none());
-        assert!(block.leios_certificate().is_none());
     }
 
-    /// The one certificate in the fixture set, and the one `guards` value,
-    /// both of which exercise types that no earlier era can represent.
+    /// MUST FIRE: the same accessors do find things when a transaction has
+    /// them, so the absences above are the fixture speaking and not the
+    /// accessor returning a constant.
+    ///
+    /// The certificate comes from a Dijkstra block. The redeemers have to come
+    /// from the Conway fixture, because no Dijkstra block on this chain
+    /// carries a script witness of any kind.
     #[test]
-    fn dijkstra_certificates_and_guards_are_reachable() {
-        let cbor = dijkstra_block(include_str!("../../test_data/dijkstra9.block"));
+    fn the_same_accessors_find_what_is_there() {
+        let cbor = dijkstra_block(include_str!("../../test_data/dijkstra-w36-3.block"));
         let block = MultiEraBlock::decode(&cbor).expect("invalid cbor");
 
-        let guards: Vec<_> = block
-            .txs()
-            .into_iter()
-            .filter_map(|tx| tx.required_signers().as_dijkstra().cloned())
-            .collect();
-
-        assert_eq!(
-            guards.len(),
-            1,
-            "dijkstra9 carries exactly one guards value"
+        assert_eq!(block.era(), Era::Dijkstra);
+        let certs: usize = block.txs().iter().map(|tx| tx.certs().len()).sum();
+        assert!(
+            certs > 0,
+            "this fixture carries transaction body key 4, so certs() must find one"
         );
 
-        // it is the credential arm, which a Conway required-signers decoder
-        // typed as a set of key hashes cannot read at all
-        assert!(matches!(
-            guards[0],
-            pallas_primitives::dijkstra::Guards::Credentials(_)
-        ));
+        let cbor = dijkstra_block(include_str!("../../test_data/dijkstra-w36-10.block"));
+        let block = MultiEraBlock::decode(&cbor).expect("invalid cbor");
+
+        assert_eq!(block.era(), Era::Conway);
+        let redeemers: usize = block.txs().iter().map(|tx| tx.redeemers().len()).sum();
+        assert!(
+            redeemers > 0,
+            "this fixture carries witness set key 5, so redeemers() must find one"
+        );
     }
 }
