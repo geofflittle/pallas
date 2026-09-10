@@ -33,13 +33,8 @@ impl<'b> MultiEraTx<'b> {
     }
 
     /// Build from a standalone Dijkstra transaction.
-    ///
-    /// A Dijkstra transaction carries no `is_valid` flag, so on its own it
-    /// cannot say whether it was accepted: that lives in the block body's
-    /// invalid transaction set. Use [`crate::MultiEraBlock::txs`] when the
-    /// block is in hand and the answer matters.
-    pub fn from_dijkstra(tx: &'b dijkstra::Tx<'b>) -> Self {
-        Self::Dijkstra(Box::new(Cow::Borrowed(tx)), true)
+    pub fn from_dijkstra(tx: &'b dijkstra::BlockTransaction<'b>) -> Self {
+        Self::Dijkstra(Box::new(Cow::Borrowed(tx)))
     }
 
     pub fn encode(&self) -> Vec<u8> {
@@ -49,7 +44,7 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => minicbor::to_vec(x).unwrap(),
             MultiEraTx::Byron(x) => minicbor::to_vec(x).unwrap(),
             MultiEraTx::Conway(x) => minicbor::to_vec(x).unwrap(),
-            MultiEraTx::Dijkstra(x, _) => minicbor::to_vec(x).unwrap(),
+            MultiEraTx::Dijkstra(x) => minicbor::to_vec(x).unwrap(),
         }
     }
 
@@ -78,7 +73,7 @@ impl<'b> MultiEraTx<'b> {
             Era::Dijkstra => {
                 let tx = minicbor::decode(cbor)?;
                 let tx = Box::new(Cow::Owned(tx));
-                Ok(MultiEraTx::Dijkstra(tx, true))
+                Ok(MultiEraTx::Dijkstra(tx))
             }
         }
     }
@@ -89,11 +84,14 @@ impl<'b> MultiEraTx<'b> {
     ///
     /// This is shape driven rather than tag driven, so it is the one decode
     /// path in this crate that a new era cannot be added to by the compiler.
-    /// Dijkstra is tried first because it is the most recent, and because its
-    /// three element transaction is the narrower shape: Conway wants four.
+    /// Dijkstra is tried first because it is the most recent. It and Conway are
+    /// both four element transactions, and they are told apart by what sits at
+    /// position 2: a bool for Conway and auxiliary data or nil for Dijkstra.
+    /// Neither shape decodes as the other, so the order is a preference and not
+    /// a correctness condition.
     pub fn decode(cbor: &'b [u8]) -> Result<Self, Error> {
         if let Ok(tx) = minicbor::decode(cbor) {
-            return Ok(MultiEraTx::Dijkstra(Box::new(Cow::Owned(tx)), true));
+            return Ok(MultiEraTx::Dijkstra(Box::new(Cow::Owned(tx))));
         }
 
         if let Ok(tx) = minicbor::decode(cbor) {
@@ -135,7 +133,7 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => x.transaction_body.original_hash(),
             MultiEraTx::Byron(x) => x.transaction.original_hash(),
             MultiEraTx::Conway(x) => x.transaction_body.original_hash(),
-            MultiEraTx::Dijkstra(x, _) => x.transaction_body.original_hash(),
+            MultiEraTx::Dijkstra(x) => x.transaction_body.original_hash(),
         }
     }
 
@@ -166,7 +164,7 @@ impl<'b> MultiEraTx<'b> {
                 .iter()
                 .map(MultiEraOutput::from_conway)
                 .collect(),
-            MultiEraTx::Dijkstra(x, _) => x
+            MultiEraTx::Dijkstra(x) => x
                 .transaction_body
                 .outputs
                 .iter()
@@ -198,7 +196,7 @@ impl<'b> MultiEraTx<'b> {
                 .outputs
                 .get(index)
                 .map(MultiEraOutput::from_conway),
-            MultiEraTx::Dijkstra(x, _) => x
+            MultiEraTx::Dijkstra(x) => x
                 .transaction_body
                 .outputs
                 .get(index)
@@ -235,7 +233,7 @@ impl<'b> MultiEraTx<'b> {
                 .iter()
                 .map(MultiEraInput::from_alonzo_compatible)
                 .collect(),
-            MultiEraTx::Dijkstra(x, _) => x
+            MultiEraTx::Dijkstra(x) => x
                 .transaction_body
                 .inputs
                 .iter()
@@ -303,7 +301,7 @@ impl<'b> MultiEraTx<'b> {
                 .flatten()
                 .map(MultiEraInput::from_alonzo_compatible)
                 .collect(),
-            MultiEraTx::Dijkstra(x, _) => x
+            MultiEraTx::Dijkstra(x) => x
                 .transaction_body
                 .reference_inputs
                 .iter()
@@ -340,7 +338,7 @@ impl<'b> MultiEraTx<'b> {
                 .flat_map(|c| c.iter())
                 .map(|c| MultiEraCert::Conway(Box::new(Cow::Borrowed(c))))
                 .collect(),
-            MultiEraTx::Dijkstra(x, _) => x
+            MultiEraTx::Dijkstra(x) => x
                 .transaction_body
                 .certificates
                 .iter()
@@ -394,7 +392,7 @@ impl<'b> MultiEraTx<'b> {
                 .flat_map(|x| x.iter())
                 .map(|(k, v)| MultiEraPolicyAssets::ConwayMint(k, v))
                 .collect(),
-            MultiEraTx::Dijkstra(x, _) => x
+            MultiEraTx::Dijkstra(x) => x
                 .transaction_body
                 .mint
                 .iter()
@@ -432,7 +430,7 @@ impl<'b> MultiEraTx<'b> {
                 .flat_map(|x| x.iter())
                 .map(MultiEraInput::from_alonzo_compatible)
                 .collect(),
-            MultiEraTx::Dijkstra(x, _) => x
+            MultiEraTx::Dijkstra(x) => x
                 .transaction_body
                 .collateral
                 .iter()
@@ -454,7 +452,7 @@ impl<'b> MultiEraTx<'b> {
                 .collateral_return
                 .as_ref()
                 .map(MultiEraOutput::from_conway),
-            MultiEraTx::Dijkstra(x, _) => x
+            MultiEraTx::Dijkstra(x) => x
                 .transaction_body
                 .collateral_return
                 .as_ref()
@@ -467,7 +465,7 @@ impl<'b> MultiEraTx<'b> {
         match self {
             MultiEraTx::Babbage(x) => x.transaction_body.total_collateral,
             MultiEraTx::Conway(x) => x.transaction_body.total_collateral,
-            MultiEraTx::Dijkstra(x, _) => x.transaction_body.total_collateral,
+            MultiEraTx::Dijkstra(x) => x.transaction_body.total_collateral,
             MultiEraTx::Byron(_) | MultiEraTx::AlonzoCompatible(..) => None,
         }
     }
@@ -483,7 +481,7 @@ impl<'b> MultiEraTx<'b> {
                 .collect(),
             // `dijkstra::ProposalProcedure` is a re-export of Conway's, so the
             // same variant carries it.
-            MultiEraTx::Dijkstra(x, _) => x
+            MultiEraTx::Dijkstra(x) => x
                 .transaction_body
                 .proposal_procedures
                 .iter()
@@ -583,7 +581,7 @@ impl<'b> MultiEraTx<'b> {
                 None => MultiEraWithdrawals::Empty,
             },
             // `dijkstra::Withdrawals` is a re-export of Conway's.
-            MultiEraTx::Dijkstra(x, _) => match &x.transaction_body.withdrawals {
+            MultiEraTx::Dijkstra(x) => match &x.transaction_body.withdrawals {
                 Some(x) => MultiEraWithdrawals::Conway(x),
                 None => MultiEraWithdrawals::Empty,
             },
@@ -596,7 +594,7 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => Some(x.transaction_body.fee),
             MultiEraTx::Byron(_) => None,
             MultiEraTx::Conway(x) => Some(x.transaction_body.fee),
-            MultiEraTx::Dijkstra(x, _) => Some(x.transaction_body.fee),
+            MultiEraTx::Dijkstra(x) => Some(x.transaction_body.fee),
         }
     }
 
@@ -606,7 +604,7 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => x.transaction_body.ttl,
             MultiEraTx::Byron(_) => None,
             MultiEraTx::Conway(x) => x.transaction_body.ttl,
-            MultiEraTx::Dijkstra(x, _) => x.transaction_body.ttl,
+            MultiEraTx::Dijkstra(x) => x.transaction_body.ttl,
         }
     }
 
@@ -622,7 +620,7 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => x.transaction_body.fee,
             MultiEraTx::Byron(x) => crate::fees::compute_byron_fee(x, None),
             MultiEraTx::Conway(x) => x.transaction_body.fee,
-            MultiEraTx::Dijkstra(x, _) => x.transaction_body.fee,
+            MultiEraTx::Dijkstra(x) => x.transaction_body.fee,
         }
     }
 
@@ -658,7 +656,7 @@ impl<'b> MultiEraTx<'b> {
     /// every earlier era's by a PlutusV4 script key.
     pub(crate) fn dijkstra_aux_data(&self) -> Option<&KeepRaw<'_, dijkstra::AuxiliaryData>> {
         match self {
-            MultiEraTx::Dijkstra(x, _) => match &x.auxiliary_data {
+            MultiEraTx::Dijkstra(x) => match &x.auxiliary_data {
                 pallas_codec::utils::Nullable::Some(x) => Some(x),
                 pallas_codec::utils::Nullable::Null => None,
                 pallas_codec::utils::Nullable::Undefined => None,
@@ -726,7 +724,7 @@ impl<'b> MultiEraTx<'b> {
             // credentials as well as key hashes, so it cannot be reported
             // through the `AlonzoCompatible` variant without losing the
             // credential arm.
-            MultiEraTx::Dijkstra(x, _) => x
+            MultiEraTx::Dijkstra(x) => x
                 .transaction_body
                 .guards
                 .as_ref()
@@ -741,7 +739,7 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => x.transaction_body.validity_interval_start,
             MultiEraTx::Byron(_) => None,
             MultiEraTx::Conway(x) => x.transaction_body.validity_interval_start,
-            MultiEraTx::Dijkstra(x, _) => x.transaction_body.validity_interval_start,
+            MultiEraTx::Dijkstra(x) => x.transaction_body.validity_interval_start,
         }
     }
 
@@ -751,7 +749,7 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => x.transaction_body.network_id,
             MultiEraTx::Byron(_) => None,
             MultiEraTx::Conway(x) => x.transaction_body.network_id,
-            MultiEraTx::Dijkstra(x, _) => x.transaction_body.network_id,
+            MultiEraTx::Dijkstra(x) => x.transaction_body.network_id,
         }
     }
 
@@ -761,10 +759,7 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => x.success,
             MultiEraTx::Byron(_) => true,
             MultiEraTx::Conway(x) => x.success,
-            // Dijkstra strips the flag from the transaction and records the
-            // invalid ones on the block body, so this is what the block said
-            // when the transaction was taken out of it.
-            MultiEraTx::Dijkstra(_, valid) => *valid,
+            MultiEraTx::Dijkstra(x) => x.success,
         }
     }
 
@@ -772,7 +767,7 @@ impl<'b> MultiEraTx<'b> {
     /// every earlier era, none of which has the field.
     pub fn sub_transactions(&self) -> Vec<&dijkstra::SubTransaction<'_>> {
         match self {
-            MultiEraTx::Dijkstra(x, _) => x
+            MultiEraTx::Dijkstra(x) => x
                 .transaction_body
                 .sub_transactions
                 .iter()
@@ -810,9 +805,9 @@ impl<'b> MultiEraTx<'b> {
         }
     }
 
-    pub fn as_dijkstra(&self) -> Option<&dijkstra::Tx<'_>> {
+    pub fn as_dijkstra(&self) -> Option<&dijkstra::BlockTransaction<'_>> {
         match self {
-            MultiEraTx::Dijkstra(x, _) => Some(x),
+            MultiEraTx::Dijkstra(x) => Some(x),
             _ => None,
         }
     }

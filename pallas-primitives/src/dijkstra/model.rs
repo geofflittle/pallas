@@ -1,9 +1,11 @@
 //! Ledger primitives and cbor codec for the Dijkstra era
 //!
-//! Handcrafted, idiomatic rust artifacts based on the [Dijkstra CDDL](https://github.com/IntersectMBO/cardano-ledger/blob/f3104f00f9819ba94de119c38bc3e0109982821f/eras/dijkstra/impl/cddl/data/dijkstra.cddl)
-//! file in the IntersectMBO repo, pinned at commit `f3104f0`. A copy of that
-//! file sits next to this one as `defs.cddl`, and every rule this module
-//! changes relative to Conway cites its line there.
+//! Handcrafted, idiomatic rust artifacts based on the [Dijkstra CDDL](https://github.com/IntersectMBO/cardano-ledger/blob/1587f21a7d1306dc590c2749a5c66232ef66aad0/eras/dijkstra/impl/cddl/data/dijkstra.cddl)
+//! file in the IntersectMBO repo, pinned at commit `1587f21a`. That is the
+//! ledger revision the node release `prototype-2026w36` integrates, and so the
+//! shape the Musashi testnet has served since it was respun on 2026-09-07. A
+//! copy of that file sits next to this one as `defs.cddl`, and every rule this
+//! module changes relative to Conway cites its line there.
 //!
 //! Types that Dijkstra leaves untouched are re-exported from [`crate::conway`]
 //! rather than copied. A type is only redefined here when the CDDL rule it
@@ -21,7 +23,7 @@ pub use crate::{
     NetworkId, NonEmptySet, NonZeroInt, Nonce, NonceVariant, Nullable, PlutusScript, PolicyId,
     PoolKeyhash, PoolMetadata, PoolMetadataHash, Port, PositiveCoin, PositiveInterval,
     ProtocolVersion, RationalNumber, Relay, RewardAccount, ScriptHash, Set, StakeCredential,
-    TransactionIndex, TransactionInput, UnitInterval, VrfCert, VrfKeyhash, plutus_data::*,
+    TransactionInput, UnitInterval, VrfCert, VrfKeyhash, plutus_data::*,
 };
 
 use crate::BTreeMap;
@@ -32,9 +34,9 @@ use crate::babbage;
 
 pub use crate::babbage::OperationalCert;
 
-/// `header_body` (`defs.cddl`) carries twelve fields in Dijkstra where Babbage
-/// and Conway carry ten: `leios_certified` and `leios_announcement` are
-/// appended.
+/// `header_body` (`defs.cddl`) carries twelve fields in Dijkstra where
+/// Babbage and Conway carry ten: `block_body_contains_leios_cert` and
+/// `eb_announcement` are appended.
 ///
 /// This is why the header cannot be re-exported from Conway the way the rest
 /// of the era's unchanged types are. Babbage's `HeaderBody` is a ten field
@@ -75,13 +77,13 @@ pub struct HeaderBody {
     pub protocol_version: ProtocolVersion,
 
     // -- NEW IN DIJKSTRA
-    /// Whether this block certifies the previously announced endorser block.
+    /// Whether this block's body carries a Leios certificate.
     #[n(10)]
-    pub leios_certified: bool,
+    pub block_body_contains_leios_cert: bool,
 
     /// Optional announcement of an endorser block.
     #[n(11)]
-    pub leios_announcement: Nullable<LeiosAnnouncement>,
+    pub eb_announcement: Nullable<EbAnnouncement>,
 }
 
 impl HeaderBody {
@@ -161,50 +163,62 @@ pub use crate::conway::LegacyTransactionOutput;
 
 // ----- Leios and Peras additions to the ranking block.
 
-/// `leios_announcement = [announced_eb : hash32, announced_eb_size : uint .size 4]`
-/// (`defs.cddl:99`). An endorser block reference carried in the header body.
+/// `eb_announcement = [eb_hash : hash32, eb_size : uint .size 4]`
+/// (`defs.cddl`). An endorser block reference carried in the header body.
+///
+/// Named `leios_announcement` with fields `announced_eb` and
+/// `announced_eb_size` in the ledger revision the blueprint still mirrors. The
+/// rename does not move a byte.
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
-pub struct LeiosAnnouncement {
+pub struct EbAnnouncement {
     /// Hash of the announced endorser block.
     #[n(0)]
-    pub announced_eb: Hash<32>,
+    pub eb_hash: Hash<32>,
 
-    /// Size in bytes of the announced endorser block.
+    /// Size in bytes of the announced endorser block closure.
     #[n(1)]
-    pub announced_eb_size: u32,
+    pub eb_size: u32,
 }
 
-/// `leios_key = [leios_pubkey : bytes .size 96, leios_possessionproof : bytes .size 48]`
-/// (`defs.cddl:480`). Carried at position 3 of `pool_params`.
+/// `bls_key = [bls_pubkey : bytes .size 96, bls_possession_proof : bytes .size 48]`
+/// (`defs.cddl`). Carried at position 3 of `pool_params`.
+///
+/// Named `leios_key` in the ledger revision the blueprint still mirrors. The
+/// rename does not move a byte.
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
-pub struct LeiosKey {
+pub struct BlsKey {
     /// BLS public key.
     #[n(0)]
-    pub leios_pubkey: Bytes,
+    pub bls_pubkey: Bytes,
 
-    /// Proof of possession for `leios_pubkey`.
+    /// Proof of possession for `bls_pubkey`.
     #[n(1)]
-    pub leios_possessionproof: Bytes,
+    pub bls_possession_proof: Bytes,
 }
 
-/// `leios_signature = bytes .size 48` (`defs.cddl:907`).
+/// `leios_signature = bytes .size 48` (`defs.cddl`).
 pub type LeiosSignature = Bytes;
 
-/// `leios_certificate = [signers : bytes, aggregated_signature : leios_signature]`
-/// (`defs.cddl:902`). Present in stock Dijkstra's `block_body`, not only in the
+/// `leios_certificate = [signers : bytes .size (0 .. 8192), signature : leios_signature]`
+/// (`defs.cddl`). Present in stock Dijkstra's `block_body`, not only in the
 /// Leios fork, so it must be modelled for any Dijkstra block to round-trip.
+///
+/// The bound on `signers` is a length constraint on a byte string, so it does
+/// not change the shape a decoder has to read. It is a validation rule this
+/// type does not enforce, in keeping with every other `.size` bound in the
+/// era.
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
 pub struct LeiosCertificate {
-    /// Bitfield naming the signers.
+    /// Bitfield naming the signers, up to 65536 entries.
     #[n(0)]
     pub signers: Bytes,
 
     /// Aggregated signature over the certified announcement.
     #[n(1)]
-    pub aggregated_signature: LeiosSignature,
+    pub signature: LeiosSignature,
 }
 
-/// `peras_certificate = bytes` (`defs.cddl:909`). Reserved in every Dijkstra
+/// `peras_certificate = bytes` (`defs.cddl`). Reserved in every Dijkstra
 /// ranking block body.
 pub type PerasCertificate = Bytes;
 
@@ -212,9 +226,10 @@ pub type PerasCertificate = Bytes;
 
 /// `certificate` (`defs.cddl`) drops Conway's `account_registration_cert` (0)
 /// and `account_unregistration_cert` (1), and `pool_params` gains an optional
-/// `leios_key` at position 3 (`defs.cddl:464`), shifting `pledge` onward.
+/// `bls_key` at position 3 of `pool_params` (`defs.cddl`), shifting `pledge`
+/// onward.
 ///
-/// The `leios_key` slot is three-state on the wire: absent entirely, present
+/// The `bls_key` slot is three-state on the wire: absent entirely, present
 /// and `nil`, or present and populated. All three re-encode differently, so
 /// the field is an `Option<Nullable<_>>` and the codec is hand written rather
 /// than derived, because a mid-array optional cannot be expressed positionally.
@@ -224,7 +239,7 @@ pub enum Certificate {
     PoolRegistration {
         operator: PoolKeyhash,
         vrf_keyhash: VrfKeyhash,
-        leios_key: Option<Nullable<LeiosKey>>,
+        bls_key: Option<Nullable<BlsKey>>,
         pledge: Coin,
         cost: Coin,
         margin: UnitInterval,
@@ -262,10 +277,10 @@ impl<'b, C> minicbor::Decode<'b, C> for Certificate {
                 let operator = d.decode_with(ctx)?;
                 let vrf_keyhash = d.decode_with(ctx)?;
 
-                // `? leios_key : leios_key/ nil` sits between `vrf_keyhash` and
+                // `? bls_key : bls_key/ nil` sits between `vrf_keyhash` and
                 // `pledge`. `pledge` is a coin, so a uint here means the slot
                 // was omitted, and an array or a null means it was supplied.
-                let leios_key = match d.datatype()? {
+                let bls_key = match d.datatype()? {
                     minicbor::data::Type::Array | minicbor::data::Type::ArrayIndef => {
                         Some(Nullable::Some(d.decode_with(ctx)?))
                     }
@@ -279,7 +294,7 @@ impl<'b, C> minicbor::Decode<'b, C> for Certificate {
                 Ok(Certificate::PoolRegistration {
                     operator,
                     vrf_keyhash,
-                    leios_key,
+                    bls_key,
                     pledge: d.decode_with(ctx)?,
                     cost: d.decode_with(ctx)?,
                     margin: d.decode_with(ctx)?,
@@ -369,7 +384,7 @@ impl<C> minicbor::Encode<C> for Certificate {
             Certificate::PoolRegistration {
                 operator,
                 vrf_keyhash,
-                leios_key,
+                bls_key,
                 pledge,
                 cost,
                 margin,
@@ -378,11 +393,11 @@ impl<C> minicbor::Encode<C> for Certificate {
                 relays,
                 pool_metadata,
             } => {
-                e.array(if leios_key.is_some() { 11 } else { 10 })?;
+                e.array(if bls_key.is_some() { 11 } else { 10 })?;
                 e.encode_with(3u16, ctx)?;
                 e.encode_with(operator, ctx)?;
                 e.encode_with(vrf_keyhash, ctx)?;
-                match leios_key {
+                match bls_key {
                     Some(Nullable::Some(k)) => {
                         e.encode_with(k, ctx)?;
                     }
@@ -562,8 +577,16 @@ impl<'b, C> minicbor::Decode<'b, C> for CostModels {
     }
 }
 
-/// `protocol_param_update` gains keys 34 through 37 (`defs.cddl:709`), the four
-/// reference script parameters.
+/// `protocol_param_update` (`defs.cddl`) gains keys 34 through 37, the four
+/// reference script parameters, and keys 38 through 48, which carry the pledge
+/// and margin limits, the five Leios period and committee parameters, and the
+/// four endorser block limits.
+///
+/// Keys 38 through 48 are what the node reads its Leios configuration from as
+/// of `prototype-2026w36`, where the earlier build took them from the Dijkstra
+/// genesis file instead. A parameter update that sets one of them decodes as
+/// an empty update through a type that stops at 37, which is why the tail is
+/// modelled rather than left to a catch-all.
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
 #[cbor(map)]
 pub struct ProtocolParamUpdate {
@@ -639,6 +662,33 @@ pub struct ProtocolParamUpdate {
     pub ref_script_cost_stride: Option<u64>,
     #[n(37)]
     pub ref_script_cost_multiplier: Option<PositiveInterval>,
+
+    // -- NEW IN THE prototype-2026w36 LEDGER
+    /// Key 38. `max_pledge_leverage = nonnegative_interval/ nil`
+    /// (`defs.cddl`), so the slot is
+    /// three-state and an explicit `nil` is not the same as an absent key.
+    #[n(38)]
+    pub max_pledge_leverage: Option<Nullable<RationalNumber>>,
+    #[n(39)]
+    pub min_pool_margin: Option<UnitInterval>,
+    #[n(40)]
+    pub leios_announcement_period_length: Option<u64>,
+    #[n(41)]
+    pub leios_vote_period_length: Option<u64>,
+    #[n(42)]
+    pub leios_diffusion_period_length: Option<u64>,
+    #[n(43)]
+    pub leios_committee_size: Option<u64>,
+    #[n(44)]
+    pub leios_quorum_stake_threshold: Option<UnitInterval>,
+    #[n(45)]
+    pub max_endorser_block_references_size: Option<u64>,
+    #[n(46)]
+    pub max_endorser_block_txs_size: Option<u64>,
+    #[n(47)]
+    pub max_endorser_block_execution_units: Option<ExUnits>,
+    #[n(48)]
+    pub max_ref_script_size_per_endorser_block: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
@@ -653,7 +703,7 @@ pub struct Update {
 // ----- Transaction body
 
 /// `guards = nonempty_set<addr_keyhash>/ nonempty_oset<credential>`
-/// (`defs.cddl:640`). Replaces Conway's `required_signers` at key 14 and
+/// (`defs.cddl`). Replaces Conway's `required_signers` at key 14 and
 /// widens it: the second arm carries credentials, which a decoder typed as
 /// `NonEmptySet<AddrKeyhash>` cannot read.
 ///
@@ -705,21 +755,32 @@ impl<C> minicbor::Encode<C> for Guards {
     }
 }
 
-/// `direct_deposits = {+ reward_account => coin}` (`defs.cddl:822`).
+/// `direct_deposits = {+ reward_account => coin}` (`defs.cddl`).
 pub type DirectDeposits = BTreeMap<RewardAccount, Coin>;
 
 /// `required_top_level_guards = {+ credential => plutus_data/ nil}`
-/// (`defs.cddl:820`). Carried by a sub transaction body at key 24.
+/// (`defs.cddl`). Carried by a transaction body at key 24 and by a sub
+/// transaction body at the same key.
 pub type RequiredTopLevelGuards = BTreeMap<StakeCredential, Nullable<PlutusData>>;
 
-/// `account_balance_intervals = {+ credential => account_balance_interval}`
-/// (`defs.cddl:824`).
-pub type AccountBalanceIntervals = BTreeMap<StakeCredential, AccountBalanceInterval>;
+/// `account_balance_intervals = {+ reward_account => account_balance_interval}`
+/// (`defs.cddl`).
+///
+/// Keyed by `credential` in the ledger revision the blueprint still mirrors.
+/// A reward account is a byte string and a credential is an array, so the two
+/// keyings are not interchangeable on the wire.
+pub type AccountBalanceIntervals = BTreeMap<RewardAccount, AccountBalanceInterval>;
 
-/// `account_balance_interval` (`defs.cddl:826`) is a two element array whose
-/// two arms between them permit a missing lower bound or a missing upper
-/// bound, but never both. The three legal combinations are named here so that
-/// the fourth cannot be constructed or decoded.
+/// `starting_account_balance_intervals = {+ reward_account => account_balance_interval}`
+/// (`defs.cddl`). Carried by a transaction body at key 27. Same shape as
+/// `account_balance_intervals`, a distinct rule and a distinct key.
+pub type StartingAccountBalanceIntervals = BTreeMap<RewardAccount, AccountBalanceInterval>;
+
+/// `account_balance_interval` (`defs.cddl`) is either a two element array
+/// whose two arms between them permit a missing lower bound or a missing upper
+/// bound but never both, or a bare `coin`. The four legal shapes are named
+/// here so that the fifth, an array with neither bound, cannot be constructed
+/// or decoded.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum AccountBalanceInterval {
     /// `[coin, nil]`
@@ -728,10 +789,19 @@ pub enum AccountBalanceInterval {
     Bounded(Coin, Coin),
     /// `[nil, coin]`
     UpperBound(Coin),
+    /// A bare `coin`, with no enclosing array.
+    Exact(Coin),
 }
 
 impl<'b, C> minicbor::Decode<'b, C> for AccountBalanceInterval {
     fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+        // The bare `coin` arm is a uint and the two bounded arms are arrays, so
+        // the shape is decided before anything is consumed.
+        match d.datatype()? {
+            minicbor::data::Type::Array | minicbor::data::Type::ArrayIndef => {}
+            _ => return Ok(AccountBalanceInterval::Exact(d.decode_with(ctx)?)),
+        }
+
         d.array()?;
 
         let lower: Option<Coin> = match d.datatype()? {
@@ -767,20 +837,26 @@ impl<C> minicbor::Encode<C> for AccountBalanceInterval {
         e: &mut minicbor::Encoder<W>,
         ctx: &mut C,
     ) -> Result<(), minicbor::encode::Error<W::Error>> {
-        e.array(2)?;
-
+        // The bare arm carries no array header, so the header is written inside
+        // the three bounded arms rather than ahead of the match.
         match self {
             AccountBalanceInterval::LowerBound(l) => {
+                e.array(2)?;
                 e.encode_with(l, ctx)?;
                 e.null()?;
             }
             AccountBalanceInterval::Bounded(l, u) => {
+                e.array(2)?;
                 e.encode_with(l, ctx)?;
                 e.encode_with(u, ctx)?;
             }
             AccountBalanceInterval::UpperBound(u) => {
+                e.array(2)?;
                 e.null()?;
                 e.encode_with(u, ctx)?;
+            }
+            AccountBalanceInterval::Exact(c) => {
+                e.encode_with(c, ctx)?;
             }
         }
 
@@ -788,7 +864,7 @@ impl<C> minicbor::Encode<C> for AccountBalanceInterval {
     }
 }
 
-/// `sub_transaction_body` (`defs.cddl:798`), the body of a nested transaction.
+/// `sub_transaction_body` (`defs.cddl`), the body of a nested transaction.
 /// It is Conway's body minus the keys a sub transaction cannot carry, plus
 /// `required_top_level_guards` at key 24.
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Clone)]
@@ -853,7 +929,8 @@ pub struct SubTransactionBody<'a> {
 }
 
 /// `sub_transaction = [sub_transaction_body, transaction_witness_set, auxiliary_data/ nil]`
-/// (`defs.cddl:795`).
+/// (`defs.cddl`). A sub transaction carries no validity flag, in Dijkstra
+/// or in the w36 ledger: only a `block_transaction` does.
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Clone)]
 pub struct SubTransaction<'b> {
     #[b(0)]
@@ -866,11 +943,11 @@ pub struct SubTransaction<'b> {
     pub auxiliary_data: Nullable<KeepRaw<'b, AuxiliaryData>>,
 }
 
-/// `sub_transactions = nonempty_oset<sub_transaction>` (`defs.cddl:793`).
+/// `sub_transactions = nonempty_oset<sub_transaction>` (`defs.cddl`).
 pub type SubTransactions<'b> = NonEmptySet<SubTransaction<'b>>;
 
 /// `transaction_body` (`defs.cddl`). Relative to Conway: key 14 is `guards`
-/// rather than `required_signers`, and keys 23, 25 and 26 are new.
+/// rather than `required_signers`, and keys 23 through 27 are new.
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Clone)]
 #[cbor(map)]
 pub struct TransactionBody<'a> {
@@ -941,11 +1018,20 @@ pub struct TransactionBody<'a> {
     #[b(23)]
     pub sub_transactions: Option<SubTransactions<'a>>,
 
+    /// Key 24. Already reachable through a sub transaction body in the earlier
+    /// ledger revision, and promoted to the top level body by the w36 ledger.
+    #[n(24)]
+    pub required_top_level_guards: Option<RequiredTopLevelGuards>,
+
     #[n(25)]
     pub direct_deposits: Option<DirectDeposits>,
 
     #[n(26)]
     pub account_balance_intervals: Option<AccountBalanceIntervals>,
+
+    // -- NEW IN THE prototype-2026w36 LEDGER
+    #[n(27)]
+    pub starting_account_balance_intervals: Option<StartingAccountBalanceIntervals>,
 }
 
 // ----- Outputs
@@ -966,7 +1052,7 @@ codec_by_datatype! {
 // ----- Scripts and witnesses
 
 /// `native_script` gains `script_require_guard = (6, credential)`
-/// (`defs.cddl:433`), so the Conway type cannot be reused even though the
+/// (`defs.cddl`), so the Conway type cannot be reused even though the
 /// witness set rule that reaches it is unchanged.
 #[derive(Encode, Decode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[cbor(flat)]
@@ -1065,7 +1151,7 @@ impl std::ops::Deref for Redeemers {
     }
 }
 
-/// `transaction_witness_set` (`defs.cddl:831`). The rule text is identical to
+/// `transaction_witness_set` (`defs.cddl`). The rule text is identical to
 /// Conway's, but two of the rules it reaches are not: `native_script` gained a
 /// variant and `redeemers` lost its array arm, so this type is redefined here
 /// rather than re-exported.
@@ -1097,7 +1183,7 @@ pub struct WitnessSet<'b> {
     pub plutus_v3_script: Option<NonEmptySet<PlutusScript<3>>>,
 }
 
-/// `auxiliary_data_map` gains `? 5 : [* plutus_v4_script]` (`defs.cddl:898`).
+/// `auxiliary_data_map` gains `? 5 : [* plutus_v4_script]` (`defs.cddl`).
 ///
 /// Keys 3 and 4 are also carried here. Conway's CDDL already defines them and
 /// the live Conway type in this crate does not, so a Conway auxiliary data
@@ -1166,29 +1252,32 @@ pub enum ScriptRef<'b> {
 
 // ----- Block and transaction
 
-/// `block_body` (`defs.cddl:102`). Dijkstra replaces Conway's segregated
+/// `block_body` (`defs.cddl`). Dijkstra replaces Conway's segregated
 /// witness layout with complete inline transactions, and reserves a Leios and
 /// a Peras certificate slot in every ranking block.
+///
+/// Three elements, not four. The earlier ledger revision led with an
+/// `invalid_transactions` index set and carried the validity of each
+/// transaction there. The w36 ledger deletes that element and the
+/// `transaction_index` rule behind it, and moves validity into each
+/// transaction as a fourth field, so the two shapes cannot both decode.
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Clone)]
 pub struct BlockBody<'b> {
-    #[n(0)]
-    pub invalid_transactions: Nullable<NonEmptySet<TransactionIndex>>,
-
     /// The node emits this list as an indefinite length array in 827 of the
     /// 1478 blocks measured off the Musashi immutable database, and as a
     /// definite one in the rest, so the distinction is preserved rather than
     /// normalised.
-    #[b(1)]
-    pub transactions: MaybeIndefArray<Tx<'b>>,
+    #[b(0)]
+    pub transactions: MaybeIndefArray<BlockTransaction<'b>>,
 
-    #[n(2)]
+    #[n(1)]
     pub leios_certificate: Nullable<LeiosCertificate>,
 
-    #[n(3)]
+    #[n(2)]
     pub peras_certificate: Nullable<PerasCertificate>,
 }
 
-/// `block = [header, block_body]` (`defs.cddl:3`).
+/// `block = [header, block_body]` (`defs.cddl`).
 ///
 /// This structure allows to retrieve the original CBOR bytes for each
 /// structure that might require hashing, so that the resulting hash matches
@@ -1202,11 +1291,22 @@ pub struct Block<'b> {
     pub block_body: BlockBody<'b>,
 }
 
-/// `transaction = [transaction_body, transaction_witness_set, auxiliary_data/ nil]`
-/// (`defs.cddl:5`). Conway's `is_valid` bool at position 2 is gone: the flag is
-/// stripped when a transaction enters a block, so it cannot appear here.
+/// `block_transaction = [transaction_body, transaction_witness_set, auxiliary_data/ nil, bool]`
+/// (`defs.cddl`). Four elements, with the validity flag last. This is what a
+/// ranking block body carries, and the only place the flag appears.
+///
+/// Conway carries the same flag at position 2, ahead of the auxiliary data.
+/// Dijkstra moves it behind, so that every field the transaction author
+/// supplies comes first and the one field the block producer sets comes last.
+/// The field is named `success` to match [`crate::conway::Tx`], since it
+/// answers the same question and reaches the same accessor.
+///
+/// The era's other transaction rule, [`MempoolTransaction`], is three elements
+/// and is a distinct type rather than this one with the flag made optional.
+/// Both are live on the wire at once, and neither decodes as the other, so
+/// which of the two a byte string is has to be a matter of which type read it.
 #[derive(Clone, Serialize, Deserialize, Encode, Decode, Debug, PartialEq)]
-pub struct Tx<'b> {
+pub struct BlockTransaction<'b> {
     #[b(0)]
     pub transaction_body: KeepRaw<'b, TransactionBody<'b>>,
 
@@ -1215,15 +1315,40 @@ pub struct Tx<'b> {
 
     #[n(2)]
     pub auxiliary_data: Nullable<KeepRaw<'b, AuxiliaryData>>,
+
+    /// Set by the block producer, not by the transaction author. A transaction
+    /// only has this field once it is in a block, which is why
+    /// [`MempoolTransaction`] does not share this type.
+    #[n(3)]
+    pub success: bool,
 }
 
-impl Eq for Tx<'_> {}
+impl Eq for BlockTransaction<'_> {}
 
-/// `transaction_mempool` (`defs.cddl`) permits the Conway four element shape on
-/// submission only, with `is_valid` required to be `true`. A transaction read
-/// back out of a block is always three elements.
+impl<'b> BlockTransaction<'b> {
+    /// The same transaction as its author submitted it, without the flag the
+    /// block producer added. Re-encodes as three elements, which is the shape
+    /// an endorser block closure and a mempool submission both carry.
+    pub fn to_mempool_transaction(&self) -> MempoolTransaction<'b> {
+        MempoolTransaction {
+            transaction_body: self.transaction_body.clone(),
+            transaction_witness_set: self.transaction_witness_set.clone(),
+            is_valid_supplied: false,
+            auxiliary_data: self.auxiliary_data.clone(),
+        }
+    }
+}
+
+/// `mempool_transaction` (`defs.cddl`) is three elements, and tolerates the
+/// Conway four element shape on submission only, with `is_valid` required to be
+/// `true`.
+///
+/// Two paths carry this shape rather than [`BlockTransaction`]: a client
+/// submitting a transaction, and an endorser block closure travelling over
+/// leios-fetch. Neither has a block producer's verdict to report, so neither
+/// carries the flag.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
-pub struct TxMempool<'b> {
+pub struct MempoolTransaction<'b> {
     pub transaction_body: KeepRaw<'b, TransactionBody<'b>>,
     pub transaction_witness_set: KeepRaw<'b, WitnessSet<'b>>,
     /// `true` when the submitted encoding carried the deprecated `is_valid`
@@ -1232,7 +1357,7 @@ pub struct TxMempool<'b> {
     pub auxiliary_data: Nullable<KeepRaw<'b, AuxiliaryData>>,
 }
 
-impl<'b, C> minicbor::Decode<'b, C> for TxMempool<'b> {
+impl<'b, C> minicbor::Decode<'b, C> for MempoolTransaction<'b> {
     fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
         let len = d.array()?;
 
@@ -1262,7 +1387,7 @@ impl<'b, C> minicbor::Decode<'b, C> for TxMempool<'b> {
             )));
         }
 
-        Ok(TxMempool {
+        Ok(MempoolTransaction {
             transaction_body,
             transaction_witness_set,
             is_valid_supplied,
@@ -1271,7 +1396,7 @@ impl<'b, C> minicbor::Decode<'b, C> for TxMempool<'b> {
     }
 }
 
-impl<C> minicbor::Encode<C> for TxMempool<'_> {
+impl<C> minicbor::Encode<C> for MempoolTransaction<'_> {
     fn encode<W: minicbor::encode::Write>(
         &self,
         e: &mut minicbor::Encoder<W>,
@@ -1289,11 +1414,11 @@ impl<C> minicbor::Encode<C> for TxMempool<'_> {
     }
 }
 
-impl Eq for TxMempool<'_> {}
+impl Eq for MempoolTransaction<'_> {}
 
 #[cfg(test)]
 mod tests {
-    use super::{Block, Header};
+    use super::{Block, BlockTransaction, Header, MempoolTransaction};
     use pallas_codec::minicbor;
     use pallas_codec::utils::KeepRaw;
 
@@ -1426,24 +1551,183 @@ mod tests {
         // The tail the Babbage type dropped is exactly the two Leios fields,
         // and no other byte moved. Their width depends on the announcement
         // size, so it is computed from the value rather than hard coded.
-        let leios_tail = minicbor::to_vec(as_dijkstra.header_body.leios_certified)
+        let leios_tail = minicbor::to_vec(as_dijkstra.header_body.block_body_contains_leios_cert)
             .unwrap()
             .len()
-            + minicbor::to_vec(&as_dijkstra.header_body.leios_announcement)
+            + minicbor::to_vec(&as_dijkstra.header_body.eb_announcement)
                 .unwrap()
                 .len();
         assert_eq!(
             raw.len() - babbage_bytes.len(),
             leios_tail,
-            "the dropped tail should be exactly leios_certified plus leios_announcement"
+            "the dropped tail should be exactly block_body_contains_leios_cert plus eb_announcement"
         );
 
         assert_eq!(minicbor::to_vec(&as_dijkstra).unwrap(), raw);
-        assert!(as_dijkstra.header_body.leios_certified);
+        assert!(as_dijkstra.header_body.block_body_contains_leios_cert);
         assert!(matches!(
-            as_dijkstra.header_body.leios_announcement,
+            as_dijkstra.header_body.eb_announcement,
             crate::Nullable::Some(_)
         ));
+    }
+
+    /// `block_transaction` and `mempool_transaction` are both live on the wire
+    /// at once: a ranking block body carries the four element form, and a
+    /// mempool submission and an endorser block closure both carry the three
+    /// element one. Neither may decode as the other, or a closure would come
+    /// back with a validity verdict nobody issued.
+    #[test]
+    fn a_block_transaction_is_not_a_mempool_transaction() {
+        let bytes = hex::decode(TEST_BLOCKS[0].1).unwrap();
+        let (_, block): BlockWrapper = minicbor::decode(&bytes).unwrap();
+
+        let tx = block
+            .block_body
+            .transactions
+            .first()
+            .expect("the first fixture must carry at least one transaction");
+
+        // MUST NOT FIRE: the four element form round trips as itself.
+        let four = minicbor::to_vec(tx).unwrap();
+        let back: BlockTransaction = minicbor::decode(&four).unwrap();
+        assert_eq!(&back, tx);
+
+        // MUST FIRE: four element bytes are refused by the three element type.
+        let as_mempool: Result<MempoolTransaction, _> = minicbor::decode(&four);
+        assert!(
+            as_mempool.is_err(),
+            "a block transaction must not decode as a mempool transaction"
+        );
+
+        // MUST NOT FIRE: dropping the flag gives the three element form, and
+        // it is three elements shorter on the wire by exactly the flag.
+        let three = minicbor::to_vec(tx.to_mempool_transaction()).unwrap();
+        let round: MempoolTransaction = minicbor::decode(&three).unwrap();
+        assert!(!round.is_valid_supplied);
+        assert_eq!(
+            four.len() - three.len(),
+            minicbor::to_vec(tx.success).unwrap().len(),
+            "the two forms should differ by the flag and nothing else"
+        );
+
+        // MUST FIRE: three element bytes are refused by the four element type.
+        let as_block: Result<BlockTransaction, _> = minicbor::decode(&three);
+        assert!(
+            as_block.is_err(),
+            "a mempool transaction must not decode as a block transaction"
+        );
+    }
+
+    const DEFS_CDDL: &str = include_str!("defs.cddl");
+
+    /// Every CDDL rule the doc comments in this module name.
+    const MODELLED_RULES: &[&str] = &[
+        "account_balance_interval",
+        "account_balance_intervals",
+        "auxiliary_data",
+        "auxiliary_data_map",
+        "block",
+        "block_body",
+        "block_transaction",
+        "bls_key",
+        "bootstrap_witness",
+        "certificate",
+        "cost_models",
+        "direct_deposits",
+        "eb_announcement",
+        "guards",
+        "header",
+        "header_body",
+        "language",
+        "leios_certificate",
+        "leios_signature",
+        "max_pledge_leverage",
+        "mempool_transaction",
+        "native_script",
+        "nonnegative_interval",
+        "peras_certificate",
+        "pool_params",
+        "protocol_param_update",
+        "redeemer_tag",
+        "redeemers",
+        "required_top_level_guards",
+        "script",
+        "script_ref",
+        "starting_account_balance_intervals",
+        "sub_transaction",
+        "sub_transaction_body",
+        "sub_transactions",
+        "transaction_body",
+        "transaction_witness_set",
+        "vrf_cert",
+    ];
+
+    /// Rules the vendored revision does not define, each because the ledger
+    /// deleted or renamed it. A type in this module answers to each one, so if
+    /// a resync brings one back the model has to change with it.
+    const ABSENT_RULES: &[&str] = &[
+        // Deleted outright along with the block body's index set.
+        "invalid_transactions",
+        "transaction_index",
+        // Renamed to `block_transaction`.
+        "transaction",
+        // Renamed to `mempool_transaction`.
+        "transaction_mempool",
+        // Renamed to `eb_announcement`.
+        "leios_announcement",
+        // Renamed to `bls_key`.
+        "leios_key",
+    ];
+
+    /// True when `defs.cddl` defines `name` as a rule of its own, rather than
+    /// merely mentioning it or defining something that starts with it.
+    fn defines_rule(name: &str) -> bool {
+        DEFS_CDDL.lines().any(|line| {
+            line.strip_prefix(name).is_some_and(|rest| {
+                let rest = rest.trim_start();
+                // A plain rule is `name =`, a generic one is `name<a0> =`.
+                rest.starts_with('=') || rest.starts_with('<')
+            })
+        })
+    }
+
+    /// A doc comment naming a CDDL rule is only worth writing if it stays true
+    /// when the vendored file is resynced. Line numbers went stale on every
+    /// insertion and nothing said so, so the citations name rules and this is
+    /// what makes the naming load bearing.
+    ///
+    /// Both directions are checked. A rule this module models must be defined,
+    /// and a rule the ledger removed must not be, because a resync that brings
+    /// one back is exactly as much of a problem as one that takes another away.
+    #[test]
+    fn every_cited_rule_matches_the_vendored_cddl() {
+        // MUST NOT FIRE: everything the doc comments cite is really in there.
+        let missing: Vec<&str> = MODELLED_RULES
+            .iter()
+            .copied()
+            .filter(|name| !defines_rule(name))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "defs.cddl defines no rule for {missing:?}, so a doc comment in this module cites a rule the vendored revision does not have"
+        );
+
+        // MUST FIRE if a resync reinstates one: none of these is defined.
+        let resurrected: Vec<&str> = ABSENT_RULES
+            .iter()
+            .copied()
+            .filter(|name| defines_rule(name))
+            .collect();
+        assert!(
+            resurrected.is_empty(),
+            "defs.cddl defines {resurrected:?}, which this module models as removed or renamed"
+        );
+
+        // MUST FIRE: the check can tell a defined rule from an undefined one,
+        // so neither list above can pass by the predicate always agreeing.
+        assert!(defines_rule("block_body"));
+        assert!(!defines_rule("block_bod"));
+        assert!(!defines_rule("no_such_rule_exists"));
     }
 
     /// A Conway (ten field) header body must be refused by the Dijkstra type

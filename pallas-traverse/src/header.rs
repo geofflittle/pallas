@@ -150,11 +150,11 @@ impl<'b> MultiEraHeader<'b> {
         }
     }
 
-    /// Whether this block certifies the previously announced endorser block.
+    /// Whether this block's body carries a Leios certificate.
     /// `None` for every era before Dijkstra, which has no such field.
-    pub fn leios_certified(&self) -> Option<bool> {
+    pub fn block_body_contains_leios_cert(&self) -> Option<bool> {
         match self {
-            MultiEraHeader::Dijkstra(x) => Some(x.header_body.leios_certified),
+            MultiEraHeader::Dijkstra(x) => Some(x.header_body.block_body_contains_leios_cert),
             _ => None,
         }
     }
@@ -163,9 +163,9 @@ impl<'b> MultiEraHeader<'b> {
     /// both for eras with no announcement field and for a Dijkstra header
     /// whose announcement is nil, so a caller that needs to tell those apart
     /// should match on the era first.
-    pub fn leios_announcement(&self) -> Option<&dijkstra::LeiosAnnouncement> {
+    pub fn eb_announcement(&self) -> Option<&dijkstra::EbAnnouncement> {
         match self {
-            MultiEraHeader::Dijkstra(x) => match &x.header_body.leios_announcement {
+            MultiEraHeader::Dijkstra(x) => match &x.header_body.eb_announcement {
                 pallas_primitives::Nullable::Some(a) => Some(a),
                 _ => None,
             },
@@ -230,8 +230,8 @@ mod tests {
 
         assert!(matches!(header, MultiEraHeader::Dijkstra(_)));
         assert!(header.as_dijkstra().is_some());
-        assert_eq!(header.leios_certified(), Some(true));
-        assert!(header.leios_announcement().is_some());
+        assert_eq!(header.block_body_contains_leios_cert(), Some(true));
+        assert!(header.eb_announcement().is_some());
         assert_eq!(header.cbor(), raw.as_slice());
     }
 
@@ -248,7 +248,7 @@ mod tests {
             "tag 6 must not produce a Dijkstra header"
         );
         assert_eq!(
-            as_conway.leios_certified(),
+            as_conway.block_body_contains_leios_cert(),
             None,
             "a header decoded through the Conway tag cannot report Leios fields"
         );
@@ -279,6 +279,6 @@ mod tests {
 
         let header = MultiEraHeader::decode(6, None, &raw).unwrap();
         assert!(matches!(header, MultiEraHeader::BabbageCompatible(_)));
-        assert_eq!(header.leios_certified(), None);
+        assert_eq!(header.block_body_contains_leios_cert(), None);
     }
 }

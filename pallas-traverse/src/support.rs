@@ -70,23 +70,12 @@ pub fn clone_byron_txs<'b>(block: &'b byron::Block) -> Vec<byron::TxPayload<'b>>
 }
 
 /// Dijkstra transactions are already complete inside the block body, so there
-/// is nothing to reassemble from segregated witness and auxiliary data lists.
+/// is nothing to reassemble from segregated witness and auxiliary data lists,
+/// and nothing to pair back on from the block either.
 ///
-/// Validity is the one piece that is not in the transaction. Dijkstra strips
-/// the `is_valid` flag when a transaction enters a block and records the
-/// invalid ones as an index set on the block body instead, so it is paired
-/// back on here where the block is still in hand.
-pub fn clone_dijkstra_txs<'b>(block: &'b dijkstra::Block) -> Vec<(dijkstra::Tx<'b>, bool)> {
-    let invalid: &[u32] = match &block.block_body.invalid_transactions {
-        pallas_codec::utils::Nullable::Some(x) => x.as_slice(),
-        _ => &[],
-    };
-
-    block
-        .block_body
-        .transactions
-        .iter()
-        .enumerate()
-        .map(|(idx, tx)| (tx.clone(), !invalid.contains(&(idx as u32))))
-        .collect()
+/// Validity rides as the fourth element of each transaction, so a Dijkstra
+/// transaction answers for its own validity the way every earlier era's does
+/// once its block has been taken apart.
+pub fn clone_dijkstra_txs<'b>(block: &'b dijkstra::Block) -> Vec<dijkstra::BlockTransaction<'b>> {
+    block.block_body.transactions.iter().cloned().collect()
 }

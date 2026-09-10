@@ -29,7 +29,7 @@ impl<'b> MultiEraTx<'b> {
                 .as_ref()
                 .map(|x| x.as_ref())
                 .unwrap_or(&[]),
-            Self::Dijkstra(x, _) => x
+            Self::Dijkstra(x) => x
                 .transaction_witness_set
                 .vkeywitness
                 .as_ref()
@@ -73,7 +73,7 @@ impl<'b> MultiEraTx<'b> {
     /// `script_require_guard` variant that no earlier era has.
     pub fn dijkstra_native_scripts(&self) -> &[KeepRaw<'b, dijkstra::NativeScript>] {
         match self {
-            Self::Dijkstra(x, _) => x
+            Self::Dijkstra(x) => x
                 .transaction_witness_set
                 .native_script
                 .as_ref()
@@ -104,7 +104,7 @@ impl<'b> MultiEraTx<'b> {
                 .as_ref()
                 .map(|x| x.as_ref())
                 .unwrap_or(&[]),
-            Self::Dijkstra(x, _) => x
+            Self::Dijkstra(x) => x
                 .transaction_witness_set
                 .bootstrap_witness
                 .as_ref()
@@ -134,7 +134,7 @@ impl<'b> MultiEraTx<'b> {
                 .as_ref()
                 .map(|x| x.as_ref())
                 .unwrap_or(&[]),
-            Self::Dijkstra(x, _) => x
+            Self::Dijkstra(x) => x
                 .transaction_witness_set
                 .plutus_v1_script
                 .as_ref()
@@ -164,7 +164,7 @@ impl<'b> MultiEraTx<'b> {
                 .as_ref()
                 .map(|x| x.as_ref())
                 .unwrap_or(&[]),
-            Self::Dijkstra(x, _) => x
+            Self::Dijkstra(x) => x
                 .transaction_witness_set
                 .plutus_data
                 .as_ref()
@@ -209,7 +209,7 @@ impl<'b> MultiEraTx<'b> {
             },
             // Dijkstra deleted Conway's array arm, so redeemers are a map and
             // only a map here.
-            Self::Dijkstra(x, _) => match x.transaction_witness_set.redeemer.as_deref() {
+            Self::Dijkstra(x) => match x.transaction_witness_set.redeemer.as_deref() {
                 Some(x) => x
                     .iter()
                     .map(|(k, v)| MultiEraRedeemer::from_dijkstra(k, v))
@@ -264,7 +264,7 @@ impl<'b> MultiEraTx<'b> {
                 .as_ref()
                 .map(|x| x.as_ref())
                 .unwrap_or(&[]),
-            Self::Dijkstra(x, _) => x
+            Self::Dijkstra(x) => x
                 .transaction_witness_set
                 .plutus_v2_script
                 .as_ref()
@@ -284,7 +284,7 @@ impl<'b> MultiEraTx<'b> {
                 .as_ref()
                 .map(|x| x.as_ref())
                 .unwrap_or(&[]),
-            Self::Dijkstra(x, _) => x
+            Self::Dijkstra(x) => x
                 .transaction_witness_set
                 .plutus_v3_script
                 .as_ref()

@@ -218,14 +218,8 @@ pub enum MultiEraTx<'b> {
     Byron(Box<Cow<'b, byron::TxPayload<'b>>>),
     /// Conway transaction.
     Conway(Box<Cow<'b, conway::Tx<'b>>>),
-    /// Dijkstra transaction (three elements, no `is_valid` flag).
-    ///
-    /// The flag is carried alongside rather than inside, because Dijkstra
-    /// strips it when a transaction enters a block and records the invalid
-    /// ones on the block body instead. It is `true` for a transaction decoded
-    /// on its own, which is the only thing a standalone Dijkstra transaction
-    /// can say: its validity lives on the block it came from.
-    Dijkstra(Box<Cow<'b, dijkstra::Tx<'b>>>, bool),
+    /// Dijkstra transaction (four elements, `is_valid` last).
+    Dijkstra(Box<Cow<'b, dijkstra::BlockTransaction<'b>>>),
 }
 
 /// Ada-plus-multi-asset value normalized across eras.

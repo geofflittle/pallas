@@ -18,7 +18,7 @@ impl MultiEraTx<'_> {
                 Nullable::Some(x) => x.raw_cbor().len() + 1,
                 _ => 2,
             },
-            MultiEraTx::Dijkstra(x, _) => match &x.auxiliary_data {
+            MultiEraTx::Dijkstra(x) => match &x.auxiliary_data {
                 Nullable::Some(x) => x.raw_cbor().len() + 1,
                 _ => 2,
             },
@@ -31,7 +31,7 @@ impl MultiEraTx<'_> {
             MultiEraTx::Babbage(x) => x.transaction_body.raw_cbor().len(),
             MultiEraTx::Byron(x) => x.transaction.raw_cbor().len(),
             MultiEraTx::Conway(x) => x.transaction_body.raw_cbor().len(),
-            MultiEraTx::Dijkstra(x, _) => x.transaction_body.raw_cbor().len(),
+            MultiEraTx::Dijkstra(x) => x.transaction_body.raw_cbor().len(),
         }
     }
 
@@ -41,7 +41,7 @@ impl MultiEraTx<'_> {
             MultiEraTx::Babbage(x) => x.transaction_witness_set.raw_cbor().len(),
             MultiEraTx::Byron(x) => x.witness.raw_cbor().len(),
             MultiEraTx::Conway(x) => x.transaction_witness_set.raw_cbor().len(),
-            MultiEraTx::Dijkstra(x, _) => x.transaction_witness_set.raw_cbor().len(),
+            MultiEraTx::Dijkstra(x) => x.transaction_witness_set.raw_cbor().len(),
         }
     }
 

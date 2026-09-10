@@ -153,7 +153,7 @@ impl<'b> MultiEraBlock<'b> {
                 .collect(),
             MultiEraBlock::Dijkstra(x) => support::clone_dijkstra_txs(x)
                 .into_iter()
-                .map(|(tx, valid)| MultiEraTx::Dijkstra(Box::new(Cow::Owned(tx)), valid))
+                .map(|x| MultiEraTx::Dijkstra(Box::new(Cow::Owned(x))))
                 .collect(),
             MultiEraBlock::EpochBoundary(_) => vec![],
         }
@@ -334,8 +334,8 @@ mod tests {
         // this fixture is an empty block that carries both Leios fields
         assert_eq!(block.tx_count(), 0);
         assert!(block.is_empty());
-        assert_eq!(block.header().leios_certified(), Some(true));
-        assert!(block.header().leios_announcement().is_some());
+        assert_eq!(block.header().block_body_contains_leios_cert(), Some(true));
+        assert!(block.header().eb_announcement().is_some());
         assert!(block.leios_certificate().is_some());
         assert!(block.peras_certificate().is_none());
     }
@@ -406,8 +406,8 @@ mod tests {
         }
 
         // and this block carries neither Leios field, where dijkstra1 carries both
-        assert_eq!(block.header().leios_certified(), Some(false));
-        assert!(block.header().leios_announcement().is_none());
+        assert_eq!(block.header().block_body_contains_leios_cert(), Some(false));
+        assert!(block.header().eb_announcement().is_none());
         assert!(block.leios_certificate().is_none());
     }
 
