@@ -174,7 +174,14 @@ pub enum Feature {
 }
 
 /// A block header normalized across eras, keeping access to its raw CBOR.
+///
+/// `#[non_exhaustive]` because pallas is a 1.x crate and this enum gains a
+/// variant every era. Without it, a new era is a breaking change for every
+/// downstream crate that matches a header exhaustively. The three enums beside
+/// it, [`Era`], [`MultiEraBlock`] and [`MultiEraTx`], have carried the
+/// attribute since before 1.0, and this one was the odd one out.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum MultiEraHeader<'b> {
     /// Byron epoch-boundary block header.
     EpochBoundary(Cow<'b, KeepRaw<'b, byron::EbbHead>>),
@@ -409,11 +416,13 @@ pub enum MultiEraSigners<'b> {
 /// representation in the Conway type. Collapsing the two into one type would
 /// mean either dropping a V4 script or reporting it as absent, so the era is
 /// kept.
-/// Deliberately not `#[non_exhaustive]`, for the same reason
-/// [`MultiEraHeader`] is not: the attribute forces every downstream match to
-/// carry a catch-all, and a catch-all is exactly how a new era's script gets
-/// silently reported as absent. Making a new era a compile error here is the
-/// point.
+///
+/// Deliberately not `#[non_exhaustive]`: the attribute forces every downstream
+/// match to carry a catch-all, and a catch-all is exactly how a new era's
+/// script gets silently reported as absent. Making a new era a compile error
+/// here is the point. This is the one place in the crate where that trade is
+/// taken the other way, and it is taken knowingly, so the guard test names it
+/// rather than skipping it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MultiEraScriptRef<'b> {
     /// Reference script from a Babbage or Conway output.
@@ -477,4 +486,87 @@ pub trait ComputeHash<const BYTES: usize> {
 pub trait OriginalHash<const BYTES: usize> {
     /// Return the hash as computed over the value's original CBOR bytes.
     fn original_hash(&self) -> pallas_crypto::hash::Hash<BYTES>;
+}
+
+#[cfg(test)]
+mod attribute_tests {
+    const THIS_FILE: &str = include_str!("lib.rs");
+
+    /// The one `MultiEra` enum that is deliberately exhaustive, so that a new
+    /// era is a compile error for every downstream match rather than a silent
+    /// catch-all. Its own doc comment says why.
+    const DELIBERATELY_EXHAUSTIVE: &[&str] = &["MultiEraScriptRef"];
+
+    /// Every `pub enum MultiEra*` declared in this file, paired with whether
+    /// the line above it is `#[non_exhaustive]`.
+    fn multi_era_enums(source: &str) -> Vec<(String, bool)> {
+        let lines: Vec<&str> = source.lines().collect();
+
+        lines
+            .iter()
+            .enumerate()
+            .filter_map(|(i, line)| {
+                let rest = line.trim().strip_prefix("pub enum MultiEra")?;
+                let name: String = std::iter::once("MultiEra")
+                    .chain(std::iter::once(
+                        rest.split(['<', ' ', '{']).next().unwrap_or_default(),
+                    ))
+                    .collect();
+                let marked = i > 0 && lines[i - 1].trim() == "#[non_exhaustive]";
+                Some((name, marked))
+            })
+            .collect()
+    }
+
+    /// Adding a variant to an exhaustive public enum is a breaking change on a
+    /// 1.x crate, and every era adds one. The attribute is easy to forget on a
+    /// new enum and nothing else notices, so this is what notices.
+    ///
+    /// The deliberate exception is named rather than skipped, and is asserted
+    /// to still be an exception, so that marking it does not leave a stale
+    /// allowance behind that would let the next enum through unmarked.
+    #[test]
+    fn every_multi_era_enum_is_non_exhaustive_unless_named() {
+        let enums = multi_era_enums(THIS_FILE);
+
+        // MUST FIRE if the scan finds nothing: an empty result would make
+        // every assertion below pass by never running.
+        assert!(
+            enums.len() > 10,
+            "expected the scan to find the crate's MultiEra enums, found {}",
+            enums.len()
+        );
+
+        let unmarked: Vec<&str> = enums
+            .iter()
+            .filter(|(_, marked)| !marked)
+            .map(|(name, _)| name.as_str())
+            .filter(|name| !DELIBERATELY_EXHAUSTIVE.contains(name))
+            .collect();
+        assert!(
+            unmarked.is_empty(),
+            "{unmarked:?} lack #[non_exhaustive], so adding an era variant to one breaks every downstream exhaustive match"
+        );
+
+        let no_longer_needed: Vec<&str> = enums
+            .iter()
+            .filter(|(name, marked)| *marked && DELIBERATELY_EXHAUSTIVE.contains(&name.as_str()))
+            .map(|(name, _)| name.as_str())
+            .collect();
+        assert!(
+            no_longer_needed.is_empty(),
+            "{no_longer_needed:?} is now #[non_exhaustive], so remove it from DELIBERATELY_EXHAUSTIVE"
+        );
+    }
+
+    /// The scan above is only worth anything if it can tell the two cases
+    /// apart, so it is shown doing that on both.
+    #[test]
+    fn the_attribute_scan_reads_both_cases() {
+        let marked = multi_era_enums("#[non_exhaustive]\npub enum MultiEraThing<'b> {");
+        assert_eq!(marked, vec![("MultiEraThing".to_string(), true)]);
+
+        let bare = multi_era_enums("#[derive(Debug)]\npub enum MultiEraThing<'b> {");
+        assert_eq!(bare, vec![("MultiEraThing".to_string(), false)]);
+    }
 }
