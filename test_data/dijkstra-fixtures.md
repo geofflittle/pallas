@@ -52,3 +52,63 @@ models is exercised by no fixture and is modelled from the CDDL alone.
 | dijkstra11.block | 0, 1, 2 | 0 | map | none | bare | 0 | nil | nil |
 | dijkstra12.block | 0, 1, 2 | 0 | array | none | tagged | 1 | nil | nil |
 | dijkstra13.block | 0, 1, 2, 4 | 0 | array | 7, 9 | tagged | 0 | nil | nil |
+
+## The header a node sent over chainsync
+
+`dijkstra-header-envelope.hex` is one header taken off a node-to-node
+chainsync session rather than out of the chain database, because the thing it
+records is not in the bytes: it is the era tag of the envelope the header
+arrived in.
+
+Era detection on the header path rests entirely on that tag, and nothing else
+on the wire repeats it. The block wrapper tag and the chainsync envelope tag
+are not the same number, so this had to be measured rather than derived from
+the wrapper tag the blocks above carry.
+
+| | |
+| --- | --- |
+| how | `PeerClient::connect` to the node, network magic 164, `intersect_tip`, then the first three `RollForward` responses |
+| envelope tag the node sent | 7, on all three |
+| header kept | the first of the three |
+| block | 16273 |
+| slot | 340473 |
+| hash | `e1ab9eadcf98f83671eed6f0fbd1c947676a5d358a7e4132c29ecd7ca5ec7b46` |
+| bytes | 855 |
+| linkage | the second header the same session sent names this hash as its parent |
+
+The same session's local state query answered `GetCurrentEra` with 7, which is
+the same index counted the same way, so two paths agree on it.
+
+## Fixtures built rather than cut
+
+Four files here are hand built CBOR, for shapes no block on this chain
+reaches. Each is written by a builder in `pallas-traverse`, and a test there
+asserts the file is byte for byte what that builder writes, so the file and
+the builder cannot drift apart.
+
+| file | what it is |
+| --- | --- |
+| `proposal-param-change-key0.hex` | a `proposal_procedure` whose parameter change sets key 0, a key every era since Shelley has |
+| `proposal-param-change-key48.hex` | the same with key 48, `max_ref_script_size_per_endorser_block`, which only this era has |
+| `dijkstra-proposal.tx` | a `block_transaction` carrying the key 48 proposal at body key 20 |
+| `dijkstra-scripts.tx` | a `block_transaction` carrying a guard clause in its witness set, the same clause and a PlutusV4 script in its auxiliary data, and a PlutusV4 reference script on its output |
+
+The two proposal files are read by `pallas-primitives` and by
+`pallas-traverse`, and the two transaction files by `pallas-utxorpc`, so one
+set of bytes serves every crate that needs the shape.
+
+## The u5c snapshots
+
+`pallas-utxorpc` keeps a JSON snapshot per schema version per block, and a
+test compares the mapper's output to it. They are generated, not written:
+`REGENERATE_SNAPSHOTS=1 cargo test -p pallas-utxorpc --features unstable
+snapshot` rewrites each file in place, and a file that does not come back byte
+for byte identical on a second run is a file that no longer describes what the
+mapper does.
+
+| file | block | why that block |
+| --- | --- | --- |
+| `u5c_v1alpha.json`, `u5c_v1beta.json` | `u5c1.block` | the pre-existing non Dijkstra case |
+| `u5c_v1alpha_dijkstra.json`, `u5c_v1beta_dijkstra.json` | `dijkstra6.block` | four transactions and five certificates, every output a legacy array |
+| `u5c_v1alpha_dijkstra_map_output.json`, `u5c_v1beta_dijkstra_map_output.json` | `dijkstra10.block` | five post Alonzo map outputs beside two legacy arrays, with certificates and auxiliary data in the same block, so the map form reaches u5c at all |
+

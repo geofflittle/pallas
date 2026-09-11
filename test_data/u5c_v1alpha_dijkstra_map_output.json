@@ -1,0 +1,341 @@
+{
+  "body": {
+    "tx": [
+      {
+        "auxiliary": {},
+        "collateral": {
+          "totalCollateral": {
+            "int": "0"
+          }
+        },
+        "fee": {
+          "int": "165237"
+        },
+        "hash": "bj8+TrrAgwIkjReJF+BbhWQjv8EyFdNm0Qj1bnbXVdw=",
+        "inputs": [
+          {
+            "txHash": "HTtm/H5gK9idaKcA3zcp2QRqmi+jAuwOMCYUQ9jeVvQ="
+          }
+        ],
+        "outputs": [
+          {
+            "address": "AOkzkdfIB60rynqFnV5BQPWxdvCjYaKBJDvn6FLX+hJBywaqF7JGs2u8gtNr6wcYJqWnaB/BED1w",
+            "coin": {
+              "int": "9903997303"
+            },
+            "datum": {}
+          }
+        ],
+        "successful": true,
+        "validity": {},
+        "witnesses": {
+          "vkeywitness": [
+            {
+              "signature": "SVDiI4j0F3xvPExD1AMgSxnloPvOng8yMb8aYC/LgltdhdFLEKJaVjlGpvoSk07NwcVyXGtVt8aa3vKAjSUwBw==",
+              "vkey": "YOgRJzMXFqvGyjXjDOu0ETXLXJl1xG7uDGHojw4GBnw="
+            }
+          ]
+        }
+      },
+      {
+        "auxiliary": {},
+        "collateral": {
+          "totalCollateral": {
+            "int": "0"
+          }
+        },
+        "fee": {
+          "int": "165237"
+        },
+        "hash": "4EYY143KKZ/jdwmh1mrgHf1cE2d+1eJXBrOPw8+jVMA=",
+        "inputs": [
+          {
+            "txHash": "IPjOdxK2I4SzxZXeyOVxMYKr6SQkGw3Sxila1MLJ6a4="
+          }
+        ],
+        "outputs": [
+          {
+            "address": "AOPtbPvbQDH+fWOPvpUr90Z+vvvqHTG58T7pZLIeB47LSZnbBv/kqMNNsi1PJc0xmMHUceiyU8qA",
+            "coin": {
+              "int": "9903336355"
+            },
+            "datum": {}
+          }
+        ],
+        "successful": true,
+        "validity": {},
+        "witnesses": {
+          "vkeywitness": [
+            {
+              "signature": "lzPiVEGem38HBCcfFmekObs7qffWSit4Eth/gDCVYpCvQ979tFKh+JLdThv0B4W+EYXsjlrKbAc/ljpP42YuCw==",
+              "vkey": "93ffiWTvQlmLPc/z1chYgAouJzDR0GexegjY1wfs54k="
+            }
+          ]
+        }
+      },
+      {
+        "auxiliary": {},
+        "collateral": {
+          "totalCollateral": {
+            "int": "0"
+          }
+        },
+        "fee": {
+          "int": "165237"
+        },
+        "hash": "0L2OWQRp6ktNxovcYkE6K+P80J2/m+HHV9TkVTI9xL0=",
+        "inputs": [
+          {
+            "txHash": "dqs4FqLwHz4PBcXRWRVUucO8I5sNeSKwgNIET/5mroo="
+          }
+        ],
+        "outputs": [
+          {
+            "address": "AIOqhaontPTXxhGTOAUAc6SLnDrSrHrYdYwgIniddfbwYVPGDGdNpWNknc896Hi4ipAfag52TTxR",
+            "coin": {
+              "int": "9904658251"
+            },
+            "datum": {}
+          }
+        ],
+        "successful": true,
+        "validity": {},
+        "witnesses": {
+          "vkeywitness": [
+            {
+              "signature": "JnbMR7qONTuMOjUCEWgi/741Y+BQl837GOJLV1HvKcnzZ6sXl0dek5zOXu/25JMjOO4zfmI80/92d2CK5I5CBg==",
+              "vkey": "Do1se7xyhLcMgXuAlL/kO774jYxVdgdUsUKhET49GvI="
+            }
+          ]
+        }
+      },
+      {
+        "auxiliary": {},
+        "collateral": {
+          "totalCollateral": {
+            "int": "0"
+          }
+        },
+        "fee": {
+          "int": "165237"
+        },
+        "hash": "uhnPAAG7TFfOH8C7yadd9boQqbpShIZsgYHqUdS80YU=",
+        "inputs": [
+          {
+            "txHash": "xELKXlydrg89jTpCkx4JiaJEp4D9aD7ugq653sMg4fo="
+          }
+        ],
+        "outputs": [
+          {
+            "address": "AI26snGw+eYO9kjjSzfhXRwA5rx62lWnGKZeQwc4thk8UaIpWgHepsFKSqxb83PRP0mxuK6AM74N",
+            "coin": {
+              "int": "9903336355"
+            },
+            "datum": {}
+          }
+        ],
+        "successful": true,
+        "validity": {},
+        "witnesses": {
+          "vkeywitness": [
+            {
+              "signature": "MY89BWOFtxPfYgfhaUM7H/CvY67uU5m7xa+rFlOJLIlvi4CyoOiqs3XlQKqBDcM4pwLe+RxGD1LDTU5HAa/QAg==",
+              "vkey": "njMYpVKA3KfhCOq2hpden91jv06OQYuqCc8ShRfDwcc="
+            }
+          ]
+        }
+      },
+      {
+        "auxiliary": {},
+        "collateral": {
+          "totalCollateral": {
+            "int": "0"
+          }
+        },
+        "fee": {
+          "int": "165237"
+        },
+        "hash": "sBYfqPyrTijKCl/Fkcr7VQP1GBYkBfcLPq69rYZd/Jg=",
+        "inputs": [
+          {
+            "txHash": "gf1FJboHRa3p+b+SEVL3e8tFuakR1QNgT+pNkGD/IC0="
+          }
+        ],
+        "outputs": [
+          {
+            "address": "AAyhsHW05WxeTQtmciYteeMC8NbLl+kR7rixGurn1kawzkzrsfQl6s/JnhLCKTGX5FXi1yxqHOhj",
+            "coin": {
+              "int": "9903832066"
+            },
+            "datum": {}
+          }
+        ],
+        "successful": true,
+        "validity": {},
+        "witnesses": {
+          "vkeywitness": [
+            {
+              "signature": "BxO60aSSZIaoPHnHJWZAEyHeDOyt46IFOAZHIUo2UVRYwiH1R3WpLHXUPBr9c3ui7oEOEayCn9uTCR+e7z8yDQ==",
+              "vkey": "ugiCfFwMoU7VuhB793z5JdYslMIwzdL+1+tI4Kit8Rk="
+            }
+          ]
+        }
+      },
+      {
+        "auxiliary": {},
+        "certificates": [
+          {
+            "regCert": {
+              "coin": {
+                "int": "2000000"
+              },
+              "stakeCredential": {
+                "addrKeyHash": "317yrYr5BCDDYxBi8t93SlIHE2aAds0HSXf1Vg=="
+              }
+            }
+          }
+        ],
+        "collateral": {
+          "totalCollateral": {
+            "int": "0"
+          }
+        },
+        "fee": {
+          "int": "170825"
+        },
+        "hash": "cIn5mayRc1JCoXB1MI2Gt5xfyOxp8wHufsL2PRDgD6o=",
+        "inputs": [
+          {
+            "txHash": "4LakhOKOU/fLMgLrfTYtINgu3lIrDRIwfhzuE6Kk88Y="
+          }
+        ],
+        "outputs": [
+          {
+            "address": "YFLmPyLFEH7XdrcPe5IkiwJVL9CPPnR7x0UJlEE=",
+            "coin": {
+              "int": "9997829175"
+            },
+            "datum": {}
+          }
+        ],
+        "successful": true,
+        "validity": {
+          "ttl": "468996"
+        },
+        "witnesses": {
+          "vkeywitness": [
+            {
+              "signature": "vQaGy1WRRnsotqnIY7isP9KcofqHqCioOx5jM18mNfZrdObkjS0P8IlOqYygQH/T+Ybx0tqxfq3UzGwgfiEcAA==",
+              "vkey": "dC2K81QzSbWxjzy6KPI7LW5GW5wTbELh+uayOQ9WVCc="
+            },
+            {
+              "signature": "rC17jyHvfL18fqXpAky5TfOSf9RXhfs0UK6vmWc931Rr/2TrQZ1DgB/ObCr0G0QVnRnVyLXbJVj1CekxYweuCA==",
+              "vkey": "tGvsovzCsjFYfAoDRKTWHGlNQDt0O+93ZJkIxjAlxSg="
+            }
+          ]
+        }
+      },
+      {
+        "auxiliary": {
+          "metadata": [
+            {
+              "label": "674",
+              "value": {
+                "map": {
+                  "pairs": [
+                    {
+                      "key": {
+                        "text": "musashinet_incentives_application_code"
+                      },
+                      "value": {
+                        "text": "a04a01833455c8394184c3d8c4eaccae4a11b044971e11788c1b051251cf4bc7"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "certificates": [
+          {
+            "poolRegistration": {
+              "cost": {
+                "int": "170000000000"
+              },
+              "margin": {
+                "denominator": 20,
+                "numerator": 1
+              },
+              "operator": "umxykRtRtzjpA7kD52yYaHFOVsijvtDDG057KA==",
+              "pledge": {
+                "int": "1000000000"
+              },
+              "poolMetadata": {
+                "hash": "vn15ruATKx4P+TVqdacNY1jTT5kcr6lvTBvzoVFI4Zs=",
+                "url": "https://raw.githubusercontent.com/hamster-stake-pool/leios-testnet/refs/heads/main/h1mda-meta.json"
+              },
+              "poolOwners": [
+                "+FzEPgxewdqTY9Jkk4wNJew6GndPNqM0+jKr8A=="
+              ],
+              "relays": [
+                {
+                  "ipV4": "ze86qQ==",
+                  "port": 3010
+                }
+              ],
+              "rewardAccount": "4PhcxD4MXsHak2PSZJOMDSXsOhp3TzajNPoyq/A=",
+              "vrfKeyhash": "SpR0OrlhwZrpIAiZrgW3zPPQ1er0EdYZV9RhJ0orwbE="
+            }
+          }
+        ],
+        "collateral": {
+          "totalCollateral": {
+            "int": "0"
+          }
+        },
+        "fee": {
+          "int": "209633"
+        },
+        "hash": "T0zC/Pn8QCgz/zrO5aJLyjKe3T0v5ySvG+rVySb0KGo=",
+        "inputs": [
+          {
+            "txHash": "lGRuBgL7iE+aBS3S56xOl198mYun/aV/V4YO+erEWbw="
+          }
+        ],
+        "outputs": [
+          {
+            "address": "AHDelzLRkwKc/JvJI3j6ZpV7gsXZqwodFO0j8sP4XMQ+DF7B2pNj0mSTjA0l7Doad082ozT6Mqvw",
+            "coin": {
+              "int": "9496609173"
+            },
+            "datum": {}
+          }
+        ],
+        "successful": true,
+        "validity": {},
+        "witnesses": {
+          "vkeywitness": [
+            {
+              "signature": "WpryuCqAXf0LBYV0VO2rU/Fi9gsY4tqai2jPUTR1W+chY1Tx2zwnhqmZPJJ7BBeKbtVhEK/Vfh6uBJxwDEYCCw==",
+              "vkey": "RS9fOo1thon54vVNGFYl5S7jOGXd2Ly+XiBDVbSiTUs="
+            },
+            {
+              "signature": "WBnCfeCs7LFpeHoj8zDThLprjGN1oNxKWjyRpMnxIs6uz/4Pvq9xdiGC0Rs3c1r933KMdZU9IQ+2kOQD4a6GAA==",
+              "vkey": "zSScgcZVAKfPqNLfLHpC+zJwgFoVyWANS7HmQA6jYas="
+            },
+            {
+              "signature": "SIvUdn+cHnrcODRvogPKp31KG+ev19cafGpkvYYwXRnlBFW5aUQhOhV8GNvLmeCi4ILKziKGIwRDeuCGGRwhDg==",
+              "vkey": "TFuaUy8UFruFZXt7ULbOjffnua+isrBGgVMW/tcfbL8="
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "header": {
+    "hash": "kXxy3NLSIi31zIL86+pVxPkTXl8Uka/WbXnUjVLkL2A=",
+    "height": "17297",
+    "slot": "369030"
+  }
+}
