@@ -272,22 +272,30 @@ impl TryFrom<GenesisFileRaw> for GenesisFile {
     type Error = String;
 
     fn try_from(raw: GenesisFileRaw) -> Result<Self, Self::Error> {
-        let extra = raw.extra_config.unwrap_or_default();
+        raw.fold(&injection::Source::NoFilesystem)
+    }
+}
 
-        let had_staking = raw.staking.is_some();
-        let (top_level_pools, top_level_stake) = match raw.staking {
+impl GenesisFileRaw {
+    fn fold(self, source: &injection::Source) -> Result<GenesisFile, String> {
+        let extra = self.extra_config.unwrap_or_default();
+
+        let had_staking = self.staking.is_some();
+        let (top_level_pools, top_level_stake) = match self.staking {
             Some(staking) => (staking.pools, staking.stake),
             None => (None, None),
         };
 
         let initial_funds = injection::resolve(
+            source,
             "initialFunds",
             "initialFunds",
             extra.initial_funds,
-            raw.initial_funds,
+            self.initial_funds,
         )?;
 
         let pools = injection::resolve(
+            source,
             "stakePools",
             "staking.pools",
             extra.stake_pools,
@@ -295,6 +303,7 @@ impl TryFrom<GenesisFileRaw> for GenesisFile {
         )?;
 
         let stake = injection::resolve(
+            source,
             "stakeCredentials",
             "staking.stake",
             extra.stake_credentials,
@@ -308,21 +317,21 @@ impl TryFrom<GenesisFileRaw> for GenesisFile {
         };
 
         Ok(GenesisFile {
-            active_slots_coeff: raw.active_slots_coeff,
-            epoch_length: raw.epoch_length,
-            gen_delegs: raw.gen_delegs,
+            active_slots_coeff: self.active_slots_coeff,
+            epoch_length: self.epoch_length,
+            gen_delegs: self.gen_delegs,
             initial_funds,
-            max_lovelace_supply: raw.max_lovelace_supply,
-            network_id: raw.network_id,
-            network_magic: raw.network_magic,
-            protocol_params: raw.protocol_params,
-            security_param: raw.security_param,
-            slot_length: raw.slot_length,
+            max_lovelace_supply: self.max_lovelace_supply,
+            network_id: self.network_id,
+            network_magic: self.network_magic,
+            protocol_params: self.protocol_params,
+            security_param: self.security_param,
+            slot_length: self.slot_length,
             staking,
-            system_start: raw.system_start,
-            update_quorum: raw.update_quorum,
-            max_kes_evolutions: raw.max_kes_evolutions,
-            slots_per_kes_period: raw.slots_per_kes_period,
+            system_start: self.system_start,
+            update_quorum: self.update_quorum,
+            max_kes_evolutions: self.max_kes_evolutions,
+            slots_per_kes_period: self.slots_per_kes_period,
         })
     }
 }
@@ -352,11 +361,17 @@ pub struct GenesisFile {
 }
 
 pub fn from_file(path: &std::path::Path) -> Result<GenesisFile, std::io::Error> {
-    let file = std::fs::File::open(path)?;
-    let reader = std::io::BufReader::new(file);
-    let parsed: GenesisFile = serde_json::from_reader(reader)?;
+    let text = std::fs::read_to_string(path)?;
+    let raw: GenesisFileRaw = serde_json::from_str(&text)?;
 
-    Ok(parsed)
+    // The segments are joined under the directory of the genesis file.
+    let directory = path
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new(""))
+        .to_path_buf();
+
+    raw.fold(&injection::Source::Directory(directory))
+        .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))
 }
 
 pub type GenesisUtxo = (Hash<32>, pallas_addresses::Address, u64);
@@ -640,6 +655,62 @@ mod tests {
             Credential::KeyHash(key) => assert_eq!(key, INJECTED_CREDENTIAL),
             _ => panic!("expected a key hash credential"),
         }
+    }
+
+    #[test]
+    fn an_injection_file_reaches_the_utxo_set() {
+        let value = test_data_json("file-injection");
+
+        assert_eq!(
+            value["extraConfig"]["initialFunds"]["file"],
+            serde_json::json!(["file-injection", "initial-funds.json"]),
+            "the fixture must name the injection file this case was written against"
+        );
+        assert!(
+            value["initialFunds"]
+                .as_object()
+                .expect("the fixture must carry a top level initialFunds object")
+                .is_empty(),
+            "the fixture's top level funds must be empty, or this says nothing about the injection"
+        );
+
+        let config = load_test_data_config("file-injection");
+
+        assert_eq!(
+            config.initial_funds.as_ref(),
+            Some(&injected_funds()),
+            "the funds read from the injection file must be the inline fixture's funds"
+        );
+
+        let reached: HashMap<String, u64> = shelley_utxos(&config)
+            .into_iter()
+            .map(|(_, address, amount)| (address.to_hex(), amount))
+            .collect();
+
+        assert_eq!(
+            reached,
+            injected_funds(),
+            "every fund read from the file must reach the utxo set under its own address"
+        );
+    }
+
+    #[test]
+    fn the_parse_path_still_refuses_an_injection_file() {
+        let text = std::fs::read_to_string(test_data_path("file-injection")).unwrap();
+
+        let err = serde_json::from_str::<GenesisFile>(&text)
+            .expect_err("a genesis parsed from text alone must refuse an injection file");
+
+        assert!(err.to_string().contains("initialFunds"), "{err}");
+        assert!(
+            err.to_string()
+                .contains("file-injection/initial-funds.json"),
+            "{err}"
+        );
+        assert!(
+            err.to_string().contains("cannot be read while parsing"),
+            "{err}"
+        );
     }
 
     #[test]

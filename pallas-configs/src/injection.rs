@@ -6,8 +6,9 @@
 //! shapes and the rule for choosing between the two places are the same in
 //! the shelley and conway files, so they live here.
 
-use serde::{Deserialize, Deserializer};
-use std::collections::HashMap;
+use pallas_crypto::hash::{Hash, Hasher};
+use serde::{Deserialize, Deserializer, de::DeserializeOwned};
+use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 /// The raw keys of one `extraConfig` entry, before it is checked.
 #[derive(Deserialize)]
@@ -77,39 +78,125 @@ where
     }
 }
 
+/// Where an injection file may be read from.
+#[derive(Debug, Clone)]
+pub(crate) enum Source {
+    /// No file may be read, so a file injection is refused.
+    NoFilesystem,
+
+    /// Injection files are read under the shelley genesis file's directory,
+    /// which the node mounts for every era.
+    Directory(PathBuf),
+}
+
+impl Source {
+    /// Read and parse one injection file, hashing its bytes and not the parsed data.
+    fn read<K, V>(
+        &self,
+        injected_name: &str,
+        file: &[String],
+        hash: &str,
+    ) -> Result<HashMap<K, V>, String>
+    where
+        K: std::hash::Hash + Eq + DeserializeOwned,
+        V: DeserializeOwned,
+    {
+        let directory = match self {
+            Self::NoFilesystem => {
+                return Err(format!(
+                    "extraConfig.{injected_name} names an injection file ({}), which cannot be read while parsing",
+                    file.join("/")
+                ));
+            }
+            Self::Directory(directory) => directory,
+        };
+
+        for segment in file {
+            let names_one_entry = !segment.is_empty()
+                && segment != "."
+                && segment != ".."
+                && !std::path::Path::new(segment).is_absolute()
+                && !segment.contains('/')
+                && !segment.contains('\\');
+
+            if !names_one_entry {
+                return Err(format!(
+                    "extraConfig.{injected_name} names the path segment {segment:?}, which is not one file or directory name"
+                ));
+            }
+        }
+
+        let expected = Hash::<32>::from_str(hash).map_err(|_| {
+            format!(
+                "extraConfig.{injected_name} names the hash {hash}, which is not a blake2b-256 hash"
+            )
+        })?;
+
+        let path = file
+            .iter()
+            .fold(directory.clone(), |path, segment| path.join(segment));
+        let named = path.display();
+
+        let bytes = std::fs::read(&path).map_err(|err| {
+            format!("the injection file {named} that extraConfig.{injected_name} names cannot be read ({err})")
+        })?;
+
+        let found = Hasher::<256>::hash(&bytes);
+        if found != expected {
+            return Err(format!(
+                "the injection file {named} hashes to {found}, not the {expected} that extraConfig.{injected_name} names"
+            ));
+        }
+
+        serde_json::from_slice(&bytes).map_err(|err| {
+            format!("the injection file {named} does not hold the map extraConfig.{injected_name} stands for ({err})")
+        })
+    }
+}
+
 /// Pick which of the two places a genesis field was written in.
 ///
-/// If there is no injection, use the top level value. If the injection points
-/// at a file, refuse, because the directory that path is relative to is not
-/// known here. If the injection is present and the top level holds entries,
-/// refuse, because the file names two sources for one field. That matches the
-/// ledger, which refuses an empty injection against a populated top level too.
-/// Otherwise use the injection.
+/// The top level is used when there is no injection, and the injection
+/// otherwise. Both sides holding entries is refused before any file is read.
 ///
 /// `injected_name` is the key under `extraConfig` and `top_level_name` is
 /// the field it replaces. Both are only used in error messages.
-pub fn resolve<K, V>(
+pub(crate) fn resolve<K, V>(
+    source: &Source,
     injected_name: &str,
     top_level_name: &str,
     injection: Option<Injection<HashMap<K, V>>>,
     top_level: Option<HashMap<K, V>>,
-) -> Result<Option<HashMap<K, V>>, String> {
-    let injected = match injection {
-        None | Some(Injection::Absent) => return Ok(top_level),
-        Some(Injection::FromFile { file, .. }) => {
-            return Err(format!(
-                "extraConfig.{injected_name} names an injection file ({}), which cannot be read while parsing",
-                file.join("/")
-            ));
-        }
-        Some(Injection::Embedded(injected)) => injected,
-    };
+) -> Result<Option<HashMap<K, V>>, String>
+where
+    K: std::hash::Hash + Eq + DeserializeOwned,
+    V: DeserializeOwned,
+{
+    match injection {
+        None | Some(Injection::Absent) => Ok(top_level),
+        Some(Injection::Embedded(injected)) => {
+            refuse_two_sources(injected_name, top_level_name, top_level.as_ref())?;
 
+            Ok(Some(injected))
+        }
+        Some(Injection::FromFile { file, hash }) => {
+            refuse_two_sources(injected_name, top_level_name, top_level.as_ref())?;
+
+            source.read(injected_name, &file, &hash).map(Some)
+        }
+    }
+}
+
+fn refuse_two_sources<K, V>(
+    injected_name: &str,
+    top_level_name: &str,
+    top_level: Option<&HashMap<K, V>>,
+) -> Result<(), String> {
     match top_level {
         Some(top_level) if !top_level.is_empty() => Err(format!(
             "extraConfig.{injected_name} and {top_level_name} are both populated, so the genesis names two sources for one field"
         )),
-        _ => Ok(Some(injected)),
+        _ => Ok(()),
     }
 }
 
@@ -198,6 +285,7 @@ mod tests {
         let top_level = funds(&[("aa", 7)]);
 
         let resolved = resolve(
+            &Source::NoFilesystem,
             "initialFunds",
             "initialFunds",
             None,
@@ -207,6 +295,7 @@ mod tests {
         assert_eq!(resolved, Some(top_level.clone()));
 
         let resolved = resolve(
+            &Source::NoFilesystem,
             "initialFunds",
             "initialFunds",
             Some(Injection::Absent),
@@ -221,6 +310,7 @@ mod tests {
         let injected = funds(&[("bb", 9)]);
 
         let resolved = resolve(
+            &Source::NoFilesystem,
             "initialFunds",
             "initialFunds",
             Some(Injection::Embedded(injected.clone())),
@@ -230,6 +320,7 @@ mod tests {
         assert_eq!(resolved, Some(injected.clone()));
 
         let resolved = resolve(
+            &Source::NoFilesystem,
             "initialFunds",
             "initialFunds",
             Some(Injection::Embedded(injected.clone())),
@@ -242,6 +333,7 @@ mod tests {
     #[test]
     fn an_empty_payload_against_a_populated_top_level_is_refused() {
         let err = resolve(
+            &Source::NoFilesystem,
             "initialFunds",
             "initialFunds",
             Some(Injection::Embedded(Funds::new())),
@@ -255,6 +347,7 @@ mod tests {
     #[test]
     fn two_empty_sources_stay_empty() {
         let resolved = resolve(
+            &Source::NoFilesystem,
             "stakePools",
             "staking.pools",
             Some(Injection::Embedded(Funds::new())),
@@ -270,6 +363,7 @@ mod tests {
     #[test]
     fn both_sources_populated_is_refused() {
         let err = resolve(
+            &Source::NoFilesystem,
             "initialFunds",
             "initialFunds",
             Some(Injection::Embedded(funds(&[("bb", 9)]))),
@@ -282,8 +376,9 @@ mod tests {
     }
 
     #[test]
-    fn a_file_arm_is_refused() {
+    fn the_text_only_path_refuses_a_file_arm() {
         let err = resolve(
+            &Source::NoFilesystem,
             "stakePools",
             "staking.pools",
             Some(Injection::FromFile {
@@ -296,5 +391,191 @@ mod tests {
 
         assert!(err.contains("stakePools"), "{err}");
         assert!(err.contains("genesis/pools.json"), "{err}");
+    }
+
+    const INJECTED_FILE: [&str; 2] = ["file-injection", "initial-funds.json"];
+    const INJECTED_FILE_HASH: &str =
+        "5f5ef4cb568ce42c470afcf6bfbca574ae345e1323b26be0de40d471db835ad7";
+
+    fn test_data() -> PathBuf {
+        PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
+            .join("..")
+            .join("test_data")
+    }
+
+    fn resolve_file(file: &[&str], hash: &str) -> Result<Option<Funds>, String> {
+        resolve(
+            &Source::Directory(test_data()),
+            "initialFunds",
+            "initialFunds",
+            Some(Injection::FromFile {
+                file: file.iter().map(|segment| (*segment).to_string()).collect(),
+                hash: hash.to_string(),
+            }),
+            Some(Funds::new()),
+        )
+    }
+
+    #[test]
+    fn an_injection_file_is_read() {
+        let resolved = resolve_file(&INJECTED_FILE, INJECTED_FILE_HASH)
+            .expect("the injection file must resolve")
+            .expect("the injection file must carry funds");
+
+        assert_eq!(resolved.len(), 3);
+        assert_eq!(
+            resolved.get("6004d2cf712cfcaafb8bda85dc31baf3a35168d2e28029e0b56c562d37"),
+            Some(&2_250_000_000_000),
+        );
+    }
+
+    #[test]
+    fn a_wrong_hash_is_refused() {
+        let wrong = "0000000000000000000000000000000000000000000000000000000000000000";
+
+        let err = resolve_file(&INJECTED_FILE, wrong)
+            .expect_err("a file that does not hash to what the genesis names must be refused");
+
+        assert!(err.contains("initial-funds.json"), "{err}");
+        assert!(err.contains(INJECTED_FILE_HASH), "{err}");
+        assert!(err.contains(wrong), "{err}");
+    }
+
+    #[test]
+    fn a_missing_file_is_refused() {
+        let err = resolve_file(&["file-injection", "absent.json"], INJECTED_FILE_HASH)
+            .expect_err("a file that is not there must be refused");
+
+        assert!(err.contains("absent.json"), "{err}");
+        assert!(
+            err.contains("that extraConfig.initialFunds names cannot be read"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_hash_that_is_not_a_hash_is_refused() {
+        let err = resolve_file(&INJECTED_FILE, "abcd")
+            .expect_err("an injection hash that is not a hash must be refused");
+
+        assert!(err.contains("abcd"), "{err}");
+        assert!(err.contains("blake2b-256"), "{err}");
+    }
+
+    #[test]
+    fn a_file_holding_something_else_is_refused() {
+        let file = ["file-injection-shelley-genesis.json"];
+        let bytes = std::fs::read(test_data().join(file[0])).expect("the fixture must be there");
+        let hash = Hasher::<256>::hash(&bytes).to_string();
+
+        let err = resolve_file(&file, &hash)
+            .expect_err("a file that does not hold the field's map must be refused");
+
+        assert!(err.contains("file-injection-shelley-genesis.json"), "{err}");
+        assert!(
+            err.contains("does not hold the map extraConfig.initialFunds"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_file_arm_against_a_populated_top_level_is_refused() {
+        let err = resolve(
+            &Source::Directory(test_data()),
+            "initialFunds",
+            "initialFunds",
+            Some(Injection::FromFile {
+                file: INJECTED_FILE
+                    .iter()
+                    .map(|segment| (*segment).to_string())
+                    .collect(),
+                hash: INJECTED_FILE_HASH.to_string(),
+            }),
+            Some(funds(&[("aa", 7)])),
+        )
+        .expect_err("a field with two sources must be refused");
+
+        assert!(err.contains("initialFunds"), "{err}");
+        assert!(err.contains("both populated"), "{err}");
+    }
+
+    #[test]
+    fn a_file_arm_against_a_populated_top_level_is_refused_before_the_read() {
+        let err = resolve(
+            &Source::Directory(test_data()),
+            "initialFunds",
+            "initialFunds",
+            Some(Injection::FromFile {
+                file: vec!["file-injection".to_string(), "absent.json".to_string()],
+                hash: INJECTED_FILE_HASH.to_string(),
+            }),
+            Some(funds(&[("aa", 7)])),
+        )
+        .expect_err("a field with two sources must be refused");
+
+        assert!(err.contains("both populated"), "{err}");
+        assert!(!err.contains("cannot be read"), "{err}");
+    }
+
+    #[test]
+    fn an_empty_segment_is_refused() {
+        let err = resolve_file(
+            &["", INJECTED_FILE[0], INJECTED_FILE[1]],
+            INJECTED_FILE_HASH,
+        )
+        .expect_err("an empty segment must be refused");
+
+        assert!(err.contains("initialFunds"), "{err}");
+        assert!(err.contains(r#""""#), "{err}");
+    }
+
+    #[test]
+    fn a_current_directory_segment_is_refused() {
+        let err = resolve_file(
+            &[".", INJECTED_FILE[0], INJECTED_FILE[1]],
+            INJECTED_FILE_HASH,
+        )
+        .expect_err("a current directory segment must be refused");
+
+        assert!(err.contains("initialFunds"), "{err}");
+        assert!(err.contains(r#"".""#), "{err}");
+    }
+
+    #[test]
+    fn a_parent_segment_is_refused() {
+        let err = resolve_file(
+            &["..", "test_data", INJECTED_FILE[0], INJECTED_FILE[1]],
+            INJECTED_FILE_HASH,
+        )
+        .expect_err("a parent segment must be refused");
+
+        assert!(err.contains("initialFunds"), "{err}");
+        assert!(err.contains(r#""..""#), "{err}");
+    }
+
+    #[test]
+    fn an_absolute_segment_is_refused() {
+        let absolute = test_data()
+            .join(INJECTED_FILE[0])
+            .join(INJECTED_FILE[1])
+            .display()
+            .to_string();
+
+        let err = resolve_file(&[&absolute], INJECTED_FILE_HASH)
+            .expect_err("an absolute segment must be refused");
+
+        assert!(err.contains("initialFunds"), "{err}");
+        assert!(err.contains(&absolute), "{err}");
+    }
+
+    #[test]
+    fn a_segment_holding_a_separator_is_refused() {
+        let joined = INJECTED_FILE.join("/");
+
+        let err = resolve_file(&[&joined], INJECTED_FILE_HASH)
+            .expect_err("a segment holding a path separator must be refused");
+
+        assert!(err.contains("initialFunds"), "{err}");
+        assert!(err.contains("file-injection/initial-funds.json"), "{err}");
     }
 }
