@@ -1,7 +1,7 @@
 use super::{
-    AuxiliaryData, Block, BlockTransaction, Certificate, DRep, GovAction, Guards, Header,
-    MempoolTransaction, NativeScript, ProposalProcedure, Set, SetArm, StakeCredential,
-    TransactionOutput, Value,
+    AccountBalanceInterval, AccountBalanceIntervals, AuxiliaryData, Block, BlockTransaction,
+    Certificate, CostModels, DRep, GovAction, Guards, Header, MempoolTransaction, NativeScript,
+    NonEmptySet, ProposalProcedure, Set, SetArm, StakeCredential, TransactionOutput, Value,
 };
 use pallas_codec::minicbor;
 use pallas_codec::utils::KeepRaw;
@@ -1162,4 +1162,140 @@ fn the_array_form_still_carries_a_clause_every_era_has() {
         hex::encode(minicbor::to_vec(&decoded).unwrap()),
         hex::encode(&aux)
     );
+}
+
+#[test]
+fn a_set_of_one_element_reads_on_both_arms() {
+    let tagged = [0xd9, 0x01, 0x02, 0x81, 0x01];
+    let bare = [0x81, 0x01];
+
+    let decoded: NonEmptySet<u64> =
+        minicbor::decode(&tagged).expect("a tagged one element nonempty set must decode");
+    assert_eq!(decoded.len(), 1);
+    assert_eq!(decoded.arm(), SetArm::Tagged);
+
+    let decoded: NonEmptySet<u64> =
+        minicbor::decode(&bare).expect("a bare one element nonempty set must decode");
+    assert_eq!(decoded.len(), 1);
+    assert_eq!(decoded.arm(), SetArm::Bare);
+
+    let empty: Set<u64> = minicbor::decode(&[0x80]).expect("an empty set must decode");
+    assert!(empty.is_empty());
+    let empty: Set<u64> =
+        minicbor::decode(&[0xd9, 0x01, 0x02, 0x80]).expect("an empty tagged set must decode");
+    assert!(empty.is_empty());
+}
+
+#[test]
+fn an_empty_array_is_not_a_nonempty_set() {
+    let cases: &[(&str, &[u8])] = &[
+        ("tagged", &[0xd9, 0x01, 0x02, 0x80]),
+        ("bare", &[0x80]),
+        ("tagged indefinite", &[0xd9, 0x01, 0x02, 0x9f, 0xff]),
+        ("bare indefinite", &[0x9f, 0xff]),
+    ];
+
+    for (arm, bytes) in cases {
+        let err = minicbor::decode::<NonEmptySet<u64>>(bytes)
+            .expect_err("an empty nonempty_set must not decode");
+        assert!(
+            err.to_string().contains("a nonempty set"),
+            "the {arm} empty array was refused for some other reason: {err}"
+        );
+    }
+}
+
+#[test]
+fn cost_models_keeps_a_key_the_named_fields_do_not_cover() {
+    // a2                      map of two keys
+    //   00  82 01 02          key 0, the PlutusV1 model [1, 2]
+    //   04  81 03             key 4, inside the CDDL's 4 .. 255 wildcard
+    let with_wildcard_key = [0xa2, 0x00, 0x82, 0x01, 0x02, 0x04, 0x81, 0x03];
+
+    let decoded: CostModels =
+        minicbor::decode(&with_wildcard_key).expect("a cost models map with key 4 must decode");
+    assert_eq!(decoded.plutus_v1, Some(vec![1, 2]));
+    assert_eq!(decoded.unknown.get(&4), Some(&vec![3]));
+    assert_eq!(
+        hex::encode(minicbor::to_vec(&decoded).unwrap()),
+        hex::encode(with_wildcard_key),
+        "the cost model under key 4 was dropped on re-encode"
+    );
+
+    let named_only = [0xa1, 0x00, 0x82, 0x01, 0x02];
+    let decoded: CostModels = minicbor::decode(&named_only).expect("a named key must decode");
+    assert!(decoded.unknown.is_empty());
+    assert_eq!(
+        hex::encode(minicbor::to_vec(&decoded).unwrap()),
+        hex::encode(named_only)
+    );
+}
+
+#[test]
+fn the_legal_account_balance_interval_forms_still_read() {
+    let cases: &[(&str, &[u8], AccountBalanceInterval)] = &[
+        (
+            "bounded",
+            &[0x82, 0x01, 0x02],
+            AccountBalanceInterval::Bounded(1, 2),
+        ),
+        (
+            "lower",
+            &[0x82, 0x01, 0xf6],
+            AccountBalanceInterval::LowerBound(1),
+        ),
+        (
+            "upper",
+            &[0x82, 0xf6, 0x02],
+            AccountBalanceInterval::UpperBound(2),
+        ),
+        ("bare coin", &[0x0a], AccountBalanceInterval::Exact(10)),
+        (
+            "indefinite",
+            &[0x9f, 0x01, 0x02, 0xff],
+            AccountBalanceInterval::Bounded(1, 2),
+        ),
+    ];
+
+    for (name, bytes, want) in cases {
+        let decoded: AccountBalanceInterval =
+            minicbor::decode(bytes).unwrap_or_else(|e| panic!("the {name} form must decode: {e}"));
+        assert_eq!(&decoded, want, "the {name} form read as something else");
+    }
+
+    let definite_in_a_map = [
+        0xa2, // map of two reward accounts
+        0x41, 0x01, 0x82, 0x01, 0x02, // the first carries a bounded interval
+        0x41, 0x02, 0x0a, // the second carries a bare coin
+    ];
+    let decoded: AccountBalanceIntervals =
+        minicbor::decode(&definite_in_a_map).expect("a map of definite intervals must decode");
+    assert_eq!(decoded.len(), 2);
+
+    let indefinite_in_a_map = [
+        0xa2, 0x41, 0x01, 0x9f, 0x01, 0x02, 0xff, // an indefinite interval
+        0x41, 0x02, 0x0a,
+    ];
+    let decoded: AccountBalanceIntervals =
+        minicbor::decode(&indefinite_in_a_map).expect("a map of indefinite intervals must decode");
+    assert_eq!(decoded.len(), 2);
+}
+
+#[test]
+fn an_account_balance_interval_is_two_elements_or_none() {
+    let cases: &[(&str, &[u8])] = &[
+        ("three element", &[0x83, 0x01, 0x02, 0x03]),
+        ("one element", &[0x81, 0x01]),
+        ("empty", &[0x80]),
+        ("three element indefinite", &[0x9f, 0x01, 0x02, 0x03, 0xff]),
+    ];
+
+    for (name, bytes) in cases {
+        let err = minicbor::decode::<AccountBalanceInterval>(bytes)
+            .expect_err("an array that is not two elements must not decode");
+        assert!(
+            err.to_string().contains("account_balance_interval"),
+            "the {name} array was refused for some other reason: {err}"
+        );
+    }
 }

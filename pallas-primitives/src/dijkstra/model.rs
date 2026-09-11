@@ -31,8 +31,19 @@ pub enum SetArm {
     Bare,
 }
 
+/// Compared here so a zero minimum is a value rather than a constant comparison.
+fn at_least(len: usize, minimum: usize, rule: &str) -> Result<(), minicbor::decode::Error> {
+    if len < minimum {
+        return Err(minicbor::decode::Error::message(format!(
+            "too few elements for {rule}: {len} of at least {minimum}"
+        )));
+    }
+
+    Ok(())
+}
+
 macro_rules! tag_preserving_set {
-    ($name:ident, $rule:literal) => {
+    ($name:ident, $rule:literal, $minimum:expr) => {
         impl<T> $name<T> {
             /// The arm the bytes carried, or [`SetArm::Tagged`] if this value was built.
             pub fn arm(&self) -> SetArm {
@@ -43,7 +54,7 @@ macro_rules! tag_preserving_set {
                 Self { arm, ..self }
             }
 
-            pub fn to_vec(self) -> Vec<T> {
+            pub fn into_vec(self) -> Vec<T> {
                 self.items
             }
         }
@@ -95,10 +106,10 @@ macro_rules! tag_preserving_set {
                     SetArm::Bare
                 };
 
-                Ok(Self {
-                    arm,
-                    items: d.decode_with(ctx)?,
-                })
+                let items: Vec<T> = d.decode_with(ctx)?;
+                at_least(items.len(), $minimum, $rule)?;
+
+                Ok(Self { arm, items })
             }
         }
 
@@ -141,7 +152,7 @@ impl<T> From<Vec<T>> for Set<T> {
     }
 }
 
-tag_preserving_set!(Set, "a set");
+tag_preserving_set!(Set, "a set", 0);
 
 /// `nonempty_set<a0> = #6.258([+ a0])/ [+ a0]` (`defs.cddl`). Carries its arm like [`Set`].
 #[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Serialize, Deserialize)]
@@ -180,7 +191,7 @@ impl<T> TryFrom<Vec<T>> for NonEmptySet<T> {
     }
 }
 
-tag_preserving_set!(NonEmptySet, "a nonempty set");
+tag_preserving_set!(NonEmptySet, "a nonempty set", 1);
 
 pub use crate::babbage::OperationalCert;
 
@@ -620,23 +631,59 @@ pub enum Language {
 }
 
 /// `cost_models` (`defs.cddl`) names key 3 for PlutusV4, leaving Conway's wildcard at `4 .. 255`.
-#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
-#[cbor(map)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct CostModels {
-    #[n(0)]
     pub plutus_v1: Option<CostModel>,
 
-    #[n(1)]
     pub plutus_v2: Option<CostModel>,
 
-    #[n(2)]
     pub plutus_v3: Option<CostModel>,
 
-    #[n(3)]
     pub plutus_v4: Option<CostModel>,
 
-    #[cbor(skip)]
+    /// Cost models under the keys the CDDL wildcard permits, 4 to 255.
     pub unknown: BTreeMap<u64, CostModel>,
+}
+
+impl CostModels {
+    /// Every key to write, ascending, a named field before the wildcard.
+    fn entries(&self) -> BTreeMap<u64, &CostModel> {
+        let mut entries: BTreeMap<u64, &CostModel> =
+            self.unknown.iter().map(|(k, v)| (*k, v)).collect();
+
+        let named = [
+            (0u64, &self.plutus_v1),
+            (1, &self.plutus_v2),
+            (2, &self.plutus_v3),
+            (3, &self.plutus_v4),
+        ];
+
+        for (key, model) in named {
+            if let Some(model) = model {
+                entries.insert(key, model);
+            }
+        }
+
+        entries
+    }
+}
+
+impl<C> minicbor::Encode<C> for CostModels {
+    fn encode<W: minicbor::encode::Write>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>> {
+        let entries = self.entries();
+
+        e.map(entries.len() as u64)?;
+        for (key, model) in entries {
+            e.u64(key)?;
+            e.encode_with(model, ctx)?;
+        }
+
+        Ok(())
+    }
 }
 
 impl<'b, C> minicbor::Decode<'b, C> for CostModels {
@@ -924,7 +971,15 @@ impl<'b, C> minicbor::Decode<'b, C> for AccountBalanceInterval {
             _ => return Ok(AccountBalanceInterval::Exact(d.decode_with(ctx)?)),
         }
 
-        d.array()?;
+        let len = d.array()?;
+        match len {
+            None | Some(2) => {}
+            Some(found) => {
+                return Err(minicbor::decode::Error::message(format!(
+                    "account_balance_interval takes two elements, found {found}"
+                )));
+            }
+        }
 
         let lower: Option<Coin> = match d.datatype()? {
             minicbor::data::Type::Null => {
@@ -941,6 +996,15 @@ impl<'b, C> minicbor::Decode<'b, C> for AccountBalanceInterval {
             }
             _ => Some(d.decode_with(ctx)?),
         };
+
+        if len.is_none() {
+            if d.datatype()? != minicbor::data::Type::Break {
+                return Err(minicbor::decode::Error::message(
+                    "account_balance_interval takes two elements, found more",
+                ));
+            }
+            d.skip()?;
+        }
 
         match (lower, upper) {
             (Some(l), None) => Ok(AccountBalanceInterval::LowerBound(l)),
