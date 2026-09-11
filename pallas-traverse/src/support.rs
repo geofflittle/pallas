@@ -2,6 +2,9 @@
 
 use pallas_primitives::{alonzo, babbage, byron, conway};
 
+#[cfg(feature = "unstable")]
+use pallas_primitives::dijkstra;
+
 macro_rules! clone_tx_fn {
     ($fn_name:ident, $era:tt) => {
         fn $fn_name<'b>(block: &'b $era::Block, index: usize) -> Option<$era::Tx<'b>> {
@@ -67,4 +70,16 @@ pub fn clone_conway_txs<'b>(block: &'b conway::Block) -> Vec<conway::Tx<'b>> {
 
 pub fn clone_byron_txs<'b>(block: &'b byron::Block) -> Vec<byron::TxPayload<'b>> {
     block.body.tx_payload.iter().cloned().collect()
+}
+
+/// Dijkstra transactions are already complete inside the block body, so there
+/// is nothing to reassemble from segregated witness and auxiliary data lists,
+/// and nothing to pair back on from the block either.
+///
+/// Validity rides as the fourth element of each transaction, so a Dijkstra
+/// transaction answers for its own validity the way every earlier era's does
+/// once its block has been taken apart.
+#[cfg(feature = "unstable")]
+pub fn clone_dijkstra_txs<'b>(block: &'b dijkstra::Block) -> Vec<dijkstra::BlockTransaction<'b>> {
+    block.block_body.transactions.iter().cloned().collect()
 }

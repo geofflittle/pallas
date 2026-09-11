@@ -97,6 +97,7 @@ impl DataLookupTable {
             datum.insert(plutus_data.original_hash(), plutus_data.clone().unwrap());
         }
 
+        #[allow(deprecated)]
         for script in tx.native_scripts() {
             scripts.insert(
                 script.compute_hash(),

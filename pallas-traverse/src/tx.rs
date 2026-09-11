@@ -9,11 +9,17 @@ use pallas_primitives::{
     byron, conway,
 };
 
+#[cfg(feature = "unstable")]
+use pallas_primitives::dijkstra;
+
 use crate::{
     Era, Error, MultiEraCert, MultiEraInput, MultiEraMeta, MultiEraOutput, MultiEraPolicyAssets,
     MultiEraProposal, MultiEraSigners, MultiEraTx, MultiEraUpdate, MultiEraWithdrawals,
     OriginalHash,
 };
+
+#[cfg(feature = "unstable")]
+use crate::probe;
 
 impl<'b> MultiEraTx<'b> {
     pub fn from_byron(tx: &'b byron::TxPayload<'b>) -> Self {
@@ -32,6 +38,12 @@ impl<'b> MultiEraTx<'b> {
         Self::Conway(Box::new(Cow::Borrowed(tx)))
     }
 
+    /// Build from a standalone Dijkstra transaction.
+    #[cfg(feature = "unstable")]
+    pub fn from_dijkstra(tx: &'b dijkstra::BlockTransaction<'b>) -> Self {
+        Self::Dijkstra(Box::new(Cow::Borrowed(tx)))
+    }
+
     pub fn encode(&self) -> Vec<u8> {
         // to_vec is infallible
         match self {
@@ -39,6 +51,9 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => minicbor::to_vec(x).unwrap(),
             MultiEraTx::Byron(x) => minicbor::to_vec(x).unwrap(),
             MultiEraTx::Conway(x) => minicbor::to_vec(x).unwrap(),
+            #[cfg(feature = "unstable")]
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => minicbor::to_vec(x).unwrap(),
         }
     }
 
@@ -64,13 +79,64 @@ impl<'b> MultiEraTx<'b> {
                 let tx = Box::new(Cow::Owned(tx));
                 Ok(MultiEraTx::Conway(tx))
             }
+            // Two rules write a Dijkstra transaction. A block transaction is
+            // four elements and ends with the flag the block producer set. A
+            // mempool transaction is three and carries no flag, because a
+            // submitted transaction asserts its own validity and only a
+            // producer has a verdict to report. Both are accepted, and the
+            // three element form is read as valid, which is the only value
+            // the rule allows a submission to claim.
+            //
+            // The value that comes back is a block transaction either way, so
+            // a mempool transaction re-encodes as four elements rather than
+            // as the three it arrived in.
+            #[cfg(feature = "unstable")]
+            Era::Dijkstra => match probe::tx_shape(cbor) {
+                probe::TxShape::DijkstraMempool => {
+                    let tx: dijkstra::MempoolTransaction = minicbor::decode(cbor)?;
+                    Ok(MultiEraTx::Dijkstra(Box::new(Cow::Owned(
+                        dijkstra::BlockTransaction {
+                            transaction_body: tx.transaction_body,
+                            transaction_witness_set: tx.transaction_witness_set,
+                            auxiliary_data: tx.auxiliary_data,
+                            success: true,
+                        },
+                    ))))
+                }
+                probe::TxShape::DijkstraBlock
+                | probe::TxShape::ValidityThird
+                | probe::TxShape::Other => {
+                    let tx = minicbor::decode(cbor)?;
+                    let tx = Box::new(Cow::Owned(tx));
+                    Ok(MultiEraTx::Dijkstra(tx))
+                }
+            },
         }
     }
 
     /// Try decode a transaction via every era's encoding format, starting with
     /// the most recent and returning on first success, or None if none are
     /// successful
+    ///
+    /// Dijkstra is picked by shape rather than by position in the chain below:
+    /// `probe::tx_shape` reads where the validity flag sits, which is the
+    /// one thing that separates a Dijkstra transaction from every era before
+    /// it. A transaction whose shape says Dijkstra and then fails to decode is
+    /// reported as a failed Dijkstra decode rather than tried as four more
+    /// eras, so the error names the rule that was actually violated.
+    ///
+    /// The eras below Dijkstra are still tried in order, which is upstream's
+    /// arrangement: their transaction rules do not differ in shape, so a
+    /// Babbage transaction still comes back as Conway.
     pub fn decode(cbor: &'b [u8]) -> Result<Self, Error> {
+        #[cfg(feature = "unstable")]
+        match probe::tx_shape(cbor) {
+            probe::TxShape::DijkstraBlock | probe::TxShape::DijkstraMempool => {
+                return Self::decode_for_era(Era::Dijkstra, cbor).map_err(Error::invalid_cbor);
+            }
+            probe::TxShape::ValidityThird | probe::TxShape::Other => (),
+        }
+
         if let Ok(tx) = minicbor::decode(cbor) {
             return Ok(MultiEraTx::Conway(Box::new(Cow::Owned(tx))));
         }
@@ -100,6 +166,9 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(_) => Era::Babbage,
             MultiEraTx::Byron(_) => Era::Byron,
             MultiEraTx::Conway(_) => Era::Conway,
+            #[cfg(feature = "unstable")]
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(..) => Era::Dijkstra,
         }
     }
 
@@ -109,6 +178,9 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => x.transaction_body.original_hash(),
             MultiEraTx::Byron(x) => x.transaction.original_hash(),
             MultiEraTx::Conway(x) => x.transaction_body.original_hash(),
+            #[cfg(feature = "unstable")]
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x.transaction_body.original_hash(),
         }
     }
 
@@ -139,6 +211,13 @@ impl<'b> MultiEraTx<'b> {
                 .iter()
                 .map(MultiEraOutput::from_conway)
                 .collect(),
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x
+                .transaction_body
+                .outputs
+                .iter()
+                .map(MultiEraOutput::from_dijkstra)
+                .collect(),
         }
     }
 
@@ -165,6 +244,12 @@ impl<'b> MultiEraTx<'b> {
                 .outputs
                 .get(index)
                 .map(MultiEraOutput::from_conway),
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x
+                .transaction_body
+                .outputs
+                .get(index)
+                .map(MultiEraOutput::from_dijkstra),
         }
     }
 
@@ -192,6 +277,13 @@ impl<'b> MultiEraTx<'b> {
                 .map(MultiEraInput::from_byron)
                 .collect(),
             MultiEraTx::Conway(x) => x
+                .transaction_body
+                .inputs
+                .iter()
+                .map(MultiEraInput::from_alonzo_compatible)
+                .collect(),
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x
                 .transaction_body
                 .inputs
                 .iter()
@@ -259,7 +351,17 @@ impl<'b> MultiEraTx<'b> {
                 .flatten()
                 .map(MultiEraInput::from_alonzo_compatible)
                 .collect(),
-            _ => vec![],
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x
+                .transaction_body
+                .reference_inputs
+                .iter()
+                .flatten()
+                .map(MultiEraInput::from_alonzo_compatible)
+                .collect(),
+            // Byron and the Alonzo-compatible eras have no reference inputs
+            // field at all, so an empty list is the whole truth for them.
+            MultiEraTx::Byron(_) | MultiEraTx::AlonzoCompatible(..) => vec![],
         }
     }
 
@@ -287,6 +389,14 @@ impl<'b> MultiEraTx<'b> {
                 .flat_map(|c| c.iter())
                 .map(|c| MultiEraCert::Conway(Box::new(Cow::Borrowed(c))))
                 .collect(),
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x
+                .transaction_body
+                .certificates
+                .iter()
+                .flat_map(|c| c.iter())
+                .map(|c| MultiEraCert::Dijkstra(Box::new(Cow::Borrowed(c))))
+                .collect(),
         }
     }
 
@@ -303,7 +413,11 @@ impl<'b> MultiEraTx<'b> {
                 .as_ref()
                 .map(MultiEraUpdate::from_babbage),
             MultiEraTx::Byron(_) => None,
+            // Conway and Dijkstra carry parameter changes as governance
+            // actions rather than as a transaction body update field.
             MultiEraTx::Conway(_) => None,
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(..) => None,
         }
     }
 
@@ -325,6 +439,14 @@ impl<'b> MultiEraTx<'b> {
                 .map(|(k, v)| MultiEraPolicyAssets::AlonzoCompatibleMint(k, v))
                 .collect(),
             MultiEraTx::Conway(x) => x
+                .transaction_body
+                .mint
+                .iter()
+                .flat_map(|x| x.iter())
+                .map(|(k, v)| MultiEraPolicyAssets::ConwayMint(k, v))
+                .collect(),
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x
                 .transaction_body
                 .mint
                 .iter()
@@ -362,6 +484,14 @@ impl<'b> MultiEraTx<'b> {
                 .flat_map(|x| x.iter())
                 .map(MultiEraInput::from_alonzo_compatible)
                 .collect(),
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x
+                .transaction_body
+                .collateral
+                .iter()
+                .flat_map(|x| x.iter())
+                .map(MultiEraInput::from_alonzo_compatible)
+                .collect(),
         }
     }
 
@@ -377,7 +507,13 @@ impl<'b> MultiEraTx<'b> {
                 .collateral_return
                 .as_ref()
                 .map(MultiEraOutput::from_conway),
-            _ => None,
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x
+                .transaction_body
+                .collateral_return
+                .as_ref()
+                .map(MultiEraOutput::from_dijkstra),
+            MultiEraTx::Byron(_) | MultiEraTx::AlonzoCompatible(..) => None,
         }
     }
 
@@ -385,7 +521,9 @@ impl<'b> MultiEraTx<'b> {
         match self {
             MultiEraTx::Babbage(x) => x.transaction_body.total_collateral,
             MultiEraTx::Conway(x) => x.transaction_body.total_collateral,
-            _ => None,
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x.transaction_body.total_collateral,
+            MultiEraTx::Byron(_) | MultiEraTx::AlonzoCompatible(..) => None,
         }
     }
 
@@ -398,7 +536,17 @@ impl<'b> MultiEraTx<'b> {
                 .flatten()
                 .map(MultiEraProposal::from_conway)
                 .collect(),
-            _ => vec![],
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x
+                .transaction_body
+                .proposal_procedures
+                .iter()
+                .flatten()
+                .map(MultiEraProposal::from_dijkstra)
+                .collect(),
+            MultiEraTx::Byron(_) | MultiEraTx::AlonzoCompatible(..) | MultiEraTx::Babbage(_) => {
+                vec![]
+            }
         }
     }
 
@@ -488,6 +636,12 @@ impl<'b> MultiEraTx<'b> {
                 Some(x) => MultiEraWithdrawals::Conway(x),
                 None => MultiEraWithdrawals::Empty,
             },
+            // `dijkstra::Withdrawals` is a re-export of Conway's.
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => match &x.transaction_body.withdrawals {
+                Some(x) => MultiEraWithdrawals::Conway(x),
+                None => MultiEraWithdrawals::Empty,
+            },
         }
     }
 
@@ -497,6 +651,8 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => Some(x.transaction_body.fee),
             MultiEraTx::Byron(_) => None,
             MultiEraTx::Conway(x) => Some(x.transaction_body.fee),
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => Some(x.transaction_body.fee),
         }
     }
 
@@ -506,6 +662,8 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => x.transaction_body.ttl,
             MultiEraTx::Byron(_) => None,
             MultiEraTx::Conway(x) => x.transaction_body.ttl,
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x.transaction_body.ttl,
         }
     }
 
@@ -521,9 +679,17 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => x.transaction_body.fee,
             MultiEraTx::Byron(x) => crate::fees::compute_byron_fee(x, None),
             MultiEraTx::Conway(x) => x.transaction_body.fee,
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x.transaction_body.fee,
         }
     }
 
+    /// Auxiliary data for every era whose auxiliary data type is Alonzo's.
+    ///
+    /// Dijkstra is deliberately not one of them: its auxiliary data map gains
+    /// a PlutusV4 script key, so it has its own type and its own accessor
+    /// below. Returning `None` here for a Dijkstra transaction would be
+    /// indistinguishable from a transaction that carries none.
     pub(crate) fn aux_data(&self) -> Option<&KeepRaw<'_, alonzo::AuxiliaryData>> {
         match self {
             MultiEraTx::AlonzoCompatible(x, _) => match &x.auxiliary_data {
@@ -542,10 +708,44 @@ impl<'b> MultiEraTx<'b> {
                 pallas_codec::utils::Nullable::Null => None,
                 pallas_codec::utils::Nullable::Undefined => None,
             },
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(..) => None,
+        }
+    }
+
+    /// Auxiliary data for a Dijkstra transaction, whose type differs from
+    /// every earlier era's by a PlutusV4 script key.
+    #[cfg(feature = "unstable")]
+    pub(crate) fn dijkstra_aux_data(&self) -> Option<&KeepRaw<'_, dijkstra::AuxiliaryData>> {
+        match self {
+            MultiEraTx::Dijkstra(x) => match &x.auxiliary_data {
+                pallas_codec::utils::Nullable::Some(x) => Some(x),
+                pallas_codec::utils::Nullable::Null => None,
+                pallas_codec::utils::Nullable::Undefined => None,
+            },
+            _ => None,
         }
     }
 
     pub fn metadata(&self) -> MultiEraMeta<'_> {
+        #[cfg(feature = "unstable")]
+        if let MultiEraTx::Dijkstra(..) = self {
+            return match self.dijkstra_aux_data() {
+                Some(x) => match x.deref() {
+                    dijkstra::AuxiliaryData::Shelley(x) => MultiEraMeta::AlonzoCompatible(x),
+                    dijkstra::AuxiliaryData::ShelleyMa(x) => {
+                        MultiEraMeta::AlonzoCompatible(&x.transaction_metadata)
+                    }
+                    dijkstra::AuxiliaryData::PostAlonzo(x) => x
+                        .metadata
+                        .as_ref()
+                        .map(MultiEraMeta::AlonzoCompatible)
+                        .unwrap_or_default(),
+                },
+                None => MultiEraMeta::Empty,
+            };
+        }
+
         match self.aux_data() {
             Some(x) => match x.deref() {
                 alonzo::AuxiliaryData::Shelley(x) => MultiEraMeta::AlonzoCompatible(x),
@@ -583,6 +783,17 @@ impl<'b> MultiEraTx<'b> {
                 .as_ref()
                 .map(|x| MultiEraSigners::AlonzoCompatible(x.deref()))
                 .unwrap_or_default(),
+            // Dijkstra renamed key 14 to `guards` and widened it to admit
+            // credentials as well as key hashes, so it cannot be reported
+            // through the `AlonzoCompatible` variant without losing the
+            // credential arm.
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x
+                .transaction_body
+                .guards
+                .as_ref()
+                .map(MultiEraSigners::Dijkstra)
+                .unwrap_or_default(),
         }
     }
 
@@ -592,6 +803,8 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => x.transaction_body.validity_interval_start,
             MultiEraTx::Byron(_) => None,
             MultiEraTx::Conway(x) => x.transaction_body.validity_interval_start,
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x.transaction_body.validity_interval_start,
         }
     }
 
@@ -601,6 +814,8 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => x.transaction_body.network_id,
             MultiEraTx::Byron(_) => None,
             MultiEraTx::Conway(x) => x.transaction_body.network_id,
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x.transaction_body.network_id,
         }
     }
 
@@ -610,6 +825,39 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Babbage(x) => x.success,
             MultiEraTx::Byron(_) => true,
             MultiEraTx::Conway(x) => x.success,
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x.success,
+        }
+    }
+
+    /// The voting procedures carried at body key 19.
+    ///
+    /// `dijkstra::VotingProcedures` is a re-export of Conway's, so one return
+    /// type serves both eras that have the field.
+    pub fn voting_procedures(&self) -> Option<&conway::VotingProcedures> {
+        match self {
+            MultiEraTx::Conway(x) => x.transaction_body.voting_procedures.as_ref(),
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x.transaction_body.voting_procedures.as_ref(),
+            // No era before Conway has a voting procedures field.
+            MultiEraTx::Byron(_) | MultiEraTx::AlonzoCompatible(..) | MultiEraTx::Babbage(_) => {
+                None
+            }
+        }
+    }
+
+    /// The sub transactions carried at body key 23, new in Dijkstra. Empty for
+    /// every earlier era, none of which has the field.
+    #[cfg(feature = "unstable")]
+    pub fn sub_transactions(&self) -> Vec<&dijkstra::SubTransaction<'_>> {
+        match self {
+            MultiEraTx::Dijkstra(x) => x
+                .transaction_body
+                .sub_transactions
+                .iter()
+                .flat_map(|x| x.iter())
+                .collect(),
+            _ => vec![],
         }
     }
 
@@ -639,5 +887,168 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Conway(x) => Some(x),
             _ => None,
         }
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn as_dijkstra(&self) -> Option<&dijkstra::BlockTransaction<'_>> {
+        match self {
+            MultiEraTx::Dijkstra(x) => Some(x),
+            _ => None,
+        }
+    }
+}
+
+#[cfg(all(test, feature = "unstable"))]
+mod tests {
+    use super::*;
+    use crate::{MultiEraBlock, probe::TxShape, testing};
+
+    fn fixture_tx(block_str: &str) -> Vec<u8> {
+        let cbor = hex::decode(block_str).unwrap();
+        let block = MultiEraBlock::decode(&cbor).unwrap();
+        block.txs().first().unwrap().encode()
+    }
+
+    /// A transaction a client submits is three elements, and it has to reach
+    /// [`MultiEraTx`] or nothing in this crate can read a transaction that is
+    /// not yet in a block.
+    ///
+    /// The value that comes back is a block transaction with the flag set,
+    /// because a submission asserts its own validity and only a producer has
+    /// a verdict to report.
+    #[test]
+    fn a_dijkstra_mempool_transaction_decodes() {
+        let cbor = testing::dijkstra_mempool_tx(
+            &testing::minimal_body(),
+            &testing::empty_witness_set(),
+            None,
+        );
+
+        assert_eq!(probe::tx_shape(&cbor), TxShape::DijkstraMempool);
+
+        let tx = MultiEraTx::decode_for_era(Era::Dijkstra, &cbor)
+            .expect("the three element form must decode");
+
+        assert_eq!(tx.era(), Era::Dijkstra);
+        assert!(
+            tx.is_valid(),
+            "a submitted transaction asserts its validity"
+        );
+        assert_eq!(tx.inputs().len(), 1);
+        assert_eq!(tx.fee(), Some(1_000));
+    }
+
+    /// The four element block form still decodes through the same entry point,
+    /// and its flag is the block producer's rather than an assumption.
+    #[test]
+    fn a_dijkstra_block_transaction_still_decodes_and_keeps_its_flag() {
+        for valid in [true, false] {
+            let cbor = testing::dijkstra_block_tx(
+                &testing::minimal_body(),
+                &testing::empty_witness_set(),
+                None,
+                valid,
+            );
+
+            assert_eq!(probe::tx_shape(&cbor), TxShape::DijkstraBlock);
+
+            let tx = MultiEraTx::decode_for_era(Era::Dijkstra, &cbor)
+                .expect("the four element form must decode");
+
+            assert_eq!(tx.era(), Era::Dijkstra);
+            assert_eq!(
+                tx.is_valid(),
+                valid,
+                "the producer's verdict must be read, not assumed"
+            );
+        }
+    }
+
+    /// Both Dijkstra forms reach the era through the shape driven entry point
+    /// too, and a Conway transaction still lands in Conway.
+    ///
+    /// This is what replaces the ordering: the two four element shapes differ
+    /// in where the validity flag sits, so neither can be reached by trying
+    /// the other first.
+    #[test]
+    fn every_transaction_lands_in_the_era_its_shape_names() {
+        let block = testing::dijkstra_block_tx(
+            &testing::minimal_body(),
+            &testing::empty_witness_set(),
+            None,
+            true,
+        );
+        assert_eq!(MultiEraTx::decode(&block).unwrap().era(), Era::Dijkstra);
+
+        let mempool = testing::dijkstra_mempool_tx(
+            &testing::minimal_body(),
+            &testing::empty_witness_set(),
+            None,
+        );
+        assert_eq!(MultiEraTx::decode(&mempool).unwrap().era(), Era::Dijkstra);
+
+        let conway = testing::conway_tx(
+            &testing::minimal_body(),
+            &testing::empty_witness_set(),
+            None,
+            true,
+        );
+        assert_eq!(MultiEraTx::decode(&conway).unwrap().era(), Era::Conway);
+
+        // and the same for bytes a node wrote rather than bytes built here
+        assert_eq!(
+            MultiEraTx::decode(&fixture_tx(include_str!("../../test_data/dijkstra3.block")))
+                .unwrap()
+                .era(),
+            Era::Dijkstra
+        );
+        assert_eq!(
+            MultiEraTx::decode(&fixture_tx(include_str!("../../test_data/conway1.block")))
+                .unwrap()
+                .era(),
+            Era::Conway
+        );
+    }
+
+    /// A Dijkstra transaction must not decode as Conway and a Conway one must
+    /// not decode as Dijkstra, whichever era is asked for. Without this the
+    /// test above could pass against an entry point that answered by order.
+    #[test]
+    fn neither_four_element_shape_decodes_as_the_other() {
+        let dijkstra = testing::dijkstra_block_tx(
+            &testing::minimal_body(),
+            &testing::empty_witness_set(),
+            None,
+            true,
+        );
+        assert!(
+            MultiEraTx::decode_for_era(Era::Conway, &dijkstra).is_err(),
+            "a Dijkstra transaction must not decode as Conway"
+        );
+
+        let conway = testing::conway_tx(
+            &testing::minimal_body(),
+            &testing::empty_witness_set(),
+            None,
+            true,
+        );
+        assert!(
+            MultiEraTx::decode_for_era(Era::Dijkstra, &conway).is_err(),
+            "a Conway transaction must not decode as Dijkstra"
+        );
+    }
+
+    /// A Dijkstra transaction's voting procedures are readable, and so are a
+    /// Conway one's, because the two eras share the type.
+    #[test]
+    fn a_transaction_with_no_voting_procedures_says_so() {
+        let cbor = testing::dijkstra_block_tx(
+            &testing::minimal_body(),
+            &testing::empty_witness_set(),
+            None,
+            true,
+        );
+        let tx = MultiEraTx::decode_for_era(Era::Dijkstra, &cbor).unwrap();
+        assert!(tx.voting_procedures().is_none());
     }
 }

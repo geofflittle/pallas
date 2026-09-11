@@ -78,17 +78,21 @@ async fn do_chainsync(
                                 tracing::info!("epoch boundary");
                                 None
                             }
-                            MultiEraHeader::ShelleyCompatible(_)
-                            | MultiEraHeader::BabbageCompatible(_) => {
+                            MultiEraHeader::Byron(_) => {
+                                tracing::info!("ignoring byron header");
+                                None
+                            }
+                            // Every other era is a block header carrying a
+                            // point, and a new one is too, so this arm is a
+                            // catch-all rather than a list that has to be
+                            // edited each time an era is added behind a
+                            // feature flag.
+                            _ => {
                                 if next_log.elapsed().as_secs() > 1 {
                                     tracing::info!("chainsync block header: {}", number);
                                     next_log = Instant::now();
                                 }
                                 Some(Point::Specific(slot, hash))
-                            }
-                            MultiEraHeader::Byron(_) => {
-                                tracing::info!("ignoring byron header");
-                                None
                             }
                         }
                     }

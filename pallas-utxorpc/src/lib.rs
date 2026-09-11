@@ -93,6 +93,28 @@ pub type UtxoMap = HashMap<TxoRef, EraCbor>;
 /// Plutus datums keyed by their 32-byte hash.
 pub type DatumMap = HashMap<Hash<32>, alonzo::PlutusData>;
 
+/// Something a mapper was asked for and cannot answer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Error {
+    /// Protocol parameters arrived for an era this mapper has no u5c shape
+    /// for. `MultiEraProtocolParameters` is non exhaustive, so this is
+    /// reachable without any change to this crate.
+    UnmappedProtocolParameters,
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::UnmappedProtocolParameters => {
+                write!(f, "no u5c mapping for this era's protocol parameters")
+            }
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
 /// Side-channel a UTxO RPC mapper uses to resolve information that is not
 /// inlined in the transaction or block being mapped (referenced UTxOs, slot
 /// timestamps, etc.).

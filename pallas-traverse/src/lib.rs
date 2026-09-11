@@ -3,7 +3,7 @@
 //! Where [`pallas-primitives`] exposes the raw typed CBOR per era, this crate
 //! hides the era split behind `MultiEra*` enums so a single piece of
 //! indexing or analysis code can run against everything from Byron to
-//! Conway.
+//! Conway, and to Dijkstra with the `unstable` feature.
 //!
 //! This is the read side of the ledger. For transaction construction see
 //! [`pallas-txbuilder`]; for ledger-rule validation see [`pallas-validate`].
@@ -39,7 +39,9 @@
 //! - [`MultiEraCert`], [`MultiEraRedeemer`], [`MultiEraWithdrawals`],
 //!   [`MultiEraSigners`], [`MultiEraMeta`], [`MultiEraUpdate`],
 //!   [`MultiEraProposal`], [`MultiEraGovAction`] — the rest of the tx
-//!   surface, normalised across eras.
+//!   surface, normalised across eras. Behind the `unstable` feature there are
+//!   three more, `MultiEraParamUpdate`, `MultiEraNativeScript` and
+//!   `MultiEraScriptRef`, which the Dijkstra era needs.
 //! - [`Era`] and [`Feature`] — discriminators for "which era is this" and
 //!   "does this era support X" (multi-assets, smart contracts, CIP-1694, …).
 //! - Trait-driven hashing: [`ComputeHash`] and [`OriginalHash`] give a
@@ -48,12 +50,15 @@
 //!   [`output`], [`assets`], [`value`], [`cert`], [`redeemers`],
 //!   [`witnesses`], [`signers`], [`hashes`], [`fees`], [`governance`],
 //!   [`time`], [`header`], [`meta`], [`auxiliary`], [`probe`], [`size`],
-//!   [`withdrawals`], [`wellknown`].
+//!   [`withdrawals`], [`wellknown`], and `script_ref` behind the `unstable`
+//!   feature.
 //!
 //! # Feature flags
 //!
 //! - `unstable` — exposes APIs that are not yet considered stable and may
-//!   change between minor releases.
+//!   change between minor releases. The Dijkstra era is one of them: its
+//!   variants, accessors and types are all behind this flag, so a build
+//!   without it sees the same surface as before the era was added.
 //!
 //! # Usage as part of `pallas`
 //!
@@ -73,7 +78,13 @@ use pallas_codec::utils::KeepRaw;
 use pallas_crypto::hash::Hash;
 use pallas_primitives::{alonzo, babbage, byron, conway};
 
+#[cfg(feature = "unstable")]
+use pallas_primitives::dijkstra;
+
 mod support;
+
+#[cfg(all(test, feature = "unstable"))]
+mod testing;
 
 /// Helpers for inspecting native and Plutus assets inside outputs and mints.
 pub mod assets;
@@ -103,6 +114,9 @@ pub mod output;
 pub mod probe;
 /// Helpers for Plutus redeemers.
 pub mod redeemers;
+/// Helpers for reference scripts attached to outputs.
+#[cfg(feature = "unstable")]
+pub mod script_ref;
 /// Helpers for required-signer hashes.
 pub mod signers;
 /// Size accounting helpers for transactions and blocks.
@@ -142,6 +156,14 @@ pub enum Era {
     Babbage,
     /// Adds CIP-1694 on-chain governance.
     Conway,
+    /// Adds inline block transactions, sub transactions and the Leios fields.
+    ///
+    /// Declared last on purpose. `Era` derives `Ord` and [`Era::has_feature`]
+    /// answers every query by comparing with `ge`, so a variant inserted
+    /// anywhere but the end silently changes the answer to feature queries for
+    /// the eras it displaces.
+    #[cfg(feature = "unstable")]
+    Dijkstra,
 }
 
 /// Feature flags individual eras can be queried for.
@@ -167,6 +189,11 @@ pub enum Feature {
 }
 
 /// A block header normalized across eras, keeping access to its raw CBOR.
+///
+/// Exhaustive, so a consumer that names every variant is told by the compiler
+/// when an era is added rather than catching it in a wildcard whose answer is
+/// indistinguishable from a real one. [`MultiEraHeader::era`] names what a
+/// wildcard caught, for a consumer that wants one anyway.
 #[derive(Debug)]
 pub enum MultiEraHeader<'b> {
     /// Byron epoch-boundary block header.
@@ -177,6 +204,9 @@ pub enum MultiEraHeader<'b> {
     BabbageCompatible(Cow<'b, KeepRaw<'b, babbage::Header>>),
     /// Byron main block header.
     Byron(Cow<'b, KeepRaw<'b, byron::BlockHead>>),
+    /// Dijkstra header, whose body carries twelve fields rather than ten.
+    #[cfg(feature = "unstable")]
+    Dijkstra(Cow<'b, KeepRaw<'b, dijkstra::Header>>),
 }
 
 /// A block normalized across eras.
@@ -193,6 +223,9 @@ pub enum MultiEraBlock<'b> {
     Byron(Box<byron::Block<'b>>),
     /// Conway block.
     Conway(Box<conway::Block<'b>>),
+    /// Dijkstra block.
+    #[cfg(feature = "unstable")]
+    Dijkstra(Box<dijkstra::Block<'b>>),
 }
 
 /// A transaction normalized across eras.
@@ -207,6 +240,9 @@ pub enum MultiEraTx<'b> {
     Byron(Box<Cow<'b, byron::TxPayload<'b>>>),
     /// Conway transaction.
     Conway(Box<Cow<'b, conway::Tx<'b>>>),
+    /// Dijkstra transaction (four elements, `is_valid` last).
+    #[cfg(feature = "unstable")]
+    Dijkstra(Box<Cow<'b, dijkstra::BlockTransaction<'b>>>),
 }
 
 /// Ada-plus-multi-asset value normalized across eras.
@@ -233,6 +269,9 @@ pub enum MultiEraOutput<'b> {
     Conway(Box<Cow<'b, conway::TransactionOutput<'b>>>),
     /// Byron output.
     Byron(Box<Cow<'b, byron::TxOut>>),
+    /// Dijkstra output, whose reference script may be PlutusV4.
+    #[cfg(feature = "unstable")]
+    Dijkstra(Box<Cow<'b, dijkstra::TransactionOutput<'b>>>),
 }
 
 /// Transaction input normalized across eras.
@@ -255,6 +294,10 @@ pub enum MultiEraCert<'b> {
     AlonzoCompatible(Box<Cow<'b, alonzo::Certificate>>),
     /// Conway-era certificate (adds governance-related variants).
     Conway(Box<Cow<'b, conway::Certificate>>),
+    /// Dijkstra certificate (drops two Conway variants, pool params may carry
+    /// a Leios key).
+    #[cfg(feature = "unstable")]
+    Dijkstra(Box<Cow<'b, dijkstra::Certificate>>),
 }
 
 /// Plutus redeemer normalized across eras.
@@ -267,6 +310,12 @@ pub enum MultiEraRedeemer<'b> {
     Conway(
         Box<Cow<'b, conway::RedeemersKey>>,
         Box<Cow<'b, conway::RedeemersValue>>,
+    ),
+    /// Dijkstra redeemer, whose tag space gains `Guarding`.
+    #[cfg(feature = "unstable")]
+    Dijkstra(
+        Box<Cow<'b, dijkstra::RedeemersKey>>,
+        Box<Cow<'b, dijkstra::RedeemersValue>>,
     ),
 }
 
@@ -343,22 +392,48 @@ pub enum MultiEraUpdate<'b> {
     Babbage(Box<Cow<'b, babbage::Update>>),
     /// Conway update.
     Conway(Box<Cow<'b, conway::Update>>),
+    /// Dijkstra update (four new reference script parameters).
+    #[cfg(feature = "unstable")]
+    Dijkstra(Box<Cow<'b, dijkstra::Update>>),
 }
 
-/// Conway-era governance proposal procedure.
+/// Governance proposal procedure normalized across eras.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum MultiEraProposal<'b> {
     /// Conway proposal procedure.
     Conway(Box<Cow<'b, conway::ProposalProcedure>>),
+    /// Dijkstra proposal procedure, whose governance action reaches this era's
+    /// protocol parameter update.
+    #[cfg(feature = "unstable")]
+    Dijkstra(Box<Cow<'b, dijkstra::ProposalProcedure>>),
 }
 
-/// Conway-era governance action carried by a [`MultiEraProposal`].
+/// Governance action carried by a [`MultiEraProposal`], normalized across eras.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum MultiEraGovAction<'b> {
     /// Conway governance action.
     Conway(Box<Cow<'b, conway::GovAction>>),
+    /// Dijkstra governance action, whose parameter change arm carries the
+    /// Dijkstra protocol parameter update.
+    #[cfg(feature = "unstable")]
+    Dijkstra(Box<Cow<'b, dijkstra::GovAction>>),
+}
+
+/// Protocol parameter update proposed by a governance action, normalized
+/// across eras.
+///
+/// The two types are not interchangeable. Conway's stops at key 33, and a
+/// Dijkstra update read through it loses keys 34 to 48, which is why the era
+/// travels with the value rather than being flattened away.
+#[cfg(feature = "unstable")]
+#[derive(Debug, Clone)]
+pub enum MultiEraParamUpdate<'b> {
+    /// Update proposed by a Conway parameter change action.
+    Conway(Box<Cow<'b, conway::ProtocolParamUpdate>>),
+    /// Update proposed by a Dijkstra parameter change action.
+    Dijkstra(Box<Cow<'b, dijkstra::ProtocolParamUpdate>>),
 }
 
 /// Required-signer hashes normalized across eras.
@@ -372,6 +447,48 @@ pub enum MultiEraSigners<'b> {
     Empty,
     /// Required signers from any Alonzo-compatible or later transaction.
     AlonzoCompatible(&'b alonzo::RequiredSigners),
+    /// Dijkstra guards, which widen required signers to admit credentials as
+    /// well as key hashes.
+    #[cfg(feature = "unstable")]
+    Dijkstra(&'b dijkstra::Guards),
+}
+
+/// A reference script attached to an output, normalized across eras.
+///
+/// Conway and Dijkstra script references are structurally identical for
+/// variants 0 through 3, but Dijkstra adds a fourth, PlutusV4, which has no
+/// representation in the Conway type. Collapsing the two into one type would
+/// mean either dropping a V4 script or reporting it as absent, so the era is
+/// kept.
+///
+/// A PlutusV4 script reaches a transaction here or in its auxiliary data. No
+/// era's `transaction_witness_set` rule has a slot for one.
+///
+/// Exhaustive on purpose: a catch-all is how a new era's script gets reported
+/// as absent, and a compile error is the better outcome.
+#[cfg(feature = "unstable")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MultiEraScriptRef<'b> {
+    /// Reference script from a Babbage or Conway output.
+    Conway(Cow<'b, conway::ScriptRef<'b>>),
+    /// Reference script from a Dijkstra output, which may be PlutusV4.
+    Dijkstra(Cow<'b, dijkstra::ScriptRef<'b>>),
+}
+
+/// A native script normalized across eras.
+///
+/// Every era through Conway shares Alonzo's six clause type. Dijkstra's
+/// `native_script` rule gains a seventh clause, `script_require_guard`, which
+/// the shared type cannot hold, so the era travels with the value.
+///
+/// Exhaustive on purpose, for the same reason [`MultiEraScriptRef`] is.
+#[cfg(feature = "unstable")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MultiEraNativeScript<'b> {
+    /// Native script from any era through Conway.
+    AlonzoCompatible(Cow<'b, alonzo::NativeScript>),
+    /// Native script from a Dijkstra transaction, which may require a guard.
+    Dijkstra(Cow<'b, dijkstra::NativeScript>),
 }
 
 /// Reference to a transaction output by transaction hash and output index.
@@ -429,4 +546,92 @@ pub trait ComputeHash<const BYTES: usize> {
 pub trait OriginalHash<const BYTES: usize> {
     /// Return the hash as computed over the value's original CBOR bytes.
     fn original_hash(&self) -> pallas_crypto::hash::Hash<BYTES>;
+}
+
+#[cfg(test)]
+mod attribute_tests {
+    const THIS_FILE: &str = include_str!("lib.rs");
+
+    /// The `MultiEra` enums that are deliberately exhaustive, so that a new
+    /// era is a compile error for every downstream match rather than a silent
+    /// catch-all. Each one's doc comment says why.
+    const DELIBERATELY_EXHAUSTIVE: &[&str] = &[
+        "MultiEraHeader",
+        "MultiEraNativeScript",
+        "MultiEraParamUpdate",
+        "MultiEraScriptRef",
+    ];
+
+    /// Every `pub enum MultiEra*` declared in this file, paired with whether
+    /// the line above it is `#[non_exhaustive]`.
+    fn multi_era_enums(source: &str) -> Vec<(String, bool)> {
+        let lines: Vec<&str> = source.lines().collect();
+
+        lines
+            .iter()
+            .enumerate()
+            .filter_map(|(i, line)| {
+                let rest = line.trim().strip_prefix("pub enum MultiEra")?;
+                let name: String = std::iter::once("MultiEra")
+                    .chain(std::iter::once(
+                        rest.split(['<', ' ', '{']).next().unwrap_or_default(),
+                    ))
+                    .collect();
+                let marked = i > 0 && lines[i - 1].trim() == "#[non_exhaustive]";
+                Some((name, marked))
+            })
+            .collect()
+    }
+
+    /// Adding a variant to an exhaustive public enum is a breaking change on a
+    /// 1.x crate, and every era adds one. The attribute is easy to forget on a
+    /// new enum and nothing else notices, so this is what notices.
+    ///
+    /// The deliberate exception is named rather than skipped, and is asserted
+    /// to still be an exception, so that marking it does not leave a stale
+    /// allowance behind that would let the next enum through unmarked.
+    #[test]
+    fn every_multi_era_enum_is_non_exhaustive_unless_named() {
+        let enums = multi_era_enums(THIS_FILE);
+
+        // An empty result would make every assertion below pass by never
+        // running, so the scan is asserted to have found something first.
+        assert!(
+            enums.len() > 10,
+            "expected the scan to find the crate's MultiEra enums, found {}",
+            enums.len()
+        );
+
+        let unmarked: Vec<&str> = enums
+            .iter()
+            .filter(|(_, marked)| !marked)
+            .map(|(name, _)| name.as_str())
+            .filter(|name| !DELIBERATELY_EXHAUSTIVE.contains(name))
+            .collect();
+        assert!(
+            unmarked.is_empty(),
+            "{unmarked:?} lack #[non_exhaustive], so adding an era variant to one breaks every downstream exhaustive match"
+        );
+
+        let no_longer_needed: Vec<&str> = enums
+            .iter()
+            .filter(|(name, marked)| *marked && DELIBERATELY_EXHAUSTIVE.contains(&name.as_str()))
+            .map(|(name, _)| name.as_str())
+            .collect();
+        assert!(
+            no_longer_needed.is_empty(),
+            "{no_longer_needed:?} is now #[non_exhaustive], so remove it from DELIBERATELY_EXHAUSTIVE"
+        );
+    }
+
+    /// The scan above is only worth anything if it can tell the two cases
+    /// apart, so it is shown doing that on both.
+    #[test]
+    fn the_attribute_scan_reads_both_cases() {
+        let marked = multi_era_enums("#[non_exhaustive]\npub enum MultiEraThing<'b> {");
+        assert_eq!(marked, vec![("MultiEraThing".to_string(), true)]);
+
+        let bare = multi_era_enums("#[derive(Debug)]\npub enum MultiEraThing<'b> {");
+        assert_eq!(bare, vec![("MultiEraThing".to_string(), false)]);
+    }
 }
