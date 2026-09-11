@@ -565,7 +565,7 @@ mod tests {
             .expect_err("an absolute segment must be refused");
 
         assert!(err.contains("initialFunds"), "{err}");
-        assert!(err.contains(&absolute), "{err}");
+        assert!(err.contains("not one file or directory name"), "{err}");
     }
 
     #[test]
