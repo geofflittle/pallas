@@ -374,7 +374,8 @@ pub enum MultiEraCertKind<'b> {
 /// eras.
 ///
 /// Both the Alonzo and the Conway pool registration certificate name every
-/// field here.
+/// field here but `bls_key`, which the `unstable` build adds for the Dijkstra
+/// one.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct MultiEraPoolRegistration<'b> {
@@ -397,6 +398,9 @@ pub struct MultiEraPoolRegistration<'b> {
     pub relays: &'b [Relay],
     /// The off chain metadata the pool points at, which it may omit.
     pub pool_metadata: Option<&'b PoolMetadata>,
+    /// The BLS key the pool registers, which it may omit.
+    #[cfg(feature = "unstable")]
+    pub bls_key: Option<&'b dijkstra::BlsKey>,
 }
 
 /// Plutus redeemer normalized across eras.
@@ -827,7 +831,6 @@ mod attribute_tests {
     /// path. A `Never` marking is an enum whose shape v1.4.0 already fixed,
     /// which a caller may match exhaustively until the next major release.
     const PUBLIC_ENUMS: &[(&str, Presence, NonExhaustive)] = &[
-        ("cert::BlsKeySlot", UnstableOnly, Always),
         ("governance::ParamRead", UnstableOnly, Always),
         ("lib::Era", EveryBuild, Always),
         ("lib::Error", EveryBuild, Never),

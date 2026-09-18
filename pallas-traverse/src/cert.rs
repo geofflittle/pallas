@@ -1,9 +1,6 @@
 use pallas_primitives::{alonzo, conway};
 
 #[cfg(feature = "unstable")]
-use std::ops::Deref;
-
-#[cfg(feature = "unstable")]
 use pallas_primitives::dijkstra;
 
 use crate::{Era, MultiEraCert, MultiEraCertKind, MultiEraPoolRegistration};
@@ -11,9 +8,14 @@ use crate::{Era, MultiEraCert, MultiEraCertKind, MultiEraPoolRegistration};
 /// Reads the fifteen certificates Conway's type names that a later era's type
 /// names too, under the era module given. An era naming further certificates
 /// passes them as further arms, so each match stays exhaustive over its own
-/// type.
+/// type. The `unstable` build sets `bls_key` to the expression after
+/// `pool_registration`, which may read the fields that list binds.
 macro_rules! shared_certs {
-    ($cert:expr, $era:ident $(, $pattern:pat => $kind:expr)* $(,)?) => {
+    (
+        $cert:expr, $era:ident,
+        pool_registration { $($field:ident),* $(,)? } => $bls_key:expr
+        $(, $pattern:pat => $kind:expr)* $(,)?
+    ) => {
         match $cert {
             $era::Certificate::StakeDelegation(credential, pool) => {
                 MultiEraCertKind::StakeDelegation(credential, pool)
@@ -28,6 +30,7 @@ macro_rules! shared_certs {
                 pool_owners,
                 relays,
                 pool_metadata,
+                $($field,)*
             } => MultiEraCertKind::PoolRegistration(MultiEraPoolRegistration {
                 operator,
                 vrf_keyhash,
@@ -38,6 +41,8 @@ macro_rules! shared_certs {
                 pool_owners: &pool_owners[..],
                 relays: &relays[..],
                 pool_metadata: pool_metadata.as_ref(),
+                #[cfg(feature = "unstable")]
+                bls_key: $bls_key,
             }),
             $era::Certificate::PoolRetirement(pool, epoch) => {
                 MultiEraCertKind::PoolRetirement(pool, *epoch)
@@ -116,6 +121,8 @@ fn alonzo_cert_kind(cert: &alonzo::Certificate) -> MultiEraCertKind<'_> {
             pool_owners: &pool_owners[..],
             relays: &relays[..],
             pool_metadata: pool_metadata.as_ref(),
+            #[cfg(feature = "unstable")]
+            bls_key: None,
         }),
         alonzo::Certificate::PoolRetirement(pool, epoch) => {
             MultiEraCertKind::PoolRetirement(pool, *epoch)
@@ -135,10 +142,24 @@ fn conway_cert_kind(cert: &conway::Certificate) -> MultiEraCertKind<'_> {
     shared_certs!(
         cert,
         conway,
+        pool_registration {} => None,
         conway::Certificate::StakeRegistration(credential) =>
             MultiEraCertKind::StakeRegistration(credential),
         conway::Certificate::StakeDeregistration(credential) =>
             MultiEraCertKind::StakeDeregistration(credential),
+    )
+}
+
+/// Reads every certificate the Dijkstra type names.
+#[cfg(feature = "unstable")]
+fn dijkstra_cert_kind(cert: &dijkstra::Certificate) -> MultiEraCertKind<'_> {
+    shared_certs!(
+        cert,
+        dijkstra,
+        pool_registration { bls_key } => match bls_key {
+            Some(pallas_primitives::Nullable::Some(key)) => Some(key),
+            _ => None,
+        },
     )
 }
 
@@ -177,63 +198,16 @@ impl MultiEraCert<'_> {
         }
     }
 
-    #[cfg(feature = "unstable")]
-    pub fn bls_key(&self) -> BlsKeySlot<'_> {
-        match self {
-            MultiEraCert::Dijkstra(x) => match x.deref().deref() {
-                dijkstra::Certificate::PoolRegistration { bls_key, .. } => match bls_key {
-                    None => BlsKeySlot::NoSlot,
-                    Some(pallas_primitives::Nullable::Some(k)) => BlsKeySlot::Key(k),
-                    Some(_) => BlsKeySlot::Null,
-                },
-                _ => BlsKeySlot::NotAPoolRegistration,
-            },
-            MultiEraCert::AlonzoCompatible(x) => match x.deref().deref() {
-                alonzo::Certificate::PoolRegistration { .. } => BlsKeySlot::NoSlot,
-                _ => BlsKeySlot::NotAPoolRegistration,
-            },
-            MultiEraCert::Conway(x) => match x.deref().deref() {
-                conway::Certificate::PoolRegistration { .. } => BlsKeySlot::NoSlot,
-                _ => BlsKeySlot::NotAPoolRegistration,
-            },
-            MultiEraCert::NotApplicable => BlsKeySlot::NotAPoolRegistration,
-        }
-    }
-
     /// Returns what this certificate certifies, with each payload in one type
-    /// serving both the Alonzo and the Conway certificate type, or None for an
-    /// era that carries no certificates at all.
+    /// that every era naming that kind shares, or None for an era with no
+    /// certificates.
     pub fn kind(&self) -> Option<MultiEraCertKind<'_>> {
         match self {
             MultiEraCert::NotApplicable => None,
             MultiEraCert::AlonzoCompatible(x) => Some(alonzo_cert_kind(x)),
             MultiEraCert::Conway(x) => Some(conway_cert_kind(x)),
             #[cfg(feature = "unstable")]
-            MultiEraCert::Dijkstra(_) => {
-                unimplemented!("map_cert is not yet implemented for Dijkstra")
-            }
-        }
-    }
-}
-
-#[cfg(feature = "unstable")]
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum BlsKeySlot<'b> {
-    NotAPoolRegistration,
-    /// A pool registration with no BLS key slot, or one the transaction omitted.
-    NoSlot,
-    /// A pool registration that wrote the slot as nil.
-    Null,
-    Key(&'b dijkstra::BlsKey),
-}
-
-#[cfg(feature = "unstable")]
-impl BlsKeySlot<'_> {
-    pub fn key(&self) -> Option<&dijkstra::BlsKey> {
-        match self {
-            BlsKeySlot::Key(k) => Some(k),
-            BlsKeySlot::NotAPoolRegistration | BlsKeySlot::NoSlot | BlsKeySlot::Null => None,
+            MultiEraCert::Dijkstra(x) => Some(dijkstra_cert_kind(x)),
         }
     }
 }
@@ -325,6 +299,7 @@ mod tests {
             (include_str!("../../test_data/dijkstra7.block"), 1, 0),
             (include_str!("../../test_data/dijkstra10.block"), 2, 1),
             (include_str!("../../test_data/dijkstra13.block"), 2, 0),
+            (include_str!("../../test_data/dijkstra14.block"), 1, 1),
         ];
 
         let mut total = 0usize;
@@ -348,7 +323,11 @@ mod tests {
                 assert!(cert.as_conway().is_none());
                 assert!(cert.as_alonzo().is_none());
 
-                if let Some(key) = cert.bls_key().key() {
+                if let Some(MultiEraCertKind::PoolRegistration(MultiEraPoolRegistration {
+                    bls_key: Some(key),
+                    ..
+                })) = cert.kind()
+                {
                     assert_eq!(key.bls_pubkey.len(), 96, "bls_pubkey is 96 bytes");
                     assert_eq!(
                         key.bls_possession_proof.len(),
@@ -368,10 +347,10 @@ mod tests {
         }
 
         assert_eq!(
-            total, 15,
-            "certificates across the seven fixtures that have any"
+            total, 16,
+            "certificates across the eight fixtures that have any"
         );
-        assert_eq!(with_key, 6, "pool registrations carrying a BLS key");
+        assert_eq!(with_key, 7, "pool registrations carrying a BLS key");
     }
 
     #[cfg(feature = "unstable")]
@@ -393,11 +372,6 @@ mod tests {
         assert!(delegation.as_conway().is_none());
         assert!(delegation.as_alonzo().is_none());
 
-        assert!(
-            delegation.bls_key().key().is_none(),
-            "a vote delegation carries no pool parameters"
-        );
-
         let Some(dijkstra::Certificate::VoteDeleg(credential, drep)) = delegation.as_dijkstra()
         else {
             unreachable!()
@@ -416,6 +390,121 @@ mod tests {
                 .any(|c| matches!(c.as_dijkstra(), Some(dijkstra::Certificate::Reg(..)))),
             "the other certificate is a registration"
         );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn every_dijkstra_fixture_certificate_reads_the_arm_its_tag_names() {
+        let cases = [
+            (
+                "dijkstra2",
+                include_str!("../../test_data/dijkstra2.block"),
+                vec!["pool registration"],
+            ),
+            (
+                "dijkstra6",
+                include_str!("../../test_data/dijkstra6.block"),
+                vec![
+                    "stake delegation",
+                    "registration",
+                    "pool registration",
+                    "registration",
+                    "pool registration",
+                ],
+            ),
+            (
+                "dijkstra13",
+                include_str!("../../test_data/dijkstra13.block"),
+                vec!["registration", "vote delegation"],
+            ),
+        ];
+
+        for (name, block_str, expected) in cases {
+            let cbor = block(block_str);
+            let decoded = MultiEraBlock::decode(&cbor).expect("invalid cbor");
+            let txs = decoded.txs();
+            let certs: Vec<_> = txs.iter().flat_map(|tx| tx.certs()).collect();
+
+            let read: Vec<&str> = certs
+                .iter()
+                .map(|cert| arm(&cert.kind().expect("a Dijkstra certificate reads a kind")))
+                .collect();
+
+            assert_eq!(
+                read, expected,
+                "a {name} certificate reads an arm its tag does not name"
+            );
+        }
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_pool_registration_reads_its_bls_key_through_the_view() {
+        let key = dijkstra::BlsKey {
+            bls_pubkey: vec![0x71; 96].into(),
+            bls_possession_proof: vec![0x72; 48].into(),
+        };
+        let dijkstra_registration = |bls_key| {
+            dijkstra_cert(dijkstra::Certificate::PoolRegistration {
+                operator: [0x02; 28].into(),
+                vrf_keyhash: [0x06; 32].into(),
+                bls_key,
+                pledge: 500,
+                cost: 340,
+                margin: margin(),
+                reward_account: vec![0xe0; 29].into(),
+                pool_owners: vec![[0x04; 28].into()].into(),
+                relays: relays(),
+                pool_metadata: Some(metadata()),
+            })
+        };
+
+        let absent = dijkstra_registration(None);
+        let nil = dijkstra_registration(Some(pallas_primitives::Nullable::Null));
+        let undefined = dijkstra_registration(Some(pallas_primitives::Nullable::Undefined));
+        let populated = dijkstra_registration(Some(pallas_primitives::Nullable::Some(key.clone())));
+        let alonzo = alonzo_cert(alonzo::Certificate::PoolRegistration {
+            operator: [0x02; 28].into(),
+            vrf_keyhash: [0x06; 32].into(),
+            pledge: 500,
+            cost: 340,
+            margin: margin(),
+            reward_account: vec![0xe0; 29].into(),
+            pool_owners: vec![[0x04; 28].into()],
+            relays: relays(),
+            pool_metadata: Some(metadata()),
+        });
+        let conway = conway_cert(conway::Certificate::PoolRegistration {
+            operator: [0x02; 28].into(),
+            vrf_keyhash: [0x06; 32].into(),
+            pledge: 500,
+            cost: 340,
+            margin: margin(),
+            reward_account: vec![0xe0; 29].into(),
+            pool_owners: vec![[0x04; 28].into()].into(),
+            relays: relays(),
+            pool_metadata: Some(metadata()),
+        });
+
+        let cases = [
+            ("an absent Dijkstra", &absent, None),
+            ("a nil Dijkstra", &nil, None),
+            ("an undefined Dijkstra", &undefined, None),
+            ("a populated Dijkstra", &populated, Some(&key)),
+            ("an Alonzo", &alonzo, None),
+            ("a Conway", &conway, None),
+        ];
+
+        for (name, cert, expected) in cases {
+            let kind = cert.kind().expect("a pool registration reads a kind");
+            let MultiEraCertKind::PoolRegistration(registration) = &kind else {
+                panic!("a pool registration reads the {} arm", arm(&kind))
+            };
+            assert_eq!(
+                registration.bls_key, expected,
+                "{name} pool registration reads the expected bls_key"
+            );
+        }
     }
 
     #[test]
@@ -591,6 +680,112 @@ mod tests {
         assert_eq!(read.len(), 7, "the Alonzo type names seven certificates");
     }
 
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn every_dijkstra_certificate_is_read_through_the_certificate_view() {
+        let cases: Vec<(&str, dijkstra::Certificate)> = vec![
+            (
+                "stake delegation",
+                dijkstra::Certificate::StakeDelegation(credential(), [0x02; 28].into()),
+            ),
+            (
+                "pool registration",
+                dijkstra::Certificate::PoolRegistration {
+                    operator: [0x02; 28].into(),
+                    vrf_keyhash: [0x06; 32].into(),
+                    bls_key: None,
+                    pledge: 500,
+                    cost: 340,
+                    margin: margin(),
+                    reward_account: vec![0xe0; 29].into(),
+                    pool_owners: vec![[0x04; 28].into()].into(),
+                    relays: relays(),
+                    pool_metadata: Some(metadata()),
+                },
+            ),
+            (
+                "pool retirement",
+                dijkstra::Certificate::PoolRetirement([0x02; 28].into(), 9),
+            ),
+            ("registration", dijkstra::Certificate::Reg(credential(), 5)),
+            (
+                "deregistration",
+                dijkstra::Certificate::UnReg(credential(), 5),
+            ),
+            (
+                "vote delegation",
+                dijkstra::Certificate::VoteDeleg(credential(), DRep::Abstain),
+            ),
+            (
+                "stake and vote delegation",
+                dijkstra::Certificate::StakeVoteDeleg(
+                    credential(),
+                    [0x02; 28].into(),
+                    DRep::NoConfidence,
+                ),
+            ),
+            (
+                "stake registration and delegation",
+                dijkstra::Certificate::StakeRegDeleg(credential(), [0x02; 28].into(), 5),
+            ),
+            (
+                "vote registration and delegation",
+                dijkstra::Certificate::VoteRegDeleg(credential(), DRep::Abstain, 5),
+            ),
+            (
+                "stake and vote registration and delegation",
+                dijkstra::Certificate::StakeVoteRegDeleg(
+                    credential(),
+                    [0x02; 28].into(),
+                    DRep::Abstain,
+                    5,
+                ),
+            ),
+            (
+                "committee hot key authorisation",
+                dijkstra::Certificate::AuthCommitteeHot(
+                    credential(),
+                    AddrKeyhash([0x07; 28].into()),
+                ),
+            ),
+            (
+                "committee resignation",
+                dijkstra::Certificate::ResignCommitteeCold(credential(), Some(anchor())),
+            ),
+            (
+                "drep registration",
+                dijkstra::Certificate::RegDRepCert(credential(), 5, Some(anchor())),
+            ),
+            (
+                "drep deregistration",
+                dijkstra::Certificate::UnRegDRepCert(credential(), 5),
+            ),
+            (
+                "drep update",
+                dijkstra::Certificate::UpdateDRepCert(credential(), None),
+            ),
+        ];
+
+        let read: Vec<&str> = cases
+            .iter()
+            .map(|(_, certificate)| {
+                let cert = MultiEraCert::Dijkstra(Box::new(Cow::Borrowed(certificate)));
+                arm(&cert.kind().expect("a Dijkstra certificate reads a kind"))
+            })
+            .collect();
+
+        let expected: Vec<&str> = cases.iter().map(|(name, _)| *name).collect();
+        assert_eq!(
+            read, expected,
+            "each Dijkstra certificate must reach the arm of the view that names it"
+        );
+        assert_eq!(
+            read.len(),
+            15,
+            "the Dijkstra type names fifteen certificates"
+        );
+    }
+
     #[test]
     fn an_era_carrying_no_certificates_reads_no_kind() {
         assert!(
@@ -614,9 +809,17 @@ mod tests {
             assert!(cert.as_alonzo().is_some());
             assert!(cert.as_dijkstra().is_none());
             assert!(cert.as_conway().is_none());
+
+            let kind = cert.kind().expect("an Alonzo certificate reads a kind");
+            let MultiEraCertKind::PoolRegistration(registration) = &kind else {
+                panic!(
+                    "this fixture writes certificate tag 3, found {}",
+                    arm(&kind)
+                )
+            };
             assert!(
-                cert.bls_key().key().is_none(),
-                "no era before Dijkstra has a BLS key slot"
+                registration.bls_key.is_none(),
+                "no era before Dijkstra has a BLS key field"
             );
         }
     }
@@ -818,6 +1021,11 @@ mod tests {
 
     fn alonzo_cert(certificate: alonzo::Certificate) -> MultiEraCert<'static> {
         MultiEraCert::AlonzoCompatible(Box::new(Cow::Owned(certificate)))
+    }
+
+    #[cfg(feature = "unstable")]
+    fn dijkstra_cert(certificate: dijkstra::Certificate) -> MultiEraCert<'static> {
+        MultiEraCert::Dijkstra(Box::new(Cow::Owned(certificate)))
     }
 
     #[test]
@@ -1049,6 +1257,157 @@ mod tests {
         for (certificate, expected) in cases {
             let cert = alonzo_cert(certificate);
             let kind = cert.kind().expect("an Alonzo certificate reads a kind");
+            assert_eq!(
+                payload(&kind),
+                expected,
+                "the {} view must report the payloads its certificate carries",
+                arm(&kind)
+            );
+        }
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn every_dijkstra_certificate_payload_reads_back_by_value() {
+        let cases: Vec<(dijkstra::Certificate, &str)> = vec![
+            (
+                dijkstra::Certificate::StakeDelegation(key_credential(0x51), [0x52; 28].into()),
+                "credential key 51515151515151515151515151515151515151515151515151515151 \
+                 pool 52525252525252525252525252525252525252525252525252525252",
+            ),
+            (
+                dijkstra::Certificate::PoolRegistration {
+                    operator: [0x53; 28].into(),
+                    vrf_keyhash: [0x54; 32].into(),
+                    bls_key: None,
+                    pledge: 555,
+                    cost: 666,
+                    margin: RationalNumber {
+                        numerator: 5,
+                        denominator: 91,
+                    },
+                    reward_account: vec![0x55; 29].into(),
+                    pool_owners: vec![[0x56; 28].into(), [0x57; 28].into()].into(),
+                    relays: vec![Relay::SingleHostName(
+                        Some(3002),
+                        "three.example.invalid".into(),
+                    )],
+                    pool_metadata: Some(distinct_metadata(0x58)),
+                },
+                "operator 53535353535353535353535353535353535353535353535353535353 \
+                 vrf 5454545454545454545454545454545454545454545454545454545454545454 \
+                 pledge 555 cost 666 margin 5/91 \
+                 reward account 5555555555555555555555555555555555555555555555555555555555 \
+                 owners 56565656565656565656565656565656565656565656565656565656 \
+                 57575757575757575757575757575757575757575757575757575757 \
+                 relays [SingleHostName(Some(3002), \"three.example.invalid\")] \
+                 metadata https://example.invalid/pool/58.json \
+                 5858585858585858585858585858585858585858585858585858585858585858",
+            ),
+            (
+                dijkstra::Certificate::PoolRetirement([0x59; 28].into(), 707),
+                "pool 59595959595959595959595959595959595959595959595959595959 epoch 707",
+            ),
+            (
+                dijkstra::Certificate::Reg(key_credential(0x5a), 808),
+                "credential key 5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a coin 808",
+            ),
+            (
+                dijkstra::Certificate::UnReg(key_credential(0x5b), 909),
+                "credential key 5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b coin 909",
+            ),
+            (
+                dijkstra::Certificate::VoteDeleg(
+                    key_credential(0x5c),
+                    DRep::Key([0x5d; 28].into()),
+                ),
+                "credential key 5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c \
+                 drep key 5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d",
+            ),
+            (
+                dijkstra::Certificate::StakeVoteDeleg(
+                    key_credential(0x5e),
+                    [0x5f; 28].into(),
+                    DRep::Key([0x60; 28].into()),
+                ),
+                "credential key 5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e \
+                 pool 5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f \
+                 drep key 60606060606060606060606060606060606060606060606060606060",
+            ),
+            (
+                dijkstra::Certificate::StakeRegDeleg(key_credential(0x61), [0x62; 28].into(), 1111),
+                "credential key 61616161616161616161616161616161616161616161616161616161 \
+                 pool 62626262626262626262626262626262626262626262626262626262 coin 1111",
+            ),
+            (
+                dijkstra::Certificate::VoteRegDeleg(
+                    key_credential(0x63),
+                    DRep::Key([0x64; 28].into()),
+                    1212,
+                ),
+                "credential key 63636363636363636363636363636363636363636363636363636363 \
+                 drep key 64646464646464646464646464646464646464646464646464646464 coin 1212",
+            ),
+            (
+                dijkstra::Certificate::StakeVoteRegDeleg(
+                    key_credential(0x65),
+                    [0x66; 28].into(),
+                    DRep::Key([0x67; 28].into()),
+                    1313,
+                ),
+                "credential key 65656565656565656565656565656565656565656565656565656565 \
+                 pool 66666666666666666666666666666666666666666666666666666666 \
+                 drep key 67676767676767676767676767676767676767676767676767676767 coin 1313",
+            ),
+            (
+                dijkstra::Certificate::AuthCommitteeHot(key_credential(0x68), key_credential(0x69)),
+                "cold key 68686868686868686868686868686868686868686868686868686868 \
+                 hot key 69696969696969696969696969696969696969696969696969696969",
+            ),
+            (
+                dijkstra::Certificate::ResignCommitteeCold(
+                    key_credential(0x6a),
+                    Some(distinct_anchor(0x6b)),
+                ),
+                "cold key 6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a \
+                 anchor https://example.invalid/anchor/6b \
+                 6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b",
+            ),
+            (
+                dijkstra::Certificate::RegDRepCert(
+                    key_credential(0x6c),
+                    1414,
+                    Some(distinct_anchor(0x6d)),
+                ),
+                "credential key 6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c coin 1414 \
+                 anchor https://example.invalid/anchor/6d \
+                 6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d",
+            ),
+            (
+                dijkstra::Certificate::UnRegDRepCert(key_credential(0x6e), 1515),
+                "credential key 6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e \
+                 coin 1515",
+            ),
+            (
+                dijkstra::Certificate::UpdateDRepCert(
+                    key_credential(0x6f),
+                    Some(distinct_anchor(0x70)),
+                ),
+                "credential key 6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f \
+                 anchor https://example.invalid/anchor/70 \
+                 7070707070707070707070707070707070707070707070707070707070707070",
+            ),
+        ];
+
+        assert_eq!(
+            cases.len(),
+            15,
+            "every certificate the Dijkstra type names carries its payloads here"
+        );
+
+        for (certificate, expected) in cases {
+            let cert = dijkstra_cert(certificate);
+            let kind = cert.kind().expect("a Dijkstra certificate reads a kind");
             assert_eq!(
                 payload(&kind),
                 expected,
