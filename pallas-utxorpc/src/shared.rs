@@ -2910,6 +2910,196 @@ macro_rules! impl_cardano_mapper_shared {
                 );
             }
 
+            #[test]
+            fn the_era_neutral_walk_preserves_mixed_shape_trees() {
+                use pallas_primitives::alonzo::NativeScript;
+
+                let script = NativeScript::ScriptNOfK(
+                    2,
+                    vec![
+                        NativeScript::ScriptPubkey([1; 28].into()),
+                        NativeScript::ScriptAll(vec![
+                            NativeScript::ScriptPubkey([2; 28].into()),
+                            NativeScript::ScriptAny(vec![
+                                NativeScript::InvalidBefore(100),
+                                NativeScript::InvalidHereafter(200),
+                            ]),
+                        ]),
+                        NativeScript::ScriptPubkey([3; 28].into()),
+                    ],
+                );
+                let script =
+                    pallas_traverse::MultiEraNativeScript::from_decoded_alonzo_compatible(&script);
+
+                let mapped = Mapper::<NoLedger>::map_multi_era_native_script(&script);
+                let Some(u5c::native_script::NativeScript::ScriptNOfK(n_of_k)) =
+                    &mapped.native_script
+                else {
+                    panic!("expected ScriptNOfK, got {:?}", mapped.native_script);
+                };
+                assert_eq!(n_of_k.k, 2);
+                assert_eq!(n_of_k.scripts.len(), 3);
+
+                // Two levels are wider than one child, so a walk that pairs a
+                // mapped child with the wrong source child keeps every count
+                // right and still fails here.
+                assert_eq!(
+                    n_of_k.scripts[0].native_script,
+                    Some(pubkey_clause(&[1u8; 28].into()))
+                );
+                assert_eq!(
+                    n_of_k.scripts[2].native_script,
+                    Some(pubkey_clause(&[3u8; 28].into()))
+                );
+
+                let Some(u5c::native_script::NativeScript::ScriptAll(all)) =
+                    &n_of_k.scripts[1].native_script
+                else {
+                    panic!(
+                        "expected ScriptAll, got {:?}",
+                        n_of_k.scripts[1].native_script
+                    );
+                };
+                assert_eq!(all.items.len(), 2);
+                assert_eq!(
+                    all.items[0].native_script,
+                    Some(pubkey_clause(&[2u8; 28].into()))
+                );
+
+                let Some(u5c::native_script::NativeScript::ScriptAny(any)) =
+                    &all.items[1].native_script
+                else {
+                    panic!("expected ScriptAny, got {:?}", all.items[1].native_script);
+                };
+                assert_eq!(any.items.len(), 2);
+                assert_eq!(
+                    any.items[0].native_script,
+                    Some(u5c::native_script::NativeScript::InvalidBefore(100))
+                );
+                assert_eq!(
+                    any.items[1].native_script,
+                    Some(u5c::native_script::NativeScript::InvalidHereafter(200))
+                );
+            }
+
+            #[test]
+            fn the_era_neutral_walk_handles_deeply_nested_scripts_on_a_small_stack() {
+                // Depth and stack size are load-bearing, not just generous:
+                // both must stay far enough apart that a mapping of one call
+                // frame per level aborts here, or this test stops proving
+                // anything the moment either constant drifts.
+                std::thread::Builder::new()
+                    .stack_size(128 * 1024)
+                    .spawn(|| {
+                        let mut script =
+                            pallas_primitives::alonzo::NativeScript::ScriptPubkey([0; 28].into());
+                        for _ in 0..20_000 {
+                            script =
+                                pallas_primitives::alonzo::NativeScript::ScriptAll(vec![script]);
+                        }
+                        let script =
+                            pallas_traverse::MultiEraNativeScript::from_decoded_alonzo_compatible(
+                                &script,
+                            );
+
+                        let mapped = Mapper::<NoLedger>::map_multi_era_native_script(&script);
+
+                        let mut depth = 0;
+                        let mut cursor = &mapped;
+                        while let Some(u5c::native_script::NativeScript::ScriptAll(list)) =
+                            &cursor.native_script
+                        {
+                            cursor = list.items.first().expect("ScriptAll must carry a child");
+                            depth += 1;
+                        }
+                        assert_eq!(depth, 20_000);
+                        assert_eq!(
+                            cursor.native_script,
+                            Some(pubkey_clause(&[0u8; 28].into())),
+                            "the walk reaches the leaf the source put at the bottom"
+                        );
+
+                        // u5c's generated type has no custom Drop, so dropping
+                        // a chain this deep aborts the way a recursive mapping
+                        // does. Leak it: this test is about the mapping, and
+                        // the leak is a few MB, thread local and test only.
+                        std::mem::forget(mapped);
+                    })
+                    .unwrap()
+                    .join()
+                    .unwrap();
+            }
+
+            #[cfg(feature = "unstable")]
+            #[test]
+            fn the_era_neutral_walk_handles_a_deeply_nested_dijkstra_script() {
+                std::thread::Builder::new()
+                    .stack_size(128 * 1024)
+                    .spawn(|| {
+                        let mut script =
+                            pallas_primitives::dijkstra::NativeScript::ScriptPubkey([0; 28].into());
+                        for _ in 0..20_000 {
+                            script =
+                                pallas_primitives::dijkstra::NativeScript::ScriptAll(vec![script]);
+                        }
+                        let script =
+                            pallas_traverse::MultiEraNativeScript::from_decoded_dijkstra(&script);
+
+                        let mapped = Mapper::<NoLedger>::map_multi_era_native_script(&script);
+
+                        let mut depth = 0;
+                        let mut cursor = &mapped;
+                        while let Some(u5c::native_script::NativeScript::ScriptAll(list)) =
+                            &cursor.native_script
+                        {
+                            cursor = list.items.first().expect("ScriptAll must carry a child");
+                            depth += 1;
+                        }
+                        assert_eq!(depth, 20_000);
+                        assert_eq!(
+                            cursor.native_script,
+                            Some(pubkey_clause(&[0u8; 28].into()))
+                        );
+
+                        std::mem::forget(mapped);
+                    })
+                    .unwrap()
+                    .join()
+                    .unwrap();
+            }
+
+            #[cfg(feature = "unstable")]
+            #[test]
+            fn a_guard_clause_nested_in_a_dijkstra_script_maps_to_an_empty_message() {
+                use pallas_primitives::dijkstra::{NativeScript, StakeCredential};
+
+                let guard = NativeScript::ScriptRequireGuard(StakeCredential::AddrKeyhash(
+                    [9u8; 28].into(),
+                ));
+                let script = NativeScript::ScriptAll(vec![
+                    NativeScript::ScriptPubkey([8; 28].into()),
+                    guard,
+                ]);
+                let script = pallas_traverse::MultiEraNativeScript::from_decoded_dijkstra(&script);
+
+                let mapped = Mapper::<NoLedger>::map_multi_era_native_script(&script);
+                let Some(u5c::native_script::NativeScript::ScriptAll(all)) = &mapped.native_script
+                else {
+                    panic!("expected ScriptAll, got {:?}", mapped.native_script);
+                };
+
+                assert_eq!(all.items.len(), 2, "a guard clause keeps its position");
+                assert_eq!(
+                    all.items[0].native_script,
+                    Some(pubkey_clause(&[8u8; 28].into())),
+                    "the clause beside a guard maps to what it means"
+                );
+                assert_eq!(
+                    all.items[1].native_script, None,
+                    "a guard clause has no u5c field and maps to an empty message"
+                );
+            }
+
             #[cfg(feature = "unstable")]
             #[test]
             fn a_sub_transaction_reaches_none_of_the_mapped_transaction() {
