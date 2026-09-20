@@ -276,6 +276,13 @@ pub enum MultiEraCert<'b> {
     Conway(Box<Cow<'b, conway::Certificate>>),
 }
 
+/// A scratch enum.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum MultiEraScratch {
+    Only,
+}
+
 /// Plutus redeemer normalized across eras.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -479,6 +486,7 @@ mod attribute_tests {
         ("MultiEraPolicyAssets", NonExhaustive::Always),
         ("MultiEraProposal", NonExhaustive::Always),
         ("MultiEraRedeemer", NonExhaustive::Always),
+        ("MultiEraScratch", NonExhaustive::Always),
         ("MultiEraSigners", NonExhaustive::Always),
         ("MultiEraTx", NonExhaustive::Always),
         ("MultiEraUpdate", NonExhaustive::Always),
