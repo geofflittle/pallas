@@ -915,10 +915,11 @@ mod attribute_tests {
                 } else {
                     Never
                 };
+                let _ = module_presence;
                 let presence = if attributes.contains(&UNSTABLE_ONLY) {
                     UnstableOnly
                 } else {
-                    module_presence
+                    EveryBuild
                 };
                 Some((format!("{module}::{name}"), presence, marking))
             })
