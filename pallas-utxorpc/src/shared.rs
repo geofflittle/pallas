@@ -1373,6 +1373,69 @@ macro_rules! impl_cardano_mapper_shared {
                     "position zero is indexed by no redeemer"
                 );
             }
+
+            #[test]
+            #[allow(deprecated)]
+            fn the_era_specific_mappers_map_through_the_certificate_view() {
+                let raw = tx_with_redeemers(vec![conway::Redeemer {
+                    tag: conway::RedeemerTag::Cert,
+                    index: 1,
+                    data: pallas_primitives::PlutusData::BoundedBytes(vec![0x0f].into()),
+                    ex_units: pallas_primitives::ExUnits {
+                        mem: 11,
+                        steps: 22,
+                    },
+                }]);
+                let tx = MultiEraTx::from_conway(&raw);
+                let mapper = Mapper::new(NoLedger);
+
+                let conway_certificate = conway::Certificate::StakeRegistration(credential());
+                let mapped = mapper.map_conway_cert(&conway_certificate, &tx, 1);
+
+                assert_eq!(
+                    mapped.certificate,
+                    Some(u5c::certificate::Certificate::StakeRegistration(
+                        key_credential(CREDENTIAL)
+                    ))
+                );
+                assert_eq!(
+                    mapped.redeemer.as_ref().map(|r| r.index),
+                    Some(1),
+                    "position one is indexed by a certificate redeemer"
+                );
+
+                let cert = MultiEraCert::Conway(Box::new(Cow::Borrowed(&conway_certificate)));
+                assert_eq!(
+                    Some(mapped),
+                    mapper.map_cert(&cert, &tx, 1),
+                    "the Conway certificate reads the same through both names"
+                );
+
+                let alonzo_certificate = alonzo::Certificate::PoolRetirement(POOL.into(), EPOCH);
+                let mapped = mapper.map_alonzo_compatible_cert(&alonzo_certificate, &tx, 0);
+
+                assert_eq!(
+                    mapped.certificate,
+                    Some(u5c::certificate::Certificate::PoolRetirement(
+                        u5c::PoolRetirementCert {
+                            pool_keyhash: POOL.to_vec().into(),
+                            epoch: EPOCH,
+                        }
+                    ))
+                );
+                assert!(
+                    mapped.redeemer.is_none(),
+                    "position zero is indexed by no redeemer"
+                );
+
+                let cert =
+                    MultiEraCert::AlonzoCompatible(Box::new(Cow::Borrowed(&alonzo_certificate)));
+                assert_eq!(
+                    Some(mapped),
+                    mapper.map_cert(&cert, &tx, 0),
+                    "the Alonzo certificate reads the same through both names"
+                );
+            }
         }
 
         // ---- protocol parameters --------------------------------------------
