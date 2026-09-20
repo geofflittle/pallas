@@ -215,79 +215,47 @@ macro_rules! impl_cardano_mapper_shared {
             pub fn map_native_script(
                 x: &pallas_traverse::MultiEraNativeScript,
             ) -> u5c::NativeScript {
-                let wrap = |inner| u5c::NativeScript {
-                    native_script: Some(inner),
+                use pallas_traverse::{MultiEraNativeClause, MultiEraNativeScript};
+
+                let list = |scripts: &[MultiEraNativeScript]| u5c::NativeScriptList {
+                    items: scripts.iter().map(Self::map_native_script).collect(),
                 };
 
-                let list = |items| u5c::NativeScriptList { items };
-
-                let n_of_k = |k: i64, scripts| {
-                    u5c::native_script::NativeScript::ScriptNOfK(u5c::ScriptNOfK {
-                        // u5c's `k` is wire-fixed at uint32, the ledger's threshold is
-                        // i64: clamp rather than cast, or a negative value wraps into
-                        // an unsatisfiable one instead of the satisfiable 0 it means.
-                        k: k.clamp(0, i64::from(u32::MAX)) as u32,
-                        scripts,
-                    })
+                let inner = match x.clause() {
+                    MultiEraNativeClause::Pubkey(x) => pubkey_clause(x),
+                    MultiEraNativeClause::All(x) => {
+                        u5c::native_script::NativeScript::ScriptAll(list(&x))
+                    }
+                    MultiEraNativeClause::Any(x) => {
+                        u5c::native_script::NativeScript::ScriptAny(list(&x))
+                    }
+                    MultiEraNativeClause::NOfK(k, scripts) => {
+                        u5c::native_script::NativeScript::ScriptNOfK(u5c::ScriptNOfK {
+                            // u5c's `k` is wire-fixed at uint32, the ledger's threshold is
+                            // i64: clamp rather than cast, or a negative value wraps into
+                            // an unsatisfiable one instead of the satisfiable 0 it means.
+                            k: k.clamp(0, i64::from(u32::MAX)) as u32,
+                            scripts: list(&scripts).items,
+                        })
+                    }
+                    MultiEraNativeClause::InvalidBefore(s) => {
+                        u5c::native_script::NativeScript::InvalidBefore(s)
+                    }
+                    MultiEraNativeClause::InvalidHereafter(s) => {
+                        u5c::native_script::NativeScript::InvalidHereafter(s)
+                    }
+                    #[cfg(feature = "unstable")]
+                    MultiEraNativeClause::RequireGuard(_) => {
+                        return u5c::NativeScript {
+                            native_script: None,
+                        };
+                    }
+                    _ => unimplemented!("map_native_script has no arm for this clause"),
                 };
 
-                // Folded bottom up rather than recursed, because scripts nest as
-                // deep as a transaction has bytes. Each era's own script type is
-                // folded, because the era neutral clause view clones a node's
-                // children every time it is read.
-                if let Some(x) = x.as_alonzo_compatible() {
-                    use pallas_primitives::alonzo::NativeScript;
-
-                    return pallas_codec::tree::fold_tree(
-                        x,
-                        |x, children: Vec<u5c::NativeScript>| match x {
-                            NativeScript::ScriptPubkey(x) => wrap(pubkey_clause(x)),
-                            NativeScript::ScriptAll(_) => wrap(
-                                u5c::native_script::NativeScript::ScriptAll(list(children)),
-                            ),
-                            NativeScript::ScriptAny(_) => wrap(
-                                u5c::native_script::NativeScript::ScriptAny(list(children)),
-                            ),
-                            NativeScript::ScriptNOfK(k, _) => wrap(n_of_k(*k, children)),
-                            NativeScript::InvalidBefore(s) => {
-                                wrap(u5c::native_script::NativeScript::InvalidBefore(*s))
-                            }
-                            NativeScript::InvalidHereafter(s) => {
-                                wrap(u5c::native_script::NativeScript::InvalidHereafter(*s))
-                            }
-                        },
-                    );
+                u5c::NativeScript {
+                    native_script: inner.into(),
                 }
-
-                #[cfg(feature = "unstable")]
-                if let Some(x) = x.as_dijkstra() {
-                    use pallas_primitives::dijkstra::NativeScript;
-
-                    return pallas_codec::tree::fold_tree(
-                        x,
-                        |x, children: Vec<u5c::NativeScript>| match x {
-                            NativeScript::ScriptPubkey(x) => wrap(pubkey_clause(x)),
-                            NativeScript::ScriptAll(_) => wrap(
-                                u5c::native_script::NativeScript::ScriptAll(list(children)),
-                            ),
-                            NativeScript::ScriptAny(_) => wrap(
-                                u5c::native_script::NativeScript::ScriptAny(list(children)),
-                            ),
-                            NativeScript::ScriptNOfK(k, _) => wrap(n_of_k(*k, children)),
-                            NativeScript::InvalidBefore(s) => {
-                                wrap(u5c::native_script::NativeScript::InvalidBefore(*s))
-                            }
-                            NativeScript::InvalidHereafter(s) => {
-                                wrap(u5c::native_script::NativeScript::InvalidHereafter(*s))
-                            }
-                            NativeScript::ScriptRequireGuard(_) => u5c::NativeScript {
-                                native_script: None,
-                            },
-                        },
-                    );
-                }
-
-                unimplemented!("map_native_script has no arm for this era")
             }
 
             /// Map a governance action of any era.
