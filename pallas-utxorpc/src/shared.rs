@@ -751,8 +751,7 @@ macro_rules! impl_cardano_mapper_shared {
                     std::borrow::Cow::Borrowed(x),
                 ));
 
-                let _ = order;
-                self.map_cert(&cert, tx, 1)
+                self.map_cert(&cert, tx, order)
                     .expect("a Conway certificate is always applicable")
             }
         }
@@ -1427,50 +1426,48 @@ macro_rules! impl_cardano_mapper_shared {
                 let mapper = Mapper::new(NoLedger);
 
                 let conway_certificate = conway::Certificate::StakeRegistration(credential());
-                let mapped = mapper.map_conway_cert(&conway_certificate, &tx, 1);
 
                 assert_eq!(
-                    mapped.certificate,
-                    Some(u5c::certificate::Certificate::StakeRegistration(
-                        key_credential(CREDENTIAL)
-                    ))
+                    mapper.map_conway_cert(&conway_certificate, &tx, 0),
+                    u5c::Certificate {
+                        certificate: Some(
+                            u5c::certificate::Certificate::StakeRegistration(key_credential(
+                                CREDENTIAL
+                            ))
+                        ),
+                        redeemer: None,
+                    }
                 );
                 assert_eq!(
-                    mapped.redeemer.as_ref().map(|r| r.index),
+                    mapper
+                        .map_conway_cert(&conway_certificate, &tx, 1)
+                        .redeemer
+                        .map(|r| r.index),
                     Some(1),
                     "position one is indexed by a certificate redeemer"
                 );
 
-                let cert = MultiEraCert::Conway(Box::new(Cow::Borrowed(&conway_certificate)));
-                assert_eq!(
-                    Some(mapped),
-                    mapper.map_cert(&cert, &tx, 1),
-                    "the Conway certificate reads the same through both names"
-                );
-
                 let alonzo_certificate = alonzo::Certificate::PoolRetirement(POOL.into(), EPOCH);
-                let mapped = mapper.map_alonzo_compatible_cert(&alonzo_certificate, &tx, 0);
 
                 assert_eq!(
-                    mapped.certificate,
-                    Some(u5c::certificate::Certificate::PoolRetirement(
-                        u5c::PoolRetirementCert {
-                            pool_keyhash: POOL.to_vec().into(),
-                            epoch: EPOCH,
-                        }
-                    ))
+                    mapper.map_alonzo_compatible_cert(&alonzo_certificate, &tx, 0),
+                    u5c::Certificate {
+                        certificate: Some(u5c::certificate::Certificate::PoolRetirement(
+                            u5c::PoolRetirementCert {
+                                pool_keyhash: POOL.to_vec().into(),
+                                epoch: EPOCH,
+                            }
+                        )),
+                        redeemer: None,
+                    }
                 );
-                assert!(
-                    mapped.redeemer.is_none(),
-                    "position zero is indexed by no redeemer"
-                );
-
-                let cert =
-                    MultiEraCert::AlonzoCompatible(Box::new(Cow::Borrowed(&alonzo_certificate)));
                 assert_eq!(
-                    Some(mapped),
-                    mapper.map_cert(&cert, &tx, 0),
-                    "the Alonzo certificate reads the same through both names"
+                    mapper
+                        .map_alonzo_compatible_cert(&alonzo_certificate, &tx, 1)
+                        .redeemer
+                        .map(|r| r.index),
+                    Some(1),
+                    "position one is indexed by a certificate redeemer"
                 );
             }
         }
