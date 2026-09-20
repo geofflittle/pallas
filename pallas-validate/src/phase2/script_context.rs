@@ -1110,6 +1110,8 @@ pub fn sort_reward_accounts(a: &Bytes, b: &Bytes) -> Ordering {
 
 #[cfg(test)]
 mod tests {
+    compile_error!("this module reached the compiler");
+
     use super::DataLookupTable;
     use pallas_crypto::hash::Hasher;
     use pallas_traverse::{ComputeHash, Era, MultiEraTx};
