@@ -1,0 +1,19 @@
+[workspace]
+
+[package]
+name = "pallas-compat-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+pallas-utxorpc = { path = "../pallas-utxorpc" }
+pallas-traverse = { path = "../pallas-traverse" }
+pallas-primitives = { path = "../pallas-primitives" }
+pallas-codec = { path = "../pallas-codec" }
+pallas-validate = { path = "../pallas-validate" }
+prost-types = "0.13.1"
+utxorpc-spec = { version = "0.19", default-features = false, features = [
+    "utxorpc-v1alpha-cardano",
+    "utxorpc-v1beta-cardano",
+] }
