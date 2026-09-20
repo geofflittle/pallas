@@ -751,7 +751,8 @@ macro_rules! impl_cardano_mapper_shared {
                     std::borrow::Cow::Borrowed(x),
                 ));
 
-                self.map_cert(&cert, tx, order)
+                let _ = order;
+                self.map_cert(&cert, tx, 1)
                     .expect("a Conway certificate is always applicable")
             }
         }
