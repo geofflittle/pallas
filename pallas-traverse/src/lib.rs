@@ -190,6 +190,7 @@ pub enum MultiEraHeader<'b> {
     /// Dijkstra header.
     #[cfg(feature = "unstable")]
     Dijkstra(Cow<'b, KeepRaw<'b, dijkstra::Header>>),
+    Scratch,
 }
 
 /// A block normalized across eras.
@@ -209,6 +210,7 @@ pub enum MultiEraBlock<'b> {
     /// Dijkstra block.
     #[cfg(feature = "unstable")]
     Dijkstra(Box<dijkstra::Block<'b>>),
+    Scratch,
 }
 
 /// A transaction normalized across eras.
@@ -226,6 +228,7 @@ pub enum MultiEraTx<'b> {
     /// Dijkstra transaction, whose `success` flag is written last.
     #[cfg(feature = "unstable")]
     Dijkstra(Box<Cow<'b, dijkstra::BlockTransaction<'b>>>),
+    Scratch,
 }
 
 /// Ada-plus-multi-asset value normalized across eras.
@@ -238,6 +241,7 @@ pub enum MultiEraValue<'b> {
     AlonzoCompatible(Cow<'b, alonzo::Value>),
     /// Conway value (uses [`PositiveCoin`] for token quantities).
     Conway(Cow<'b, conway::Value>),
+    Scratch,
 }
 
 /// Transaction output normalized across eras.
@@ -252,6 +256,7 @@ pub enum MultiEraOutput<'b> {
     Conway(Box<Cow<'b, conway::TransactionOutput<'b>>>),
     /// Byron output.
     Byron(Box<Cow<'b, byron::TxOut>>),
+    Scratch,
 }
 
 /// Transaction input normalized across eras.
@@ -262,6 +267,7 @@ pub enum MultiEraInput<'b> {
     Byron(Box<Cow<'b, byron::TxIn>>),
     /// Input of any Alonzo-compatible or later era.
     AlonzoCompatible(Box<Cow<'b, alonzo::TransactionInput>>),
+    Scratch,
 }
 
 /// On-chain certificate normalized across eras.
@@ -274,6 +280,7 @@ pub enum MultiEraCert<'b> {
     AlonzoCompatible(Box<Cow<'b, alonzo::Certificate>>),
     /// Conway-era certificate (adds governance-related variants).
     Conway(Box<Cow<'b, conway::Certificate>>),
+    Scratch,
 }
 
 /// Plutus redeemer normalized across eras.
@@ -287,6 +294,7 @@ pub enum MultiEraRedeemer<'b> {
         Box<Cow<'b, conway::RedeemersKey>>,
         Box<Cow<'b, conway::RedeemersValue>>,
     ),
+    Scratch,
 }
 
 /// Transaction metadata normalized across eras.
@@ -300,6 +308,7 @@ pub enum MultiEraMeta<'b> {
     NotApplicable,
     /// Metadata from any Shelley-or-later era.
     AlonzoCompatible(&'b alonzo::Metadata),
+    Scratch,
 }
 
 /// Multi-asset bundle for a single policy, normalized across eras.
@@ -320,6 +329,7 @@ pub enum MultiEraPolicyAssets<'b> {
         &'b alonzo::PolicyId,
         &'b BTreeMap<alonzo::AssetName, PositiveCoin>,
     ),
+    Scratch,
 }
 
 /// A single native or Plutus asset, normalized across eras.
@@ -334,6 +344,7 @@ pub enum MultiEraAsset<'b> {
     ConwayOutput(&'b alonzo::PolicyId, &'b alonzo::AssetName, PositiveCoin),
     /// Asset appearing in a Conway mint field.
     ConwayMint(&'b alonzo::PolicyId, &'b alonzo::AssetName, NonZeroInt),
+    Scratch,
 }
 
 /// Reward-account withdrawals normalized across eras.
@@ -348,6 +359,7 @@ pub enum MultiEraWithdrawals<'b> {
     AlonzoCompatible(&'b alonzo::Withdrawals),
     /// Withdrawals from a Conway transaction.
     Conway(&'b conway::Withdrawals),
+    Scratch,
 }
 
 /// Protocol-parameter update proposal normalized across eras.
@@ -362,6 +374,7 @@ pub enum MultiEraUpdate<'b> {
     Babbage(Box<Cow<'b, babbage::Update>>),
     /// Conway update.
     Conway(Box<Cow<'b, conway::Update>>),
+    Scratch,
 }
 
 /// Conway-era governance proposal procedure.
@@ -370,6 +383,7 @@ pub enum MultiEraUpdate<'b> {
 pub enum MultiEraProposal<'b> {
     /// Conway proposal procedure.
     Conway(Box<Cow<'b, conway::ProposalProcedure>>),
+    Scratch,
 }
 
 /// Conway-era governance action carried by a [`MultiEraProposal`].
@@ -378,6 +392,7 @@ pub enum MultiEraProposal<'b> {
 pub enum MultiEraGovAction<'b> {
     /// Conway governance action.
     Conway(Box<Cow<'b, conway::GovAction>>),
+    Scratch,
 }
 
 /// Required-signer hashes normalized across eras.
@@ -391,6 +406,7 @@ pub enum MultiEraSigners<'b> {
     Empty,
     /// Required signers from any Alonzo-compatible or later transaction.
     AlonzoCompatible(&'b alonzo::RequiredSigners),
+    Scratch,
 }
 
 /// Reference to a transaction output by transaction hash and output index.
