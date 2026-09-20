@@ -13,6 +13,7 @@ pallas-primitives = { path = "../pallas-primitives" }
 pallas-codec = { path = "../pallas-codec" }
 pallas-validate = { path = "../pallas-validate" }
 prost-types = "0.13.1"
+hex = "0.4"
 utxorpc-spec = { version = "0.19", default-features = false, features = [
     "utxorpc-v1alpha-cardano",
     "utxorpc-v1beta-cardano",
