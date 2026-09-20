@@ -184,7 +184,6 @@ impl<'b> MultiEraGovAction<'b> {
 ///
 /// An era with no such key and an update that leaves the parameter alone
 /// are different results.
-#[cfg(feature = "unstable")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ParamRead<T> {
