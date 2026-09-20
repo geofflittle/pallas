@@ -675,32 +675,6 @@ macro_rules! impl_cardano_mapper_shared {
                             },
                         )
                     }
-                    MultiEraCertKind::MoveInstantaneousRewards(rewards) => {
-                        u5c::certificate::Certificate::MirCert(u5c::MirCert {
-                            from: match &rewards.source {
-                                alonzo::InstantaneousRewardSource::Reserves => {
-                                    u5c::MirSource::Reserves.into()
-                                }
-                                alonzo::InstantaneousRewardSource::Treasury => {
-                                    u5c::MirSource::Treasury.into()
-                                }
-                            },
-                            to: match &rewards.target {
-                                alonzo::InstantaneousRewardTarget::StakeCredentials(x) => x
-                                    .iter()
-                                    .map(|(k, v)| u5c::MirTarget {
-                                        stake_credential: self.map_stake_credential(k).into(),
-                                        delta_coin: i64_to_bigint(*v),
-                                    })
-                                    .collect(),
-                                _ => Default::default(),
-                            },
-                            other_pot: match &rewards.target {
-                                alonzo::InstantaneousRewardTarget::OtherAccountingPot(x) => *x,
-                                _ => Default::default(),
-                            },
-                        })
-                    }
                     // The u5c schema names no message for a kind this mapper
                     // does not name.
                     _ => return None,
