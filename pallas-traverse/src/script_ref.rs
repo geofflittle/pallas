@@ -155,7 +155,6 @@ pub enum ScriptLanguage {
     PlutusV2,
     PlutusV3,
     /// Plutus V4, new in Dijkstra.
-    #[cfg(feature = "unstable")]
     PlutusV4,
 }
 
@@ -167,7 +166,6 @@ impl ScriptLanguage {
             Self::PlutusV1 => 1,
             Self::PlutusV2 => 2,
             Self::PlutusV3 => 3,
-            #[cfg(feature = "unstable")]
             Self::PlutusV4 => 4,
         }
     }
