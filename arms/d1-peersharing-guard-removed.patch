@@ -1,0 +1,12 @@
+diff --git a/pallas-network2/src/behavior/initiator/discovery.rs b/pallas-network2/src/behavior/initiator/discovery.rs
+index 74f5b52..b7a5957 100644
+--- a/pallas-network2/src/behavior/initiator/discovery.rs
++++ b/pallas-network2/src/behavior/initiator/discovery.rs
+@@ -33,7 +33,6 @@ fn peer_is_available(peer: &InitiatorState) -> bool {
+                 crate::protocol::peersharing::IdleState::Empty
+             )
+         )
+-        && !peer.send_unconfirmed(crate::protocol::peersharing::CHANNEL_ID)
+ }
+ 
+ /// Sub-behavior that discovers new peers via the peer-sharing mini-protocol.

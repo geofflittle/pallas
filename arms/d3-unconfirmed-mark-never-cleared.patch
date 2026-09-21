@@ -1,0 +1,12 @@
+diff --git a/pallas-network2/src/behavior/initiator/mod.rs b/pallas-network2/src/behavior/initiator/mod.rs
+index 55f3f67..826e4ad 100644
+--- a/pallas-network2/src/behavior/initiator/mod.rs
++++ b/pallas-network2/src/behavior/initiator/mod.rs
+@@ -445,7 +445,6 @@ impl InitiatorBehavior {
+         tracing::debug!(channel = msg.channel(), "new outbound message");
+ 
+         self.peers.entry(pid.clone()).and_modify(|state| {
+-            state.unconfirmed_sends.remove(&msg.channel());
+             state.apply_outbound_msg(msg);
+ 
+             all_visitors!(self, pid, state, visit_outbound_msg);

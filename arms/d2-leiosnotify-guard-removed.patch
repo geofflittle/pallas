@@ -1,0 +1,15 @@
+diff --git a/pallas-network2/src/behavior/initiator/leiosnotify.rs b/pallas-network2/src/behavior/initiator/leiosnotify.rs
+index 0f71694..ddf94bd 100644
+--- a/pallas-network2/src/behavior/initiator/leiosnotify.rs
++++ b/pallas-network2/src/behavior/initiator/leiosnotify.rs
+@@ -50,9 +50,7 @@ impl LeiosNotifyBehavior {
+ /// handshaked, it speaks Leios, and no earlier request of ours is still waiting
+ /// for the IO layer to confirm its send.
+ fn peer_ready(state: &InitiatorState) -> bool {
+-    state.is_initialized()
+-        && state.supports_leios()
+-        && !state.send_unconfirmed(notify_proto::CHANNEL_ID)
++    state.is_initialized() && state.supports_leios()
+ }
+ 
+ impl PeerVisitor for LeiosNotifyBehavior {

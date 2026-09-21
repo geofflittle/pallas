@@ -1,0 +1,12 @@
+diff --git a/pallas-network2/src/behavior/initiator/mod.rs b/pallas-network2/src/behavior/initiator/mod.rs
+index 55f3f67..c702a91 100644
+--- a/pallas-network2/src/behavior/initiator/mod.rs
++++ b/pallas-network2/src/behavior/initiator/mod.rs
+@@ -241,7 +241,6 @@ impl InitiatorState {
+     pub fn apply_inbound_msg(&mut self, msg: &AnyMessage) {
+         if let Err(err) = self.apply(msg) {
+             tracing::warn!(channel = msg.channel(), %err, "peer protocol violation");
+-            self.violation = true;
+         }
+     }
+ 
