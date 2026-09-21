@@ -158,32 +158,11 @@ impl<'b> MultiEraBlock<'b> {
                 .into_iter()
                 .map(|x| MultiEraTx::Conway(Box::new(Cow::Owned(x))))
                 .collect(),
-            // A sub transaction is emitted before the parent whose body contains
-            // it. The parent's transaction id is the hash of a body that includes
-            // the sub transaction bodies, so a sub transaction cannot name a
-            // parent output as an input and a parent can name a sub output.
             #[cfg(feature = "unstable")]
-            MultiEraBlock::Dijkstra(x) => {
-                let mut out = Vec::new();
-
-                for tx in support::clone_dijkstra_txs(x).into_iter() {
-                    let subs: Vec<_> = tx
-                        .transaction_body
-                        .sub_transactions
-                        .iter()
-                        .flat_map(|x| x.iter())
-                        .cloned()
-                        .collect();
-
-                    for sub in subs {
-                        out.push(MultiEraTx::DijkstraSub(Box::new(Cow::Owned(sub))));
-                    }
-
-                    out.push(MultiEraTx::Dijkstra(Box::new(Cow::Owned(tx))));
-                }
-
-                out
-            }
+            MultiEraBlock::Dijkstra(x) => support::clone_dijkstra_txs(x)
+                .into_iter()
+                .map(|x| MultiEraTx::Dijkstra(Box::new(Cow::Owned(x))))
+                .collect(),
             MultiEraBlock::EpochBoundary(_) => vec![],
         }
     }
@@ -210,19 +189,7 @@ impl<'b> MultiEraBlock<'b> {
             MultiEraBlock::Byron(x) => x.body.tx_payload.len(),
             MultiEraBlock::Conway(x) => x.transaction_bodies.len(),
             #[cfg(feature = "unstable")]
-            MultiEraBlock::Dijkstra(x) => x
-                .block_body
-                .transactions
-                .iter()
-                .map(|tx| {
-                    1 + tx
-                        .transaction_body
-                        .sub_transactions
-                        .iter()
-                        .flat_map(|x| x.iter())
-                        .count()
-                })
-                .sum(),
+            MultiEraBlock::Dijkstra(x) => x.block_body.transactions.len(),
         }
     }
 
@@ -757,6 +724,106 @@ mod tests {
             assert!(tx.withdrawals_sorted_set().is_empty());
             assert!(tx.certs().is_empty());
             assert!(tx.sub_transactions().is_empty());
+        }
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn zz_probe_batch_shape() {
+        for (name, block_str) in [
+            ("dijkstra17", include_str!("../../test_data/dijkstra17.block")),
+            ("dijkstra18", include_str!("../../test_data/dijkstra18.block")),
+        ] {
+            let cbor = dijkstra_block(block_str);
+            let block = MultiEraBlock::decode(&cbor).expect("invalid cbor");
+            let txs = block.txs();
+
+            println!(
+                "PROBE {} slot {} hash {} txs {} tx_count {} aux {}",
+                name,
+                block.slot(),
+                block.hash(),
+                txs.len(),
+                block.tx_count(),
+                block.has_aux_data()
+            );
+
+            let mut sub_ids: Vec<String> = Vec::new();
+
+            for (i, tx) in txs.iter().enumerate() {
+                let subs = tx.sub_transactions();
+                if subs.is_empty() {
+                    continue;
+                }
+                println!(
+                    "PROBE {} parent index {} hash {} inputs {:?} outputs {}",
+                    name,
+                    i,
+                    tx.hash(),
+                    tx.consumes()
+                        .iter()
+                        .map(|c| format!("{}#{}", c.hash(), c.index()))
+                        .collect::<Vec<_>>(),
+                    tx.produces().len()
+                );
+                for (j, sub) in subs.iter().enumerate() {
+                    sub_ids.push(sub.hash().to_string());
+                    println!(
+                        "PROBE {} sub {}.{} hash {} inputs {:?} outputs {} aux {}",
+                        name,
+                        i,
+                        j,
+                        sub.hash(),
+                        sub.consumes()
+                            .iter()
+                            .map(|c| format!("{}#{}", c.hash(), c.index()))
+                            .collect::<Vec<_>>(),
+                        sub.produces().len(),
+                        sub.metadata().collect::<Vec<_>>().len()
+                    );
+                }
+            }
+
+            for (i, tx) in txs.iter().enumerate() {
+                for c in tx.consumes() {
+                    if sub_ids.contains(&c.hash().to_string()) {
+                        println!(
+                            "PROBE {} top level index {} hash {} spends sub output {}#{}",
+                            name,
+                            i,
+                            tx.hash(),
+                            c.hash(),
+                            c.index()
+                        );
+                    }
+                }
+            }
+
+            let parent_ids: Vec<String> = txs.iter().map(|tx| tx.hash().to_string()).collect();
+            for (i, tx) in txs.iter().enumerate() {
+                for sub in tx.sub_transactions() {
+                    for c in sub.consumes() {
+                        if parent_ids.contains(&c.hash().to_string()) {
+                            println!(
+                                "PROBE {} sub of index {} spends top level output {}#{}",
+                                name,
+                                i,
+                                c.hash(),
+                                c.index()
+                            );
+                        }
+                        if sub_ids.contains(&c.hash().to_string()) {
+                            println!(
+                                "PROBE {} sub of index {} spends sub output {}#{}",
+                                name,
+                                i,
+                                c.hash(),
+                                c.index()
+                            );
+                        }
+                    }
+                }
+            }
         }
     }
 
