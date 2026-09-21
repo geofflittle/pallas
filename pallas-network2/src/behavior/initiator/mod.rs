@@ -2,7 +2,8 @@ use futures::{Stream, StreamExt, stream::FusedStream};
 use std::{collections::HashMap, task::Poll};
 
 use crate::{
-    Behavior, BehaviorOutput, Message as MessageTrait, OutboundQueue, PeerId, protocol as proto,
+    Behavior, BehaviorOutput, InterfaceCommand, Message as MessageTrait, OutboundQueue, PeerId,
+    protocol as proto,
 };
 
 use super::{AcceptedVersion, AnyMessage, BlockRange, ConnectionState};
@@ -359,6 +360,15 @@ pub enum InitiatorCommand {
     DemotePeer(PeerId),
 }
 
+/// Why a peer's session ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DisconnectReason {
+    /// The connection closed with no error reported by the interface.
+    Closed,
+    /// The interface reported an error on the connection.
+    Errored,
+}
+
 /// Events emitted by the initiator behavior to external consumers.
 #[derive(Debug)]
 pub enum InitiatorEvent {
@@ -382,6 +392,8 @@ pub enum InitiatorEvent {
     EbNotification(PeerId, proto::leiosnotify::Notification),
     /// An EB body or transactions were received via leios-fetch, for the given EB.
     EbFetched(PeerId, proto::EbId, proto::leiosfetch::Response),
+    /// The session with the peer ended, cleanly or on an error.
+    PeerDisconnected(PeerId, DisconnectReason),
 }
 
 /// The main initiator behavior that orchestrates outbound Cardano connections.
@@ -1235,6 +1247,330 @@ mod tests {
         assert!(
             !swept.has_disconnect_for(&pid),
             "a burst of fetch commands should not disconnect the peer"
+        );
+    }
+
+    /// A peer that has been included, connected and handshaked on a
+    /// Leios-capable version, with everything those steps produced drained.
+    fn ready_leios_peer() -> (InitiatorBehavior, PeerId) {
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(30);
+
+        behavior.execute(InitiatorCommand::IncludePeer(pid.clone()));
+        behavior.execute(InitiatorCommand::Housekeeping);
+        drain_outputs(&mut behavior);
+
+        behavior.handle_io(InterfaceEvent::Connected(pid.clone()));
+        drain_outputs(&mut behavior);
+        complete_handshake_leios(&mut behavior, &pid);
+        drain_outputs(&mut behavior);
+
+        (behavior, pid)
+    }
+
+    /// Collects every message the behavior asked the IO layer to send.
+    fn all_sends(outputs: &[BehaviorOutput<InitiatorBehavior>]) -> Vec<AnyMessage> {
+        outputs
+            .iter()
+            .filter_map(|o| match o {
+                BehaviorOutput::InterfaceCommand(InterfaceCommand::Send(_, m)) => Some(m.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Collects every event the behavior surfaced to the external consumer.
+    fn external_events(outputs: &[BehaviorOutput<InitiatorBehavior>]) -> Vec<&InitiatorEvent> {
+        outputs
+            .iter()
+            .filter_map(|o| match o {
+                BehaviorOutput::ExternalEvent(e) => Some(e),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Collects the peer sessions the behavior reported as ended, in order.
+    fn disconnections(
+        outputs: &[BehaviorOutput<InitiatorBehavior>],
+    ) -> Vec<(PeerId, DisconnectReason)> {
+        outputs
+            .iter()
+            .filter_map(|o| match o {
+                BehaviorOutput::ExternalEvent(InitiatorEvent::PeerDisconnected(pid, why)) => {
+                    Some((pid.clone(), *why))
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    type RequestKind = (&'static str, fn(&AnyMessage) -> bool);
+
+    /// The three requests a housekeeping pass issues to a handshaked Leios
+    /// peer, each with the name a failure should print.
+    fn housekeeping_requests() -> [RequestKind; 3] {
+        [
+            ("keepalive", |m| matches!(m, AnyMessage::KeepAlive(_))),
+            ("peer sharing", |m| matches!(m, AnyMessage::PeerSharing(_))),
+            ("leios notify", |m| matches!(m, AnyMessage::LeiosNotify(_))),
+        ]
+    }
+
+    #[tokio::test]
+    async fn a_keepalive_response_nothing_asked_for_is_a_violation() {
+        // A reply with no request of ours outstanding is the peer's own fault
+        // and has to stay one, whatever the initiator forgives itself.
+        tokio::time::pause();
+        let (mut behavior, pid) = ready_leios_peer();
+
+        let unprovoked = AnyMessage::KeepAlive(keepalive::Message::ResponseKeepAlive(42));
+        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![unprovoked]));
+        drain_outputs(&mut behavior);
+
+        assert!(
+            behavior.peers.get(&pid).unwrap().violation,
+            "an unrequested keepalive response should mark the peer"
+        );
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let swept = drain_outputs(&mut behavior);
+        assert!(
+            behavior.promotion.banned_peers.contains(&pid),
+            "an unrequested keepalive response should ban the peer"
+        );
+        assert!(
+            swept.has_disconnect_for(&pid),
+            "an unrequested keepalive response should disconnect the peer"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_notification_nothing_asked_for_is_a_violation() {
+        tokio::time::pause();
+        let (mut behavior, pid) = ready_leios_peer();
+
+        let unprovoked =
+            AnyMessage::LeiosNotify(ln::Message::BlockOffer(Point::new(7, vec![0xF1; 32]), 99));
+        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![unprovoked]));
+        drain_outputs(&mut behavior);
+
+        assert!(
+            behavior.peers.get(&pid).unwrap().violation,
+            "an offer with no request outstanding should mark the peer"
+        );
+        assert!(
+            behavior.promotion.banned_peers.contains(&pid),
+            "an offer with no request outstanding should ban the peer"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_answered_request_is_asked_again_on_the_next_pass() {
+        // The guard on a duplicate send must not become a guard on sending.
+        tokio::time::pause();
+        let (mut behavior, pid) = ready_leios_peer();
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let first = all_sends(&drain_outputs(&mut behavior));
+        assert_eq!(
+            first.len(),
+            3,
+            "the first pass should ask for three, got {first:?}"
+        );
+
+        for msg in first.iter() {
+            behavior.handle_io(InterfaceEvent::Sent(pid.clone(), msg.clone()));
+        }
+        drain_outputs(&mut behavior);
+
+        let answers = vec![
+            AnyMessage::KeepAlive(keepalive::Message::ResponseKeepAlive(u16::MAX)),
+            AnyMessage::LeiosNotify(ln::Message::BlockOffer(Point::new(7, vec![0xA7; 32]), 99)),
+        ];
+        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), answers));
+        drain_outputs(&mut behavior);
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let second = all_sends(&drain_outputs(&mut behavior));
+
+        // Peer sharing is left unanswered here, and an answered one ends its
+        // own loop, so keepalive and leios notify are the two that come round.
+        let looping: [RequestKind; 2] = [
+            ("keepalive", |m| matches!(m, AnyMessage::KeepAlive(_))),
+            ("leios notify", |m| matches!(m, AnyMessage::LeiosNotify(_))),
+        ];
+        for (name, is_mine) in looping {
+            let count = second.iter().filter(|m| is_mine(m)).count();
+            assert_eq!(
+                count, 1,
+                "an answered {name} should be asked again, got {count} in {second:?}"
+            );
+        }
+        assert!(
+            !behavior.peers.get(&pid).unwrap().violation,
+            "answering a request is not a violation"
+        );
+        assert!(
+            !behavior.promotion.banned_peers.contains(&pid),
+            "a peer that answers should not be banned"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_request_this_node_sent_twice_is_not_the_peers_fault() {
+        // The IO layer confirming two of our keepalives is a fault on this
+        // side, and the peer has done nothing at all.
+        tokio::time::pause();
+        let (mut behavior, pid) = ready_leios_peer();
+
+        let request = AnyMessage::KeepAlive(keepalive::Message::KeepAlive(u16::MAX));
+        behavior.handle_io(InterfaceEvent::Sent(pid.clone(), request.clone()));
+        behavior.handle_io(InterfaceEvent::Sent(pid.clone(), request));
+        drain_outputs(&mut behavior);
+
+        assert!(
+            !behavior.peers.get(&pid).unwrap().violation,
+            "our own duplicate should not mark the peer"
+        );
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let swept = drain_outputs(&mut behavior);
+        assert!(
+            !behavior.promotion.banned_peers.contains(&pid),
+            "our own duplicate should not ban the peer"
+        );
+        assert!(
+            !swept.has_disconnect_for(&pid),
+            "our own duplicate should not disconnect the peer"
+        );
+    }
+
+    #[tokio::test]
+    async fn two_passes_before_a_confirmation_send_one_request_each() {
+        // Nothing is drained between the passes, so the IO layer has confirmed
+        // none of the first pass's sends when the second pass runs. This is the
+        // shape a one second housekeeping tick produces against a real socket.
+        tokio::time::pause();
+        let (mut behavior, pid) = ready_leios_peer();
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let sends = all_sends(&drain_outputs(&mut behavior));
+
+        for (name, is_mine) in housekeeping_requests() {
+            let count = sends.iter().filter(|m| is_mine(m)).count();
+            assert_eq!(
+                count, 1,
+                "{name} should have one request on the wire, got {count} in {sends:?}"
+            );
+        }
+
+        for msg in sends.iter() {
+            behavior.handle_io(InterfaceEvent::Sent(pid.clone(), msg.clone()));
+        }
+        drain_outputs(&mut behavior);
+        assert!(
+            !behavior.peers.get(&pid).unwrap().violation,
+            "two housekeeping passes should not mark the peer"
+        );
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let swept = drain_outputs(&mut behavior);
+        assert!(
+            !behavior.promotion.banned_peers.contains(&pid),
+            "two housekeeping passes should not ban the peer"
+        );
+        assert!(
+            !swept.has_disconnect_for(&pid),
+            "two housekeeping passes should not disconnect the peer"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_confirmed_request_is_not_repeated_until_the_peer_answers() {
+        tokio::time::pause();
+        let (mut behavior, pid) = ready_leios_peer();
+
+        for pass in 0..4 {
+            behavior.execute(InitiatorCommand::Housekeeping);
+            let sends = all_sends(&drain_outputs(&mut behavior));
+            let expected = if pass == 0 { 3 } else { 0 };
+            assert_eq!(
+                sends.len(),
+                expected,
+                "pass {pass} should send {expected}, got {sends:?}"
+            );
+
+            for msg in sends.iter() {
+                behavior.handle_io(InterfaceEvent::Sent(pid.clone(), msg.clone()));
+            }
+            drain_outputs(&mut behavior);
+        }
+
+        assert!(!behavior.peers.get(&pid).unwrap().violation);
+        assert!(!behavior.promotion.banned_peers.contains(&pid));
+    }
+
+    #[tokio::test]
+    async fn a_closed_session_is_reported_to_the_consumer() {
+        tokio::time::pause();
+        let (mut behavior, pid) = ready_leios_peer();
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let live = drain_outputs(&mut behavior);
+        assert!(
+            disconnections(&live).is_empty(),
+            "a peer still holding its connection has not ended a session"
+        );
+
+        behavior.handle_io(InterfaceEvent::Disconnected(pid.clone()));
+        let ended = drain_outputs(&mut behavior);
+
+        assert_eq!(
+            disconnections(&ended),
+            vec![(pid.clone(), DisconnectReason::Closed)],
+            "a close should be reported once, naming the peer"
+        );
+        assert_eq!(
+            external_events(&ended).len(),
+            1,
+            "a close should surface exactly one event, got {:?}",
+            external_events(&ended)
+        );
+    }
+
+    #[tokio::test]
+    async fn an_errored_session_is_reported_to_the_consumer() {
+        tokio::time::pause();
+        let (mut behavior, pid) = ready_leios_peer();
+
+        behavior.handle_io(InterfaceEvent::Error(
+            pid.clone(),
+            InterfaceError::Other("socket gone".into()),
+        ));
+        let ended = drain_outputs(&mut behavior);
+
+        assert_eq!(
+            disconnections(&ended),
+            vec![(pid.clone(), DisconnectReason::Errored)],
+            "an error should be reported once, naming the peer and the error"
+        );
+        assert_eq!(
+            external_events(&ended).len(),
+            1,
+            "an error should surface exactly one event, got {:?}",
+            external_events(&ended)
+        );
+
+        // The error makes the behavior close the socket, and that close is
+        // reported in its own right.
+        behavior.handle_io(InterfaceEvent::Disconnected(pid.clone()));
+        let closed = drain_outputs(&mut behavior);
+        assert_eq!(
+            disconnections(&closed),
+            vec![(pid.clone(), DisconnectReason::Closed)],
+            "the close that follows an error should be reported too"
         );
     }
 }
