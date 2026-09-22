@@ -44,6 +44,7 @@ impl<'b, C> Decode<'b, C> for EndorserBlock {
             entries.push((Hash::new(key), d.decode_with(ctx)?));
         }
 
+        entries.reverse();
         Ok(Self(entries))
     }
 }
