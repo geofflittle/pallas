@@ -237,13 +237,14 @@ fn decode_closure_transaction(
     index: usize,
     inner: &[u8],
 ) -> Result<dijkstra::BlockTransaction<'_>, Error> {
-    let mempool: dijkstra::MempoolTransaction =
-        minicbor::decode(inner).map_err(|e| Error::TxDecode {
-            index,
-            reason: e.to_string(),
-        })?;
+    if let Ok(mempool) = minicbor::decode::<dijkstra::MempoolTransaction>(inner) {
+        return Ok(mempool.to_block_transaction());
+    }
 
-    Ok(mempool.to_block_transaction())
+    minicbor::decode(inner).map_err(|e| Error::TxDecode {
+        index,
+        reason: e.to_string(),
+    })
 }
 
 /// An announced endorser block, with the point a leios-fetch request needs.
