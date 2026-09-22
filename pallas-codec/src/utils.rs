@@ -149,7 +149,8 @@ where
         let datatype = d.datatype()?;
 
         let items: Result<Vec<_>, _> = d.map_iter_with::<C, K, V>(ctx)?.collect();
-        let items = items?;
+        let mut items = items?;
+        items.reverse();
 
         match datatype {
             minicbor::data::Type::Map => Ok(KeyValuePairs::Def(items)),
