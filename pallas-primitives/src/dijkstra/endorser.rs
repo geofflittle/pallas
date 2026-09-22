@@ -7,7 +7,6 @@ use pallas_crypto::hash::Hash;
 /// `endorser_block = { * hash => word32 }`: the blake2b-256 and byte length of
 /// each transaction the block names. Pairs rather than a sorted map, because
 /// the announced hash covers the wire order.
-pub type EndorserBlock = KeyValuePairs<Hash<32>, u32>;
 
 #[cfg(test)]
 mod tests {
