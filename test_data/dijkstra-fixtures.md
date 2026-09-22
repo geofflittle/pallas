@@ -36,6 +36,7 @@ with the block's CRC32 and the header's offset and size.
 | dijkstra13.block | 00278/24 | 301082 | 14594 | `cf522686b27e452b3e261904058c7e323f3723e2f5c629e5a7542579b59474b4` | 1274 | 8 | 1 | certificate tag 9, vote delegation |
 | dijkstra14.block | 00574/21 | 620349 | 28687 | `9b481f4b4fa46de9a1bde085570b5fc9d90f161f99bde7f63bfe4ed20dbc37bf` | 1734 | 8 | 1 | a transaction body writing its certificate set as a bare array rather than under tag 258 |
 | dijkstra15.block | 00344/11 | 371916 | 17406 | `0db84efa0259153a240cecacd0f9e52f942d40f96b132ebd0d5b3526e19b3a7b` | 964 | 8 | 0 | an announced endorser block size of 71103, which needs the five byte uint |
+| dijkstra16.block | 00287/58 | 311025 | 14935 | `c9d7bca094227279830e2e2110acbb965dc9e90d469ac97594d40bc8e295735c` | 862 | 8 | 0 | no transactions, no Leios certificate and no announcement, the block before dijkstra7.block |
 
 The `tag` column is the block wrapper tag. A Dijkstra header arriving on its
 own over chainsync carries envelope tag 7 rather than the wrapper tag 8, and
@@ -60,3 +61,20 @@ models is exercised by no fixture and is modelled from the CDDL alone.
 | dijkstra13.block | 0, 1, 2, 4 | 0 | array | 7, 9 | tagged | 0 | nil | nil |
 | dijkstra14.block | 0, 1, 2, 3, 4 | 0 | map | 3 | bare | 0 | nil | nil |
 | dijkstra15.block | none | none | none | none | none | 0 | present | present |
+| dijkstra16.block | none | none | none | none | none | 0 | nil | nil |
+
+## The endorser block fixtures
+
+Three `.ebbody` files hold endorser blocks of the Musashi chain that ran before
+the one above, under node release `prototype-2026w35`, each the body as
+leios-fetch delivered it from that chain's relay.
+
+What each body names, read with a standalone CBOR walker and Python's
+`hashlib.blake2b` rather than with pallas. The count is the body's map length.
+The first key is blake2b-256 of the first transaction with its envelope removed.
+
+| file | transactions | first key | first size |
+| --- | --- | --- | --- |
+| dijkstra-eb1.ebbody | 1 | `a69f9fc581e5914a101a3e619f5ce64b6bce76721fd5eed0cbad0e0f6d411cc5` | 229 |
+| dijkstra-eb2.ebbody | 30 | `455a00b521f35f2c0a6ff0a59296c3316de6219af206c13d2e95870f66541fec` | 200 |
+| dijkstra-eb3.ebbody | 425 | `b6813cef46bc2f5b0ce9761e7177138f93edf6d4b9c95ff28b071a4ce0978d6b` | 201 |
