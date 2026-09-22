@@ -182,6 +182,7 @@ impl EndorserBlockBody {
             out.push(decode_closure_transaction(index, inner)?);
         }
 
+        out.reverse();
         Ok(out)
     }
 }
