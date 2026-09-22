@@ -96,14 +96,27 @@ mod tests {
         assert!(minicbor::decode::<EndorserBlock>(&array).is_err());
     }
 
-    #[cfg(not(feature = "relaxed"))]
+    fn one_entry_with_key_of(len: u8) -> Vec<u8> {
+        let mut body = vec![0xa1, 0x58, len];
+        body.extend_from_slice(&vec![0x11; len as usize]);
+        body.push(0x01);
+        body
+    }
+
     #[test]
     fn a_key_that_is_not_32_bytes_is_refused() {
-        let mut short = vec![0xa1, 0x58, 31];
-        short.extend_from_slice(&[0x11; 31]);
-        short.push(0x01);
+        let block = minicbor::decode::<EndorserBlock>(&one_entry_with_key_of(32))
+            .expect("a 32 byte key must be accepted");
+        assert_eq!(block[0], (Hash::new([0x11; 32]), 1));
 
-        assert!(minicbor::decode::<EndorserBlock>(&short).is_err());
+        for len in [31, 33] {
+            let err = minicbor::decode::<EndorserBlock>(&one_entry_with_key_of(len))
+                .expect_err("a key that is not 32 bytes must be refused");
+            assert!(
+                err.to_string().contains(&format!("{len} bytes")),
+                "wrong refusal for {len}: {err}"
+            );
+        }
     }
 
     #[test]
