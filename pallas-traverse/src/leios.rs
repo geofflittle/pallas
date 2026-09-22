@@ -264,16 +264,6 @@ fn decode_closure_transaction(
         reason: e.to_string(),
     })?;
 
-    if d.position() != inner.len() {
-        return Err(Error::TxDecode {
-            index,
-            reason: format!(
-                "{} trailing bytes after the transaction",
-                inner.len() - d.position()
-            ),
-        });
-    }
-
     Ok(mempool.to_block_transaction())
 }
 
