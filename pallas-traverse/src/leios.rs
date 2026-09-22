@@ -104,14 +104,6 @@ impl EndorserBlockBody {
             });
         }
 
-        let found = Hasher::<256>::hash(cbor);
-        if found != announcement.eb_hash {
-            return Err(Error::BodyHash {
-                announced: announcement.eb_hash,
-                found,
-            });
-        }
-
         let mut d = Decoder::new(cbor);
 
         let block = d.decode().map_err(|e| Error::InvalidBody(e.to_string()))?;
