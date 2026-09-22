@@ -800,6 +800,42 @@ mod tests {
         assert!(matches!(err, Error::TxDecode { index: 0, .. }), "{err}");
     }
 
+    fn enveloped_body(inner: &[u8]) -> (EndorserBlockBody, Vec<u8>) {
+        let body_cbor = encode_entries(&[(Hasher::<256>::hash(inner), inner.len() as u32)]);
+        let body = EndorserBlockBody::decode(&body_cbor).unwrap();
+
+        let mut enveloped = Vec::new();
+        Encoder::new(&mut enveloped)
+            .bytes(inner)
+            .expect("write to a vec");
+
+        (body, enveloped)
+    }
+
+    #[test]
+    fn a_transaction_with_bytes_after_it_inside_its_envelope_is_refused() {
+        let (_, wire) = fixture(0);
+        let clean = unwrap_tx(&wire[0]).expect("the fixture is enveloped").to_vec();
+
+        let (body, enveloped) = enveloped_body(&clean);
+        assert_eq!(body.transactions(&[enveloped]).unwrap().len(), 1);
+
+        let mut trailing = clean.clone();
+        trailing.push(0x00);
+        let (body, enveloped) = enveloped_body(&trailing);
+
+        let err = body
+            .transactions(&[enveloped.clone()])
+            .expect_err("a transaction with bytes after it must be refused");
+        assert!(matches!(err, Error::TxDecode { index: 0, .. }), "{err}");
+
+        let raw = hex::decode(include_str!("../../test_data/dijkstra8.block").trim()).unwrap();
+        assert!(
+            resolve_certified_block(&raw, &body, &[enveloped]).is_err(),
+            "resolve must refuse a transaction with bytes after it"
+        );
+    }
+
     /// Re-encodes a real block's header with the two Leios fields set, which
     /// leaves the header signature no longer covering the header body.
     pub(super) fn with_leios_header_fields(
