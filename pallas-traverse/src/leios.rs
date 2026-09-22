@@ -185,6 +185,7 @@ impl EndorserBlockBody {
             out.push(MultiEraTx::Dijkstra(Box::new(Cow::Owned(tx))));
         }
 
+        out.reverse();
         Ok(out)
     }
 }
