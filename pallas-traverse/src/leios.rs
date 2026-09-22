@@ -138,7 +138,8 @@ impl EndorserBlockBody {
             });
         }
 
-        let found = Hasher::<256>::hash(cbor);
+        let decoded = Self::decode(cbor)?;
+        let found = Hasher::<256>::hash(&minicbor::to_vec(&decoded.block).unwrap());
         if found != announcement.eb_hash {
             return Err(Error::BodyHash {
                 announced: announcement.eb_hash,
