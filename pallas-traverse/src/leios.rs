@@ -289,13 +289,7 @@ pub fn certification(
     }
 
     let certified = if header.block_body_contains_leios_cert() == Some(true) {
-        let announced = parent
-            .and_then(announcement_of)
-            .ok_or(Error::CertifiesNothing {
-                slot: header.slot(),
-            })?;
-
-        Some(announced)
+        parent.and_then(announcement_of)
     } else {
         None
     };
