@@ -70,6 +70,10 @@ const TEST_BLOCKS: &[(&str, &str)] = &[
         "dijkstra15",
         include_str!("../../../test_data/dijkstra15.block"),
     ),
+    (
+        "dijkstra16",
+        include_str!("../../../test_data/dijkstra16.block"),
+    ),
 ];
 
 /// Blocks from before the fork. Their bodies are the Conway five element
@@ -328,6 +332,39 @@ fn a_block_transaction_is_not_a_mempool_transaction() {
     assert!(
         as_block.is_err(),
         "a mempool transaction must not decode as a block transaction"
+    );
+}
+
+/// A valid block transaction comes back byte for byte from a round trip through
+/// the mempool form.
+#[test]
+fn a_mempool_transaction_becomes_a_valid_block_transaction() {
+    let bytes = hex::decode(TEST_BLOCKS[WITH_TRANSACTIONS].1).unwrap();
+    let (_, block): BlockWrapper = minicbor::decode(&bytes).unwrap();
+
+    let tx = block
+        .block_body
+        .transactions
+        .first()
+        .expect("this fixture must carry at least one transaction");
+
+    let three = minicbor::to_vec(tx.to_mempool_transaction()).unwrap();
+    let mempool: MempoolTransaction = minicbor::decode(&three).unwrap();
+
+    let rebuilt = mempool.to_block_transaction();
+    assert!(rebuilt.success, "the mempool form admits no other verdict");
+    assert_eq!(&rebuilt, tx, "nothing but the flag was restored");
+    assert_eq!(
+        minicbor::to_vec(&rebuilt).unwrap(),
+        minicbor::to_vec(tx).unwrap(),
+        "the round trip is byte for byte"
+    );
+
+    let four = minicbor::to_vec(&rebuilt).unwrap();
+    let round: Result<MempoolTransaction, _> = minicbor::decode(&four);
+    assert!(
+        round.is_err(),
+        "the rebuilt transaction must no longer read as a mempool one"
     );
 }
 
@@ -860,6 +897,10 @@ const HEADER_HASHES: &[(&str, &str)] = &[
     (
         "dijkstra15",
         "0db84efa0259153a240cecacd0f9e52f942d40f96b132ebd0d5b3526e19b3a7b",
+    ),
+    (
+        "dijkstra16",
+        "c9d7bca094227279830e2e2110acbb965dc9e90d469ac97594d40bc8e295735c",
     ),
 ];
 
