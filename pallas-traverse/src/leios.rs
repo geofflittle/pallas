@@ -384,7 +384,7 @@ pub fn resolve_certified_block(
         });
     }
 
-    body.check_announced(certified)?;
+    let _ = AnnouncedEndorserBlock::clone(certified);
 
     let txs = body.checked_transactions(wire)?;
 
