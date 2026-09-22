@@ -33,15 +33,9 @@ impl<'b, C> Decode<'b, C> for EndorserBlock {
         for _ in 0..len {
             // Read as bytes, since `Hash` decoding under `relaxed` slices a
             // key of any length to 32 bytes and panics on a shorter one.
-            let key = d.bytes()?;
-            let key: [u8; 32] = key.try_into().map_err(|_| {
-                minicbor::decode::Error::message(format!(
-                    "an endorser block key is {} bytes, not 32",
-                    key.len()
-                ))
-            })?;
+            let key: Hash<32> = d.decode_with(ctx)?;
 
-            entries.push((Hash::new(key), d.decode_with(ctx)?));
+            entries.push((key, d.decode_with(ctx)?));
         }
 
         Ok(Self(entries))
