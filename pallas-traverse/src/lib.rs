@@ -98,6 +98,9 @@ pub mod hashes;
 pub mod header;
 /// Helpers for transaction inputs across eras.
 pub mod input;
+/// Leios endorser block bodies and the certification walk over ranking headers.
+#[cfg(feature = "unstable")]
+pub mod leios;
 /// Helpers for transaction metadata.
 pub mod meta;
 /// Helpers for transaction outputs across eras.
