@@ -581,7 +581,7 @@ mod tests {
             ),
             (
                 include_str!("../../test_data/dijkstra16.block"),
-                "c9d7bca094227279830e2e2110acbb965dc9e90d469ac97594d40bc8e295735c",
+                "c9d7bca094227279830e2e2110acbb965dc9e90d469ac97594d40bc8e295735d",
                 14935,
                 311025,
                 crate::Era::Dijkstra,
