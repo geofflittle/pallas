@@ -212,10 +212,15 @@ fn decode_closure_transaction(
 ) -> Result<dijkstra::BlockTransaction<'_>, Error> {
     let mut d = Decoder::new(inner);
 
-    let mempool: dijkstra::MempoolTransaction = d.decode().map_err(|e| Error::TxDecode {
-        index,
-        reason: e.to_string(),
-    })?;
+    let mempool: dijkstra::MempoolTransaction = match d.decode() {
+        Ok(m) => m,
+        Err(_) => {
+            return pallas_codec::minicbor::decode(inner).map_err(|e| Error::TxDecode {
+                index,
+                reason: e.to_string(),
+            })
+        }
+    };
 
     if d.position() != inner.len() {
         return Err(Error::TxDecode {
