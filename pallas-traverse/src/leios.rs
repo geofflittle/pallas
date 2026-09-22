@@ -354,6 +354,7 @@ fn replace_transaction_list<'b>(
         minicbor::decode(block_cbor).map_err(|e| Error::InvalidBlock(e.to_string()))?;
 
     block.block_body.transactions = MaybeIndefArray::Def(txs);
+    block.block_body.peras_certificate = pallas_codec::utils::Nullable::Null;
 
     Ok(minicbor::to_vec((era, block)).expect("write to a vec"))
 }
