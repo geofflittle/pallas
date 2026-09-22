@@ -278,6 +278,12 @@ fn decode_closure_transaction(
 }
 
 /// An announced endorser block, with the point a leios-fetch request needs.
+///
+/// ```compile_fail
+/// fn forge(a: &mut pallas_traverse::leios::AnnouncedEndorserBlock) {
+///     a.size = 0;
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct AnnouncedEndorserBlock {
