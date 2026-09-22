@@ -440,6 +440,7 @@ fn replace_transaction_list<'b>(
 mod tests {
     use super::*;
     use pallas_codec::minicbor::Encoder;
+    use pallas_codec::utils::AnyCbor;
 
     /// One endorser block of `test_data/dijkstra-fixtures.md`, with the values
     /// recorded for it there.
@@ -793,6 +794,25 @@ mod tests {
         };
         assert_eq!(tx.transaction_body.outputs.len(), 1);
         assert_eq!(tx.transaction_body.inputs.len(), 1);
+    }
+
+    #[test]
+    fn a_delivery_as_any_cbor_or_borrowed_bytes_reads_as_the_same_transactions() {
+        let (body, wire) = fixture(1);
+        let owned = body.transactions(&wire).unwrap();
+
+        let any: Vec<AnyCbor> = wire.iter().cloned().map(AnyCbor::from).collect();
+        let borrowed: Vec<&[u8]> = wire.iter().map(Vec::as_slice).collect();
+
+        for txs in [
+            body.transactions(&any).unwrap(),
+            body.transactions(&borrowed).unwrap(),
+        ] {
+            assert_eq!(txs.len(), 30);
+            for (a, b) in txs.iter().zip(&owned) {
+                assert_eq!(a.hash(), b.hash());
+            }
+        }
     }
 
     #[test]
