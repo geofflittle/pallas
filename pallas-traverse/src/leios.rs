@@ -104,7 +104,9 @@ impl EndorserBlockBody {
             });
         }
 
-        let found = Hasher::<256>::hash(cbor);
+        let decoded: dijkstra::EndorserBlock = pallas_codec::minicbor::decode(cbor)
+            .map_err(|e| Error::InvalidBody(e.to_string()))?;
+        let found = Hasher::<256>::hash(&pallas_codec::minicbor::to_vec(&decoded).unwrap());
         if found != announcement.eb_hash {
             return Err(Error::BodyHash {
                 announced: announcement.eb_hash,
