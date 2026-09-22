@@ -1,0 +1,72 @@
+== 0680cb0 0680cb0a01fa92ff6efd64f440d0954fa4229457 label=v-0680cb0-build
+synced
+started v-0680cb0-build
+exit=0
+== 0680cb0 0680cb0a01fa92ff6efd64f440d0954fa4229457 label=v-0680cb0-test
+synced
+started v-0680cb0-test
+exit=0
+test result: ok. 142 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+test result: ok. 95 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+== 0680cb0 0680cb0a01fa92ff6efd64f440d0954fa4229457 label=v-0680cb0-clippy-all
+synced
+started v-0680cb0-clippy-all
+exit=101
+error: couldn't read `pallas-network2/src/protocol/handshake/../../../../cardano-blueprint/src/network/node-to-node/handshake/test-data/test-0`: No such file or directory (os error 2)
+error: couldn't read `pallas-network2/src/protocol/handshake/../../../../cardano-blueprint/src/network/node-to-node/handshake/test-data/test-1`: No such file or directory (os error 2)
+error: couldn't read `pallas-network2/src/protocol/handshake/../../../../cardano-blueprint/src/network/node-to-node/handshake/test-data/test-2`: No such file or directory (os error 2)
+error: couldn't read `pallas-network2/src/protocol/handshake/../../../../cardano-blueprint/src/network/node-to-node/handshake/test-data/test-3`: No such file or directory (os error 2)
+error: couldn't read `pallas-network2/src/protocol/handshake/../../../../cardano-blueprint/src/network/node-to-node/handshake/test-data/test-4`: No such file or directory (os error 2)
+error: couldn't read `pallas-network2/src/protocol/../../../cardano-blueprint/src/network/node-to-node/leios-fetch/messages.cddl`: No such file or directory (os error 2)
+error: couldn't read `pallas-network2/src/protocol/../../../cardano-blueprint/src/network/node-to-node/leios-notify/messages.cddl`: No such file or directory (os error 2)
+error: could not compile `pallas-network2` (lib test) due to 7 previous errors
+== 0680cb0 0680cb0a01fa92ff6efd64f440d0954fa4229457 label=v-0680cb0-clippy-unstable
+synced
+started v-0680cb0-clippy-unstable
+exit=0
+== 0680cb0 0680cb0a01fa92ff6efd64f440d0954fa4229457 label=v-0680cb0-fmt
+synced
+started v-0680cb0-fmt
+exit=0
+== acdba9a acdba9a3d592605e6432a95ed13fe478bb357251 label=v-acdba9a-build
+synced
+started v-acdba9a-build
+exit=0
+== acdba9a acdba9a3d592605e6432a95ed13fe478bb357251 label=v-acdba9a-test
+synced
+started v-acdba9a-test
+exit=0
+test result: ok. 142 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+test result: ok. 64 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+== acdba9a acdba9a3d592605e6432a95ed13fe478bb357251 label=v-acdba9a-clippy-all
+synced
+started v-acdba9a-clippy-all
+exit=101
+error: couldn't read `pallas-network2/src/protocol/handshake/../../../../cardano-blueprint/src/network/node-to-node/handshake/test-data/test-0`: No such file or directory (os error 2)
+error: couldn't read `pallas-network2/src/protocol/handshake/../../../../cardano-blueprint/src/network/node-to-node/handshake/test-data/test-1`: No such file or directory (os error 2)
+error: couldn't read `pallas-network2/src/protocol/handshake/../../../../cardano-blueprint/src/network/node-to-node/handshake/test-data/test-2`: No such file or directory (os error 2)
+error: couldn't read `pallas-network2/src/protocol/handshake/../../../../cardano-blueprint/src/network/node-to-node/handshake/test-data/test-3`: No such file or directory (os error 2)
+error: couldn't read `pallas-network2/src/protocol/handshake/../../../../cardano-blueprint/src/network/node-to-node/handshake/test-data/test-4`: No such file or directory (os error 2)
+error: couldn't read `pallas-network2/src/protocol/../../../cardano-blueprint/src/network/node-to-node/leios-fetch/messages.cddl`: No such file or directory (os error 2)
+error: couldn't read `pallas-network2/src/protocol/../../../cardano-blueprint/src/network/node-to-node/leios-notify/messages.cddl`: No such file or directory (os error 2)
+error: could not compile `pallas-network2` (lib test) due to 7 previous errors
+== acdba9a acdba9a3d592605e6432a95ed13fe478bb357251 label=v-acdba9a-clippy-unstable
+synced
+started v-acdba9a-clippy-unstable
+exit=0
+== acdba9a acdba9a3d592605e6432a95ed13fe478bb357251 label=v-acdba9a-fmt
+synced
+started v-acdba9a-fmt
+exit=0
