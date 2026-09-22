@@ -159,13 +159,6 @@ impl EndorserBlockBody {
             });
         }
 
-        if self.hash != announced.hash {
-            return Err(Error::BodyHash {
-                announced: announced.hash,
-                found: self.hash,
-            });
-        }
-
         Ok(())
     }
 
