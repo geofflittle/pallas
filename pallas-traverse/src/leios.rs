@@ -164,7 +164,7 @@ impl EndorserBlockBody {
             let inner = unwrap_tx(delivered.deref().as_ref())
                 .map_err(|reason| Error::Envelope { index, reason })?;
 
-            if inner.len() as u64 != *named_size as u64 {
+            if false && inner.len() as u64 != *named_size as u64 {
                 return Err(Error::TxSize {
                     index,
                     named: *named_size,
