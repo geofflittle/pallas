@@ -86,16 +86,17 @@ mod tests {
     }
 
     #[test]
-    fn an_indefinite_body_re_encodes_indefinite() {
+    fn an_indefinite_body_is_refused() {
         let definite = body(FIXTURES[0].1);
         assert_eq!(definite[0], 0xa1, "fixture precondition");
+        assert!(minicbor::decode::<EndorserBlock>(&definite).is_ok());
 
         let mut indefinite = vec![0xbf];
         indefinite.extend_from_slice(&definite[1..]);
         indefinite.push(0xff);
 
-        let block: EndorserBlock = minicbor::decode(&indefinite).unwrap();
-        assert!(matches!(block, KeyValuePairs::Indef(_)));
-        assert_eq!(minicbor::to_vec(&block).unwrap(), indefinite);
+        let err = minicbor::decode::<EndorserBlock>(&indefinite)
+            .expect_err("an indefinite length body must be refused");
+        assert!(err.to_string().contains("definite"), "wrong refusal: {err}");
     }
 }
