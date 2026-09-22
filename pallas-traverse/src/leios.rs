@@ -1138,6 +1138,17 @@ mod resolve_tests {
     }
 
     #[test]
+    fn a_body_the_parent_did_not_announce_is_refused() {
+        let raw = certifying(0);
+        let (body, wire) = fixture(0);
+
+        assert!(
+            resolve_certified_block(&raw, &body, &wire).is_err(),
+            "dijkstra8 certifies 29694e6d and eb1 is f753a2b1, so it must be refused"
+        );
+    }
+
+    #[test]
     fn a_delivery_the_body_does_not_name_is_refused_before_the_splice() {
         let raw = certifying(0);
 
