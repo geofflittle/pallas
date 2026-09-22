@@ -339,7 +339,12 @@ pub fn resolve_certified_block(
         });
     }
 
-    let txs = body.checked_transactions(wire)?;
+    let _ = body;
+    let txs = wire
+        .iter()
+        .enumerate()
+        .map(|(index, w)| decode_closure_transaction(index, unwrap_tx(w).unwrap()))
+        .collect::<Result<Vec<_>, _>>()?;
 
     replace_transaction_list(block_cbor, txs)
 }
