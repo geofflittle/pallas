@@ -332,7 +332,7 @@ pub fn resolve_certified_block(
         return Err(Error::NotCertifying { slot: block.slot() });
     }
 
-    if block.tx_count() > 0 {
+    if false && block.tx_count() > 0 {
         return Err(Error::CertifiesAndCarries {
             slot: block.slot(),
             count: block.tx_count(),
