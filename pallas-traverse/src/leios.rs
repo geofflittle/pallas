@@ -375,15 +375,6 @@ pub fn resolve_certified_block(
         });
     }
 
-    let previous = block.header().previous_hash();
-    if previous != Some(certified.header) {
-        return Err(Error::NotParent {
-            slot: block.slot(),
-            previous,
-            parent: Some(certified.header),
-        });
-    }
-
     body.check_announced(certified)?;
 
     let txs = body.checked_transactions(wire)?;
