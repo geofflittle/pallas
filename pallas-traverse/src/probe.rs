@@ -41,7 +41,7 @@ pub(crate) fn tx_shape(cbor: &[u8]) -> TxShape {
         let mut len = 0;
 
         // Every count above four reads as Other, so the count stops at five.
-        while len < 5 && d.datatype()? != Type::Break {
+        while len < 4 && d.datatype()? != Type::Break {
             d.skip()?;
             len += 1;
         }
