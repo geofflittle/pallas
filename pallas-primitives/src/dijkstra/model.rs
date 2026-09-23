@@ -1473,7 +1473,7 @@ impl<'b> From<MempoolTransaction<'b>> for BlockTransaction<'b> {
         BlockTransaction {
             transaction_body: tx.transaction_body,
             transaction_witness_set: tx.transaction_witness_set,
-            auxiliary_data: tx.auxiliary_data,
+            auxiliary_data: tx.auxiliary_data.clone(),
             success: true,
         }
     }
