@@ -53,7 +53,7 @@ pub(crate) fn tx_shape(cbor: &[u8]) -> TxShape {
 
         let len = match d.array()? {
             Some(len) => len,
-            None => indefinite_len(d.clone())?,
+            None => 3,
         };
 
         if len != 3 && len != 4 {
