@@ -476,7 +476,7 @@ impl<'b, C> minicbor::Decode<'b, C> for Certificate {
         if len.is_none() {
             if d.datatype()? != minicbor::data::Type::Break {
                 return Err(minicbor::decode::Error::message(format!(
-                    "certificate variant {variant} carries more fields than it takes"
+                    "certificate variant {variant} is malformed"
                 )));
             }
             d.skip()?;
