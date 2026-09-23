@@ -380,6 +380,94 @@ where
     }
 }
 
+/// Key value pairs encoded as a definite length map
+///
+/// Decoding refuses an indefinite length map. Entries keep their wire order,
+/// duplicate keys included.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[serde(transparent)]
+pub struct DefiniteKeyValuePairs<K, V>(Vec<(K, V)>);
+
+impl<K, V> DefiniteKeyValuePairs<K, V> {
+    pub fn to_vec(self) -> Vec<(K, V)> {
+        self.0
+    }
+}
+
+impl<K, V> FromIterator<(K, V)> for DefiniteKeyValuePairs<K, V> {
+    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
+        DefiniteKeyValuePairs(Vec::from_iter(iter))
+    }
+}
+
+impl<K, V> From<Vec<(K, V)>> for DefiniteKeyValuePairs<K, V> {
+    fn from(value: Vec<(K, V)>) -> Self {
+        DefiniteKeyValuePairs(value)
+    }
+}
+
+impl<K, V> From<DefiniteKeyValuePairs<K, V>> for Vec<(K, V)> {
+    fn from(value: DefiniteKeyValuePairs<K, V>) -> Self {
+        value.0
+    }
+}
+
+impl<K, V> IntoIterator for DefiniteKeyValuePairs<K, V> {
+    type Item = (K, V);
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<K, V> Deref for DefiniteKeyValuePairs<K, V> {
+    type Target = Vec<(K, V)>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'b, C, K, V> minicbor::decode::Decode<'b, C> for DefiniteKeyValuePairs<K, V>
+where
+    K: Decode<'b, C>,
+    V: Decode<'b, C>,
+{
+    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+        let datatype = d.datatype()?;
+        let items: Result<Vec<_>, _> = d.map_iter_with::<C, K, V>(ctx)?.collect();
+        let items = items?;
+
+        if datatype == minicbor::data::Type::MapIndef {
+            return Err(minicbor::decode::Error::message("red stub"));
+        }
+
+        Ok(DefiniteKeyValuePairs(items))
+    }
+}
+
+impl<C, K, V> minicbor::encode::Encode<C> for DefiniteKeyValuePairs<K, V>
+where
+    K: Encode<C>,
+    V: Encode<C>,
+{
+    fn encode<W: minicbor::encode::Write>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>> {
+        e.map(self.0.len() as u64)?;
+
+        for (k, v) in self.0.iter() {
+            k.encode(e, ctx)?;
+            v.encode(e, ctx)?;
+        }
+
+        Ok(())
+    }
+}
+
 /// A struct that maintains a reference to whether a cbor array was indef or not
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub enum MaybeIndefArray<A> {
@@ -1573,5 +1661,71 @@ mod tests {
 
         assert_eq!(subject.inner, vec![1, 2, 3]);
         assert_eq!(encoded, hex::decode("83010203").unwrap());
+    }
+
+    #[derive(Debug, PartialEq)]
+    struct CountedKey(u64);
+
+    impl<'b> minicbor::Decode<'b, usize> for CountedKey {
+        fn decode(
+            d: &mut minicbor::Decoder<'b>,
+            reads: &mut usize,
+        ) -> Result<Self, minicbor::decode::Error> {
+            *reads += 1;
+            Ok(CountedKey(d.u64()?))
+        }
+    }
+
+    #[test]
+    fn definite_key_value_pairs_reads_every_entry_of_a_definite_map() {
+        let raw = hex::decode("a2010a0214").unwrap();
+        let mut reads = 0;
+
+        let subject: DefiniteKeyValuePairs<CountedKey, u64> =
+            minicbor::decode_with(&raw, &mut reads).unwrap();
+
+        assert_eq!(reads, 2);
+        assert_eq!(
+            subject.to_vec(),
+            vec![(CountedKey(1), 10), (CountedKey(2), 20)]
+        );
+    }
+
+    #[test]
+    fn definite_key_value_pairs_refuses_an_indefinite_map_before_any_entry() {
+        let raw = hex::decode("bf010a0214ff").unwrap();
+        let mut reads = 0;
+
+        let result: Result<DefiniteKeyValuePairs<CountedKey, u64>, _> =
+            minicbor::decode_with(&raw, &mut reads);
+
+        assert!(result.is_err());
+        assert_eq!(reads, 0);
+    }
+
+    #[test]
+    fn definite_key_value_pairs_roundtrips_a_definite_map() {
+        let raw = hex::decode("a2010a0214").unwrap();
+
+        let subject: DefiniteKeyValuePairs<u64, u64> = minicbor::decode(&raw).unwrap();
+
+        assert_eq!(minicbor::to_vec(&subject).unwrap(), raw);
+    }
+
+    #[test]
+    fn definite_key_value_pairs_keeps_duplicate_keys_in_wire_order() {
+        let raw = hex::decode("a3020a0114020f").unwrap();
+
+        let subject: DefiniteKeyValuePairs<u64, u64> = minicbor::decode(&raw).unwrap();
+
+        assert_eq!(minicbor::to_vec(&subject).unwrap(), raw);
+        assert_eq!(subject.to_vec(), vec![(2, 10), (1, 20), (2, 15)]);
+    }
+
+    #[test]
+    fn definite_key_value_pairs_encodes_a_definite_map_header() {
+        let subject = DefiniteKeyValuePairs::from(vec![(1u64, 10u64)]);
+
+        assert_eq!(minicbor::to_vec(&subject).unwrap(), hex::decode("a1010a").unwrap());
     }
 }
