@@ -77,13 +77,15 @@ impl<'b> MultiEraTx<'b> {
             // `true` third, the only value it allows.
             #[cfg(feature = "unstable")]
             Era::Dijkstra => match probe::tx_shape(cbor) {
-                probe::TxShape::DijkstraMempool | probe::TxShape::ValidityThird => {
+                probe::TxShape::DijkstraMempool => {
                     let tx: dijkstra::MempoolTransaction = minicbor::decode(cbor)?;
                     Ok(MultiEraTx::Dijkstra(Box::new(Cow::Owned(
                         dijkstra::BlockTransaction::from(&tx),
                     ))))
                 }
-                probe::TxShape::DijkstraBlock | probe::TxShape::Other => {
+                probe::TxShape::ValidityThird
+                | probe::TxShape::DijkstraBlock
+                | probe::TxShape::Other => {
                     let tx = minicbor::decode(cbor)?;
                     let tx = Box::new(Cow::Owned(tx));
                     Ok(MultiEraTx::Dijkstra(tx))
