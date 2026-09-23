@@ -1471,8 +1471,8 @@ pub struct MempoolTransaction<'b> {
 impl<'b> From<MempoolTransaction<'b>> for BlockTransaction<'b> {
     fn from(tx: MempoolTransaction<'b>) -> Self {
         BlockTransaction {
-            transaction_body: tx.transaction_body,
-            transaction_witness_set: tx.transaction_witness_set,
+            transaction_body: tx.transaction_body.clone(),
+            transaction_witness_set: tx.transaction_witness_set.clone(),
             auxiliary_data: tx.auxiliary_data,
             success: true,
         }
