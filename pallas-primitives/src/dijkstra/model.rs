@@ -390,14 +390,12 @@ impl<'b, C> minicbor::Decode<'b, C> for Certificate {
 
                 // `pledge` is a coin, so a uint in this slot means the optional
                 // `bls_key` was omitted, and an array or a null means it was supplied.
-                let bls_key = match d.datatype()? {
-                    minicbor::data::Type::Array | minicbor::data::Type::ArrayIndef => {
-                        Some(Nullable::Some(d.decode_with(ctx)?))
-                    }
-                    minicbor::data::Type::Null => {
+                let bls_key = match (len, d.datatype()?) {
+                    (Some(11), minicbor::data::Type::Null) => {
                         d.null()?;
                         Some(Nullable::Null)
                     }
+                    (Some(11), _) => Some(Nullable::Some(d.decode_with(ctx)?)),
                     _ => None,
                 };
 
