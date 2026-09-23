@@ -554,6 +554,24 @@ where
     }
 }
 
+/// Reads the break that ends an indefinite array whose header gave `len`,
+/// refusing any other item with `msg`. A definite array has no break and
+/// reads nothing.
+pub fn end_array(
+    d: &mut minicbor::Decoder<'_>,
+    len: Option<u64>,
+    msg: impl fmt::Display,
+) -> Result<(), Error> {
+    if len.is_none() {
+        if d.datatype()? != Type::Break {
+            return Err(Error::message(msg));
+        }
+        d.skip()?;
+    }
+
+    Ok(())
+}
+
 /// Order-preserving set of attributes
 ///
 /// There's no guarantee that the entries on a Cardano cbor entity that uses
@@ -1724,6 +1742,59 @@ mod tests {
 
         assert_eq!(minicbor::to_vec(&subject).unwrap(), raw);
         assert_eq!(subject.to_vec(), vec![(2, 10), (1, 20), (2, 15)]);
+    }
+
+    fn read_two_items(d: &mut minicbor::Decoder<'_>) -> Option<u64> {
+        let len = d.array().unwrap();
+        d.u8().unwrap();
+        d.u8().unwrap();
+        len
+    }
+
+    #[test]
+    fn end_array_reads_nothing_after_a_definite_array() {
+        let raw = hex::decode("82010203").unwrap();
+        let mut d = minicbor::Decoder::new(&raw);
+        let len = read_two_items(&mut d);
+
+        end_array(&mut d, len, "unused").unwrap();
+
+        assert_eq!(d.position(), 3);
+        assert_eq!(d.u8().unwrap(), 3);
+    }
+
+    #[test]
+    fn end_array_reads_the_break_of_an_indefinite_array() {
+        let raw = hex::decode("9f0102ff03").unwrap();
+        let mut d = minicbor::Decoder::new(&raw);
+        let len = read_two_items(&mut d);
+
+        end_array(&mut d, len, "unused").unwrap();
+
+        assert_eq!(d.position(), 4);
+        assert_eq!(d.u8().unwrap(), 3);
+    }
+
+    #[test]
+    fn end_array_refuses_an_item_where_the_break_belongs() {
+        let raw = hex::decode("9f010203ff").unwrap();
+        let mut d = minicbor::Decoder::new(&raw);
+        let len = read_two_items(&mut d);
+
+        let err = end_array(&mut d, len, "three items, two expected").unwrap_err();
+
+        assert_eq!(err.to_string(), "three items, two expected");
+    }
+
+    #[test]
+    fn end_array_refuses_an_indefinite_array_cut_before_its_break() {
+        let raw = hex::decode("9f0102").unwrap();
+        let mut d = minicbor::Decoder::new(&raw);
+        let len = read_two_items(&mut d);
+
+        let err = end_array(&mut d, len, "unused").unwrap_err();
+
+        assert!(err.is_end_of_input(), "{err}");
     }
 
     #[test]
