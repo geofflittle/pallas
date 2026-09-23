@@ -461,6 +461,10 @@ where
         e: &mut minicbor::Encoder<W>,
         ctx: &mut C,
     ) -> Result<(), minicbor::encode::Error<W::Error>> {
+        if self.0.is_empty() {
+            e.begin_map()?.end()?;
+            return Ok(());
+        }
         e.map(self.0.len() as u64)?;
 
         for (k, v) in self.0.iter() {
