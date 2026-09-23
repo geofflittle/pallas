@@ -112,9 +112,12 @@ impl<'b> MultiEraTx<'b> {
             probe::TxShape::DijkstraBlock => {
                 return Self::decode_for_era(Era::Dijkstra, cbor).map_err(Error::invalid_cbor);
             }
-            probe::TxShape::DijkstraMempool
-            | probe::TxShape::ValidityThird
-            | probe::TxShape::Other => (),
+            probe::TxShape::DijkstraMempool => {
+                let tx: dijkstra::BlockTransaction =
+                    minicbor::decode(cbor).map_err(Error::invalid_cbor)?;
+                return Ok(MultiEraTx::Dijkstra(Box::new(Cow::Owned(tx))));
+            }
+            probe::TxShape::ValidityThird | probe::TxShape::Other => (),
         }
 
         if let Ok(tx) = minicbor::decode(cbor) {
