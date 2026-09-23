@@ -351,8 +351,18 @@ fn a_mempool_transaction_becomes_a_valid_block_transaction() {
     let three = minicbor::to_vec(tx.to_mempool_transaction()).unwrap();
     let mempool: MempoolTransaction = minicbor::decode(&three).unwrap();
 
-    let rebuilt = mempool.to_block_transaction();
+    let rebuilt = BlockTransaction::from(&mempool);
     assert!(rebuilt.success, "the mempool form admits no other verdict");
+
+    let spelled_out = MempoolTransaction {
+        is_valid_supplied: true,
+        ..mempool.clone()
+    };
+    assert_eq!(
+        BlockTransaction::from(&spelled_out),
+        rebuilt,
+        "a `true` written out means what the three element form means"
+    );
     assert_eq!(&rebuilt, tx, "nothing but the flag was restored");
     assert_eq!(
         minicbor::to_vec(&rebuilt).unwrap(),
