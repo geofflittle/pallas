@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use pallas_codec::minicbor::{self, Decode, Encode};
+use pallas_codec::utils::end_array;
 
 pub use pallas_codec::codec_by_datatype;
 
@@ -997,14 +998,11 @@ impl<'b, C> minicbor::Decode<'b, C> for AccountBalanceInterval {
             _ => Some(d.decode_with(ctx)?),
         };
 
-        if len.is_none() {
-            if d.datatype()? != minicbor::data::Type::Break {
-                return Err(minicbor::decode::Error::message(
-                    "account_balance_interval takes two elements, found more",
-                ));
-            }
-            d.skip()?;
-        }
+        end_array(
+            d,
+            len,
+            "account_balance_interval takes two elements, found more",
+        )?;
 
         match (lower, upper) {
             (Some(l), None) => Ok(AccountBalanceInterval::LowerBound(l)),
