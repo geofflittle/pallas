@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 
-use pallas_codec::minicbor::{self, bytes::ByteSlice, Decoder};
+use pallas_codec::minicbor::{self, Decoder, bytes::ByteSlice};
 use pallas_codec::utils::AnyCbor;
 use pallas_crypto::hash::{Hash, Hasher};
 use pallas_primitives::dijkstra;
@@ -258,8 +258,8 @@ mod tests {
             wire_txs(self.txs)
         }
 
-        /// The announcement read out of the fixture's announcing header, so no
-        /// test compares a body to a digest of itself.
+        /// The announcement from the fixture's announcing header, the digest
+        /// the chain holds for the body.
         fn announcement(&self) -> dijkstra::EbAnnouncement {
             let raw = hex::decode(self.header.trim()).expect("fixture header is hex");
             let header = dijkstra_header(&raw);
@@ -425,7 +425,7 @@ mod tests {
         assert_eq!(body.len(), 244);
     }
 
-    /// The node does not compare a body with the announced size.
+    /// The node checks a body against the announced hash alone.
     #[test]
     fn a_body_is_accepted_whatever_size_the_announcement_names() {
         let f = &FIXTURES[2];
@@ -444,10 +444,10 @@ mod tests {
         }
     }
 
-    /// The announcement names this body's own length and digest, so only the
-    /// shape is left to refuse.
+    /// The announcement names this body's own digest, so only the shape is left
+    /// to refuse.
     #[test]
-    fn a_body_of_the_right_length_but_the_wrong_shape_is_refused() {
+    fn a_body_that_is_not_a_map_is_refused() {
         let malformed = [0x83, 0x01, 0x02];
 
         let announcement = dijkstra::EbAnnouncement {
@@ -491,8 +491,7 @@ mod tests {
         assert_eq!(body.len(), f.count);
     }
 
-    /// A reordered body has the announced length, so the hash is the only
-    /// check that can refuse it.
+    /// The announced hash covers the order of the entries.
     #[test]
     fn a_body_with_the_announced_entries_in_another_order_is_refused_on_hash() {
         let f = &FIXTURES[2];
@@ -509,11 +508,6 @@ mod tests {
         assert_ne!(
             reordered, raw,
             "the wire already had this body in key sorted order"
-        );
-        assert_eq!(
-            reordered.len(),
-            announcement.eb_size as usize,
-            "a reordering leaves the announced length intact"
         );
 
         let err = EndorserBlockBody::decode_announced(&reordered, &announcement)
@@ -532,7 +526,7 @@ mod tests {
     }
 
     /// The size 229 written in three bytes rather than two decodes to the same
-    /// entry, and the node hashes that entry's minimal encoding.
+    /// entry, and the node hashes the body's minimal encoding.
     #[test]
     fn the_announced_hash_is_over_the_minimal_re_encoding() {
         let f = &FIXTURES[0];
@@ -613,7 +607,7 @@ mod tests {
         assert!(matches!(err, Error::TxHash { index: 0, .. }), "{err}");
     }
 
-    /// The node does not compare a transaction with the size its entry names.
+    /// The node checks transaction sizes only as a total per fetch job.
     #[test]
     fn a_transaction_is_accepted_whatever_size_its_entry_names() {
         let (_, wire) = fixture(0);
@@ -621,8 +615,8 @@ mod tests {
         let id = Hasher::<256>::hash(inner);
 
         for size in [0, inner.len() as u32 - 1, inner.len() as u32 + 1, u32::MAX] {
-            let body = announced_as_itself(&encode_entries(&[(id, size)]))
-                .expect("a body of one entry");
+            let body =
+                announced_as_itself(&encode_entries(&[(id, size)])).expect("a body of one entry");
 
             let txs = body
                 .transactions(&wire)
