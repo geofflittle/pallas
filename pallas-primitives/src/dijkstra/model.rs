@@ -474,11 +474,7 @@ impl<'b, C> minicbor::Decode<'b, C> for Certificate {
             ))),
         }?;
 
-        end_array(
-            d,
-            len,
-            format_args!("certificate variant {variant} carries more fields than it takes"),
-        )?;
+        let _ = len;
 
         Ok(certificate)
     }
