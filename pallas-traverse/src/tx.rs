@@ -955,6 +955,39 @@ mod tests {
         }
     }
 
+    #[test]
+    fn probe_indefinite_block_form() {
+        let cbor = dijkstra_block_bytes();
+        let block = MultiEraBlock::decode(&cbor).expect("invalid cbor");
+        let source = block.as_dijkstra().unwrap().block_body.transactions[0].clone();
+        let body = source.transaction_body.raw_cbor();
+        let witnesses = source.transaction_witness_set.raw_cbor();
+        let aux: &[u8] = match &source.auxiliary_data {
+            pallas_codec::utils::Nullable::Some(aux) => aux.raw_cbor(),
+            _ => &[0xf6],
+        };
+        let indefinite = [&[0x9f][..], body, witnesses, aux, &[0xf5], &[0xff]].concat();
+        println!("shape: {:?}", probe::tx_shape(&indefinite));
+        match MultiEraTx::decode_for_era(Era::Dijkstra, &indefinite) {
+            Ok(tx) => println!(
+                "decode_for_era: ok era={:?} hash_match={} valid={}",
+                tx.era(),
+                tx.hash() == source.transaction_body.original_hash(),
+                tx.is_valid()
+            ),
+            Err(e) => println!("decode_for_era: err {e:?}"),
+        }
+        match MultiEraTx::decode(&indefinite) {
+            Ok(tx) => println!("decode: ok era={:?}", tx.era()),
+            Err(e) => println!("decode: err {e:?}"),
+        }
+        let mempool = [&[0x9f][..], body, witnesses, aux, &[0xff]].concat();
+        match MultiEraTx::decode(&mempool) {
+            Ok(tx) => println!("decode mempool: ok era={:?}", tx.era()),
+            Err(e) => println!("decode mempool: err {e:?}"),
+        }
+    }
+
     type Accessor = fn(&MultiEraTx);
 
     const NOT_YET_IMPLEMENTED: [(&str, Accessor); 22] = [
