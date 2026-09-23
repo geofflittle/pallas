@@ -1498,7 +1498,12 @@ impl<'b, C> minicbor::Decode<'b, C> for MempoolTransaction<'b> {
             )));
         }
 
-        let auxiliary_data = d.decode_with(ctx)?;
+        let auxiliary_data =
+            if len.is_none() && d.datatype()? == minicbor::data::Type::Break {
+                Nullable::Null
+            } else {
+                d.decode_with(ctx)?
+            };
 
         end_array(
             d,
