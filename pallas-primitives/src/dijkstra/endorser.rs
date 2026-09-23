@@ -1,11 +1,11 @@
 //! The Leios endorser block, `endorser_block` in
 //! `cardano-blueprint/src/network/node-to-node/leios-fetch/messages.cddl`.
 
-use pallas_codec::utils::DefiniteKeyValuePairs;
+use pallas_codec::utils::KeyValuePairs;
 use pallas_crypto::hash::Hash;
 
 /// The blake2b-256 and byte length of each transaction the block names.
-pub type EndorserBlock = DefiniteKeyValuePairs<Hash<32>, u32>;
+pub type EndorserBlock = KeyValuePairs<Hash<32>, u32>;
 
 #[cfg(test)]
 mod tests {
