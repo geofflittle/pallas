@@ -1500,12 +1500,6 @@ impl<'b, C> minicbor::Decode<'b, C> for MempoolTransaction<'b> {
 
         let auxiliary_data = d.decode_with(ctx)?;
 
-        end_array(
-            d,
-            len,
-            format_args!("expected a {expected} element transaction, found more"),
-        )?;
-
         Ok(MempoolTransaction {
             transaction_body,
             transaction_witness_set,
