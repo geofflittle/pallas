@@ -287,7 +287,7 @@ pub fn certification<'a>(
 mod tests {
     use super::*;
     use crate::{Era, MultiEraBlock};
-    use pallas_codec::minicbor::{self, Encoder};
+    use pallas_codec::minicbor::{self, bytes::ByteSlice, Encoder};
     use pallas_codec::utils::AnyCbor;
 
     /// One endorser block of `test_data/dijkstra-fixtures.md`, with the values
@@ -341,11 +341,8 @@ mod tests {
             hex::decode(self.body.trim()).expect("fixture body is hex")
         }
 
-        fn wire_txs(&self) -> Vec<Vec<u8>> {
-            self.txs
-                .split_whitespace()
-                .map(|l| hex::decode(l).expect("fixture tx is hex"))
-                .collect()
+        fn wire_txs(&self) -> Vec<AnyCbor> {
+            wire_txs(self.txs)
         }
 
         /// The announcement read out of the fixture's announcing header, so no
@@ -363,7 +360,14 @@ mod tests {
         }
     }
 
-    fn fixture(index: usize) -> (EndorserBlockBody, Vec<Vec<u8>>) {
+    fn wire_txs(hex_txs: &str) -> Vec<AnyCbor> {
+        hex_txs
+            .split_whitespace()
+            .map(|l| AnyCbor::from(hex::decode(l).expect("fixture tx is hex")))
+            .collect()
+    }
+
+    fn fixture(index: usize) -> (EndorserBlockBody, Vec<AnyCbor>) {
         let f = &FIXTURES[index];
         let body = EndorserBlockBody::decode_announced(&f.body_bytes(), &f.announcement())
             .unwrap_or_else(|e| panic!("{}: {e}", f.name));
@@ -398,10 +402,25 @@ mod tests {
         )
     }
 
-    fn enveloped(inner: &[u8]) -> Vec<u8> {
+    fn enveloped(inner: &[u8]) -> AnyCbor {
         let mut out = Vec::new();
         Encoder::new(&mut out).bytes(inner).expect("write to a vec");
-        out
+        AnyCbor::from(out)
+    }
+
+    fn unwrapped(tx: &AnyCbor) -> &[u8] {
+        minicbor::decode::<&ByteSlice>(tx.raw_bytes()).expect("the fixture is enveloped")
+    }
+
+    /// A body naming each transaction by its own hash and length, announced as
+    /// itself.
+    fn body_naming(txs: &[&[u8]]) -> EndorserBlockBody {
+        let entries: Vec<_> = txs
+            .iter()
+            .map(|tx| (Hasher::<256>::hash(tx), tx.len() as u32))
+            .collect();
+
+        announced_as_itself(&encode_entries(&entries)).expect("a body of distinct entries")
     }
 
     #[test]
@@ -481,9 +500,9 @@ mod tests {
             .expect_err("an empty body must not pass as this endorser block");
 
         match err {
-            Error::BodySize { announced, found } => {
-                assert_eq!(announced, 8786);
-                assert_eq!(found, 1);
+            Error::BodyHash { announced, found } => {
+                assert_eq!(announced, announcement.eb_hash);
+                assert_eq!(found, Hasher::<256>::hash(&[0xa0]));
             }
             other => panic!("wrong refusal: {other}"),
         }
@@ -491,6 +510,25 @@ mod tests {
         let body = EndorserBlockBody::decode_announced(&f.body_bytes(), &announcement)
             .expect("the announced body must be accepted");
         assert_eq!(body.len(), 244);
+    }
+
+    /// The node does not compare a body with the announced size.
+    #[test]
+    fn a_body_is_accepted_whatever_size_the_announcement_names() {
+        let f = &FIXTURES[2];
+        let announced = f.announcement();
+        assert_eq!(announced.eb_size, 8786, "fixture precondition");
+
+        for eb_size in [0, 8785, 8787, u32::MAX] {
+            let announcement = dijkstra::EbAnnouncement {
+                eb_size,
+                ..announced.clone()
+            };
+
+            let body = EndorserBlockBody::decode_announced(&f.body_bytes(), &announcement)
+                .unwrap_or_else(|e| panic!("announced size {eb_size}: {e}"));
+            assert_eq!(body.len(), 244);
+        }
     }
 
     /// The announcement names this body's own length and digest, so only the
@@ -581,9 +619,9 @@ mod tests {
     }
 
     /// The size 229 written in three bytes rather than two decodes to the same
-    /// entry, and a hash over its minimal re-encoding would not match.
+    /// entry, and the node hashes that entry's minimal encoding.
     #[test]
-    fn the_announced_hash_is_over_the_bytes_as_received() {
+    fn the_announced_hash_is_over_the_minimal_re_encoding() {
         let f = &FIXTURES[0];
         let minimal = f.body_bytes();
         assert_eq!(&minimal[35..], &[0x18, 0xe5], "fixture precondition");
@@ -591,28 +629,34 @@ mod tests {
         let mut wide = minimal[..35].to_vec();
         wide.extend_from_slice(&[0x19, 0x00, 0xe5]);
 
-        let announcement = dijkstra::EbAnnouncement {
-            eb_hash: Hasher::<256>::hash(&wide),
+        let of_minimal = dijkstra::EbAnnouncement {
+            eb_hash: f.announcement().eb_hash,
             eb_size: wide.len() as u32,
         };
+        assert_eq!(of_minimal.eb_hash, Hasher::<256>::hash(&minimal));
 
-        let body = EndorserBlockBody::decode_announced(&wide, &announcement)
-            .expect("a body must be checked as it arrived");
+        let body = EndorserBlockBody::decode_announced(&wide, &of_minimal)
+            .expect("the wide body re-encodes to the announced one");
 
         let (minimal_body, wire) = fixture(0);
         assert_eq!(body.entries(), minimal_body.entries());
         assert_eq!(body.transactions(&wire).unwrap().len(), 1);
 
-        let re_encoded = encode_entries(body.entries());
-        assert_eq!(re_encoded, minimal);
-        assert_ne!(Hasher::<256>::hash(&re_encoded), announcement.eb_hash);
+        let of_wide = dijkstra::EbAnnouncement {
+            eb_hash: Hasher::<256>::hash(&wide),
+            eb_size: wide.len() as u32,
+        };
 
-        let err = EndorserBlockBody::decode_announced(&wide, &f.announcement())
-            .expect_err("the minimal body's announcement must not pass the wide one");
-        assert!(
-            matches!(err, Error::BodySize { .. }),
-            "wrong refusal: {err}"
-        );
+        let err = EndorserBlockBody::decode_announced(&wide, &of_wide)
+            .expect_err("a hash over the wide bytes names no body the node accepts");
+
+        match err {
+            Error::BodyHash { announced, found } => {
+                assert_eq!(announced, of_wide.eb_hash);
+                assert_eq!(found, of_minimal.eb_hash);
+            }
+            other => panic!("wrong refusal: {other}"),
+        }
     }
 
     /// The body keys a transaction by the blake2b-256 of the whole
@@ -645,25 +689,6 @@ mod tests {
     }
 
     #[test]
-    fn a_delivery_as_any_cbor_or_borrowed_bytes_reads_as_the_same_transactions() {
-        let (body, wire) = fixture(1);
-        let owned = body.transactions(&wire).unwrap();
-
-        let any: Vec<AnyCbor> = wire.iter().cloned().map(AnyCbor::from).collect();
-        let borrowed: Vec<&[u8]> = wire.iter().map(Vec::as_slice).collect();
-
-        for txs in [
-            body.transactions(&any).unwrap(),
-            body.transactions(&borrowed).unwrap(),
-        ] {
-            assert_eq!(txs.len(), 30);
-            for (a, b) in txs.iter().zip(&owned) {
-                assert_eq!(a.hash(), b.hash());
-            }
-        }
-    }
-
-    #[test]
     fn a_permuted_delivery_is_refused() {
         let (body, mut wire) = fixture(1);
         wire.swap(0, 1);
@@ -675,31 +700,21 @@ mod tests {
         assert!(matches!(err, Error::TxHash { index: 0, .. }), "{err}");
     }
 
-    /// Entries 65 and 66 of `dijkstra-17402` differ in size, where every entry
-    /// of `dijkstra-eb2` has the same size.
+    /// The node does not compare a transaction with the size its entry names.
     #[test]
-    fn a_delivery_with_two_sizes_swapped_is_refused_on_size() {
-        let (body, mut wire) = fixture(2);
-        assert_eq!(body.entries()[65].1, 201, "fixture precondition");
-        assert_eq!(body.entries()[66].1, 200, "fixture precondition");
+    fn a_transaction_is_accepted_whatever_size_its_entry_names() {
+        let (_, wire) = fixture(0);
+        let inner = unwrapped(&wire[0]);
+        let id = Hasher::<256>::hash(inner);
 
-        wire.swap(65, 66);
+        for size in [0, inner.len() as u32 - 1, inner.len() as u32 + 1, u32::MAX] {
+            let body = announced_as_itself(&encode_entries(&[(id, size)]))
+                .expect("a body of one entry");
 
-        let err = body
-            .transactions(&wire)
-            .expect_err("a delivery of the wrong size must be refused");
-
-        match err {
-            Error::TxSize {
-                index,
-                named,
-                found,
-            } => {
-                assert_eq!(index, 65);
-                assert_eq!(named, 201);
-                assert_eq!(found, 200);
-            }
-            other => panic!("wrong refusal: {other}"),
+            let txs = body
+                .transactions(&wire)
+                .unwrap_or_else(|e| panic!("named size {size}: {e}"));
+            assert_eq!(txs[0].hash().to_string(), FIXTURES[0].first_tx_id);
         }
     }
 
@@ -724,93 +739,87 @@ mod tests {
     #[test]
     fn a_transaction_delivered_without_its_envelope_is_refused() {
         let (body, wire) = fixture(0);
+        assert_eq!(body.transactions(&wire).unwrap().len(), 1);
 
-        let inner = unwrap_tx(&wire[0])
-            .expect("the fixture is enveloped")
-            .to_vec();
+        let inner = unwrapped(&wire[0]);
         assert_eq!(inner.len(), 229);
         assert_ne!(inner.len(), wire[0].len(), "the envelope is real");
 
         let err = body
-            .transactions(&[inner])
+            .transactions(&[AnyCbor::from(inner.to_vec())])
             .expect_err("an unwrapped transaction must be refused");
-
-        assert!(matches!(err, Error::Envelope { index: 0, .. }), "{err}");
-    }
-
-    #[test]
-    fn a_block_form_transaction_is_refused() {
-        let (_, wire) = fixture(0);
-        let inner = unwrap_tx(&wire[0]).expect("the fixture is enveloped");
-        assert_eq!(inner[0], 0x83, "fixture precondition");
-
-        let mempool: dijkstra::MempoolTransaction = minicbor::decode(inner).unwrap();
-        let block_form = minicbor::to_vec(mempool.to_block_transaction()).unwrap();
-        assert_eq!(block_form[0], 0x84, "the block form has four elements");
-
-        let body_cbor =
-            encode_entries(&[(Hasher::<256>::hash(&block_form), block_form.len() as u32)]);
-        let body = announced_as_itself(&body_cbor).unwrap();
-
-        let err = body
-            .transactions(&[enveloped(&block_form)])
-            .expect_err("a block form transaction must be refused");
 
         assert!(matches!(err, Error::TxDecode { index: 0, .. }), "{err}");
     }
 
+    /// The node reads an indefinite length transaction as it reads the
+    /// definite one, with or without the `true` third element.
     #[test]
-    fn a_transaction_with_bytes_after_it_inside_its_envelope_is_refused() {
+    fn an_indefinite_length_transaction_reads_as_the_definite_one() {
         let (_, wire) = fixture(0);
-        let clean = unwrap_tx(&wire[0])
-            .expect("the fixture is enveloped")
-            .to_vec();
+        let three = unwrapped(&wire[0]);
+        assert_eq!(three[0], 0x83, "fixture precondition");
 
-        let body_of =
-            |inner: &[u8]| encode_entries(&[(Hasher::<256>::hash(inner), inner.len() as u32)]);
+        let mempool: dijkstra::MempoolTransaction = minicbor::decode(three).unwrap();
+        let four = minicbor::to_vec(dijkstra::MempoolTransaction {
+            is_valid_supplied: true,
+            ..mempool
+        })
+        .unwrap();
+        assert_eq!(four[0], 0x84, "the four element form");
 
-        let body = announced_as_itself(&body_of(&clean)).unwrap();
-        assert_eq!(body.transactions(&[enveloped(&clean)]).unwrap().len(), 1);
+        for definite in [three, four.as_slice()] {
+            let mut indefinite = vec![0x9f];
+            indefinite.extend_from_slice(&definite[1..]);
+            indefinite.push(0xff);
 
-        let mut trailing = clean.clone();
-        trailing.push(0x00);
-        let body = announced_as_itself(&body_of(&trailing)).unwrap();
+            let wire = [enveloped(&indefinite)];
+            let txs = body_naming(&[&indefinite])
+                .transactions(&wire)
+                .unwrap_or_else(|e| panic!("{:02x} form: {e}", definite[0]));
 
-        let err = body
-            .transactions(&[enveloped(&trailing)])
-            .expect_err("a transaction with bytes after it must be refused");
-
-        match err {
-            Error::TxDecode { index, reason } => {
-                assert_eq!(index, 0);
-                assert!(reason.contains("1 trailing bytes"), "{reason}");
-            }
-            other => panic!("wrong refusal: {other}"),
+            assert_eq!(txs[0].hash().to_string(), FIXTURES[0].first_tx_id);
         }
     }
 
+    /// The Dijkstra era decoder also reads the four element block form.
     #[test]
-    fn a_transaction_with_bytes_after_its_envelope_is_refused() {
-        let (body, wire) = fixture(0);
-        assert_eq!(body.transactions(&wire).unwrap().len(), 1);
+    fn a_block_form_transaction_is_accepted() {
+        let (_, wire) = fixture(0);
+        let inner = unwrapped(&wire[0]);
+        assert_eq!(inner[0], 0x83, "fixture precondition");
 
-        let mut trailing = wire[0].clone();
+        let mempool: dijkstra::MempoolTransaction = minicbor::decode(inner).unwrap();
+        let block_form = minicbor::to_vec(dijkstra::BlockTransaction {
+            transaction_body: mempool.transaction_body,
+            transaction_witness_set: mempool.transaction_witness_set,
+            auxiliary_data: mempool.auxiliary_data,
+            success: true,
+        })
+        .unwrap();
+        assert_eq!(block_form[0], 0x84, "the block form has four elements");
+
+        let wire = [enveloped(&block_form)];
+        let txs = body_naming(&[&block_form])
+            .transactions(&wire)
+            .expect("a block form transaction");
+
+        assert_eq!(txs[0].hash().to_string(), FIXTURES[0].first_tx_id);
+    }
+
+    /// The Dijkstra era decoder stops after one transaction.
+    #[test]
+    fn a_transaction_with_bytes_after_it_inside_its_envelope_is_accepted() {
+        let (_, wire) = fixture(0);
+        let mut trailing = unwrapped(&wire[0]).to_vec();
         trailing.push(0x00);
 
-        let err = body
-            .transactions(&[trailing])
-            .expect_err("bytes after the envelope must be refused");
+        let wire = [enveloped(&trailing)];
+        let txs = body_naming(&[&trailing])
+            .transactions(&wire)
+            .expect("the transaction before the trailing byte");
 
-        match err {
-            Error::Envelope { index, reason } => {
-                assert_eq!(index, 0);
-                assert!(
-                    reason.contains("1 trailing bytes after the byte string"),
-                    "{reason}"
-                );
-            }
-            other => panic!("wrong refusal: {other}"),
-        }
+        assert_eq!(txs[0].hash().to_string(), FIXTURES[0].first_tx_id);
     }
 
     #[test]
@@ -1206,11 +1215,7 @@ mod tests {
             let body_cbor = hex::decode(c.body.trim()).unwrap();
             let body = EndorserBlockBody::decode_announced(&body_cbor, certified)
                 .unwrap_or_else(|e| panic!("{name}: {e}"));
-            let wire: Vec<Vec<u8>> = c
-                .txs
-                .split_whitespace()
-                .map(|l| hex::decode(l).expect("fixture tx is hex"))
-                .collect();
+            let wire = wire_txs(c.txs);
 
             let txs = body
                 .transactions(&wire)

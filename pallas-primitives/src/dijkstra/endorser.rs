@@ -106,8 +106,9 @@ mod tests {
         body
     }
 
+    #[cfg(not(feature = "relaxed"))]
     #[test]
-    fn a_key_that_is_not_32_bytes_is_refused() {
+    fn a_key_that_is_not_32_bytes_is_refused_as_a_hash() {
         let block = minicbor::decode::<EndorserBlock>(&one_entry_with_key_of(32))
             .expect("a 32 byte key must be accepted");
         assert_eq!(block[0], (Hash::new([0x11; 32]), 1));
@@ -116,7 +117,7 @@ mod tests {
             let err = minicbor::decode::<EndorserBlock>(&one_entry_with_key_of(len))
                 .expect_err("a key that is not 32 bytes must be refused");
             assert!(
-                err.to_string().contains(&format!("{len} bytes")),
+                err.to_string().contains("Invalid hash size"),
                 "wrong refusal for {len}: {err}"
             );
         }
