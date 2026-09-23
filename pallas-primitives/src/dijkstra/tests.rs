@@ -733,6 +733,57 @@ fn a_mempool_transaction_re_encodes_both_accepted_shapes() {
     );
 }
 
+/// The body `{0: [], 1: [], 2: 0}` and an empty witness set.
+const EMPTY_BODY_AND_WITNESSES: &[u8] = &[0xa3, 0x00, 0x80, 0x01, 0x80, 0x02, 0x00, 0xa0];
+
+#[test]
+fn a_mempool_transaction_of_indefinite_length_decodes_as_its_definite_form() {
+    let body_and_witnesses = EMPTY_BODY_AND_WITNESSES;
+
+    for (label, header, tail) in [
+        ("three elements", 0x83, &[0xf6][..]),
+        ("four elements", 0x84, &[0xf5, 0xf6][..]),
+    ] {
+        let definite = [&[header][..], body_and_witnesses, tail].concat();
+        let mut d = minicbor::Decoder::new(&definite);
+        let expected: MempoolTransaction = d
+            .decode()
+            .unwrap_or_else(|e| panic!("{label}: the definite form must decode: {e:?}"));
+        assert_eq!(d.position(), definite.len(), "{label}: definite form");
+
+        let indefinite = [&[0x9f][..], body_and_witnesses, tail, &[0xff]].concat();
+        let mut d = minicbor::Decoder::new(&indefinite);
+        let back: MempoolTransaction = d
+            .decode()
+            .unwrap_or_else(|e| panic!("{label}: the indefinite form must decode: {e:?}"));
+        assert_eq!(
+            d.position(),
+            indefinite.len(),
+            "{label}: the break is part of the transaction"
+        );
+        assert_eq!(back, expected, "{label}");
+
+        let extra = [&[0x9f][..], body_and_witnesses, tail, &[0xf6, 0xff]].concat();
+        let refused: Result<MempoolTransaction, _> = minicbor::decode(&extra);
+        assert!(
+            refused.is_err(),
+            "{label}: an element after the last one must be refused"
+        );
+    }
+}
+
+#[test]
+fn an_indefinite_mempool_transaction_ended_early_is_still_refused() {
+    for (label, elements) in [("three elements", &[][..]), ("four elements", &[0xf5][..])] {
+        let bytes = [&[0x9f][..], EMPTY_BODY_AND_WITNESSES, elements, &[0xff]].concat();
+        let refused: Result<MempoolTransaction, _> = minicbor::decode(&bytes);
+        assert!(
+            refused.is_err(),
+            "{label}: a break where the auxiliary data belongs must be refused"
+        );
+    }
+}
+
 /// An empty array has no first element to decide the arm on, so it is refused.
 #[test]
 fn an_empty_guards_array_is_refused() {
