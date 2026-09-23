@@ -1,0 +1,404 @@
+    Updating crates.io index
+     Locking 438 packages to latest compatible versions
+      Adding amaru-uplc v0.1.0 (available: v0.4.0)
+      Adding base64 v0.22.1 (available: v0.23.1)
+      Adding bech32 v0.11.1 (available: v0.12.0)
+      Adding cddl v0.10.6 (available: v0.10.7)
+      Adding criterion v0.5.1 (available: v0.8.2)
+      Adding criterion v0.7.0 (available: v0.8.2)
+      Adding crossterm v0.28.1 (available: v0.29.0)
+      Adding cryptoxide v0.4.4 (available: v0.6.5)
+      Adding dashu-base v0.4.3 (available: v0.6.0)
+      Adding dashu-int v0.4.3 (available: v0.6.0)
+      Adding ed25519-dalek v2.2.0 (available: v3.0.0)
+      Adding generic-array v0.14.7 (available: v0.14.9)
+      Adding itertools v0.14.0 (available: v0.15.0)
+      Adding minicbor v0.26.5 (available: v2.3.0)
+      Adding minicov v0.3.8 (available: v0.3.9)
+      Adding num-bigint v0.4.8 (available: v0.5.1)
+      Adding opentelemetry v0.30.0 (available: v0.33.0)
+      Adding opentelemetry-appender-tracing v0.30.1 (available: v0.33.0)
+      Adding opentelemetry-otlp v0.30.0 (available: v0.33.0)
+      Adding opentelemetry_sdk v0.30.0 (available: v0.33.0)
+      Adding prost v0.13.5 (available: v0.14.4)
+      Adding prost-types v0.13.5 (available: v0.14.4)
+      Adding ratatui v0.29.0 (available: v0.30.2)
+      Adding unicode-width v0.2.0 (available: v0.2.2)
+   Compiling pallas-codec v1.1.1 (/pallas/pallas-codec)
+   Compiling pallas-crypto v1.1.1 (/pallas/pallas-crypto)
+   Compiling pallas-primitives v1.1.1 (/pallas/pallas-primitives)
+   Compiling pallas-addresses v1.1.1 (/pallas/pallas-addresses)
+   Compiling pallas-traverse v1.1.1 (/pallas/pallas-traverse)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 15.27s
+     Running unittests src/lib.rs (/target/debug/deps/pallas_codec-8b30ee3291c590c2)
+
+running 17 tests
+test tests::roundtrip_codec_by_datatype ... ok
+test tree::tests::decodes_mixed_definite_and_indefinite_lists ... ok
+test tree::tests::rejects_truncated_input ... ok
+test utils::tests::definite_key_value_pairs_keeps_duplicate_keys_in_wire_order ... ok
+test utils::tests::definite_key_value_pairs_refuses_a_map_shorter_than_its_header ... ok
+test utils::tests::definite_key_value_pairs_reads_every_entry_of_a_definite_map ... ok
+test utils::tests::definite_key_value_pairs_refuses_an_indefinite_map_before_any_entry ... ok
+test utils::tests::end_array_reads_nothing_after_a_definite_array ... ok
+test utils::tests::definite_key_value_pairs_roundtrips_a_definite_map ... ok
+test utils::tests::definite_key_value_pairs_roundtrips_an_empty_definite_map ... ok
+test utils::tests::end_array_reads_the_break_of_an_indefinite_array ... ok
+test utils::tests::keep_raw_clears_original_when_mutated ... ok
+test utils::tests::end_array_refuses_an_indefinite_array_cut_before_its_break ... ok
+test utils::tests::end_array_refuses_an_item_where_the_break_belongs ... ok
+test utils::tests::keep_raw_retains_original ... ok
+test utils::tests::keep_raw_fallbacks_to_encode ... ok
+test tree::tests::decodes_deep_nesting_on_a_small_stack ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/flat.rs (/target/debug/deps/flat-6e3f3acef4a902ad)
+
+running 12 tests
+test encode_bool ... ok
+test encode_boxed ... ok
+test encode_big_vec_u8 ... ok
+test encode_big_arr_u8 ... ok
+test encode_filler ... ok
+test encode_arr_u8 ... ok
+test encode_u8 ... ok
+test encode_char ... ok
+test encode_isize ... ok
+test encode_usize ... ok
+test encode_vec_u8 ... ok
+test encode_string ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/zigzag.rs (/target/debug/deps/zigzag-ca015bc1fede8f8e)
+
+running 2 tests
+test zigzag ... ok
+test zagzig ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (/target/debug/deps/pallas_primitives-207160cc524a6610)
+
+running 144 tests
+test alonzo::model::tests::header_isomorphic_decoding_encoding ... ok
+test alonzo::model::tests::plutus_data_isomorphic_decoding_encoding ... ok
+test alonzo::json::tests::test_datums_serialize_as_expected ... ok
+test alonzo::native_script::tests::equality_checks_variant_payload_order_and_arity ... ok
+test alonzo::json::tests::test_native_scripts_serialize_as_expected ... ok
+test alonzo::native_script::tests::malformed_arrays_are_rejected_without_reserving_claimed_length ... ok
+test alonzo::native_script::tests::matches_ledger_cddl_wire_format ... ok
+test alonzo::native_script::tests::n_of_k_threshold_is_signed ... ok
+test alonzo::native_script::tests::preserves_permissive_array_decoding ... ok
+test alonzo::native_script::tests::malformed_deep_script_cleans_up_completed_children ... ok
+test babbage::model::tests::block_isomorphic_decoding_encoding ... ok
+test babbage::model::tests::fragments_decoding ... ok
+test alonzo::model::tests::block_isomorphic_decoding_encoding ... ok
+test alonzo::native_script::tests::round_trips_through_cbor ... ok
+test byron::model::tests::header_isomorphic_decoding_encoding ... ok
+test conway::model::tests::block_isomorphic_decoding_encoding ... ok
+test conway::model::tests::tests_voter::voter_ordering::test_case_10_drep_script_alice_drep_key_alice_expects_ordering_less ... ok
+test conway::model::tests::tests_voter::voter_ordering::test_case_11_drep_script_alice_spo_alice_expects_ordering_less ... ok
+test conway::model::tests::tests_voter::voter_ordering::test_case_12_drep_script_bob_drep_script_alice_expects_ordering_greater ... ok
+test conway::model::tests::tests_voter::voter_ordering::test_case_1_cc_script_alice_cc_script_alice_expects_ordering_equal ... ok
+test conway::model::tests::tests_voter::voter_ordering::test_case_2_cc_script_alice_cc_key_alice_expects_ordering_less ... ok
+test conway::model::tests::tests_voter::voter_ordering::test_case_3_cc_script_alice_drep_script_alice_expects_ordering_less ... ok
+test conway::model::tests::tests_voter::voter_ordering::test_case_4_cc_script_alice_drep_key_alice_expects_ordering_less ... ok
+test conway::model::tests::tests_voter::voter_ordering::test_case_5_cc_script_alice_spo_alice_expects_ordering_less ... ok
+test conway::model::tests::tests_voter::voter_ordering::test_case_6_cc_script_bob_cc_script_alice_expects_ordering_greater ... ok
+test conway::model::tests::tests_voter::voter_ordering::test_case_7_drep_script_alice_cc_script_alice_expects_ordering_greater ... ok
+test alonzo::native_script::tests::deep_script_lifecycle_on_small_stack ... ok
+test conway::model::tests::tests_voter::voter_ordering::test_case_8_drep_script_alice_cc_key_alice_expects_ordering_greater ... ok
+test conway::model::tests::tests_voter::voter_ordering::test_case_9_drep_script_alice_drep_script_alice_expects_ordering_equal ... ok
+test byron::model::tests::main_block_isomorphic_decoding_encoding ... ok
+test dijkstra::endorser::tests::a_key_that_is_not_32_bytes_is_refused_as_a_hash ... ok
+test dijkstra::endorser::tests::each_body_decodes_to_its_recorded_count_and_first_entry ... ok
+test dijkstra::endorser::tests::each_body_re_encodes_byte_for_byte ... ok
+test dijkstra::tests::a_block_carrying_both_leios_fields_reads_both ... ok
+test dijkstra::tests::a_block_transaction_is_not_a_mempool_transaction ... ok
+test conway::script_data::tests::test_script_data_hash ... ok
+test dijkstra::tests::a_certificate_travels_without_an_announcement ... ok
+test dijkstra::tests::a_mempool_transaction_becomes_a_valid_block_transaction ... ok
+test dijkstra::tests::a_mempool_transaction_is_moved_into_its_block_form ... ok
+test dijkstra::tests::a_mempool_transaction_of_indefinite_length_decodes_as_its_definite_form ... ok
+test dijkstra::tests::a_mempool_transaction_re_encodes_both_accepted_shapes ... ok
+test dijkstra::tests::a_certificate_set_is_read_on_both_arms_from_the_chain ... ok
+test dijkstra::tests::a_proposal_keeps_the_dijkstra_parameter_keys ... ok
+test dijkstra::tests::a_set_of_one_element_reads_on_both_arms ... ok
+test dijkstra::tests::a_pool_registration_re_encodes_each_bls_key_state ... ok
+test dijkstra::tests::a_ttl_and_both_output_forms_are_read_from_one_block ... ok
+test dijkstra::tests::a_set_re_encodes_the_arm_it_was_read_from ... ok
+test dijkstra::tests::a_vote_delegation_certificate_is_read_from_the_chain ... ok
+test dijkstra::tests::an_account_balance_interval_is_two_elements_or_none ... ok
+test dijkstra::tests::an_empty_array_is_not_a_nonempty_set ... ok
+test dijkstra::tests::an_empty_guards_array_is_refused ... ok
+test dijkstra::tests::an_indefinite_mempool_transaction_ended_early_is_still_refused ... ok
+test dijkstra::tests::an_announced_size_reaches_the_five_byte_uint ... ok
+test dijkstra::tests::conway_header_is_refused_as_dijkstra ... ok
+test dijkstra::tests::cost_models_keeps_a_key_the_named_fields_do_not_cover ... ok
+test dijkstra::tests::dijkstra_header_is_not_a_babbage_header ... ok
+test dijkstra::tests::block_isomorphic_decoding_encoding ... ok
+test dijkstra::endorser::tests::an_indefinite_body_is_refused ... FAILED
+test dijkstra::tests::header_isomorphic_decoding_encoding ... ok
+test dijkstra::tests::pre_fork_blocks_are_refused_as_dijkstra_blocks ... ok
+test dijkstra::tests::every_fixture_hashes_to_its_recorded_header_hash ... ok
+test dijkstra::tests::the_array_form_of_auxiliary_data_carries_this_eras_native_scripts ... ok
+test dijkstra::tests::the_array_form_still_carries_a_clause_every_era_has ... ok
+test dijkstra::tests::the_legal_account_balance_interval_forms_still_read ... ok
+test dijkstra::tests::every_cited_rule_matches_the_vendored_cddl ... ok
+test dijkstra::tests::transaction_payloads_reencode_to_their_wire_bytes ... ok
+test plutus_data::tests::ordering::test_case_10_bytes_map_indef_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_11_bytes_array_def_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_12_bytes_array_indef_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_13_bytes_int_0_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_14_int_42_int_14_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_15_int_14_int_14_expects_ordering_equal ... ok
+test plutus_data::tests::ordering::test_case_16_int_14_int_42_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_17_int_0_int_1_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_18_int_2_int_1_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_19_int_0_biguint_0_expects_ordering_equal ... ok
+test plutus_data::tests::ordering::test_case_1_bytes_bytes_expects_ordering_equal ... ok
+test plutus_data::tests::ordering::test_case_20_int_14_biguint_14_expects_ordering_equal ... ok
+test plutus_data::tests::ordering::test_case_21_int_14_biguint_42_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_22_biguint_14_int_42_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_23_biguint_42_int_14_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_24_biguint_14_255_int_42_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_25_bignint_0_int_0_expects_ordering_equal ... ok
+test plutus_data::tests::ordering::test_case_26_bignint_14_255_int_42_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_27_biguint_int_0_expects_ordering_equal ... ok
+test plutus_data::tests::ordering::test_case_28_biguint_0_0_1_int_1_expects_ordering_equal ... ok
+test plutus_data::tests::ordering::test_case_29_int_0_constr_121_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_2_bytes_1_2_3_bytes_4_5_6_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_30_int_0_map_def_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_31_int_0_map_indef_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_32_int_0_array_def_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_33_int_0_array_indef_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_34_int_0_bytes_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_35_array_def_array_def_expects_ordering_equal ... ok
+test plutus_data::tests::ordering::test_case_36_array_def_array_indef_expects_ordering_equal ... ok
+test plutus_data::tests::ordering::test_case_37_array_indef_array_def_expects_ordering_equal ... ok
+test plutus_data::tests::ordering::test_case_38_array_def_int_14_int_42_array_def_int_14_int_42_expects_ordering_equal ... ok
+test plutus_data::tests::ordering::test_case_39_array_def_int_14_int_42_array_def_int_15_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_3_bytes_1_2_3_bytes_1_2_3_expects_ordering_equal ... ok
+test plutus_data::tests::ordering::test_case_40_array_def_int_14_int_42_array_def_int_1_int_2_int_3_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_41_array_def_int_14_int_42_array_indef_int_14_int_42_expects_ordering_equal ... ok
+test plutus_data::tests::ordering::test_case_42_array_indef_int_14_int_42_array_def_int_15_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_43_array_def_int_14_int_42_array_indef_int_1_int_2_int_3_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_44_array_def_constr_121_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_45_array_def_map_def_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_46_array_def_map_indef_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_47_array_def_int_0_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_48_array_def_bytes_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_49_map_def_map_def_expects_ordering_equal ... ok
+test plutus_data::tests::ordering::test_case_4_bytes_4_5_6_bytes_1_2_3_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_50_map_def_map_indef_expects_ordering_equal ... ok
+test plutus_data::tests::ordering::test_case_51_map_indef_map_def_expects_ordering_equal ... ok
+test plutus_data::tests::ordering::test_case_52_map_def_int_14_int_42_map_def_int_14_int_41_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_53_map_def_int_14_int_41_map_def_int_14_int_42_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_54_map_def_int_14_int_42_map_def_int_14_int_42_expects_ordering_equal ... ok
+test plutus_data::tests::ordering::test_case_55_map_def_int_14_int_42_map_indef_int_14_int_42_int_1_int_999_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_56_map_def_int_15_int_42_map_indef_int_14_int_42_int_1_int_999_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_57_map_def_constr_121_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_58_map_def_array_def_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_59_map_def_array_indef_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_5_bytes_1_2_3_bytes_2_2_3_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_60_map_def_int_0_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_61_map_def_bytes_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_62_constr_121_constr_121_expects_ordering_equal ... ok
+test plutus_data::tests::ordering::test_case_63_constr_122_constr_121_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_64_constr_122_constr_121_int_999_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_65_constr_126_int_999_constr_1281_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_66_constr_any_0_constr_121_expects_ordering_equal ... ok
+test plutus_data::tests::ordering::test_case_67_constr_any_1_constr_121_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_68_constr_any_7_int_14_constr_1280_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_69_constr_any_7_int_14_constr_1281_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_6_bytes_1_2_3_bytes_1_2_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_70_constr_any_121_map_def_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_71_constr_any_121_map_indef_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_72_constr_any_121_array_def_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_73_constr_any_121_array_indef_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_74_constr_any_121_int_0_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_75_constr_any_121_bytes_expects_ordering_less ... ok
+test plutus_data::tests::ordering::test_case_7_bytes_2_2_bytes_1_2_3_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_8_bytes_constr_121_expects_ordering_greater ... ok
+test plutus_data::tests::ordering::test_case_9_bytes_map_def_expects_ordering_greater ... ok
+test plutus_data::tests::cbor_roundtrip ... ok
+test plutus_data::tests::equals_list_irrespective_of_encoding ... ok
+test byron::model::tests::boundary_block_isomorphic_decoding_encoding ... ok
+
+failures:
+
+---- dijkstra::endorser::tests::an_indefinite_body_is_refused stdout ----
+
+thread 'dijkstra::endorser::tests::an_indefinite_body_is_refused' (305) panicked at pallas-primitives/src/dijkstra/endorser.rs:98:14:
+an indefinite length body must be refused: Indef([(Hash<32>("a69f9fc581e5914a101a3e619f5ce64b6bce76721fd5eed0cbad0e0f6d411cc5"), 229)])
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/panicking.rs:80:14
+   2: core::result::unwrap_failed
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/result.rs:1870:5
+   3: <core::result::Result<pallas_codec::utils::KeyValuePairs<pallas_crypto::hash::hash::Hash<32>, u32>, minicbor::decode::error::Error>>::expect_err
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/result.rs:1296:22
+   4: pallas_primitives::dijkstra::endorser::tests::an_indefinite_body_is_refused
+             at ./src/dijkstra/endorser.rs:98:14
+   5: pallas_primitives::dijkstra::endorser::tests::an_indefinite_body_is_refused::{closure#0}
+             at ./src/dijkstra/endorser.rs:88:39
+   6: <pallas_primitives::dijkstra::endorser::tests::an_indefinite_body_is_refused::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    dijkstra::endorser::tests::an_indefinite_body_is_refused
+
+test result: FAILED. 143 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+error: test failed, to rerun pass `-p pallas-primitives --lib`
+     Running unittests src/lib.rs (/target/debug/deps/pallas_traverse-6df95b34a882c4ec)
+
+running 95 tests
+test attribute_tests::the_attribute_scan_reads_all_three_markings ... ok
+test block::tests::a_block_body_that_carries_certificates_reports_them ... ok
+test attribute_tests::every_multi_era_enum_carries_the_marking_it_is_listed_with ... ok
+test block::tests::a_block_body_that_carries_no_certificates_reports_none ... ok
+test block::tests::a_block_that_carries_a_leios_certificate_reports_it ... ok
+test block::tests::dijkstra_block_decodes_as_dijkstra ... ok
+test era::tests::dijkstra_sorts_after_conway_and_inherits_its_features ... ok
+test era::tests::every_era_round_trips_through_its_tag ... ok
+test era::tests::unknown_era_tags_are_still_refused ... ok
+test block::tests::the_block_before_the_fork_is_conway ... ok
+test fees::tests::known_fee_matches ... ok
+test block::tests::auxiliary_data_is_reported_only_where_a_block_carries_it ... ok
+test hashes::tests::alonzo_transaction_hash_works ... ok
+test hashes::tests::babbage_transaction_hash_works ... ok
+test hashes::tests::byron_transaction_hash_works ... ok
+test hashes::tests::dijkstra_transaction_ids_match_the_node_utxo_keys ... ok
+test hashes::tests::native_script_hashes_as_cardano_cli ... ok
+test hashes::tests::plutus_data_hashes_as_cardano_cli ... ok
+test hashes::tests::plutus_v1_script_hashes_as_cardano_cli ... ok
+test block::tests::test_iteration ... ok
+test hashes::tests::test_inline_datum_hash_respects_original_cbor ... ok
+test hashes::tests::test_public_key_hash ... ok
+test hashes::tests::test_witness_datum_hash_respects_original_cbor ... ok
+test hashes::tests::plutus_v2_script_hashes_as_cardano_cli ... ok
+test hashes::tests::the_first_dijkstra_block_names_the_last_conway_one ... ok
+test header::tests::a_header_that_announces_an_endorser_block_says_so ... ok
+test hashes::tests::tx_wits_plutus_v1_script_hashes_as_cli ... ok
+test header::tests::conway_header_still_decodes ... ok
+test header::tests::an_earlier_era_header_has_no_leios_fields_at_all ... ok
+test hashes::tests::every_dijkstra_block_body_re_encodes_to_what_its_header_names ... ok
+test header::tests::dijkstra_header_decodes_as_dijkstra ... ok
+test header::tests::envelope_tag_seven_reads_the_slot_the_fixture_record_names ... ok
+test header::tests::the_certificate_flag_and_the_announcement_are_read_separately ... ok
+test header::tests::the_conway_tag_reads_a_dijkstra_header_as_babbage_and_drops_two_fields ... ok
+test hashes::tests::every_fixture_block_hashes_as_the_node_recorded_it ... ok
+test header::tests::unknown_envelope_tag_is_refused ... ok
+test header::tests::every_header_variant_names_its_era ... ok
+test input::tests::test_utxo_ref_parsing ... ok
+test input::tests::test_duplicate_consumed_inputs ... ok
+test leios::tests::a_block_form_transaction_is_accepted ... ok
+test input::tests::test_expected_values ... ok
+test leios::tests::a_body_that_is_a_different_endorser_block_is_refused ... ok
+test leios::tests::a_body_that_is_not_a_map_is_refused ... ok
+test leios::tests::a_body_with_trailing_bytes_is_refused ... ok
+test leios::tests::a_certificate_after_a_parent_that_announced_nothing_is_refused_on_a_rewritten_header ... ok
+test leios::tests::a_header_given_a_parent_it_does_not_name_is_refused ... ok
+test leios::tests::a_header_that_does_not_certify_after_a_parent_that_announced_certifies_nothing ... ok
+test leios::tests::a_body_with_the_announced_entries_in_another_order_is_refused_on_hash ... ok
+test leios::tests::a_header_that_does_not_certify_given_a_parent_it_does_not_name_is_refused ... ok
+test leios::tests::a_short_delivery_is_refused ... ok
+test leios::tests::a_transaction_delivered_without_its_envelope_is_refused ... ok
+test leios::tests::a_permuted_delivery_is_refused ... ok
+test leios::tests::a_body_is_accepted_whatever_size_the_announcement_names ... ok
+test leios::tests::a_transaction_with_bytes_after_it_inside_its_envelope_is_accepted ... ok
+test leios::tests::a_transaction_is_accepted_whatever_size_its_entry_names ... ok
+test leios::tests::an_indefinite_length_transaction_reads_as_the_definite_one ... ok
+test leios::tests::an_empty_reply_is_refused_against_the_announcement_that_named_it ... ok
+test leios::tests::each_fixture_header_is_the_ranking_block_the_chain_stored ... ok
+test leios::tests::a_body_naming_one_transaction_twice_is_refused ... ok
+test leios::tests::the_announced_hash_is_over_the_minimal_re_encoding ... ok
+test leios::tests::each_real_certificate_names_its_parents_announcement ... ok
+test leios::tests::the_first_dijkstra_header_after_a_conway_parent_certifies_nothing ... ok
+test leios::tests::the_synthetic_header_changes_two_fields_and_nothing_else ... ok
+test probe::tests::a_shape_no_rule_describes_is_reported_as_other ... ok
+test probe::tests::a_three_element_transaction_is_the_mempool_shape ... ok
+test probe::tests::allegra_block_detected ... ok
+test probe::tests::alonzo_block_detected ... ok
+test probe::tests::an_indefinite_array_is_read_by_the_same_rules_as_a_definite_one ... ok
+test probe::tests::babbage_block_detected ... ok
+test probe::tests::byron_block_detected ... ok
+test probe::tests::conway_block_detected ... ok
+test probe::tests::dijkstra_block_detected ... ok
+test leios::tests::each_fixture_reads_as_its_recorded_count_and_first_transaction ... ok
+test leios::tests::each_real_certifying_block_names_the_endorser_block_whose_transactions_it_lacks ... ok
+test probe::tests::shelley_block_detected ... ok
+test probe::tests::mary_block_detected ... ok
+test leios::tests::the_body_key_of_a_transaction_is_not_its_id ... ok
+test time::tests::calc_matches_mainnet_values ... ok
+test time::tests::calc_matches_preprod_values ... ok
+test time::tests::calc_matches_preview_values ... ok
+test time::tests::calc_matches_testnet_values ... ok
+test size::tests::known_size_matches ... ok
+test probe::tests::the_validity_flag_position_tells_the_two_four_element_shapes_apart ... ok
+test tx::tests::a_dijkstra_transaction_decodes_through_the_era_agnostic_entry_point ... ok
+test time::tests::known_slot_matches ... ok
+test tx::tests::an_indefinite_block_form_decodes_through_the_era_agnostic_entry_point ... ok
+test tx::tests::a_three_element_transaction_is_not_guessed_as_dijkstra ... ok
+test tx::tests::an_earlier_era_transaction_answers_as_it_did_before ... ok
+test tx::tests::an_indefinite_mempool_form_decodes_for_the_dijkstra_era ... ok
+test tx::tests::an_indefinite_earlier_era_transaction_decodes_as_its_definite_form ... ok
+test tx::tests::the_four_element_mempool_form_decodes_for_the_dijkstra_era ... ok
+test tx::tests::the_two_fallible_decoders_refuse_by_name_rather_than_panic ... ok
+test tx::tests::an_indefinite_three_element_transaction_is_not_guessed_as_dijkstra ... ok
+test tx::tests::every_accessor_not_yet_written_refuses_by_name ... ok
+test probe::tests::genesis_block_detected ... ok
+
+test result: ok. 95 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests/deep_native_script.rs (/target/debug/deps/deep_native_script-e3cb2fae4a91953a)
+
+running 1 test
+test preprod_deep_native_script_block_on_default_sized_stack ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/signed_n_of_k_threshold.rs (/target/debug/deps/signed_n_of_k_threshold-dca6e8a2ca09f24e)
+
+running 1 test
+test preprod_negative_n_of_k_threshold_decodes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests pallas_codec
+
+running 3 tests
+test pallas-codec/src/utils.rs - utils::AnyCbor (line 1330) ... ok
+test pallas-codec/src/lib.rs - (line 15) ... ok
+test pallas-codec/src/utils.rs - utils::KeepRaw (line 1198) ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.25s; merged doctests compilation took 0.24s
+   Doc-tests pallas_primitives
+
+running 1 test
+test pallas-primitives/src/lib.rs - (line 18) - compile ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.75s; merged doctests compilation took 0.75s
+   Doc-tests pallas_traverse
+
+running 1 test
+test pallas-traverse/src/lib.rs - (line 17) - compile ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.26s; merged doctests compilation took 0.25s
+error: 1 target failed:
+    `-p pallas-primitives --lib`

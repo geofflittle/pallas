@@ -1,0 +1,103 @@
+    Updating crates.io index
+     Locking 438 packages to latest compatible versions
+      Adding amaru-uplc v0.1.0 (available: v0.4.0)
+      Adding base64 v0.22.1 (available: v0.23.1)
+      Adding bech32 v0.11.1 (available: v0.12.0)
+      Adding cddl v0.10.6 (available: v0.10.7)
+      Adding criterion v0.5.1 (available: v0.8.2)
+      Adding criterion v0.7.0 (available: v0.8.2)
+      Adding crossterm v0.28.1 (available: v0.29.0)
+      Adding cryptoxide v0.4.4 (available: v0.6.5)
+      Adding dashu-base v0.4.3 (available: v0.6.0)
+      Adding dashu-int v0.4.3 (available: v0.6.0)
+      Adding ed25519-dalek v2.2.0 (available: v3.0.0)
+      Adding generic-array v0.14.7 (available: v0.14.9)
+      Adding itertools v0.14.0 (available: v0.15.0)
+      Adding minicbor v0.26.5 (available: v2.3.0)
+      Adding minicov v0.3.8 (available: v0.3.9)
+      Adding num-bigint v0.4.8 (available: v0.5.1)
+      Adding opentelemetry v0.30.0 (available: v0.33.0)
+      Adding opentelemetry-appender-tracing v0.30.1 (available: v0.33.0)
+      Adding opentelemetry-otlp v0.30.0 (available: v0.33.0)
+      Adding opentelemetry_sdk v0.30.0 (available: v0.33.0)
+      Adding prost v0.13.5 (available: v0.14.4)
+      Adding prost-types v0.13.5 (available: v0.14.4)
+      Adding ratatui v0.29.0 (available: v0.30.2)
+      Adding unicode-width v0.2.0 (available: v0.2.2)
+   Compiling pallas-codec v1.1.1 (/pallas/pallas-codec)
+   Compiling pallas-crypto v1.1.1 (/pallas/pallas-crypto)
+   Compiling pallas-primitives v1.1.1 (/pallas/pallas-primitives)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.65s
+     Running unittests src/lib.rs (/target/debug/deps/pallas_primitives-207160cc524a6610)
+
+running 35 tests
+test dijkstra::endorser::tests::an_indefinite_body_is_refused ... ok
+test dijkstra::endorser::tests::a_key_that_is_not_32_bytes_is_refused_as_a_hash ... ok
+test dijkstra::endorser::tests::each_body_decodes_to_its_recorded_count_and_first_entry ... ok
+test dijkstra::endorser::tests::each_body_re_encodes_byte_for_byte ... ok
+test dijkstra::tests::a_block_transaction_is_not_a_mempool_transaction ... ok
+test dijkstra::tests::a_mempool_transaction_becomes_a_valid_block_transaction ... ok
+test dijkstra::tests::a_certificate_travels_without_an_announcement ... ok
+test dijkstra::tests::a_block_carrying_both_leios_fields_reads_both ... ok
+test dijkstra::tests::a_mempool_transaction_of_indefinite_length_decodes_as_its_definite_form ... ok
+test dijkstra::tests::a_mempool_transaction_re_encodes_both_accepted_shapes ... ok
+test dijkstra::tests::a_proposal_keeps_the_dijkstra_parameter_keys ... ok
+test dijkstra::tests::a_set_of_one_element_reads_on_both_arms ... ok
+test dijkstra::tests::a_certificate_set_is_read_on_both_arms_from_the_chain ... ok
+test dijkstra::tests::a_ttl_and_both_output_forms_are_read_from_one_block ... ok
+test dijkstra::tests::a_vote_delegation_certificate_is_read_from_the_chain ... ok
+test dijkstra::tests::an_account_balance_interval_is_two_elements_or_none ... ok
+test dijkstra::tests::a_pool_registration_re_encodes_each_bls_key_state ... ok
+test dijkstra::tests::an_announced_size_reaches_the_five_byte_uint ... ok
+test dijkstra::tests::an_empty_array_is_not_a_nonempty_set ... ok
+test dijkstra::tests::an_empty_guards_array_is_refused ... ok
+test dijkstra::tests::an_indefinite_mempool_transaction_ended_early_is_still_refused ... ok
+test dijkstra::tests::conway_header_is_refused_as_dijkstra ... ok
+test dijkstra::tests::cost_models_keeps_a_key_the_named_fields_do_not_cover ... ok
+test dijkstra::tests::a_set_re_encodes_the_arm_it_was_read_from ... ok
+test dijkstra::tests::dijkstra_header_is_not_a_babbage_header ... ok
+test dijkstra::tests::block_isomorphic_decoding_encoding ... ok
+test dijkstra::tests::every_fixture_hashes_to_its_recorded_header_hash ... ok
+test dijkstra::tests::pre_fork_blocks_are_refused_as_dijkstra_blocks ... ok
+test dijkstra::tests::the_array_form_of_auxiliary_data_carries_this_eras_native_scripts ... ok
+test dijkstra::tests::the_array_form_still_carries_a_clause_every_era_has ... ok
+test dijkstra::tests::the_legal_account_balance_interval_forms_still_read ... ok
+test dijkstra::tests::header_isomorphic_decoding_encoding ... ok
+test dijkstra::tests::a_mempool_transaction_is_moved_into_its_block_form ... FAILED
+test dijkstra::tests::every_cited_rule_matches_the_vendored_cddl ... ok
+test dijkstra::tests::transaction_payloads_reencode_to_their_wire_bytes ... ok
+
+failures:
+
+---- dijkstra::tests::a_mempool_transaction_is_moved_into_its_block_form stdout ----
+
+thread 'dijkstra::tests::a_mempool_transaction_is_moved_into_its_block_form' (73) panicked at pallas-primitives/src/dijkstra/tests.rs:437:5:
+assertion `left == right` failed: the body, witness set and auxiliary data must keep their allocations
+  left: [135111752301136, 135111752307600, 135111752311976]
+ right: [135111752312288, 135111752309616, 135111752311976]
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/panicking.rs:434:23
+   3: core::panicking::assert_failed::<[usize; 3], [usize; 3]>
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/panicking.rs:394:5
+   4: pallas_primitives::dijkstra::tests::a_mempool_transaction_is_moved_into_its_block_form
+             at ./src/dijkstra/tests.rs:437:5
+   5: pallas_primitives::dijkstra::tests::a_mempool_transaction_is_moved_into_its_block_form::{closure#0}
+             at ./src/dijkstra/tests.rs:412:56
+   6: <pallas_primitives::dijkstra::tests::a_mempool_transaction_is_moved_into_its_block_form::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    dijkstra::tests::a_mempool_transaction_is_moved_into_its_block_form
+
+test result: FAILED. 34 passed; 1 failed; 0 ignored; 0 measured; 109 filtered out; finished in 0.04s
+
+error: test failed, to rerun pass `-p pallas-primitives --lib`
