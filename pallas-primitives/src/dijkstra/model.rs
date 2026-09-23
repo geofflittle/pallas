@@ -1001,7 +1001,7 @@ impl<'b, C> minicbor::Decode<'b, C> for AccountBalanceInterval {
         end_array(
             d,
             len,
-            "account_balance_interval takes two elements, found more",
+            "interval takes two elements, found more",
         )?;
 
         match (lower, upper) {
