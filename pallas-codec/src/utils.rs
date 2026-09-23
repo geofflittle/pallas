@@ -562,12 +562,11 @@ pub fn end_array(
     len: Option<u64>,
     msg: impl fmt::Display,
 ) -> Result<(), Error> {
-    if len.is_none() {
-        if d.datatype()? != Type::Break {
-            return Err(Error::message(msg));
-        }
-        d.skip()?;
+    let _ = len;
+    if d.datatype()? != Type::Break {
+        return Err(Error::message(msg));
     }
+    d.skip()?;
 
     Ok(())
 }
