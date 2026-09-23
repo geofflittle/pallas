@@ -1,73 +1,16 @@
-//! The Leios endorser block, defined by the node to node `leios-fetch` CDDL
-//! rather than by the ledger CDDL in `defs.cddl`.
+//! The Leios endorser block, `endorser_block` in
+//! `cardano-blueprint/src/network/node-to-node/leios-fetch/messages.cddl`.
 
-use std::ops::Deref;
-
-use pallas_codec::minicbor::{self, Decode, Decoder, Encode, Encoder};
+use pallas_codec::utils::DefiniteKeyValuePairs;
 use pallas_crypto::hash::Hash;
-use serde::{Deserialize, Serialize};
 
-/// `endorser_block = { * base.hash => base.word32 }`: the blake2b-256 and byte
-/// length of each transaction the block names. Pairs rather than a sorted map,
-/// because the announced hash covers the wire order, and a definite length map
-/// only, the one form the node decodes.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct EndorserBlock(Vec<(Hash<32>, u32)>);
-
-impl Deref for EndorserBlock {
-    type Target = [(Hash<32>, u32)];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<'b, C> Decode<'b, C> for EndorserBlock {
-    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
-        let len = d.map()?.ok_or_else(|| {
-            minicbor::decode::Error::message("an endorser block is a definite length map")
-        })?;
-
-        // No capacity from `len`, which the sending peer chooses.
-        let mut entries = Vec::new();
-        for _ in 0..len {
-            // Read as bytes, since `Hash` decoding under `relaxed` slices a
-            // key of any length to 32 bytes and panics on a shorter one.
-            let key = d.bytes()?;
-            let key: [u8; 32] = key.try_into().map_err(|_| {
-                minicbor::decode::Error::message(format!(
-                    "an endorser block key is {} bytes, not 32",
-                    key.len()
-                ))
-            })?;
-
-            entries.push((Hash::new(key), d.decode_with(ctx)?));
-        }
-
-        Ok(Self(entries))
-    }
-}
-
-impl<C> Encode<C> for EndorserBlock {
-    fn encode<W: minicbor::encode::Write>(
-        &self,
-        e: &mut Encoder<W>,
-        ctx: &mut C,
-    ) -> Result<(), minicbor::encode::Error<W::Error>> {
-        e.map(self.0.len() as u64)?;
-
-        for (hash, size) in &self.0 {
-            e.encode_with(hash, ctx)?;
-            e.encode_with(size, ctx)?;
-        }
-
-        Ok(())
-    }
-}
+/// The blake2b-256 and byte length of each transaction the block names.
+pub type EndorserBlock = DefiniteKeyValuePairs<Hash<32>, u32>;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pallas_codec::minicbor;
 
     /// Name, body, and the count, first key and first size recorded for it in
     /// `test_data/dijkstra-fixtures.md`.

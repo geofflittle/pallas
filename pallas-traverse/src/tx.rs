@@ -80,7 +80,7 @@ impl<'b> MultiEraTx<'b> {
                 probe::TxShape::DijkstraMempool | probe::TxShape::ValidityThird => {
                     let tx: dijkstra::MempoolTransaction = minicbor::decode(cbor)?;
                     Ok(MultiEraTx::Dijkstra(Box::new(Cow::Owned(
-                        tx.to_block_transaction(),
+                        dijkstra::BlockTransaction::from(&tx),
                     ))))
                 }
                 probe::TxShape::DijkstraBlock | probe::TxShape::Other => {

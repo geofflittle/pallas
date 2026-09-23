@@ -6,40 +6,32 @@
 //! block's transactions apply to its parent's ledger state, before the tick to
 //! the certifying block's slot.
 
-use std::borrow::Cow;
 use std::collections::HashMap;
-use std::ops::Deref;
 
-use pallas_codec::minicbor::Decoder;
+use pallas_codec::minicbor::{self, bytes::ByteSlice, Decoder};
+use pallas_codec::utils::AnyCbor;
 use pallas_crypto::hash::{Hash, Hasher};
 use pallas_primitives::dijkstra;
 
-use crate::{MultiEraHeader, MultiEraTx};
+use crate::{Era, MultiEraHeader, MultiEraTx};
 
 /// Why an endorser block, its transactions, or a certificate was refused.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
     /// The body is not a definite length CBOR map of hash to size.
-    #[error("endorser block body is not a cbor map of hash to size: {0}")]
+    #[error("invalid endorser block body: {0}")]
     InvalidBody(String),
 
-    /// The body length differs from the announced length.
-    #[error(
-        "endorser block body is {found} bytes and the announcement committed to {announced}, \
-         so it is not the announced endorser block"
-    )]
-    BodySize { announced: u32, found: usize },
-
     /// The body hash differs from the announced hash.
-    #[error("endorser block body hashes to {found} and the announcement named {announced}")]
+    #[error("endorser block hash {found}, announced {announced}")]
     BodyHash {
         announced: Hash<32>,
         found: Hash<32>,
     },
 
     /// The body names one transaction hash at two entries.
-    #[error("endorser block names transaction hash {hash} at entries {first} and {second}")]
+    #[error("endorser block names {hash} at entries {first} and {second}")]
     DuplicateTx {
         hash: Hash<32>,
         first: usize,
@@ -47,38 +39,24 @@ pub enum Error {
     },
 
     /// The number of delivered transactions differs from the number the body names.
-    #[error("endorser block names {named} transactions and {delivered} were delivered")]
+    #[error("{delivered} transactions delivered, endorser block names {named}")]
     TxCount { named: usize, delivered: usize },
 
-    /// A delivered transaction is not a single CBOR byte string.
-    #[error("transaction {index} is not wrapped in a cbor byte string: {reason}")]
-    Envelope { index: usize, reason: String },
-
-    /// A delivered transaction's length differs from the length its entry names.
-    #[error("transaction {index} is {found} bytes, the endorser block names {named}")]
-    TxSize {
-        index: usize,
-        named: u32,
-        found: usize,
-    },
-
     /// A delivered transaction's hash differs from the hash its entry names.
-    #[error("transaction {index} hashes to {found}, the endorser block names {named}")]
+    #[error("transaction {index} hash {found}, endorser block names {named}")]
     TxHash {
         index: usize,
         named: Hash<32>,
         found: Hash<32>,
     },
 
-    /// A delivered transaction is not a Dijkstra mempool transaction.
-    #[error("transaction {index} does not decode as a Dijkstra transaction: {reason}")]
+    /// A delivered transaction is not a CBOR byte string holding a Dijkstra
+    /// transaction.
+    #[error("transaction {index} is not a Dijkstra transaction: {reason}")]
     TxDecode { index: usize, reason: String },
 
     /// The header given as the parent is not the one the header names.
-    #[error(
-        "the header at slot {slot} names {previous:?} as its parent and the header given as its \
-         parent is {parent:?}"
-    )]
+    #[error("header at slot {slot} has parent {previous:?}, given {parent:?}")]
     NotParent {
         slot: u64,
         previous: Option<Hash<32>>,
@@ -86,10 +64,7 @@ pub enum Error {
     },
 
     /// A header certifies an endorser block and its parent announced none.
-    #[error(
-        "the header at slot {slot} certifies an endorser block and its parent header announced \
-         none"
-    )]
+    #[error("header at slot {slot} certifies, its parent announced none")]
     CertifiesNothing { slot: u64 },
 }
 
@@ -100,28 +75,12 @@ pub struct EndorserBlockBody {
 }
 
 impl EndorserBlockBody {
-    /// Decodes a body, refusing one whose length or blake2b-256 over the bytes
-    /// as received differs from the announcement, or that names one
-    /// transaction twice.
+    /// Decodes a body, refusing one whose minimal re-encoding does not hash to
+    /// the announced blake2b-256, or that names one transaction twice.
     pub fn decode_announced(
         cbor: &[u8],
         announcement: &dijkstra::EbAnnouncement,
     ) -> Result<Self, Error> {
-        if cbor.len() as u64 != announcement.eb_size as u64 {
-            return Err(Error::BodySize {
-                announced: announcement.eb_size,
-                found: cbor.len(),
-            });
-        }
-
-        let found = Hasher::<256>::hash(cbor);
-        if found != announcement.eb_hash {
-            return Err(Error::BodyHash {
-                announced: announcement.eb_hash,
-                found,
-            });
-        }
-
         let mut d = Decoder::new(cbor);
 
         let block: dijkstra::EndorserBlock =
@@ -132,6 +91,14 @@ impl EndorserBlockBody {
                 "{} trailing bytes after the map",
                 cbor.len() - d.position()
             )));
+        }
+
+        let found = Hasher::<256>::hash_cbor(&block);
+        if found != announcement.eb_hash {
+            return Err(Error::BodyHash {
+                announced: announcement.eb_hash,
+                found,
+            });
         }
 
         let mut seen = HashMap::with_capacity(block.len());
@@ -164,16 +131,11 @@ impl EndorserBlockBody {
     }
 
     /// Checks every transaction the body names, in body order, against its
-    /// entry and decodes it. `wire` holds one enveloped transaction per entry,
-    /// as a `Vec<u8>`, a `&[u8]`, or the `AnyCbor` leios-fetch returns. The
-    /// `encode()` of a returned transaction is the four element block form, not
-    /// the delivered bytes, and its `hash()` is the blake2b-256 of its body
-    /// bytes as delivered.
-    pub fn transactions<'b, T>(&self, wire: &'b [T]) -> Result<Vec<MultiEraTx<'b>>, Error>
-    where
-        T: Deref,
-        T::Target: AsRef<[u8]>,
-    {
+    /// entry's hash and decodes it. `wire` holds the byte strings leios-fetch
+    /// delivers, one per entry. The `encode()` of a returned transaction is the
+    /// four element block form, not the delivered bytes, and its `hash()` is
+    /// the blake2b-256 of its body bytes as delivered.
+    pub fn transactions<'b>(&self, wire: &'b [AnyCbor]) -> Result<Vec<MultiEraTx<'b>>, Error> {
         if wire.len() != self.block.len() {
             return Err(Error::TxCount {
                 named: self.block.len(),
@@ -183,76 +145,28 @@ impl EndorserBlockBody {
 
         let mut out = Vec::with_capacity(wire.len());
 
-        for (index, ((named_hash, named_size), delivered)) in
-            self.block.iter().zip(wire.iter()).enumerate()
-        {
-            let inner = unwrap_tx(delivered.deref().as_ref())
-                .map_err(|reason| Error::Envelope { index, reason })?;
+        for (index, ((named, _), delivered)) in self.block.iter().zip(wire).enumerate() {
+            let tx_decode = |e: minicbor::decode::Error| Error::TxDecode {
+                index,
+                reason: e.to_string(),
+            };
 
-            if inner.len() as u64 != *named_size as u64 {
-                return Err(Error::TxSize {
-                    index,
-                    named: *named_size,
-                    found: inner.len(),
-                });
-            }
+            let inner: &ByteSlice = minicbor::decode(delivered.raw_bytes()).map_err(tx_decode)?;
 
             let found = Hasher::<256>::hash(inner);
-            if found != *named_hash {
+            if found != *named {
                 return Err(Error::TxHash {
                     index,
-                    named: *named_hash,
+                    named: *named,
                     found,
                 });
             }
 
-            let tx = decode_closure_transaction(index, inner)?;
-            out.push(MultiEraTx::Dijkstra(Box::new(Cow::Owned(tx))));
+            out.push(MultiEraTx::decode_for_era(Era::Dijkstra, inner).map_err(tx_decode)?);
         }
 
         Ok(out)
     }
-}
-
-/// Removes the CBOR byte string envelope a leios-fetch transaction arrives in.
-fn unwrap_tx(wire: &[u8]) -> Result<&[u8], String> {
-    let mut d = Decoder::new(wire);
-
-    let inner = d.bytes().map_err(|e| e.to_string())?;
-
-    if d.position() != wire.len() {
-        return Err(format!(
-            "{} trailing bytes after the byte string",
-            wire.len() - d.position()
-        ));
-    }
-
-    Ok(inner)
-}
-
-/// An endorser block transaction is a ledger `mempool_transaction`, never the block form.
-fn decode_closure_transaction(
-    index: usize,
-    inner: &[u8],
-) -> Result<dijkstra::BlockTransaction<'_>, Error> {
-    let mut d = Decoder::new(inner);
-
-    let mempool: dijkstra::MempoolTransaction = d.decode().map_err(|e| Error::TxDecode {
-        index,
-        reason: e.to_string(),
-    })?;
-
-    if d.position() != inner.len() {
-        return Err(Error::TxDecode {
-            index,
-            reason: format!(
-                "{} trailing bytes after the transaction",
-                inner.len() - d.position()
-            ),
-        });
-    }
-
-    Ok(mempool.to_block_transaction())
 }
 
 /// The announcement a ranking header certifies, which is its parent's and
@@ -286,9 +200,8 @@ pub fn certification<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Era, MultiEraBlock};
-    use pallas_codec::minicbor::{self, bytes::ByteSlice, Encoder};
-    use pallas_codec::utils::AnyCbor;
+    use crate::MultiEraBlock;
+    use pallas_codec::minicbor::Encoder;
 
     /// One endorser block of `test_data/dijkstra-fixtures.md`, with the values
     /// recorded for it there.
@@ -790,13 +703,7 @@ mod tests {
         assert_eq!(inner[0], 0x83, "fixture precondition");
 
         let mempool: dijkstra::MempoolTransaction = minicbor::decode(inner).unwrap();
-        let block_form = minicbor::to_vec(dijkstra::BlockTransaction {
-            transaction_body: mempool.transaction_body,
-            transaction_witness_set: mempool.transaction_witness_set,
-            auxiliary_data: mempool.auxiliary_data,
-            success: true,
-        })
-        .unwrap();
+        let block_form = minicbor::to_vec(dijkstra::BlockTransaction::from(&mempool)).unwrap();
         assert_eq!(block_form[0], 0x84, "the block form has four elements");
 
         let wire = [enveloped(&block_form)];

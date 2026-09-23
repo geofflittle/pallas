@@ -152,5 +152,3 @@ with the byte string envelope removed.
 
 Entry 0 of `dijkstra-17402.ebbody` has key
 `2bc50f5b4942ca304e39e7cd7f1c4261d85437ea5464b2d1a623f47790254a3d` and size 201.
-Entry 65 has size 201 and entry 66 has size 200, the first pair of neighbours
-whose sizes differ.
