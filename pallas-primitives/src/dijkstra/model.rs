@@ -905,7 +905,8 @@ impl<'b, C> minicbor::Decode<'b, C> for Guards {
         // Reading the element type of an empty array would read the byte after
         // the value, which belongs to whatever encloses it.
         if len == Some(0) {
-            return Ok(Guards::AddrKeyhashes(d.decode_with(ctx)?));
+            d.skip()?;
+            return Ok(Guards::AddrKeyhashes(Set::from(Vec::new())));
         }
 
         match probe.datatype()? {
