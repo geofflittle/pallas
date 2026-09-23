@@ -733,6 +733,53 @@ fn a_mempool_transaction_re_encodes_both_accepted_shapes() {
     );
 }
 
+/// The ledger reads a transaction array of definite or indefinite length.
+#[test]
+fn a_mempool_transaction_of_indefinite_length_decodes_as_its_definite_form() {
+    // The body `{0: [], 1: [], 2: 0}` and an empty witness set.
+    let body_and_witnesses: &[u8] = &[0xa3, 0x00, 0x80, 0x01, 0x80, 0x02, 0x00, 0xa0];
+
+    for (label, header, tail) in [
+        ("three elements", 0x83, &[0xf6][..]),
+        ("four elements", 0x84, &[0xf5, 0xf6][..]),
+    ] {
+        let definite = [&[header][..], body_and_witnesses, tail].concat();
+        let mut d = minicbor::Decoder::new(&definite);
+        let expected: MempoolTransaction = d
+            .decode()
+            .unwrap_or_else(|e| panic!("{label}: the definite form must decode: {e:?}"));
+        assert_eq!(d.position(), definite.len(), "{label}: definite form");
+
+        let indefinite = [&[0x9f][..], body_and_witnesses, tail, &[0xff]].concat();
+        let mut d = minicbor::Decoder::new(&indefinite);
+        let back: MempoolTransaction = d
+            .decode()
+            .unwrap_or_else(|e| panic!("{label}: the indefinite form must decode: {e:?}"));
+        assert_eq!(
+            d.position(),
+            indefinite.len(),
+            "{label}: the break is part of the transaction"
+        );
+        assert_eq!(back, expected, "{label}");
+
+        for (what, elements) in [
+            (
+                "an element after the last one",
+                [tail, &[0xf6][..]].concat(),
+            ),
+            ("a missing last element", tail[..tail.len() - 1].to_vec()),
+            (
+                "`false` as the third element",
+                [&[0xf4][..], &tail[1..]].concat(),
+            ),
+        ] {
+            let bytes = [&[0x9f][..], body_and_witnesses, &elements, &[0xff]].concat();
+            let refused: Result<MempoolTransaction, _> = minicbor::decode(&bytes);
+            assert!(refused.is_err(), "{label}: {what} must be refused");
+        }
+    }
+}
+
 /// An empty array has no first element to decide the arm on, so it is refused.
 #[test]
 fn an_empty_guards_array_is_refused() {

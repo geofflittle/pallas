@@ -1500,11 +1500,22 @@ impl<'b, C> minicbor::Decode<'b, C> for MempoolTransaction<'b> {
             )));
         }
 
+        let auxiliary_data = d.decode_with(ctx)?;
+
+        if len.is_none() {
+            if d.datatype()? != minicbor::data::Type::Break {
+                return Err(minicbor::decode::Error::message(format!(
+                    "expected a {expected} element transaction, found more"
+                )));
+            }
+            d.skip()?;
+        }
+
         Ok(MempoolTransaction {
             transaction_body,
             transaction_witness_set,
             is_valid_supplied,
-            auxiliary_data: d.decode_with(ctx)?,
+            auxiliary_data,
         })
     }
 }
