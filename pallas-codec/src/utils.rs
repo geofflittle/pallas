@@ -442,6 +442,9 @@ where
         let mut items = Vec::new();
 
         for _ in 0..len {
+            if d.datatype().is_err() {
+                break;
+            }
             let k = d.decode_with(ctx)?;
             let v = d.decode_with(ctx)?;
             items.push((k, v));
