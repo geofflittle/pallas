@@ -376,10 +376,10 @@ pub enum Certificate {
 
 impl<'b, C> minicbor::Decode<'b, C> for Certificate {
     fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
-        d.array()?;
+        let len = d.array()?;
         let variant = d.u16()?;
 
-        match variant {
+        let certificate = match variant {
             2 => Ok(Certificate::StakeDelegation(
                 d.decode_with(ctx)?,
                 d.decode_with(ctx)?,
@@ -472,7 +472,15 @@ impl<'b, C> minicbor::Decode<'b, C> for Certificate {
             _ => Err(minicbor::decode::Error::message(format!(
                 "unknown certificate variant {variant}"
             ))),
-        }
+        }?;
+
+        end_array(
+            d,
+            len,
+            format_args!("certificate variant {variant} carries more fields than it takes"),
+        )?;
+
+        Ok(certificate)
     }
 }
 

@@ -1,7 +1,8 @@
 use super::{
     AccountBalanceInterval, AccountBalanceIntervals, AuxiliaryData, Block, BlockTransaction,
     Certificate, CostModels, DRep, GovAction, Guards, Header, MempoolTransaction, NativeScript,
-    NonEmptySet, ProposalProcedure, Set, SetArm, StakeCredential, TransactionOutput, Value,
+    NetworkId, NonEmptySet, ProposalProcedure, Set, SetArm, StakeCredential, TransactionBody,
+    TransactionOutput, Value,
 };
 use pallas_codec::minicbor;
 use pallas_codec::utils::KeepRaw;
@@ -1165,6 +1166,105 @@ fn a_vote_delegation_certificate_is_read_from_the_chain() {
 
     let round: Certificate = minicbor::decode(&minicbor::to_vec(delegation).unwrap()).unwrap();
     assert_eq!(&round, delegation);
+}
+
+fn indefinite_form(definite: &[u8]) -> Vec<u8> {
+    assert!(
+        (0x81..=0x97).contains(&definite[0]),
+        "expected a short definite array header, found {:#04x}",
+        definite[0]
+    );
+    let mut indefinite = vec![0x9f];
+    indefinite.extend_from_slice(&definite[1..]);
+    indefinite.push(0xff);
+    indefinite
+}
+
+#[test]
+fn an_indefinite_certificate_in_a_body_decodes_as_its_definite_form() {
+    let block = block_of("dijkstra13");
+    let mut cases: Vec<Vec<u8>> = Vec::new();
+    for tx in block.block_body.transactions.iter() {
+        if let Some(found) = tx.transaction_body.clone().unwrap().certificates {
+            cases.extend(found.iter().map(|c| minicbor::to_vec(c).unwrap()));
+        }
+    }
+    assert_eq!(cases.len(), 2, "dijkstra13 carries two certificates");
+
+    let keyhash = [0x22u8; 28];
+    let mut credential = vec![0x82, 0x00, 0x58, 0x1c];
+    credential.extend_from_slice(&keyhash);
+
+    // `[4, h'..', 256]`
+    let mut pool_retirement = vec![0x83, 0x04, 0x58, 0x1c];
+    pool_retirement.extend_from_slice(&keyhash);
+    pool_retirement.extend_from_slice(&[0x19, 0x01, 0x00]);
+    cases.push(pool_retirement);
+
+    // `[17, credential, 0]`
+    let mut unreg_drep = vec![0x83, 0x11];
+    unreg_drep.extend_from_slice(&credential);
+    unreg_drep.push(0x00);
+    cases.push(unreg_drep);
+
+    // `[15, credential, null]`
+    let mut resign = vec![0x83, 0x0f];
+    resign.extend_from_slice(&credential);
+    resign.push(0xf6);
+    cases.push(resign);
+
+    // `[3, ..]` with `bls_key` populated, null and absent.
+    let registration = block_of("dijkstra14")
+        .block_body
+        .transactions
+        .iter()
+        .next()
+        .and_then(|tx| tx.transaction_body.clone().unwrap().certificates)
+        .expect("dijkstra14 registers a pool")[0]
+        .clone();
+    cases.push(minicbor::to_vec(&registration).unwrap());
+    for slot in [Some(crate::Nullable::Null), None] {
+        let mut certificate = registration.clone();
+        if let Certificate::PoolRegistration { bls_key, .. } = &mut certificate {
+            *bls_key = slot;
+        }
+        cases.push(minicbor::to_vec(&certificate).unwrap());
+    }
+
+    let mut variants = Vec::new();
+    for definite in &cases {
+        let expected: Certificate = minicbor::decode(definite).unwrap();
+        variants.push(definite[1]);
+
+        // `{0: [], 1: [], 2: 0, 4: [certificate], 15: 1}`
+        let mut body = vec![0xa5, 0x00, 0x80, 0x01, 0x80, 0x02, 0x00, 0x04, 0x81];
+        body.extend_from_slice(&indefinite_form(definite));
+        body.extend_from_slice(&[0x0f, 0x01]);
+
+        let decoded: TransactionBody = minicbor::decode(&body).unwrap_or_else(|e| {
+            panic!(
+                "a body carrying the indefinite form of variant {} must decode: {e}",
+                definite[1]
+            )
+        });
+        let certificates = decoded
+            .certificates
+            .expect("the body carries a certificates set");
+        assert_eq!(&certificates[..], std::slice::from_ref(&expected));
+        assert_eq!(decoded.network_id, Some(NetworkId::Mainnet));
+    }
+    variants.sort();
+    assert_eq!(variants, [3, 3, 3, 4, 7, 9, 15, 17]);
+
+    // One field too many before the break.
+    let mut extra = indefinite_form(&cases[2]);
+    extra.insert(extra.len() - 1, 0x00);
+    let refused = minicbor::decode::<Certificate>(&extra)
+        .expect_err("an indefinite certificate with an extra field must be refused");
+    assert!(
+        refused.to_string().contains("more fields"),
+        "refused for the wrong reason: {refused}"
+    );
 }
 
 /// The fixture set holds both arms. If the bare arm ever left it, the round
