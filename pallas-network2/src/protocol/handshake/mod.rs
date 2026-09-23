@@ -134,15 +134,13 @@ where
     T: std::fmt::Debug + Clone + Decode<'b, ()>,
 {
     fn decode(d: &mut Decoder<'b>, _ctx: &mut ()) -> Result<Self, decode::Error> {
-        let len = d.map()?.ok_or(decode::Error::message(
-            "expected def-length map for versiontable",
-        ))?;
+        let len = d.map()?.unwrap_or(0);
         let mut values = HashMap::new();
 
         for _ in 0..len {
             let key = d.u64()?;
             let value = d.decode()?;
-            values.insert(key, value);
+            values.entry(key).or_insert(value);
         }
         Ok(VersionTable { values })
     }
@@ -323,5 +321,43 @@ mod tests {
                 "re-encoded bytes didn't match original file {idx}"
             );
         }
+    }
+
+    #[test]
+    fn version_table_decodes_a_definite_map() {
+        use super::VersionTable;
+        use pallas_codec::minicbor;
+        use std::collections::HashMap;
+
+        let raw = hex::decode("a2010a0214").unwrap();
+
+        let table: VersionTable<u64> = minicbor::decode(&raw).unwrap();
+
+        assert_eq!(table.values, HashMap::from([(1, 10), (2, 20)]));
+    }
+
+    #[test]
+    fn version_table_refuses_an_indefinite_map() {
+        use super::VersionTable;
+        use pallas_codec::minicbor;
+
+        let raw = hex::decode("bf010aff").unwrap();
+
+        let result: Result<VersionTable<u64>, _> = minicbor::decode(&raw);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn version_table_keeps_the_last_duplicate_key() {
+        use super::VersionTable;
+        use pallas_codec::minicbor;
+        use std::collections::HashMap;
+
+        let raw = hex::decode("a2010a0114").unwrap();
+
+        let table: VersionTable<u64> = minicbor::decode(&raw).unwrap();
+
+        assert_eq!(table.values, HashMap::from([(1, 20)]));
     }
 }
