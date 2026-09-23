@@ -65,17 +65,90 @@ models is exercised by no fixture and is modelled from the CDDL alone.
 
 ## The endorser block fixtures
 
-Two `.ebbody` files hold endorser blocks of an earlier Musashi chain, with
+Six files describe two endorser blocks of an earlier Musashi chain, with
 network magic 164 like the chain above, under node release
-`prototype-2026w35`, each the body as leios-fetch delivered it from that
-chain's relay. The chain above started afresh on 2026-09-07 under
-`prototype-2026w36`.
+`prototype-2026w35`. The chain above started afresh on 2026-09-07 under
+`prototype-2026w36`. The `.ebbody` file is
+the body as leios-fetch delivered it, the `.ebtxs` file is one hex transaction
+per line in body order with its byte string envelope still on, and the
+`.header` file is the ranking block header whose `eb_announcement` names that
+body.
+
+The bodies and the transactions were pulled over leios-fetch from that chain's
+relay. The headers were cut afterwards from the same chain's immutable
+database, kept beside the node that captured the bodies, by walking one chunk
+with a CBOR decoder and taking each block's header span. Every header hash
+below is blake2b-256 of the header bytes and equals what that node's own
+secondary index records for the block.
+
+| file | chunk/index | slot | block | announcing header hash | bytes | certifies | announces |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| dijkstra-eb1.header | 00397/47 | 429789 | 21507 | `abba50f39b31ca7ed67ebe72f588668073a66090a33504a76d9abbc1d6a9d3b5` | 892 | yes | `dijkstra-eb1.ebbody`, 37 bytes, `f753a2b1e556780d36961a1cde7ba05ea3ff9a58047b03385d5242b5c4610b5c` |
+| dijkstra-eb2.header | 00368/27 | 397855 | 19847 | `779e95c2816db83f41528b1b8260034f68c8f817c4f32edadc05de0fc16f22fb` | 896 | no | `dijkstra-eb2.ebbody`, 1082 bytes, `8f21f4531c3d5e6cf6939821221d01bc6c4f33c6470de4b1a852dd99ea19883d` |
+
+The `certifies` column is `block_body_contains_leios_cert`. A header that sets
+it certifies its parent header's announcement, not the one it makes itself, so
+one header can do both, as `dijkstra-eb1.header` does.
+
+The header alone is cut rather than the whole block because that chain writes a
+four element block body led by a nil, and this era models the three element
+body of the chain above. The block at slot 397855 is also 88105 bytes against
+896 for its header.
 
 What each body names, read with a standalone CBOR walker and Python's
-`hashlib.blake2b` rather than with pallas. The count is the body's map length.
-The first key is blake2b-256 of the first transaction with its envelope removed.
+`hashlib.blake2b` rather than with pallas. The count is both the body's map
+length and the number of lines in its `.ebtxs` file. The first key is
+blake2b-256 of the first transaction with its envelope removed, and the first
+transaction id is blake2b-256 of that transaction's body span.
 
-| file | transactions | first key | first size |
-| --- | --- | --- | --- |
-| dijkstra-eb1.ebbody | 1 | `a69f9fc581e5914a101a3e619f5ce64b6bce76721fd5eed0cbad0e0f6d411cc5` | 229 |
-| dijkstra-eb2.ebbody | 30 | `455a00b521f35f2c0a6ff0a59296c3316de6219af206c13d2e95870f66541fec` | 200 |
+| file | transactions | first key | first size | first transaction id |
+| --- | --- | --- | --- | --- |
+| dijkstra-eb1.ebbody | 1 | `a69f9fc581e5914a101a3e619f5ce64b6bce76721fd5eed0cbad0e0f6d411cc5` | 229 | `a2a3715bac697e28991d003c62a0c280fb91af40944f7bbcee27d972ad0f0a08` |
+| dijkstra-eb2.ebbody | 30 | `455a00b521f35f2c0a6ff0a59296c3316de6219af206c13d2e95870f66541fec` | 200 | `1839e14ac4327a8a8f6c00d2bfbdb0b4a95bb6dc92d84d3a45d3ff9ada7964c2` |
+
+## The parent header fixtures
+
+Six `.header` files are ranking block headers of the chain in the first table.
+The first four are each the parent of a certifying block there, cut from the
+relay's immutable chunks the same way. The last two were cut the same way from
+the immutable chunks of another node of that chain. Each was checked against
+the secondary index for header span, header hash and block CRC32.
+
+| file | chunk/index | slot | block | hash | bytes | certifies | announces | parent of |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| dijkstra-17402.header | 00344/7 | 371680 | 17402 | `b0e696b02f5c527b43eabf2149b71c7f9579b4e2db1dbe0c04fe67881cdb8aa9` | 896 | no | `29694e6d204e586f170a1f4f75da3703cb86289d08e7eaea2def826a6dcd7e90`, 8786 bytes | dijkstra8.block |
+| dijkstra-17404.header | 00344/9 | 371771 | 17404 | `d1118745015532fa2b7a896895cf1924584df241ad15a3c00c571d5922fb0c6a` | 893 | yes | `df3e00644db8fb9020057eab4d130befab8e7f2eb2a69af008116ccc8c2f0527`, 43312 bytes | block 17405 |
+| dijkstra-17405.header | 00344/10 | 371837 | 17405 | `aeb7f1cfd248acb1780bd1517cdc8424139cb27e3e6f5be135bd5911f4a70011` | 893 | yes | `b0233a1c2608013cec07e933e3d0101f48dc75d785ee9b096bee94cd8713a72d`, 59439 bytes | dijkstra15.block |
+| dijkstra-17511.header | 00346/19 | 374267 | 17511 | `9bc3734faa48f8eae7e3a76409c2e60bc12daa37090ec2e0b538b708831008a2` | 893 | yes | `2abe14e0dd956846cd06b786b36380a608488b265790a55676af90f0ebe86201`, 24772 bytes | dijkstra9.block |
+| dijkstra-17513.header | 00346/21 | 374317 | 17513 | `68d831715019aa837971400882b6a435a4cafbf61c560821eb8b06230bda9660` | 896 | no | `ca3307d00fa71c0b56eda818b5dbd49b05dbc4e91b4a806772fb0e1090a06dae`, 29487 bytes | dijkstra-17514.header |
+| dijkstra-17514.header | 00346/22 | 374322 | 17514 | `a4afe2e204ff56356e568e57e3b416787cd63b77f82e75dee8610b6dfa01d2d6` | 896 | no | `96e2601ff180781092c8f2308cb5f1b4164fbf59268ee3378e7a7c7af6097977`, 18291 bytes | none |
+
+Block 17404 is the child of dijkstra8.block, so blocks 17402 to 17406 form one
+unbroken run of headers in which each of the last four certifies. Blocks 17511
+to 17514 form another, in which block 17513 announces an endorser block and its
+child 17514 does not certify it.
+
+## The certified endorser block fixtures
+
+Two files hold the endorser block that `dijkstra-17402.header` announces and
+dijkstra8.block certifies.
+They were fetched on 2026-09-22 over leios-fetch from a node of the chain in
+the first table, cardano-node `afa091b4af2795d1d9c46e59145ed16127760f7b`, at
+the point of the announcing slot and the announced hash. The `.ebbody` and
+`.ebtxs` files have the format of the endorser block fixtures above, and each
+file is named after the header that announces it.
+
+| file | announced at slot | bytes | blake2b-256 | transactions | certified by |
+| --- | --- | --- | --- | --- | --- |
+| dijkstra-17402.ebbody | 371680 | 8786 | `29694e6d204e586f170a1f4f75da3703cb86289d08e7eaea2def826a6dcd7e90` | 244 | dijkstra8.block |
+
+The transaction ids below are what `cardano-cli dijkstra transaction txid` of
+the same node release prints for the first and last transaction of the body,
+with the byte string envelope removed.
+
+| file | first transaction id | last transaction id |
+| --- | --- | --- |
+| dijkstra-17402.ebtxs | `82bfbdf62f180269e15a72672b51610bc17a043c3d6f5c5a2434403b00a49d98` | `7c165b9f5287113a811c8e6276b57ffb89fb0d9daf9bfe028310e68408c7f756` |
+
+Entry 0 of `dijkstra-17402.ebbody` has key
+`2bc50f5b4942ca304e39e7cd7f1c4261d85437ea5464b2d1a623f47790254a3d` and size 201.
