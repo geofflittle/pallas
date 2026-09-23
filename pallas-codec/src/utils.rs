@@ -1372,6 +1372,13 @@ impl AnyCbor {
     {
         minicbor::decode(&self.inner)
     }
+
+    pub fn to_decode<'b, T>(&'b self) -> Result<T, minicbor::decode::Error>
+    where
+        T: Decode<'b, ()>,
+    {
+        minicbor::decode(&self.inner)
+    }
 }
 
 impl From<Vec<u8>> for AnyCbor {
@@ -1819,5 +1826,15 @@ mod tests {
             let err = result.expect_err(raw);
             assert!(err.is_end_of_input(), "{raw}: {err}");
         }
+    }
+
+    #[test]
+    fn any_cbor_to_decode_decodes_a_borrowed_byte_string() {
+        let any = AnyCbor::from_raw_bytes(hex::decode("43010203").unwrap());
+
+        let decoded: &minicbor::bytes::ByteSlice = any.to_decode().unwrap();
+
+        assert_eq!(decoded.as_ref(), [1u8, 2, 3]);
+        assert!(any.raw_bytes().as_ptr_range().contains(&decoded.as_ptr()));
     }
 }
