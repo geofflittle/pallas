@@ -905,6 +905,56 @@ mod tests {
         assert!(MultiEraTx::decode_for_era(Era::Dijkstra, &with_false).is_err());
     }
 
+    #[test]
+    fn an_indefinite_mempool_form_decodes_for_the_dijkstra_era() {
+        let cbor = dijkstra_block_bytes();
+        let block = MultiEraBlock::decode(&cbor).expect("invalid cbor");
+        let source = block
+            .as_dijkstra()
+            .expect("a Dijkstra block")
+            .block_body
+            .transactions
+            .first()
+            .expect("dijkstra3 carries a transaction")
+            .clone();
+
+        let definite = minicbor::to_vec(source.to_mempool_transaction()).expect("infallible");
+        let definite = MultiEraTx::decode_for_era(Era::Dijkstra, &definite)
+            .expect("the three element mempool form is legal Dijkstra");
+        let MultiEraTx::Dijkstra(definite_tx) = &definite else {
+            panic!("a Dijkstra transaction");
+        };
+
+        let body = source.transaction_body.raw_cbor();
+        let witnesses = source.transaction_witness_set.raw_cbor();
+        let aux: &[u8] = match &source.auxiliary_data {
+            pallas_codec::utils::Nullable::Some(aux) => aux.raw_cbor(),
+            _ => &[0xf6],
+        };
+
+        for items in [
+            vec![body, witnesses, aux],
+            vec![body, witnesses, &[0xf5], aux],
+        ] {
+            let indefinite = [&[0x9f][..], &items.concat(), &[0xff]].concat();
+
+            let decoded = MultiEraTx::decode_for_era(Era::Dijkstra, &indefinite)
+                .expect("an indefinite length mempool form is legal Dijkstra");
+            assert_eq!(decoded.hash(), definite.hash());
+
+            let MultiEraTx::Dijkstra(tx) = &decoded else {
+                panic!("a Dijkstra transaction");
+            };
+            assert_eq!(tx.transaction_body, definite_tx.transaction_body);
+            assert_eq!(
+                tx.transaction_witness_set,
+                definite_tx.transaction_witness_set
+            );
+            assert_eq!(tx.auxiliary_data, definite_tx.auxiliary_data);
+            assert!(tx.success);
+        }
+    }
+
     type Accessor = fn(&MultiEraTx);
 
     const NOT_YET_IMPLEMENTED: [(&str, Accessor); 22] = [
