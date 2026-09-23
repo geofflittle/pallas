@@ -1763,4 +1763,34 @@ mod tests {
         assert_eq!(first, (456u16, 789u16));
         assert_eq!(first, second);
     }
+
+    #[derive(Debug, PartialEq)]
+    struct Prop(u64, u64);
+
+    impl<'b, C> minicbor::Decode<'b, C> for Prop {
+        fn decode(
+            d: &mut minicbor::Decoder<'b>,
+            _ctx: &mut C,
+        ) -> Result<Self, minicbor::decode::Error> {
+            Ok(Prop(d.u64()?, d.u64()?))
+        }
+    }
+
+    #[test]
+    fn probe_order_preserving_properties_definite_map() {
+        let raw = hex::decode("82a1010205").unwrap();
+        let (props, tail): (OrderPreservingProperties<Prop>, u64) =
+            minicbor::decode(&raw).unwrap();
+        println!("definite: props={:?} tail={tail}", props.0);
+        assert_eq!((props.0, tail), (vec![Prop(1, 2)], 5));
+    }
+
+    #[test]
+    fn probe_order_preserving_properties_indefinite_map() {
+        let raw = hex::decode("82bf0102ff05").unwrap();
+        let result: Result<(OrderPreservingProperties<Prop>, u64), _> = minicbor::decode(&raw);
+        println!("indefinite: {result:?}");
+        let (props, tail) = result.unwrap();
+        assert_eq!((props.0, tail), (vec![Prop(1, 2)], 5));
+    }
 }
