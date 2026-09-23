@@ -1,7 +1,8 @@
 use super::{
     AccountBalanceInterval, AccountBalanceIntervals, AuxiliaryData, Block, BlockTransaction,
     Certificate, CostModels, DRep, GovAction, Guards, Header, MempoolTransaction, NativeScript,
-    NonEmptySet, ProposalProcedure, Set, SetArm, StakeCredential, TransactionOutput, Value,
+    NetworkId, NonEmptySet, ProposalProcedure, Set, SetArm, StakeCredential, SubTransactionBody,
+    TransactionBody, TransactionOutput, Value,
 };
 use pallas_codec::minicbor;
 use pallas_codec::utils::KeepRaw;
@@ -733,36 +734,107 @@ fn a_mempool_transaction_re_encodes_both_accepted_shapes() {
     );
 }
 
-/// An empty array has no first element to decide the arm on, so it is refused.
 #[test]
-fn an_empty_guards_array_is_refused() {
+fn an_empty_guards_set_decodes_in_every_arm_and_length_form() {
     let keyhash = [0x11u8; 28];
 
-    let mut empty = vec![0x80];
-    empty.push(0x58);
-    empty.push(0x1c);
-    empty.extend_from_slice(&keyhash);
+    for (form, empty, reencoded) in [
+        ("definite", &[0x80][..], &[0x80][..]),
+        (
+            "tagged definite",
+            &[0xd9, 0x01, 0x02, 0x80][..],
+            &[0xd9, 0x01, 0x02, 0x80][..],
+        ),
+        ("indefinite", &[0x9f, 0xff][..], &[0x80][..]),
+        (
+            "tagged indefinite",
+            &[0xd9, 0x01, 0x02, 0x9f, 0xff][..],
+            &[0xd9, 0x01, 0x02, 0x80][..],
+        ),
+    ] {
+        // The byte string after the set is not part of it.
+        let mut bytes = empty.to_vec();
+        bytes.extend_from_slice(&[0x58, 0x1c]);
+        bytes.extend_from_slice(&keyhash);
 
-    // The byte string after the empty array is not part of it.
-    let decoded: Result<Guards, _> = minicbor::decode(&empty);
-    assert!(
-        decoded.is_err(),
-        "an empty guards array must be refused, decoded as {:?}",
-        decoded.ok()
-    );
+        let mut d = minicbor::Decoder::new(&bytes);
+        let decoded: Guards = d
+            .decode()
+            .unwrap_or_else(|e| panic!("the {form} empty guards set must decode: {e}"));
+        assert_eq!(
+            d.position(),
+            empty.len(),
+            "the {form} empty guards set must end where its bytes end"
+        );
 
-    // The same shape with one element decodes, so the refusal is about emptiness.
+        let Guards::AddrKeyhashes(set) = &decoded else {
+            panic!("the {form} empty guards set must decode as key hashes, found {decoded:?}");
+        };
+        assert!(
+            set.is_empty(),
+            "the {form} set must be empty, found {set:?}"
+        );
+
+        assert_eq!(
+            hex::encode(minicbor::to_vec(&decoded).unwrap()),
+            hex::encode(reencoded),
+            "the {form} empty guards set keeps its tag and re-encodes definite"
+        );
+    }
+
     let mut one_keyhash = vec![0x81, 0x58, 0x1c];
     one_keyhash.extend_from_slice(&keyhash);
     let decoded: Guards =
         minicbor::decode(&one_keyhash).expect("a one element addr_keyhash guards must decode");
-    assert!(matches!(decoded, Guards::AddrKeyhashes(_)));
+    assert!(matches!(&decoded, Guards::AddrKeyhashes(x) if x.len() == 1));
 
     let mut one_credential = vec![0x81, 0x82, 0x00, 0x58, 0x1c];
     one_credential.extend_from_slice(&keyhash);
     let decoded: Guards =
         minicbor::decode(&one_credential).expect("a one element credential guards must decode");
-    assert!(matches!(decoded, Guards::Credentials(_)));
+    assert!(matches!(&decoded, Guards::Credentials(x) if x.len() == 1));
+
+    let refused = minicbor::decode::<Guards>(&[0x81, 0x01])
+        .expect_err("an integer is neither a key hash nor a credential");
+    assert!(
+        refused.to_string().contains("invalid guards element type"),
+        "refused for the wrong reason: {refused}"
+    );
+}
+
+#[test]
+fn a_body_with_an_empty_guards_set_decodes_its_later_keys() {
+    // `{0: [], 1: [], 2: 0, 14: [], 15: 1}`
+    let body = [
+        0xa5, 0x00, 0x80, 0x01, 0x80, 0x02, 0x00, 0x0e, 0x80, 0x0f, 0x01,
+    ];
+    let decoded: TransactionBody =
+        minicbor::decode(&body).expect("a body carrying `14: []` must decode");
+    assert!(
+        matches!(&decoded.guards, Some(Guards::AddrKeyhashes(x)) if x.is_empty() && x.arm() == SetArm::Bare),
+        "found {:?}",
+        decoded.guards
+    );
+    assert_eq!(decoded.network_id, Some(NetworkId::Mainnet));
+
+    // `{0: [], 1: [], 14: 258([]), 15: 1}`
+    let sub = [
+        0xa4, 0x00, 0x80, 0x01, 0x80, 0x0e, 0xd9, 0x01, 0x02, 0x80, 0x0f, 0x01,
+    ];
+    let decoded: SubTransactionBody =
+        minicbor::decode(&sub).expect("a sub transaction body carrying `14: 258([])` must decode");
+    assert!(
+        matches!(&decoded.guards, Some(Guards::AddrKeyhashes(x)) if x.is_empty() && x.arm() == SetArm::Tagged),
+        "found {:?}",
+        decoded.guards
+    );
+    assert_eq!(decoded.network_id, Some(NetworkId::Mainnet));
+
+    // `{0: [], 1: [], 2: 0}`, where the key is absent rather than empty.
+    let without = [0xa3, 0x00, 0x80, 0x01, 0x80, 0x02, 0x00];
+    let decoded: TransactionBody =
+        minicbor::decode(&without).expect("a body without key 14 must decode");
+    assert_eq!(decoded.guards, None);
 }
 
 /// A type reaching Alonzo's native script from here would refuse a whole

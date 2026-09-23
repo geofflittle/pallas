@@ -886,15 +886,12 @@ pub enum GovAction {
 /// `guards = nonempty_set<addr_keyhash>/ nonempty_oset<credential>`
 /// (`defs.cddl`), Conway's `required_signers` widened. The arms are told
 /// apart by element type: an `addr_keyhash` is a byte string, a `credential`
-/// an array.
+/// an array. The node decodes an empty set at this key, which is read as
+/// empty `AddrKeyhashes`.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum Guards {
-    AddrKeyhashes(NonEmptySet<AddrKeyhash>),
+    AddrKeyhashes(Set<AddrKeyhash>),
     Credentials(NonEmptySet<StakeCredential>),
-}
-
-fn empty_guards() -> minicbor::decode::Error {
-    minicbor::decode::Error::message("guards must carry at least one element")
 }
 
 impl<'b, C> minicbor::Decode<'b, C> for Guards {
@@ -908,17 +905,16 @@ impl<'b, C> minicbor::Decode<'b, C> for Guards {
         // Reading the element type of an empty array would read the byte after
         // the value, which belongs to whatever encloses it.
         if len == Some(0) {
-            return Err(empty_guards());
+            return Ok(Guards::AddrKeyhashes(d.decode_with(ctx)?));
         }
 
         match probe.datatype()? {
-            minicbor::data::Type::Break => Err(empty_guards()),
             minicbor::data::Type::Array | minicbor::data::Type::ArrayIndef => {
                 Ok(Guards::Credentials(d.decode_with(ctx)?))
             }
-            minicbor::data::Type::Bytes | minicbor::data::Type::BytesIndef => {
-                Ok(Guards::AddrKeyhashes(d.decode_with(ctx)?))
-            }
+            minicbor::data::Type::Break
+            | minicbor::data::Type::Bytes
+            | minicbor::data::Type::BytesIndef => Ok(Guards::AddrKeyhashes(d.decode_with(ctx)?)),
             other => Err(minicbor::decode::Error::message(format!(
                 "invalid guards element type {other} at position {}",
                 d.position()
