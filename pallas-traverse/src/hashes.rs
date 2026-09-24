@@ -177,6 +177,13 @@ impl OriginalHash<28> for KeepRaw<'_, dijkstra::NativeScript> {
     }
 }
 
+#[cfg(feature = "unstable")]
+impl OriginalHash<32> for KeepRaw<'_, dijkstra::EndorserBlock> {
+    fn original_hash(&self) -> Hash<32> {
+        Hasher::<256>::hash(self.raw_cbor())
+    }
+}
+
 impl ComputeHash<32> for babbage::TransactionBody<'_> {
     fn compute_hash(&self) -> Hash<32> {
         Hasher::<256>::hash_cbor(self)
@@ -579,12 +586,14 @@ mod tests {
                 371916,
                 crate::Era::Dijkstra,
             ),
+            (
+                include_str!("../../test_data/dijkstra16.block"),
+                "c9d7bca094227279830e2e2110acbb965dc9e90d469ac97594d40bc8e295735c",
+                14935,
+                311025,
+                crate::Era::Dijkstra,
+            ),
         ]);
-
-        #[cfg(feature = "unstable")]
-        assert_eq!(cases.len(), 16, "one Conway fixture and fifteen Dijkstra");
-        #[cfg(not(feature = "unstable"))]
-        assert_eq!(cases.len(), 1, "the Conway fixture alone without the era");
 
         for (block_str, hash, number, slot, era) in cases {
             let cbor = hex::decode(block_str).expect("invalid hex");
@@ -618,9 +627,8 @@ mod tests {
             include_str!("../../test_data/dijkstra13.block"),
             include_str!("../../test_data/dijkstra14.block"),
             include_str!("../../test_data/dijkstra15.block"),
+            include_str!("../../test_data/dijkstra16.block"),
         ];
-
-        assert_eq!(fixtures.len(), 15, "every Dijkstra fixture must be listed");
 
         for (index, block_str) in fixtures.iter().enumerate() {
             let name = format!("dijkstra{}.block", index + 1);

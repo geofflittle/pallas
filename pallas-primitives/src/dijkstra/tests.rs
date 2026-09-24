@@ -9,7 +9,7 @@ use pallas_codec::utils::{KeepRaw, Nullable};
 
 type BlockWrapper<'b> = (u16, Block<'b>);
 
-/// Provenance for these fixtures is in `test_data/dijkstra-fixtures.md`.
+/// The Dijkstra blocks of `test_data/dijkstra-fixtures.md`, by name.
 const TEST_BLOCKS: &[(&str, &str)] = &[
     (
         "dijkstra1",
@@ -70,6 +70,10 @@ const TEST_BLOCKS: &[(&str, &str)] = &[
     (
         "dijkstra15",
         include_str!("../../../test_data/dijkstra15.block"),
+    ),
+    (
+        "dijkstra16",
+        include_str!("../../../test_data/dijkstra16.block"),
     ),
 ];
 
@@ -924,7 +928,7 @@ fn n_of_k_threshold_is_signed_at_the_extremes() {
     }
 }
 
-/// The header hash each fixture was cut against, from `test_data/dijkstra-fixtures.md`.
+/// The header hash of each fixture block, as `test_data/dijkstra-fixtures.md` lists it.
 const HEADER_HASHES: &[(&str, &str)] = &[
     (
         "dijkstra1",
@@ -985,6 +989,10 @@ const HEADER_HASHES: &[(&str, &str)] = &[
     (
         "dijkstra15",
         "0db84efa0259153a240cecacd0f9e52f942d40f96b132ebd0d5b3526e19b3a7b",
+    ),
+    (
+        "dijkstra16",
+        "c9d7bca094227279830e2e2110acbb965dc9e90d469ac97594d40bc8e295735c",
     ),
 ];
 
