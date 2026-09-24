@@ -817,7 +817,7 @@ mod attribute_tests {
                 if name.is_empty() || !name.chars().all(|c| c.is_ascii_lowercase() || c == '_') {
                     return None;
                 }
-                let presence = if attributes_above(&lines, i).contains(&UNSTABLE_ONLY) {
+                let presence = if lines[..i].iter().any(|above| above.trim() == UNSTABLE_ONLY) {
                     UnstableOnly
                 } else {
                     EveryBuild
