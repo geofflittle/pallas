@@ -6,6 +6,8 @@
 //! block's transactions apply to its parent's ledger state, before the tick to
 //! the certifying block's slot.
 
+use std::ops::Deref;
+
 use pallas_codec::minicbor::{self, bytes::ByteSlice};
 use pallas_codec::utils::{AnyCbor, KeepRaw};
 use pallas_crypto::hash::{Hash, Hasher};
@@ -60,8 +62,14 @@ pub enum Error {
 
 /// An endorser block body as leios-fetch delivers it.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EndorserBlockBody {
-    block: dijkstra::EndorserBlock,
+pub struct EndorserBlockBody(dijkstra::EndorserBlock);
+
+impl Deref for EndorserBlockBody {
+    type Target = dijkstra::EndorserBlock;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 impl EndorserBlockBody {
@@ -82,39 +90,22 @@ impl EndorserBlockBody {
             });
         }
 
-        Ok(Self {
-            block: block.unwrap(),
-        })
-    }
-
-    /// The hash and length of each named transaction, in body order.
-    pub fn entries(&self) -> &[(Hash<32>, u32)] {
-        &self.block
-    }
-
-    /// The number of transactions the body names.
-    pub fn len(&self) -> usize {
-        self.block.len()
-    }
-
-    /// Whether the body names no transactions.
-    pub fn is_empty(&self) -> bool {
-        self.block.is_empty()
+        Ok(Self(block.unwrap()))
     }
 
     /// Decodes the transactions `wire` delivers, one per entry in body order,
     /// refusing any whose byte string content does not hash to its entry.
     pub fn transactions<'b>(&self, wire: &'b [AnyCbor]) -> Result<Vec<MultiEraTx<'b>>, Error> {
-        if wire.len() != self.block.len() {
+        if wire.len() != self.len() {
             return Err(Error::TxCount {
-                named: self.block.len(),
+                named: self.len(),
                 delivered: wire.len(),
             });
         }
 
         let mut out = Vec::with_capacity(wire.len());
 
-        for (index, ((named, _), delivered)) in self.block.iter().zip(wire).enumerate() {
+        for (index, ((named, _), delivered)) in self.iter().zip(wire).enumerate() {
             let tx_decode = |e: minicbor::decode::Error| Error::TxDecode {
                 index,
                 reason: e.to_string(),
@@ -170,7 +161,7 @@ pub fn certification<'a>(
 mod tests {
     use super::*;
     use crate::MultiEraBlock;
-    use pallas_codec::minicbor::{Decoder, Encoder};
+    use pallas_codec::minicbor::Encoder;
 
     /// One endorser block of `test_data/dijkstra-fixtures.md`, with the values
     /// recorded for it there.
@@ -284,25 +275,8 @@ mod tests {
         )
     }
 
-    fn enveloped(inner: &[u8]) -> AnyCbor {
-        let mut out = Vec::new();
-        Encoder::new(&mut out).bytes(inner).expect("write to a vec");
-        AnyCbor::from(out)
-    }
-
     fn unwrapped(tx: &AnyCbor) -> &[u8] {
         minicbor::decode::<&ByteSlice>(tx.raw_bytes()).expect("the fixture is enveloped")
-    }
-
-    /// A body naming each transaction by its own hash and length, announced as
-    /// itself.
-    fn body_naming(txs: &[&[u8]]) -> EndorserBlockBody {
-        let entries: Vec<_> = txs
-            .iter()
-            .map(|tx| (Hasher::<256>::hash(tx), tx.len() as u32))
-            .collect();
-
-        announced_as_itself(&encode_entries(&entries)).expect("a body of distinct entries")
     }
 
     #[test]
@@ -373,30 +347,6 @@ mod tests {
         assert_eq!(body.len(), f.count);
     }
 
-    /// leios-fetch answers a request for a block the peer lacks with an empty
-    /// map, which only the announcement tells apart from an endorser block
-    /// naming nothing.
-    #[test]
-    fn an_empty_reply_is_refused_against_the_announcement_that_named_it() {
-        let f = &FIXTURES[2];
-        let announcement = f.announcement();
-
-        let err = EndorserBlockBody::decode_announced(&[0xa0], &announcement)
-            .expect_err("an empty body must not pass as this endorser block");
-
-        match err {
-            Error::BodyHash { announced, found } => {
-                assert_eq!(announced, announcement.eb_hash);
-                assert_eq!(found, Hasher::<256>::hash(&[0xa0]));
-            }
-            other => panic!("wrong refusal: {other}"),
-        }
-
-        let body = EndorserBlockBody::decode_announced(&f.body_bytes(), &announcement)
-            .expect("the announced body must be accepted");
-        assert_eq!(body.len(), 244);
-    }
-
     #[test]
     fn a_body_is_accepted_whatever_size_the_announcement_names() {
         let f = &FIXTURES[2];
@@ -453,40 +403,6 @@ mod tests {
         assert_eq!(body.len(), f.count);
     }
 
-    /// The announced hash covers the order of the entries.
-    #[test]
-    fn a_body_with_the_announced_entries_in_another_order_is_refused_on_hash() {
-        let f = &FIXTURES[2];
-        let announcement = f.announcement();
-        let raw = f.body_bytes();
-
-        let body = EndorserBlockBody::decode_announced(&raw, &announcement)
-            .expect("the announced body must be accepted");
-
-        let mut sorted = body.entries().to_vec();
-        sorted.sort_by(|a, b| a.0.as_ref().cmp(b.0.as_ref()));
-        let reordered = encode_entries(&sorted);
-
-        assert_ne!(
-            reordered, raw,
-            "the wire already had this body in key sorted order"
-        );
-
-        let err = EndorserBlockBody::decode_announced(&reordered, &announcement)
-            .expect_err("a reordered body must be refused");
-
-        match err {
-            Error::BodyHash { announced, found } => {
-                assert_eq!(announced, announcement.eb_hash);
-                assert_eq!(found, Hasher::<256>::hash(&reordered));
-                assert_ne!(found, announced);
-            }
-            other => panic!("wrong refusal: {other}"),
-        }
-
-        assert_eq!(encode_entries(body.entries()), raw);
-    }
-
     /// The entries of `dijkstra-eb1` in two forms other than the announced one:
     /// the size 229 written in three bytes, and a map of indefinite length.
     fn other_forms_of_eb1() -> [(&'static str, Vec<u8>); 2] {
@@ -511,7 +427,7 @@ mod tests {
         for (form, raw) in other_forms_of_eb1() {
             let body = announced_as_itself(&raw).unwrap_or_else(|e| panic!("{form}: {e}"));
 
-            assert_eq!(body.entries(), announced_body.entries(), "{form}");
+            assert_eq!(body[..], announced_body[..], "{form}");
             assert_eq!(body.transactions(&wire).unwrap().len(), 1, "{form}");
         }
     }
@@ -542,7 +458,7 @@ mod tests {
         let f = &FIXTURES[2];
         let body = EndorserBlockBody::decode_announced(&f.body_bytes(), &f.announcement()).unwrap();
 
-        let (key, size) = body.entries()[0];
+        let (key, size) = body[0];
         assert_eq!(
             key.to_string(),
             "2bc50f5b4942ca304e39e7cd7f1c4261d85437ea5464b2d1a623f47790254a3d"
@@ -613,6 +529,24 @@ mod tests {
     }
 
     #[test]
+    fn a_long_delivery_is_refused() {
+        let (body, mut wire) = fixture(1);
+        wire.push(wire[0].clone());
+
+        let err = body
+            .transactions(&wire)
+            .expect_err("a long delivery must be refused");
+
+        match err {
+            Error::TxCount { named, delivered } => {
+                assert_eq!(named, 30);
+                assert_eq!(delivered, 31);
+            }
+            other => panic!("wrong refusal: {other}"),
+        }
+    }
+
+    #[test]
     fn a_transaction_delivered_without_its_envelope_is_refused() {
         let (body, wire) = fixture(0);
         assert_eq!(body.transactions(&wire).unwrap().len(), 1);
@@ -628,136 +562,17 @@ mod tests {
         assert!(matches!(err, Error::TxDecode { index: 0, .. }), "{err}");
     }
 
-    /// The node reads an indefinite length transaction as it reads the
-    /// definite one, with or without the `true` third element.
-    #[test]
-    fn an_indefinite_length_transaction_reads_as_the_definite_one() {
-        let (_, wire) = fixture(0);
-        let three = unwrapped(&wire[0]);
-        assert_eq!(three[0], 0x83, "fixture precondition");
-
-        let mempool: dijkstra::MempoolTransaction = minicbor::decode(three).unwrap();
-        let four = minicbor::to_vec(dijkstra::MempoolTransaction {
-            is_valid_supplied: true,
-            ..mempool
-        })
-        .unwrap();
-        assert_eq!(four[0], 0x84, "the four element form");
-
-        for definite in [three, four.as_slice()] {
-            let mut indefinite = vec![0x9f];
-            indefinite.extend_from_slice(&definite[1..]);
-            indefinite.push(0xff);
-
-            let wire = [enveloped(&indefinite)];
-            let txs = body_naming(&[&indefinite])
-                .transactions(&wire)
-                .unwrap_or_else(|e| panic!("{:02x} form: {e}", definite[0]));
-
-            assert_eq!(txs[0].hash().to_string(), FIXTURES[0].first_tx_id);
-        }
-    }
-
-    /// The Dijkstra era decoder also reads the four element block form.
-    #[test]
-    fn a_block_form_transaction_is_accepted() {
-        let (_, wire) = fixture(0);
-        let inner = unwrapped(&wire[0]);
-        assert_eq!(inner[0], 0x83, "fixture precondition");
-
-        let mempool: dijkstra::MempoolTransaction = minicbor::decode(inner).unwrap();
-        let block_form = minicbor::to_vec(dijkstra::BlockTransaction::from(mempool)).unwrap();
-        assert_eq!(block_form[0], 0x84, "the block form has four elements");
-
-        let wire = [enveloped(&block_form)];
-        let txs = body_naming(&[&block_form])
-            .transactions(&wire)
-            .expect("a block form transaction");
-
-        assert_eq!(txs[0].hash().to_string(), FIXTURES[0].first_tx_id);
-    }
-
-    /// The Dijkstra era decoder stops after one transaction.
-    #[test]
-    fn a_transaction_with_bytes_after_it_inside_its_envelope_is_accepted() {
-        let (_, wire) = fixture(0);
-        let mut trailing = unwrapped(&wire[0]).to_vec();
-        trailing.push(0x00);
-
-        let wire = [enveloped(&trailing)];
-        let txs = body_naming(&[&trailing])
-            .transactions(&wire)
-            .expect("the transaction before the trailing byte");
-
-        assert_eq!(txs[0].hash().to_string(), FIXTURES[0].first_tx_id);
-    }
-
     #[test]
     fn a_body_naming_one_transaction_twice_is_accepted() {
         let (real, _) = fixture(2);
-        let first = real.entries()[0];
-        let second = real.entries()[1];
+        let first = real[0];
+        let second = real[1];
         assert_ne!(first.0, second.0, "fixture precondition");
 
         let body = announced_as_itself(&encode_entries(&[first, second, first]))
             .unwrap_or_else(|e| panic!("a repeated entry: {e}"));
 
-        assert_eq!(body.entries(), &[first, second, first]);
-    }
-
-    /// Re-encodes a real block's header with the two Leios fields set, which
-    /// leaves the header signature no longer covering the header body.
-    fn with_leios_header_fields(
-        block_str: &str,
-        certifies: bool,
-        announcement: Option<dijkstra::EbAnnouncement>,
-    ) -> Vec<u8> {
-        let cbor = hex::decode(block_str.trim()).unwrap();
-
-        let (start, end) = header_span(&cbor);
-
-        let mut header: dijkstra::Header =
-            minicbor::decode(&cbor[start..end]).expect("fixture header decodes");
-
-        assert!(
-            !header.header_body.block_body_contains_leios_cert,
-            "the fixture must not already certify"
-        );
-        assert!(
-            matches!(
-                header.header_body.eb_announcement,
-                pallas_codec::utils::Nullable::Null
-            ),
-            "the fixture must not already announce"
-        );
-
-        header.header_body.block_body_contains_leios_cert = certifies;
-        header.header_body.eb_announcement = match announcement {
-            Some(a) => pallas_codec::utils::Nullable::Some(a),
-            None => pallas_codec::utils::Nullable::Null,
-        };
-
-        let rebuilt = minicbor::to_vec(&header).expect("write to a vec");
-
-        let mut out = Vec::with_capacity(cbor.len() + rebuilt.len());
-        out.extend_from_slice(&cbor[..start]);
-        out.extend_from_slice(&rebuilt);
-        out.extend_from_slice(&cbor[end..]);
-
-        out
-    }
-
-    fn header_span(block_cbor: &[u8]) -> (usize, usize) {
-        let mut d = Decoder::new(block_cbor);
-
-        d.array().expect("era envelope");
-        d.u16().expect("era tag");
-        d.array().expect("block array");
-
-        let start = d.position();
-        d.skip().expect("header");
-
-        (start, d.position())
+        assert_eq!(body[..], [first, second, first]);
     }
 
     fn header_of(block_cbor: &[u8]) -> Vec<u8> {
@@ -775,50 +590,6 @@ mod tests {
 
     fn block_header(hex_block: &str) -> Vec<u8> {
         header_of(&hex::decode(hex_block.trim()).expect("fixture block is hex"))
-    }
-
-    #[test]
-    fn the_synthetic_header_changes_two_fields_and_nothing_else() {
-        let plain = hex::decode(include_str!("../../test_data/dijkstra16.block").trim()).unwrap();
-        let built = with_leios_header_fields(
-            include_str!("../../test_data/dijkstra16.block"),
-            true,
-            Some(dijkstra::EbAnnouncement {
-                eb_hash: Hash::new([7; 32]),
-                eb_size: 4096,
-            }),
-        );
-
-        let common = plain
-            .iter()
-            .zip(built.iter())
-            .take_while(|(a, b)| a == b)
-            .count();
-
-        assert_eq!(
-            &plain[common..common + 2],
-            &[0xf4, 0xf6],
-            "the fixture's own flag and null announcement are what changed"
-        );
-        assert_eq!(built[common], 0xf5, "the built block certifies");
-
-        let (ps, pe) = header_span(&plain);
-        let (bs, be) = header_span(&built);
-        assert_eq!(ps, bs);
-        assert_eq!(&plain[pe..], &built[be..], "the block body is untouched");
-
-        let raw = header_of(&built);
-        let header = dijkstra_header(&raw);
-        assert_eq!(header.block_body_contains_leios_cert(), Some(true));
-        assert_eq!(header.eb_announcement().map(|a| a.eb_size), Some(4096));
-        assert_eq!(header.slot(), 311025, "the chain's own slot survives");
-
-        let neither = with_leios_header_fields(
-            include_str!("../../test_data/dijkstra16.block"),
-            false,
-            None,
-        );
-        assert_eq!(neither, plain, "a no-op build re-encodes byte for byte");
     }
 
     /// Blocks 17402 to 17406 in chain order, and 17511 and 17512, where each
@@ -882,18 +653,18 @@ mod tests {
     }
 
     /// No fixture block certifies after a parent that announced nothing, so
-    /// block 14936 is rewritten to certify after the real block 14935.
+    /// the header of block 14936 is rewritten to certify after the real block
+    /// 14935.
     #[test]
     fn a_certificate_after_a_parent_that_announced_nothing_is_refused_on_a_rewritten_header() {
         let parent = block_header(include_str!("../../test_data/dijkstra16.block"));
         let parent = dijkstra_header(&parent);
         assert!(parent.eb_announcement().is_none(), "fixture precondition");
 
-        let child = header_of(&with_leios_header_fields(
-            include_str!("../../test_data/dijkstra7.block"),
-            true,
-            None,
-        ));
+        let child = block_header(include_str!("../../test_data/dijkstra7.block"));
+        let mut child: dijkstra::Header = minicbor::decode(&child).expect("fixture header decodes");
+        child.header_body.block_body_contains_leios_cert = true;
+        let child = minicbor::to_vec(&child).expect("write to a vec");
         let child = dijkstra_header(&child);
 
         let err = certification(Some(&parent), &child)

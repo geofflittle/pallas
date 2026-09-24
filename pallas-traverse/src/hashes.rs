@@ -595,6 +595,11 @@ mod tests {
             ),
         ]);
 
+        #[cfg(feature = "unstable")]
+        assert_eq!(cases.len(), 17, "one Conway fixture and sixteen Dijkstra");
+        #[cfg(not(feature = "unstable"))]
+        assert_eq!(cases.len(), 1, "the Conway fixture alone without the era");
+
         for (block_str, hash, number, slot, era) in cases {
             let cbor = hex::decode(block_str).expect("invalid hex");
             let block = crate::MultiEraBlock::decode(&cbor).expect("invalid cbor");
@@ -629,6 +634,8 @@ mod tests {
             include_str!("../../test_data/dijkstra15.block"),
             include_str!("../../test_data/dijkstra16.block"),
         ];
+
+        assert_eq!(fixtures.len(), 16, "every Dijkstra fixture must be listed");
 
         for (index, block_str) in fixtures.iter().enumerate() {
             let name = format!("dijkstra{}.block", index + 1);
