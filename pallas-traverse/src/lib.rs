@@ -725,6 +725,7 @@ mod attribute_tests {
     const PUBLIC_ENUMS: &[(&str, Presence, NonExhaustive)] = &[
         ("cert::BlsKeySlot", UnstableOnly, Always),
         ("governance::ParamRead", UnstableOnly, Always),
+        ("leios::Error", UnstableOnly, Always),
         ("lib::Era", EveryBuild, Always),
         ("lib::Error", EveryBuild, Never),
         ("lib::Feature", EveryBuild, Always),
