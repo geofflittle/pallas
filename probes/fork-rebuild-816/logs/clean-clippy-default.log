@@ -1,0 +1,61 @@
+   Compiling serde_core v1.0.229
+    Checking regex-automata v0.4.18
+    Checking num-integer v0.1.47
+    Checking clap_builder v4.6.7
+    Checking num-bigint v0.4.8
+    Checking num-rational v0.4.2
+    Checking rustix v1.1.5
+    Checking clap v4.6.7
+    Checking matchers v0.2.0
+    Checking regex v1.13.1
+    Checking serde v1.0.229
+    Checking serde_json v1.0.151
+    Checking tracing-subscriber v0.3.23
+    Checking pallas-codec v1.4.0 (/pallas/pallas-codec)
+    Checking pbjson v0.7.0
+    Checking serde_with v3.23.0
+    Checking pbjson-types v0.7.0
+    Checking pallas-crypto v1.4.0 (/pallas/pallas-crypto)
+    Checking pallas-primitives v1.4.0 (/pallas/pallas-primitives)
+    Checking pallas-addresses v1.4.0 (/pallas/pallas-addresses)
+    Checking pallas-network v1.4.0 (/pallas/pallas-network)
+    Checking pallas-network2 v1.4.0 (/pallas/pallas-network2)
+    Checking utxorpc-spec v0.19.2
+    Checking tempfile v3.27.0
+    Checking rusty-fork v0.3.1
+    Checking serde_urlencoded v0.7.1
+    Checking reqwest v0.12.28
+    Checking proptest v1.11.0
+    Checking tinytemplate v1.2.1
+    Checking opentelemetry_sdk v0.30.0
+    Checking pallas-traverse v1.4.0 (/pallas/pallas-traverse)
+    Checking pallas-validate v1.4.0 (/pallas/pallas-validate)
+    Checking pallas-txbuilder v1.4.0 (/pallas/pallas-txbuilder)
+    Checking pallas-configs v1.4.0 (/pallas/pallas-configs)
+    Checking ciborium v0.2.2
+    Checking opentelemetry-proto v0.30.0
+    Checking opentelemetry-http v0.30.0
+    Checking opentelemetry-appender-tracing v0.30.1
+    Checking criterion v0.5.1
+    Checking env_filter v2.0.0
+    Checking env_logger v0.11.11
+    Checking opentelemetry-otlp v0.30.0
+    Checking quickcheck v1.1.0
+    Checking criterion v0.7.0
+    Checking serde_test v1.0.177
+    Checking p2p-responder v0.1.0 (/pallas/examples/p2p-responder)
+    Checking p2p-discovery v0.1.0 (/pallas/examples/p2p-discovery)
+    Checking pallas-utxorpc v1.4.0 (/pallas/pallas-utxorpc)
+    Checking pallas v1.4.0 (/pallas/pallas)
+    Checking block-download v0.1.0 (/pallas/examples/block-download)
+    Checking n2n-miniprotocols v0.1.0 (/pallas/examples/n2n-miniprotocols)
+    Checking crawler v0.1.0 (/pallas/examples/crawler)
+    Checking byron-decoder v0.1.0 (/pallas/examples/block-decode)
+    Checking n2c-miniprotocols v0.1.0 (/pallas/examples/n2c-miniprotocols)
+    Checking pallas-math v1.4.0 (/pallas/pallas-math)
+    Checking pallas-hardano v1.4.0 (/pallas/pallas-hardano)
+    Checking leios-tui v0.1.0 (/pallas/examples/leios-tui)
+    Checking p2p-initiator v0.1.0 (/pallas/examples/p2p-initiator)
+    Checking leios-testnet v0.1.0 (/pallas/examples/leios-testnet)
+    Finished `dev` profile [unoptimized] target(s) in 20.95s
+EXIT 0
