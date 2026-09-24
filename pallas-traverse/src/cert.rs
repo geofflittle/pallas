@@ -375,6 +375,94 @@ mod tests {
     }
 
     #[cfg(feature = "unstable")]
+    fn dijkstra_arm(cert: &dijkstra::Certificate) -> &'static str {
+        match cert {
+            dijkstra::Certificate::StakeDelegation(..) => "stake delegation",
+            dijkstra::Certificate::PoolRegistration { .. } => "pool registration",
+            dijkstra::Certificate::PoolRetirement(..) => "pool retirement",
+            dijkstra::Certificate::Reg(..) => "registration",
+            dijkstra::Certificate::UnReg(..) => "deregistration",
+            dijkstra::Certificate::VoteDeleg(..) => "vote delegation",
+            dijkstra::Certificate::StakeVoteDeleg(..) => "stake and vote delegation",
+            dijkstra::Certificate::StakeRegDeleg(..) => "stake registration and delegation",
+            dijkstra::Certificate::VoteRegDeleg(..) => "vote registration and delegation",
+            dijkstra::Certificate::StakeVoteRegDeleg(..) => {
+                "stake and vote registration and delegation"
+            }
+            dijkstra::Certificate::AuthCommitteeHot(..) => "committee hot key authorisation",
+            dijkstra::Certificate::ResignCommitteeCold(..) => "committee resignation",
+            dijkstra::Certificate::RegDRepCert(..) => "drep registration",
+            dijkstra::Certificate::UnRegDRepCert(..) => "drep deregistration",
+            dijkstra::Certificate::UpdateDRepCert(..) => "drep update",
+        }
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn every_dijkstra_fixture_certificate_reads_its_kind() {
+        let fixtures = [
+            include_str!("../../test_data/dijkstra2.block"),
+            include_str!("../../test_data/dijkstra3.block"),
+            include_str!("../../test_data/dijkstra4.block"),
+            include_str!("../../test_data/dijkstra5.block"),
+            include_str!("../../test_data/dijkstra6.block"),
+            include_str!("../../test_data/dijkstra7.block"),
+            include_str!("../../test_data/dijkstra10.block"),
+            include_str!("../../test_data/dijkstra13.block"),
+        ];
+
+        let mut arms = Vec::new();
+        let mut not_pool_registrations = 0usize;
+
+        for block_str in fixtures {
+            let cbor = block(block_str);
+            let decoded = MultiEraBlock::decode(&cbor).expect("invalid cbor");
+
+            for tx in decoded.txs() {
+                for cert in tx.certs() {
+                    let raw = cert.as_dijkstra().expect("a Dijkstra certificate");
+                    let kind = cert.kind().expect("a Dijkstra certificate has a kind");
+                    assert_eq!(arm(&kind), dijkstra_arm(raw));
+
+                    match (raw, &kind) {
+                        (
+                            dijkstra::Certificate::PoolRegistration {
+                                operator,
+                                pledge,
+                                cost,
+                                margin,
+                                reward_account,
+                                ..
+                            },
+                            MultiEraCertKind::PoolRegistration(view),
+                        ) => {
+                            assert_eq!(view.operator, operator);
+                            assert_eq!(view.pledge, *pledge);
+                            assert_eq!(view.cost, *cost);
+                            assert_eq!(view.margin, margin);
+                            assert_eq!(view.reward_account, reward_account);
+                        }
+                        (_, MultiEraCertKind::PoolRegistration(_)) => {
+                            panic!("{raw:?} is not a pool registration")
+                        }
+                        _ => not_pool_registrations += 1,
+                    }
+
+                    arms.push(arm(&kind));
+                }
+            }
+        }
+
+        arms.sort_unstable();
+        let mut expected = vec!["pool registration"; 6];
+        expected.extend(["registration"; 6]);
+        expected.extend(["stake delegation"; 2]);
+        expected.push("vote delegation");
+        assert_eq!(arms, expected);
+        assert_eq!(not_pool_registrations, 9);
+    }
+
+    #[cfg(feature = "unstable")]
     #[test]
     fn a_vote_delegation_certificate_is_read_through_the_multi_era_cert() {
         let cbor = block(include_str!("../../test_data/dijkstra13.block"));
