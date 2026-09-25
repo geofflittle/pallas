@@ -1,0 +1,104 @@
+   Compiling pallas-primitives v1.4.0 (/pallas/pallas-primitives)
+   Compiling pallas-traverse v1.4.0 (/pallas/pallas-traverse)
+    Finished `test` profile [unoptimized] target(s) in 8.22s
+     Running unittests src/lib.rs (/target/debug/deps/pallas_traverse-f9f471eb3e24c12a)
+
+running 73 tests
+test attribute_tests::stable_variants::every_listed_enum_has_a_stable_variant_list ... ok
+test attribute_tests::the_attribute_scan_reads_every_marking_and_presence ... ok
+test block::tests::a_dijkstra_block_is_refused_without_the_feature ... ok
+test cert::tests::an_alonzo_pool_registration_carries_its_parameters_through_the_view ... ok
+test cert::tests::every_alonzo_certificate_is_read_through_the_certificate_view ... ok
+test cert::tests::every_alonzo_certificate_payload_reads_back_by_value ... ok
+test cert::tests::every_conway_certificate_is_read_through_the_certificate_view ... ok
+test cert::tests::every_conway_certificate_payload_reads_back_by_value ... ok
+test era::tests::every_era_round_trips_through_its_tag ... ok
+test cert::tests::an_era_carrying_no_certificates_reads_no_kind ... ok
+test era::tests::tag_eight_is_unknown_without_the_feature ... ok
+test era::tests::unknown_era_tags_are_still_refused ... ok
+test fees::tests::known_fee_matches ... ok
+test governance::tests::a_conway_committee_update_carries_both_credential_lists ... ok
+test governance::tests::a_conway_parameter_change_carries_its_update_through_the_view ... ok
+test governance::tests::a_conway_proposal_reaches_its_parameter_update_without_the_feature ... ok
+test governance::tests::a_conway_update_leaving_key_18_alone_reads_no_cost_models ... ok
+test governance::tests::a_conway_update_reads_every_cost_model_it_proposes ... ok
+test governance::tests::a_conway_update_writing_key_3_still_reads_no_plutus_v4 ... ok
+test governance::tests::an_info_action_proposes_no_parameter_update ... ok
+test attribute_tests::every_public_enum_carries_the_marking_it_is_listed_with ... ok
+test block::tests::test_iteration ... ok
+test governance::tests::every_conway_action_is_read_through_the_action_view ... ok
+test governance::tests::every_conway_action_reports_the_id_it_carries_and_no_other_reports_one ... ok
+test hashes::tests::alonzo_transaction_hash_works ... ok
+test hashes::tests::babbage_transaction_hash_works ... ok
+test hashes::tests::byron_transaction_hash_works ... ok
+test hashes::tests::native_script_hashes_as_cardano_cli ... ok
+test hashes::tests::plutus_data_hashes_as_cardano_cli ... ok
+test hashes::tests::every_fixture_block_hashes_as_the_node_recorded_it ... ok
+test hashes::tests::test_inline_datum_hash_respects_original_cbor ... ok
+test hashes::tests::plutus_v1_script_hashes_as_cardano_cli ... ok
+test hashes::tests::test_public_key_hash ... ok
+test hashes::tests::plutus_v2_script_hashes_as_cardano_cli ... ok
+test hashes::tests::tx_wits_plutus_v1_script_hashes_as_cli ... ok
+test hashes::tests::test_witness_datum_hash_respects_original_cbor ... ok
+test header::tests::a_babbage_header_carries_no_leios_certificate_flag ... ok
+test input::tests::test_duplicate_consumed_inputs ... ok
+test header::tests::conway_header_still_decodes ... ok
+test input::tests::test_utxo_ref_parsing ... ok
+test header::tests::an_unknown_envelope_tag_decodes_as_babbage_without_the_feature ... ok
+test header::tests::every_header_variant_names_its_era ... ok
+test probe::tests::babbage_block_detected ... ok
+test probe::tests::allegra_block_detected ... ok
+test input::tests::test_expected_values ... ok
+test probe::tests::alonzo_block_detected ... ok
+test probe::tests::byron_block_detected ... ok
+test probe::tests::conway_block_detected ... ok
+test probe::tests::dijkstra_block_is_inconclusive_without_the_feature ... ok
+test redeemers::tests::a_conway_purpose_keeps_its_name_in_the_shared_tag_space ... ok
+test probe::tests::shelley_block_detected ... ok
+test script_ref::tests::a_conway_native_reference_script_is_read_in_the_shared_type ... ok
+test redeemers::tests::a_purpose_the_redeemer_does_not_carry_is_not_reported ... ok
+test script_ref::tests::a_conway_output_with_no_reference_script_reports_none ... ok
+test script_ref::tests::a_conway_reference_script_is_read_in_the_shared_type ... ok
+test testing::tests::the_shared_transaction_fixtures_are_what_these_builders_write ... ok
+test time::tests::calc_matches_mainnet_values ... ok
+test time::tests::calc_matches_preprod_values ... ok
+test time::tests::calc_matches_preview_values ... ok
+test probe::tests::mary_block_detected ... ok
+test time::tests::calc_matches_testnet_values ... ok
+test size::tests::known_size_matches ... ok
+test time::tests::known_slot_matches ... ok
+test witnesses::tests::a_conway_native_script_reads_every_clause_it_can_hold ... ok
+test witnesses::tests::a_conway_native_script_witness_is_read_in_the_shared_type ... ok
+test witnesses::tests::a_conway_transaction_with_no_script_reports_none ... ok
+test witnesses::tests::a_negative_n_of_k_threshold_reads_back_signed ... ok
+test witnesses::tests::a_nested_script_carries_no_bytes_of_its_own ... ok
+test witnesses::tests::an_auxiliary_data_script_hashes_this_crates_own_encoding ... ok
+test witnesses::tests::conway_auxiliary_data_scripts_are_read_in_the_shared_type ... ok
+test witnesses::tests::a_witness_set_script_hashes_the_bytes_it_arrived_in ... ok
+test witnesses::tests::the_three_dijkstra_auxiliary_plutus_accessors_answer_empty_for_conway ... ok
+test probe::tests::genesis_block_detected ... ok
+
+test result: ok. 73 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/deep_native_script.rs (/target/debug/deps/deep_native_script-42abb6842372b5cd)
+
+running 1 test
+test preprod_deep_native_script_block_on_default_sized_stack ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/signed_n_of_k_threshold.rs (/target/debug/deps/signed_n_of_k_threshold-9c22ea8acae5127f)
+
+running 1 test
+test preprod_negative_n_of_k_threshold_decodes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests pallas_traverse
+
+running 1 test
+test pallas-traverse/src/lib.rs - (line 17) - compile ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.21s; merged doctests compilation took 0.21s

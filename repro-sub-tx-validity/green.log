@@ -1,0 +1,43 @@
+    Updating crates.io index
+     Locking 438 packages to latest compatible versions
+      Adding amaru-uplc v0.1.0 (available: v0.4.0)
+      Adding base64 v0.22.1 (available: v0.23.1)
+      Adding bech32 v0.11.1 (available: v0.12.0)
+      Adding cddl v0.10.6 (available: v0.10.7)
+      Adding criterion v0.5.1 (available: v0.8.2)
+      Adding criterion v0.7.0 (available: v0.8.2)
+      Adding crossterm v0.28.1 (available: v0.29.0)
+      Adding cryptoxide v0.4.4 (available: v0.6.5)
+      Adding dashu-base v0.4.3 (available: v0.6.1)
+      Adding dashu-int v0.4.3 (available: v0.6.1)
+      Adding ed25519-dalek v2.2.0 (available: v3.0.0)
+      Adding generic-array v0.14.7 (available: v0.14.9)
+      Adding itertools v0.14.0 (available: v0.15.0)
+      Adding minicbor v0.26.5 (available: v2.3.0)
+      Adding minicov v0.3.8 (available: v0.3.9)
+      Adding num-bigint v0.4.8 (available: v0.5.1)
+      Adding opentelemetry v0.30.0 (available: v0.33.0)
+      Adding opentelemetry-appender-tracing v0.30.1 (available: v0.33.0)
+      Adding opentelemetry-otlp v0.30.0 (available: v0.33.0)
+      Adding opentelemetry_sdk v0.30.0 (available: v0.33.0)
+      Adding prost v0.13.5 (available: v0.14.4)
+      Adding prost-types v0.13.5 (available: v0.14.4)
+      Adding ratatui v0.29.0 (available: v0.30.2)
+      Adding unicode-width v0.2.0 (available: v0.2.2)
+   Compiling pallas-codec v1.4.0 (/pallas/pallas-codec)
+   Compiling pallas-crypto v1.4.0 (/pallas/pallas-crypto)
+   Compiling pallas-addresses v1.4.0 (/pallas/pallas-addresses)
+   Compiling pallas-primitives v1.4.0 (/pallas/pallas-primitives)
+   Compiling pallas-traverse v1.4.0 (/pallas/pallas-traverse)
+    Finished `test` profile [unoptimized] target(s) in 9.55s
+     Running unittests src/lib.rs (/target/debug/deps/pallas_traverse-b6176f5c4c39bc5c)
+
+running 5 tests
+test tx::tests::a_sub_transaction_answers_the_accessors_from_its_own_body ... ok
+test tx::tests::a_chain_transaction_carries_one_sub_transaction ... ok
+test tx::tests::a_sub_transaction_hashes_the_body_bytes_it_arrived_in ... ok
+test block::tests::txs_yields_only_the_transactions_the_block_body_lists ... ok
+test tx::tests::a_sub_transaction_reports_the_verdict_on_the_transaction_carrying_it ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 140 filtered out; finished in 0.04s
+
