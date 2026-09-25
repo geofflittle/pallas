@@ -204,7 +204,7 @@ impl<'b> MultiEraBlock<'b> {
                 .block_body
                 .transactions
                 .iter()
-                .map(|tx| 1 + tx.transaction_body.sub_transactions.iter().flatten().count())
+                .map(|tx| 1 + tx.transaction_body.sub_transactions.iter().flatten().count().max(1))
                 .sum(),
         }
     }
