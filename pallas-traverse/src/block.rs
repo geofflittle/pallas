@@ -158,22 +158,11 @@ impl<'b> MultiEraBlock<'b> {
                 .into_iter()
                 .map(|x| MultiEraTx::Conway(Box::new(Cow::Owned(x))))
                 .collect(),
-            // Sub transactions precede their parent. The parent's id hashes a body
-            // that holds them, so a parent can spend a sub transaction output.
             #[cfg(feature = "unstable")]
-            MultiEraBlock::Dijkstra(x) => {
-                let mut out = Vec::new();
-
-                for tx in support::clone_dijkstra_txs(x) {
-                    for sub in tx.transaction_body.sub_transactions.iter().flatten() {
-                        out.push(MultiEraTx::DijkstraSub(Box::new(Cow::Owned(sub.clone()))));
-                    }
-
-                    out.push(MultiEraTx::Dijkstra(Box::new(Cow::Owned(tx))));
-                }
-
-                out
-            }
+            MultiEraBlock::Dijkstra(x) => support::clone_dijkstra_txs(x)
+                .into_iter()
+                .map(|x| MultiEraTx::Dijkstra(Box::new(Cow::Owned(x))))
+                .collect(),
             MultiEraBlock::EpochBoundary(_) => vec![],
         }
     }
@@ -200,12 +189,7 @@ impl<'b> MultiEraBlock<'b> {
             MultiEraBlock::Byron(x) => x.body.tx_payload.len(),
             MultiEraBlock::Conway(x) => x.transaction_bodies.len(),
             #[cfg(feature = "unstable")]
-            MultiEraBlock::Dijkstra(x) => x
-                .block_body
-                .transactions
-                .iter()
-                .map(|tx| 1 + tx.transaction_body.sub_transactions.iter().flatten().count())
-                .sum(),
+            MultiEraBlock::Dijkstra(x) => x.block_body.transactions.len(),
         }
     }
 
