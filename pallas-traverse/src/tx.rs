@@ -1684,4 +1684,46 @@ mod tests {
             "the sub body and the outer body are different bytes, so a shared hash would mean one of them was read for the other"
         );
     }
+
+    #[test]
+    fn a_sub_transaction_reports_the_verdict_on_the_transaction_carrying_it() {
+        let cases = [
+            (include_str!("../../test_data/dijkstra17.block"), 1usize),
+            (include_str!("../../test_data/dijkstra18.block"), 2),
+        ];
+
+        for (block_str, outputs) in cases {
+            let cbor = hex::decode(block_str).unwrap();
+            let block = MultiEraBlock::decode(&cbor).unwrap();
+            let txs = block.txs();
+            let parent = txs
+                .iter()
+                .filter_map(MultiEraTx::as_dijkstra)
+                .find(|x| x.transaction_body.sub_transactions.is_some())
+                .expect("one transaction of the block carries body key 23");
+
+            for success in [true, false] {
+                let mut flagged = parent.clone();
+                flagged.success = success;
+                let tx = MultiEraTx::from_dijkstra(&flagged);
+
+                let subs = tx.sub_transactions();
+                assert_eq!(subs.len(), 1, "body key 23 holds one sub transaction");
+                let sub = subs.first().expect("one sub transaction");
+
+                assert_eq!(
+                    sub.is_valid(),
+                    success,
+                    "a sub transaction is applied only when the transaction carrying it is"
+                );
+
+                let applied = (sub.consumes().len(), sub.produces().len());
+                let expected = if success { (1, outputs) } else { (0, 0) };
+                assert_eq!(
+                    applied, expected,
+                    "a sub transaction of a phase 2 invalid transaction spends and creates nothing"
+                );
+            }
+        }
+    }
 }

@@ -36,6 +36,11 @@ with the block's CRC32 and the header's offset and size.
 | dijkstra13.block | 00278/24 | 301082 | 14594 | `cf522686b27e452b3e261904058c7e323f3723e2f5c629e5a7542579b59474b4` | 1274 | 8 | 1 | certificate tag 9, vote delegation |
 | dijkstra14.block | 00574/21 | 620349 | 28687 | `9b481f4b4fa46de9a1bde085570b5fc9d90f161f99bde7f63bfe4ed20dbc37bf` | 1734 | 8 | 1 | a transaction body writing its certificate set as a bare array rather than under tag 258 |
 | dijkstra15.block | 00344/11 | 371916 | 17406 | `0db84efa0259153a240cecacd0f9e52f942d40f96b132ebd0d5b3526e19b3a7b` | 964 | 8 | 0 | an announced endorser block size of 71103, which needs the five byte uint |
+| dijkstra17.block | 00791/1 | 854292 | 39080 | `435a2d49007479dedc45e27f5054158aabd2cfdabf4860877416588287243cb6` | 50838 | 8 | 246 | a transaction whose body key 23 holds one sub transaction with one output |
+| dijkstra18.block | 00956/22 | 1032954 | 46854 | `4eef873084a917feff38bf65e4ecf58021d1d9bcf98fac95ffbcb5cee02fcc98` | 88499 | 8 | 434 | a transaction whose body key 23 holds one sub transaction with two outputs |
+
+`dijkstra17.block` and `dijkstra18.block` were read from the immutable chunks of
+the Musashi node itself, and checked against its secondary index in the same way.
 
 The `tag` column is the block wrapper tag. A Dijkstra header arriving on its
 own over chainsync carries envelope tag 7 rather than the wrapper tag 8, and
@@ -60,6 +65,8 @@ models is exercised by no fixture and is modelled from the CDDL alone.
 | dijkstra13.block | 0, 1, 2, 4 | 0 | array | 7, 9 | tagged | 0 | nil | nil |
 | dijkstra14.block | 0, 1, 2, 3, 4 | 0 | map | 3 | bare | 0 | nil | nil |
 | dijkstra15.block | none | none | none | none | none | 0 | present | present |
+| dijkstra17.block | 0, 1, 2, 13, 18, 23 | 0 | map, array | none | tagged | 1 | nil | nil |
+| dijkstra18.block | 0, 1, 2, 18, 23 | 0 | array | none | tagged | 1 | nil | nil |
 
 ## Transactions cut from the chain
 
