@@ -159,10 +159,19 @@ impl<'b> MultiEraBlock<'b> {
                 .map(|x| MultiEraTx::Conway(Box::new(Cow::Owned(x))))
                 .collect(),
             #[cfg(feature = "unstable")]
-            MultiEraBlock::Dijkstra(x) => support::clone_dijkstra_txs(x)
-                .into_iter()
-                .map(|x| MultiEraTx::Dijkstra(Box::new(Cow::Owned(x))))
-                .collect(),
+            MultiEraBlock::Dijkstra(x) => {
+                let mut out = Vec::new();
+                for tx in support::clone_dijkstra_txs(x) {
+                    for sub in tx.transaction_body.sub_transactions.iter().flatten() {
+                        out.push(MultiEraTx::DijkstraSub(
+                            Box::new(Cow::Owned(sub.clone())),
+                            tx.success,
+                        ));
+                    }
+                    out.push(MultiEraTx::Dijkstra(Box::new(Cow::Owned(tx))));
+                }
+                out
+            }
             MultiEraBlock::EpochBoundary(_) => vec![],
         }
     }
