@@ -1,0 +1,5 @@
+    Checking p2p-discovery v0.1.0 (/pallas/examples/p2p-discovery)
+    Checking pallas-txbuilder v1.4.0 (/pallas/pallas-txbuilder)
+    Checking pallas-traverse v1.4.0 (/pallas/pallas-traverse)
+    Finished `dev` profile [unoptimized] target(s) in 0.67s
+EXIT 0

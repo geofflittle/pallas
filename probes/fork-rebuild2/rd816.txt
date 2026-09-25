@@ -1,0 +1,186 @@
+1:  9be3f014 ! 1:  9bb1cead feat: read leios endorser blocks
+    @@ test_data/dijkstra-eb2.header (new)
+      ## test_data/dijkstra-fixtures.md ##
+     @@
+     -# Dijkstra block fixtures
+    --
+    ++# Dijkstra fixtures
+    + 
+     -Real blocks from the Musashi testnet, as lowercase hex of the block exactly as
+     -the node stored it, wrapper and all, no trailing newline.
+    --
+    ++The Dijkstra and Leios tests read the files below. Each is lowercase hex. The
+    ++`.ebtxs` files end every line with a newline, and the other files hold no
+    ++newline. Hashes are blake2b-256.
+    + 
+     -| | |
+     -| --- | --- |
+     -| network | Musashi, network magic 164 |
+    @@ test_data/dijkstra-fixtures.md
+     -pallas-hardano's chunk reader. Each hash is blake2b-256 of the header CBOR and
+     -was checked against the header hash in the node's own secondary index, together
+     -with the block's CRC32 and the header's offset and size.
+    --
+    ++## Blocks
+    + 
+     -| file | chunk/index | slot | block | hash | bytes | tag | txs | why |
+     -| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+     -| conway5.block | 00079/39 | 86373 | 4254 | `802112126cc600a6afc5193a0150aafd9f6563bec28207df7e6c20cc62e95f8e` | 862 | 7 | 0 | the last block before the fork, a Conway body under a twelve element header body |
+    @@ test_data/dijkstra-fixtures.md
+     -| dijkstra13.block | 00278/24 | 301082 | 14594 | `cf522686b27e452b3e261904058c7e323f3723e2f5c629e5a7542579b59474b4` | 1274 | 8 | 1 | certificate tag 9, vote delegation |
+     -| dijkstra14.block | 00574/21 | 620349 | 28687 | `9b481f4b4fa46de9a1bde085570b5fc9d90f161f99bde7f63bfe4ed20dbc37bf` | 1734 | 8 | 1 | a transaction body writing its certificate set as a bare array rather than under tag 258 |
+     -| dijkstra15.block | 00344/11 | 371916 | 17406 | `0db84efa0259153a240cecacd0f9e52f942d40f96b132ebd0d5b3526e19b3a7b` | 964 | 8 | 0 | an announced endorser block size of 71103, which needs the five byte uint |
+    --
+    ++Cut from the Musashi chain of node release `prototype-2026w36`, each the CBOR
+    ++array `[era, block]`. `conway5.block` is the last Conway block and the rest are
+    ++Dijkstra blocks. The hash is the header hash.
+    + 
+     -The `tag` column is the block wrapper tag. A Dijkstra header arriving on its
+     -own over chainsync carries envelope tag 7 rather than the wrapper tag 8, and
+     -that number was observed on a node rather than read from any file here.
+    --
+    --What each fixture's transactions carry. Every other key and shape the era
+    --models is exercised by no fixture and is modelled from the CDDL alone.
+    --
+    --| file | body keys | witness keys | outputs | certificate tags | set arms | indefinite | leios certificate | announcement |
+    --| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+    --| dijkstra2.block | 0, 1, 2, 4 | 0 | array | 3 | tagged | 0 | nil | nil |
+    --| dijkstra3.block | 0, 1, 2 | 0 | array | none | tagged | 0 | nil | nil |
+    --| dijkstra4.block | 0, 1, 2, 4, 7 | 0 | array | 3, 7 | tagged | 0 | nil | nil |
+    --| dijkstra5.block | 0, 1, 2, 4, 7 | 0 | array | 3, 7 | tagged | 0 | nil | nil |
+    --| dijkstra6.block | 0, 1, 2, 4, 7 | 0 | array | 2, 3, 7 | tagged | 0 | nil | nil |
+    --| dijkstra7.block | 0, 1, 2, 4 | 0 | array | 2 | tagged | 0 | nil | nil |
+    --| dijkstra8.block | none | none | none | none | none | 0 | present | present |
+    --| dijkstra9.block | none | none | none | none | none | 0 | present | nil |
+    --| dijkstra10.block | 0, 1, 2, 3, 4, 7 | 0 | map, array | 3, 7 | tagged, bare | 0 | nil | nil |
+    --| dijkstra11.block | 0, 1, 2 | 0 | map | none | bare | 0 | nil | nil |
+    --| dijkstra12.block | 0, 1, 2 | 0 | array | none | tagged | 1 | nil | nil |
+    --| dijkstra13.block | 0, 1, 2, 4 | 0 | array | 7, 9 | tagged | 0 | nil | nil |
+    --| dijkstra14.block | 0, 1, 2, 3, 4 | 0 | map | 3 | bare | 0 | nil | nil |
+    --| dijkstra15.block | none | none | none | none | none | 0 | present | present |
+    -+# Dijkstra fixtures
+    -+
+    -+Every file named here is lowercase hex. The `.ebtxs` files end every line with
+    -+a newline, and the other files hold no newline. Hashes are blake2b-256.
+    -+
+    -+## Blocks
+    -+
+    -+Blocks of the Musashi chain of node release `prototype-2026w36`, each the CBOR
+    -+array `[era, block]`. `conway5.block` is the last Conway block and the rest are
+    -+Dijkstra blocks. The hash is the header hash.
+    -+
+     +| file | block | slot | hash |
+     +| --- | --- | --- | --- |
+     +| conway5.block | 4254 | 86373 | `802112126cc600a6afc5193a0150aafd9f6563bec28207df7e6c20cc62e95f8e` |
+    @@ test_data/dijkstra-fixtures.md
+     +| dijkstra14.block | 28687 | 620349 | `9b481f4b4fa46de9a1bde085570b5fc9d90f161f99bde7f63bfe4ed20dbc37bf` |
+     +| dijkstra15.block | 17406 | 371916 | `0db84efa0259153a240cecacd0f9e52f942d40f96b132ebd0d5b3526e19b3a7b` |
+     +| dijkstra16.block | 14935 | 311025 | `c9d7bca094227279830e2e2110acbb965dc9e90d469ac97594d40bc8e295735c` |
+    -+
+    + 
+    +-What each fixture's transactions carry. Every other key and shape the era
+    +-models is exercised by no fixture and is modelled from the CDDL alone.
+     +## Headers
+    -+
+    -+Ranking block headers of the Musashi chain of node release
+    + 
+    +-| file | body keys | witness keys | outputs | certificate tags | set arms | indefinite | leios certificate | announcement |
+    +-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+    +-| dijkstra2.block | 0, 1, 2, 4 | 0 | array | 3 | tagged | 0 | nil | nil |
+    +-| dijkstra3.block | 0, 1, 2 | 0 | array | none | tagged | 0 | nil | nil |
+    +-| dijkstra4.block | 0, 1, 2, 4, 7 | 0 | array | 3, 7 | tagged | 0 | nil | nil |
+    +-| dijkstra5.block | 0, 1, 2, 4, 7 | 0 | array | 3, 7 | tagged | 0 | nil | nil |
+    +-| dijkstra6.block | 0, 1, 2, 4, 7 | 0 | array | 2, 3, 7 | tagged | 0 | nil | nil |
+    +-| dijkstra7.block | 0, 1, 2, 4 | 0 | array | 2 | tagged | 0 | nil | nil |
+    +-| dijkstra8.block | none | none | none | none | none | 0 | present | present |
+    +-| dijkstra9.block | none | none | none | none | none | 0 | present | nil |
+    +-| dijkstra10.block | 0, 1, 2, 3, 4, 7 | 0 | map, array | 3, 7 | tagged, bare | 0 | nil | nil |
+    +-| dijkstra11.block | 0, 1, 2 | 0 | map | none | bare | 0 | nil | nil |
+    +-| dijkstra12.block | 0, 1, 2 | 0 | array | none | tagged | 1 | nil | nil |
+    +-| dijkstra13.block | 0, 1, 2, 4 | 0 | array | 7, 9 | tagged | 0 | nil | nil |
+    +-| dijkstra14.block | 0, 1, 2, 3, 4 | 0 | map | 3 | bare | 0 | nil | nil |
+    +-| dijkstra15.block | none | none | none | none | none | 0 | present | present |
+    ++Ranking block headers cut from the Musashi chain of node release
+     +`prototype-2026w36`, each the CBOR array `[header_body, body_signature]`.
+     +`certifies` is `block_body_contains_leios_cert` and `announces` is the
+     +`eb_announcement`.
+    -+
+    + 
+    +-## Transactions cut from the chain
+     +| file | block | slot | hash | certifies | announces |
+     +| --- | --- | --- | --- | --- | --- |
+     +| dijkstra-17402.header | 17402 | 371680 | `b0e696b02f5c527b43eabf2149b71c7f9579b4e2db1dbe0c04fe67881cdb8aa9` | no | `29694e6d204e586f170a1f4f75da3703cb86289d08e7eaea2def826a6dcd7e90`, 8786 bytes |
+    @@ test_data/dijkstra-fixtures.md
+     +| dijkstra-17511.header | 17511 | 374267 | `9bc3734faa48f8eae7e3a76409c2e60bc12daa37090ec2e0b538b708831008a2` | yes | `2abe14e0dd956846cd06b786b36380a608488b265790a55676af90f0ebe86201`, 24772 bytes |
+     +| dijkstra-17513.header | 17513 | 374317 | `68d831715019aa837971400882b6a435a4cafbf61c560821eb8b06230bda9660` | no | `ca3307d00fa71c0b56eda818b5dbd49b05dbc4e91b4a806772fb0e1090a06dae`, 29487 bytes |
+     +| dijkstra-17514.header | 17514 | 374322 | `a4afe2e204ff56356e568e57e3b416787cd63b77f82e75dee8610b6dfa01d2d6` | no | `96e2601ff180781092c8f2308cb5f1b4164fbf59268ee3378e7a7c7af6097977`, 18291 bytes |
+    -+
+    + 
+    +-One file here is a single transaction rather than a whole block, read from the
+    +-chain in the same way the blocks above were, and not hand built.
+     +## Endorser blocks
+    -+
+    -+For each name, `.ebbody` is an endorser block body, a CBOR map from transaction
+    -+hash to transaction size. `.ebtxs` holds its transactions in body order, each
+    -+line one transaction as a CBOR byte string. `.header` is the ranking block
+    -+header that announces it. `dijkstra-17402` is from the Musashi chain of node
+    -+release `prototype-2026w36`, and `dijkstra-eb1` and `dijkstra-eb2` are from the
+    + 
+    +-| file | slot | block | transaction | what it carries |
+    +-| --- | --- | --- | --- | --- |
+    +-| `dijkstra-subtx.tx` | 853600 | `0c88b1e221beb608ed37dcfabed93a4a4e8f1ea0ec96f2d93b84c04816d5ddb4` | `74e2116ca6e0c809f156aa062a9d4ee8b156322618846f1bdea5d9ad7a206a12` | body keys 0, 1, 2, 13, 18, 23, where key 23 is `sub_transactions` and holds one sub transaction whose own body carries keys 0, 1, 11, 14, 18, so the file exercises `guards` at key 14 inside a sub transaction body |
+    ++Each name has three files. `.ebbody` is an endorser block body, a CBOR map from
+    ++transaction hash to transaction size. `.ebtxs` holds its transactions in body
+    ++order, one CBOR byte string per line. `.header` is the ranking block header
+    ++that announces it. `dijkstra-17402` is cut from the Musashi chain of node
+    ++release `prototype-2026w36`, and `dijkstra-eb1` and `dijkstra-eb2` from the
+     +Musashi chain of node release `prototype-2026w35`.
+    -+
+    -+| name | announced at slot | header hash | body bytes | transactions | first key | first size | first transaction id |
+    -+| --- | --- | --- | --- | --- | --- | --- | --- |
+    -+| dijkstra-eb1 | 429789 | `abba50f39b31ca7ed67ebe72f588668073a66090a33504a76d9abbc1d6a9d3b5` | 37 | 1 | `a69f9fc581e5914a101a3e619f5ce64b6bce76721fd5eed0cbad0e0f6d411cc5` | 229 | `a2a3715bac697e28991d003c62a0c280fb91af40944f7bbcee27d972ad0f0a08` |
+    -+| dijkstra-eb2 | 397855 | `779e95c2816db83f41528b1b8260034f68c8f817c4f32edadc05de0fc16f22fb` | 1082 | 30 | `455a00b521f35f2c0a6ff0a59296c3316de6219af206c13d2e95870f66541fec` | 200 | `1839e14ac4327a8a8f6c00d2bfbdb0b4a95bb6dc92d84d3a45d3ff9ada7964c2` |
+    -+| dijkstra-17402 | 371680 | `b0e696b02f5c527b43eabf2149b71c7f9579b4e2db1dbe0c04fe67881cdb8aa9` | 8786 | 244 | `2bc50f5b4942ca304e39e7cd7f1c4261d85437ea5464b2d1a623f47790254a3d` | 201 | `82bfbdf62f180269e15a72672b51610bc17a043c3d6f5c5a2434403b00a49d98` |
+    + 
+    +-The file is the transaction as it sat in the block, 728 bytes in the four
+    +-element `block_transaction` form, written as lowercase hex with no trailing
+    +-newline. Blake2b-256 over the body alone gives the transaction hash in the
+    +-table, and `pallas-traverse` asserts that.
+    ++| name | announced at slot | header hash | transactions | first key | first size | first transaction id |
+    ++| --- | --- | --- | --- | --- | --- | --- |
+    ++| dijkstra-eb1 | 429789 | `abba50f39b31ca7ed67ebe72f588668073a66090a33504a76d9abbc1d6a9d3b5` | 1 | `a69f9fc581e5914a101a3e619f5ce64b6bce76721fd5eed0cbad0e0f6d411cc5` | 229 | `a2a3715bac697e28991d003c62a0c280fb91af40944f7bbcee27d972ad0f0a08` |
+    ++| dijkstra-eb2 | 397855 | `779e95c2816db83f41528b1b8260034f68c8f817c4f32edadc05de0fc16f22fb` | 30 | `455a00b521f35f2c0a6ff0a59296c3316de6219af206c13d2e95870f66541fec` | 200 | `1839e14ac4327a8a8f6c00d2bfbdb0b4a95bb6dc92d84d3a45d3ff9ada7964c2` |
+    ++| dijkstra-17402 | 371680 | `b0e696b02f5c527b43eabf2149b71c7f9579b4e2db1dbe0c04fe67881cdb8aa9` | 244 | `2bc50f5b4942ca304e39e7cd7f1c4261d85437ea5464b2d1a623f47790254a3d` | 201 | `82bfbdf62f180269e15a72672b51610bc17a043c3d6f5c5a2434403b00a49d98` |
+    + 
+    +-## Fixtures built rather than cut
+    ++## Transactions and proposals
+    + 
+    +-Four files here are hand built CBOR, for shapes no block on this chain
+    +-reaches. Each is written by a builder in `pallas-traverse`, and a test there
+    +-asserts the file is byte for byte what that builder writes, so the file and
+    +-the builder cannot drift apart.
+    ++Each `.tx` file is one `block_transaction`, the four element array a block
+    ++holds. `dijkstra-subtx.tx` is cut from the Musashi chain of node release
+    ++`prototype-2026w36` at slot 853600, and the other four files are built. A test
+    ++in `pallas_traverse::testing` asserts that `dijkstra-proposal.tx` and
+    ++`dijkstra-scripts.tx` are byte for byte what its builders write.
+    + 
+    + | file | what it is |
+    + | --- | --- |
+    +-| `proposal-param-change-key0.hex` | a `proposal_procedure` whose parameter change sets key 0, a key every era since Shelley has |
+    +-| `proposal-param-change-key48.hex` | the same with key 48, `max_ref_script_size_per_endorser_block`, which only this era has |
+    +-| `dijkstra-proposal.tx` | a `block_transaction` carrying the key 48 proposal at body key 20 |
+    +-| `dijkstra-scripts.tx` | a `block_transaction` carrying a guard clause in its witness set, the same clause and a PlutusV4 script in its auxiliary data, and a PlutusV4 reference script on its output |
+    +-
+    +-The two proposal files are read by `pallas-primitives` and by
+    +-`pallas-traverse`, and the two transaction files by `pallas-utxorpc`, so one
+    +-set of bytes serves every crate that needs the shape.
+    ++| dijkstra-subtx.tx | transaction `74e2116ca6e0c809f156aa062a9d4ee8b156322618846f1bdea5d9ad7a206a12`, whose body key 23 holds one sub transaction with `guards` at its body key 14 |
+    ++| proposal-param-change-key0.hex | a `proposal_procedure` whose parameter change sets key 0, which every era since Shelley has |
+    ++| proposal-param-change-key48.hex | the same with key 48, `max_ref_script_size_per_endorser_block`, which only Dijkstra has |
+    ++| dijkstra-proposal.tx | a transaction carrying the key 48 proposal at body key 20 |
+    ++| dijkstra-scripts.tx | a transaction carrying a guard clause in its witness set, the same clause and a PlutusV4 script in its auxiliary data, and a PlutusV4 reference script on its output |
+     
+      ## test_data/dijkstra16.block (new) ##
+     @@
+-:  -------- > 2:  ac21ae9c fix(traverse): read module gates in the enum scan

@@ -1,0 +1,99 @@
+    Checking pallas-codec v1.4.0 (/pallas/pallas-codec)
+    Checking pallas-math v1.4.0 (/pallas/pallas-math)
+    Checking pallas-crypto v1.4.0 (/pallas/pallas-crypto)
+    Checking pallas-network2 v1.4.0 (/pallas/pallas-network2)
+    Checking pallas-primitives v1.4.0 (/pallas/pallas-primitives)
+    Checking pallas-addresses v1.4.0 (/pallas/pallas-addresses)
+    Checking pallas-network v1.4.0 (/pallas/pallas-network)
+    Checking p2p-responder v0.1.0 (/pallas/examples/p2p-responder)
+    Checking leios-tui v0.1.0 (/pallas/examples/leios-tui)
+    Checking p2p-initiator v0.1.0 (/pallas/examples/p2p-initiator)
+    Checking pallas-traverse v1.4.0 (/pallas/pallas-traverse)
+    Checking pallas-configs v1.4.0 (/pallas/pallas-configs)
+    Checking pallas-validate v1.4.0 (/pallas/pallas-validate)
+    Checking pallas-txbuilder v1.4.0 (/pallas/pallas-txbuilder)
+    Checking pallas-hardano v1.4.0 (/pallas/pallas-hardano)
+    Checking pallas-utxorpc v1.4.0 (/pallas/pallas-utxorpc)
+    Checking pallas v1.4.0 (/pallas/pallas)
+    Checking block-download v0.1.0 (/pallas/examples/block-download)
+    Checking n2n-miniprotocols v0.1.0 (/pallas/examples/n2n-miniprotocols)
+    Checking n2c-miniprotocols v0.1.0 (/pallas/examples/n2c-miniprotocols)
+    Checking crawler v0.1.0 (/pallas/examples/crawler)
+    Checking byron-decoder v0.1.0 (/pallas/examples/block-decode)
+    Checking leios-testnet v0.1.0 (/pallas/examples/leios-testnet)
+    Checking p2p-discovery v0.1.0 (/pallas/examples/p2p-discovery)
+error: manual implementation of `.is_multiple_of()`
+   --> examples/leios-testnet/src/bin/harvest.rs:205:20
+    |
+205 |                 if rows % 5000 == 0 {
+    |                    ^^^^^^^^^^^^^^^^ help: replace with: `rows.is_multiple_of(5000)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+    = note: `-D clippy::manual-is-multiple-of` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_is_multiple_of)]`
+
+error: manual implementation of `.is_multiple_of()`
+   --> examples/leios-testnet/src/bin/harvest.rs:326:20
+    |
+326 |                 if blocks % 200 == 0 {
+    |                    ^^^^^^^^^^^^^^^^^ help: replace with: `blocks.is_multiple_of(200)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+
+error: this `if` statement can be collapsed
+   --> examples/leios-testnet/src/bin/harvest.rs:396:25
+    |
+396 | /                         if let Some(&at) = position.get(input.hash()) {
+397 | |                             if at > i {
+398 | |                                 writeln!(
+399 | |                                     file,
+...   |
+407 | |                         }
+    | |_________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#collapsible_if
+    = note: `-D clippy::collapsible-if` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::collapsible_if)]`
+help: collapse nested if block
+    |
+396 ~                         if let Some(&at) = position.get(input.hash())
+397 ~                             && at > i {
+398 |                                 writeln!(
+...
+405 |                                 found.0 += 1;
+406 ~                             }
+    |
+
+error: manual implementation of `.is_multiple_of()`
+   --> examples/leios-testnet/src/bin/harvest.rs:448:20
+    |
+448 |                 if blocks % 2000 == 0 {
+    |                    ^^^^^^^^^^^^^^^^^^ help: replace with: `blocks.is_multiple_of(2000)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#manual_is_multiple_of
+
+error: this `if` statement can be collapsed
+   --> examples/leios-testnet/src/bin/harvest.rs:635:17
+    |
+635 | /                 if let Some(&at) = position.get(input.hash()) {
+636 | |                     if at > i {
+637 | |                         println!(
+638 | |                             "{prefix}\tforward_ref\tspender {i} produced_by {at} ref {}#{}",
+...   |
+644 | |                 }
+    | |_________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#collapsible_if
+help: collapse nested if block
+    |
+635 ~                 if let Some(&at) = position.get(input.hash())
+636 ~                     && at > i {
+637 |                         println!(
+...
+642 |                         forward += 1;
+643 ~                     }
+    |
+
+error: could not compile `leios-testnet` (bin "harvest" test) due to 5 previous errors
+warning: build failed, waiting for other jobs to finish...
+EXIT 101

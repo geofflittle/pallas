@@ -1,0 +1,140 @@
+info: syncing channel updates for 1.93-x86_64-unknown-linux-gnu
+info: latest update on 2026-02-12 for version 1.93.1 (01f6ddf75 2026-02-11)
+info: downloading 5 components
+   Compiling libc v0.2.186
+    Checking regex-automata v0.4.9
+    Checking crossbeam-channel v0.5.15
+   Compiling ahash v0.8.12
+   Compiling cfg_aliases v0.2.1
+   Compiling nix v0.30.1
+    Checking crossbeam v0.8.4
+warning: dolos@2.0.0-alpha.0: not within a suitable 'git' worktree!
+warning: dolos@2.0.0-alpha.0: VERGEN_GIT_SHA set to default
+    Checking csv-core v0.1.13
+   Compiling serial_test_derive v3.5.0
+    Checking csv v1.4.0
+    Checking bech32 v0.9.1
+    Checking mown v1.0.0
+    Checking stats_alloc v0.1.10
+    Checking parking_lot_core v0.9.10
+    Checking signal-hook-registry v1.4.5
+    Checking mio v1.2.2
+    Checking socket2 v0.6.3
+    Checking parking_lot v0.12.3
+    Checking getrandom v0.2.17
+    Checking socket2 v0.5.9
+    Checking tokio v1.52.3
+    Checking ring v0.17.14
+    Checking rand_core v0.6.4
+    Checking num_cpus v1.16.0
+    Checking rand_chacha v0.3.1
+    Checking getrandom v0.4.2
+    Checking threadpool v1.8.1
+    Checking rand v0.8.6
+    Checking blst v0.3.16
+    Checking rand v0.10.1
+    Checking getrandom v0.3.2
+    Checking stacker v0.1.21
+    Checking rustls-webpki v0.103.15
+    Checking chumsky v1.0.0-alpha.8
+    Checking regex v1.11.1
+    Checking rustls v0.23.45
+    Checking divan v0.1.21
+    Checking matchers v0.2.0
+    Checking tracing-subscriber v0.3.23
+    Checking tracing-opentelemetry v0.33.0
+    Checking tempfile v3.20.0
+    Checking tokio-util v0.7.14
+    Checking pallas-network v1.4.0 (/pallas/pallas-network)
+    Checking h2 v0.4.16
+    Checking tower v0.5.2
+    Checking tokio-rustls v0.26.2
+    Checking tokio-stream v0.1.17
+    Checking tower v0.4.13
+    Checking axum v0.7.9
+    Checking tower-http v0.6.8
+    Checking amaru-uplc v0.1.0
+    Checking hyper v1.6.0
+    Checking pallas-hardano v1.4.0 (/pallas/pallas-hardano)
+    Checking rustls-platform-verifier v0.7.0
+    Checking pallas-network2 v1.4.0 (/pallas/pallas-network2)
+    Checking hyper-util v0.1.15
+    Checking ed25519-dalek v2.2.0
+    Checking kes-summed-ed25519 v0.2.1
+    Checking pallas-validate v1.4.0 (/pallas/pallas-validate)
+    Checking rand_core v0.9.3
+    Checking hyper-timeout v0.5.2
+    Checking hyper-rustls v0.27.5
+    Checking tonic v0.12.3
+    Checking reqwest v0.13.4
+    Checking mithril-stm v0.10.5
+    Checking rand_chacha v0.9.0
+    Checking rand v0.9.3
+    Checking tonic v0.14.6
+    Checking oci-spec v0.9.0
+    Checking mithril-common v0.6.67
+    Checking utxorpc-spec v0.19.0
+    Checking uuid v1.23.5
+    Checking signal-hook v0.3.17
+    Checking utxorpc-spec v0.15.0
+    Checking oci-client v0.17.0
+    Checking mithril-aggregator-client v0.1.10
+    Checking lsm-tree v3.1.0
+    Checking pallas-network v1.3.0
+    Checking jsonrpsee-core v0.24.9
+    Checking soketto v0.8.1
+    Checking dashmap v6.1.0
+    Checking filetime v0.2.25
+    Checking tar v0.4.46
+    Checking fjall v3.1.0
+    Checking jsonrpsee-server v0.24.9
+    Checking stelae v0.2.0 (https://github.com/txpipe/stelae?tag=v0.2.0#703cc34b)
+    Checking mithril-aggregator-discovery v0.1.4
+    Checking utxorpc v0.10.0
+    Checking mithril-cardano-node-internal-database v0.1.11
+    Checking signal-hook-mio v0.2.5
+    Checking tonic-prost v0.14.6
+    Checking opentelemetry_sdk v0.32.1
+    Checking axum v0.8.4
+    Checking pallas-utxorpc v1.4.0 (/pallas/pallas-utxorpc)
+    Checking pallas-utxorpc v1.3.0
+    Checking pallas v1.4.0 (/pallas/pallas)
+    Checking dolos-core v2.0.0-alpha.0 (/dolos/crates/core)
+    Checking pallas v1.3.0
+    Checking dolos-flatfiles v2.0.0-alpha.0 (/dolos/crates/flatfiles)
+    Checking backtrace v0.3.74
+    Checking backtrace-ext v0.2.1
+    Checking tx3-cardano v0.23.0
+    Checking opentelemetry-proto v0.32.0
+    Checking mithril-client v0.14.5
+    Checking crossterm v0.29.0
+    Checking dolos-cardano v2.0.0-alpha.0 (/dolos/crates/cardano)
+    Checking dolos-redb3 v2.0.0-alpha.0 (/dolos/crates/redb3)
+    Checking dolos-fjall v2.0.0-alpha.0 (/dolos/crates/fjall)
+    Checking stelae-driver v0.2.0 (https://github.com/txpipe/stelae?tag=v0.2.0#703cc34b)
+    Checking jsonrpsee v0.24.9
+    Checking tx3-resolver v0.23.0
+    Checking tonic-types v0.14.6
+    Checking opentelemetry-http v0.32.0
+    Checking reqwest v0.12.28
+    Checking crossterm v0.28.1
+    Checking console v0.15.11
+    Checking comfy-table v7.1.4
+    Checking indicatif v0.17.11
+    Checking opentelemetry-otlp v0.32.0
+    Checking dolos-mithril v2.0.0-alpha.0 (/dolos/crates/mithril)
+    Checking inquire v0.9.4
+    Checking miette v7.6.0
+    Checking gasket v0.9.0
+    Checking tonic-reflection v0.12.3
+    Checking tonic-web v0.12.3
+    Checking serial_test v3.5.0
+    Checking csv-diff v0.1.2
+    Checking dolos-minibf v2.0.0-alpha.0 (/dolos/crates/minibf)
+    Checking dolos-minikupo v2.0.0-alpha.0 (/dolos/crates/minikupo)
+    Checking dolos-snapshot v2.0.0-alpha.0 (/dolos/crates/snapshot)
+    Checking dolos-trp v2.0.0-alpha.0 (/dolos/crates/trp)
+    Checking dolos-testing v2.0.0-alpha.0 (/dolos/crates/testing)
+    Checking dolos v2.0.0-alpha.0 (/dolos)
+    Finished `dev` profile [unoptimized] target(s) in 43.85s
+EXIT 0
