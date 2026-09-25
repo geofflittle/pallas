@@ -931,7 +931,7 @@ impl<'b> MultiEraTx<'b> {
                 .sub_transactions
                 .iter()
                 .flat_map(|subs| subs.iter())
-                .map(|sub| MultiEraTx::from_dijkstra_sub(sub, x.success))
+                .map(|sub| MultiEraTx::from_dijkstra_sub(sub, true))
                 .collect(),
             // The rule admits no nesting, so a sub transaction carries none.
             MultiEraTx::DijkstraSub(..) => vec![],
