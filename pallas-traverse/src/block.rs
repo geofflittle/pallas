@@ -165,11 +165,11 @@ impl<'b> MultiEraBlock<'b> {
                 let mut out = Vec::new();
 
                 for tx in support::clone_dijkstra_txs(x) {
+                    out.push(MultiEraTx::Dijkstra(Box::new(Cow::Owned(tx.clone()))));
+
                     for sub in tx.transaction_body.sub_transactions.iter().flatten() {
                         out.push(MultiEraTx::DijkstraSub(Box::new(Cow::Owned(sub.clone()))));
                     }
-
-                    out.push(MultiEraTx::Dijkstra(Box::new(Cow::Owned(tx))));
                 }
 
                 out
