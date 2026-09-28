@@ -46,7 +46,7 @@ impl LeiosFetchBehavior {
         }
 
         if let Some(idx) = self.requests.iter().position(|(p, _)| p == pid) {
-            let (_, request) = self.requests.remove(idx).expect("index just found");
+            let (_, request) = self.requests[idx].clone();
             send_to_peer(pid, state, request_message(request), outbound);
         }
     }
