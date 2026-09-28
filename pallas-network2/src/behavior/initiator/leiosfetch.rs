@@ -48,9 +48,7 @@ impl LeiosFetchBehavior {
         if let Some(idx) = self.requests.iter().position(|(p, _)| p == pid) {
             let msg = request_message(&self.requests[idx].1);
 
-            if send_to_peer(pid, state, msg, outbound) {
-                self.requests.remove(idx);
-            }
+            send_to_peer(pid, state, msg, outbound);
         }
     }
 
