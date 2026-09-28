@@ -26,6 +26,18 @@ impl KeepaliveBehavior {
         }
     }
 
+    /// Sends a keepalive message to the peer if its state allows it and applies it to that state.
+    pub fn request_keepalive(
+        &mut self,
+        pid: &PeerId,
+        state: &mut InitiatorState,
+        outbound: &mut OutboundQueue<super::InitiatorBehavior>,
+    ) {
+        if let Some(msg) = self.next_keepalive(state) {
+            send_to_peer(pid, state, msg, outbound);
+        }
+    }
+
     fn next_keepalive(&self, peer: &InitiatorState) -> Option<AnyMessage> {
         if !peer.is_initialized() {
             return None;
@@ -48,8 +60,6 @@ impl PeerVisitor for KeepaliveBehavior {
         state: &mut InitiatorState,
         outbound: &mut OutboundQueue<InitiatorBehavior>,
     ) {
-        if let Some(msg) = self.next_keepalive(state) {
-            send_to_peer(pid, state, msg, outbound);
-        }
+        self.request_keepalive(pid, state, outbound);
     }
 }
