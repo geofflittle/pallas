@@ -54,6 +54,20 @@ impl ChainSyncBehavior {
         )));
     }
 
+    /// Sends a `FindIntersect` message with the given points and applies it to the peer state.
+    pub fn find_intersect(
+        &self,
+        pid: &PeerId,
+        state: &mut InitiatorState,
+        intersection: &Intersection,
+        outbound: &mut OutboundQueue<super::InitiatorBehavior>,
+    ) {
+        tracing::debug!("requesting intersection");
+
+        let msg = chainsync_proto::Message::FindIntersect(intersection.clone());
+        send_to_peer(pid, state, AnyMessage::ChainSync(msg), outbound);
+    }
+
     /// Sends a `RequestNext` message and applies it to the peer state.
     pub fn request_next(
         &self,
@@ -170,8 +184,7 @@ impl PeerVisitor for ChainSyncBehavior {
 
         tracing::trace!("peer needs to sync");
 
-        let msg = chainsync_proto::Message::FindIntersect(intersection.clone());
-        send_to_peer(pid, state, AnyMessage::ChainSync(msg), outbound);
+        self.find_intersect(pid, state, intersection, outbound);
     }
 }
 
