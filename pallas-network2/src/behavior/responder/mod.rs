@@ -484,6 +484,7 @@ impl ResponderBehavior {
                 return;
             }
 
+            state.apply_msg(msg);
             all_visitors!(self, pid, state, visit_outbound_msg);
         });
     }
