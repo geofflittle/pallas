@@ -15,6 +15,10 @@ impl Default for KeepaliveBehavior {
 
 impl KeepaliveBehavior {
     /// Sends a keepalive message to the peer if the protocol state allows it.
+    #[deprecated(
+        since = "1.5.0",
+        note = "the message is not applied to the peer state, so the peer's reply is a protocol violation, use `request_keepalive` instead"
+    )]
     pub fn send_keepalive(
         &mut self,
         pid: &PeerId,

@@ -38,6 +38,10 @@ impl ChainSyncBehavior {
     }
 
     /// Sends a `FindIntersect` message to the peer with the known points.
+    #[deprecated(
+        since = "1.5.0",
+        note = "the message is not applied to the peer state, so the peer's reply is a protocol violation, use `find_intersect` instead"
+    )]
     pub fn request_intersection(
         &self,
         pid: &PeerId,

@@ -443,9 +443,17 @@ impl InitiatorBehavior {
         });
     }
 
-    #[tracing::instrument(skip_all, fields(pid = %pid, channel = %msg.channel()))]
     /// Notifies visitors of an outbound message the interface has confirmed.
+    #[deprecated(
+        since = "1.5.0",
+        note = "no longer applies `msg` to the peer state, so the reply to a message sent without `send_to_peer` is a protocol violation, use `send_to_peer` instead"
+    )]
     pub fn on_outbound_msg(&mut self, pid: &PeerId, msg: &AnyMessage) {
+        self.on_sent(pid, msg);
+    }
+
+    #[tracing::instrument(skip_all, fields(pid = %pid, channel = %msg.channel()))]
+    fn on_sent(&mut self, pid: &PeerId, msg: &AnyMessage) {
         tracing::debug!(channel = msg.channel(), "new outbound message");
 
         self.peers.entry(pid.clone()).and_modify(|state| {
@@ -599,7 +607,7 @@ impl Behavior for InitiatorBehavior {
                 }
             }
             crate::InterfaceEvent::Sent(pid, msg) => {
-                self.on_outbound_msg(pid, msg);
+                self.on_sent(pid, msg);
             }
             crate::InterfaceEvent::Error(pid, _) => {
                 self.on_errored(pid);
