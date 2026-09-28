@@ -443,9 +443,17 @@ impl InitiatorBehavior {
         });
     }
 
-    #[tracing::instrument(skip_all, fields(pid = %pid, channel = %msg.channel()))]
-    /// Notifies visitors of an outbound message the interface has confirmed.
+    /// Applies an outbound message the interface has confirmed and notifies visitors.
+    #[deprecated(since = "1.5.0", note = "use `InitiatorState::apply_msg` when sending")]
     pub fn on_outbound_msg(&mut self, pid: &PeerId, msg: &AnyMessage) {
+        if let Some(state) = self.peers.get_mut(pid) {
+            state.apply_msg(msg);
+        }
+        self.on_sent(pid, msg);
+    }
+
+    #[tracing::instrument(skip_all, fields(pid = %pid, channel = %msg.channel()))]
+    fn on_sent(&mut self, pid: &PeerId, msg: &AnyMessage) {
         tracing::debug!(channel = msg.channel(), "new outbound message");
 
         self.peers.entry(pid.clone()).and_modify(|state| {
@@ -599,7 +607,7 @@ impl Behavior for InitiatorBehavior {
                 }
             }
             crate::InterfaceEvent::Sent(pid, msg) => {
-                self.on_outbound_msg(pid, msg);
+                self.on_sent(pid, msg);
             }
             crate::InterfaceEvent::Error(pid, _) => {
                 self.on_errored(pid);
@@ -1611,6 +1619,26 @@ mod tests {
 
         let reply = AnyMessage::PeerSharing(peersharing::Message::SharePeers(vec![]));
         assert_reply_accepted(&mut behavior, &pid, sent, reply);
+    }
+
+    #[tokio::test]
+    #[allow(deprecated)]
+    async fn on_outbound_msg_applies_a_raw_send() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(49);
+        connect_peer(&mut behavior, &pid, false);
+
+        let request = AnyMessage::PeerSharing(peersharing::Message::ShareRequest(3));
+        behavior
+            .outbound
+            .push_ready(InterfaceCommand::Send(pid.clone(), request.clone()));
+        drain_outputs(&mut behavior);
+        behavior.on_outbound_msg(&pid, &request);
+
+        let reply = AnyMessage::PeerSharing(peersharing::Message::SharePeers(vec![]));
+        assert_reply_accepted(&mut behavior, &pid, vec![], reply);
     }
 
     #[tokio::test]
