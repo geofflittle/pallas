@@ -334,7 +334,7 @@ pub(crate) fn send_to_peer(
     msg: AnyMessage,
     outbound: &mut OutboundQueue<InitiatorBehavior>,
 ) {
-    state.apply_msg(&msg);
+    let _ = &state;
     outbound.push_ready(InterfaceCommand::Send(pid.clone(), msg));
 }
 
