@@ -466,9 +466,14 @@ impl ResponderBehavior {
         });
     }
 
-    #[tracing::instrument(skip_all, fields(pid = %pid, channel = %msg.channel()))]
     /// Notifies visitors of an outbound message the interface has confirmed.
+    #[deprecated(since = "1.5.0", note = "use `ResponderState::apply_msg` when sending")]
     pub fn on_outbound_msg(&mut self, pid: &PeerId, msg: &AnyMessage) {
+        self.on_sent(pid, msg);
+    }
+
+    #[tracing::instrument(skip_all, fields(pid = %pid, channel = %msg.channel()))]
+    fn on_sent(&mut self, pid: &PeerId, msg: &AnyMessage) {
         tracing::debug!(channel = msg.channel(), "new outbound message");
 
         self.peers.entry(pid.clone()).and_modify(|state| {
@@ -649,7 +654,7 @@ impl Behavior for ResponderBehavior {
                 }
             }
             crate::InterfaceEvent::Sent(pid, msg) => {
-                self.on_outbound_msg(pid, msg);
+                self.on_sent(pid, msg);
             }
             crate::InterfaceEvent::Error(pid, _) => {
                 self.on_errored(pid);
@@ -1021,6 +1026,34 @@ mod tests {
                 AnyMessage::KeepAlive(keepalive::Message::ResponseKeepAlive(2))
             )),
             "the second keepalive is answered"
+        );
+    }
+
+    #[tokio::test]
+    async fn apply_msg_before_a_raw_send_accepts_the_reply() {
+        tokio::time::pause();
+
+        let mut behavior = ResponderBehavior::default();
+        let pid = PeerId::test(17);
+        connect_and_handshake(&mut behavior, &pid);
+
+        let init = AnyMessage::TxSubmission(txsub::Message::Init);
+        let request = AnyMessage::TxSubmission(txsub::Message::RequestTxIds(true, 0, 3));
+        for msg in [init, request] {
+            behavior.peers.get_mut(&pid).unwrap().apply_msg(&msg);
+            behavior
+                .outbound
+                .push_ready(InterfaceCommand::Send(pid.clone(), msg.clone()));
+            behavior.handle_io(InterfaceEvent::Sent(pid.clone(), msg));
+        }
+
+        let reply = AnyMessage::TxSubmission(txsub::Message::ReplyTxIds(vec![]));
+        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![reply]));
+        drain_outputs(&mut behavior);
+
+        assert!(
+            !behavior.peers[&pid].violation,
+            "the reply to an applied request is valid"
         );
     }
 }
