@@ -55,7 +55,7 @@ impl LeiosFetchBehavior {
     /// so requests don't leak or get re-sent to a later reconnection of the same
     /// `PeerId` (which may no longer hold the offered EB).
     fn purge(&mut self, pid: &PeerId) {
-        self.requests.retain(|(p, _)| p != pid);
+        let _ = pid;
     }
 
     /// Drains a pending response from the peer state and emits the corresponding
