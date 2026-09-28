@@ -1,8 +1,12 @@
 use futures::{Stream, StreamExt, stream::FusedStream};
-use std::{collections::HashMap, task::Poll};
+use std::{
+    collections::{HashMap, HashSet},
+    task::Poll,
+};
 
 use crate::{
-    Behavior, BehaviorOutput, Message as MessageTrait, OutboundQueue, PeerId, protocol as proto,
+    Behavior, BehaviorOutput, Channel, InterfaceCommand, Message as MessageTrait, OutboundQueue,
+    PeerId, protocol as proto,
 };
 
 use super::{AcceptedVersion, AnyMessage, BlockRange, ConnectionState};
@@ -152,6 +156,7 @@ pub struct InitiatorState {
     pub(crate) violation: bool,
     pub(crate) error_count: u32,
     pub(crate) continue_sync: bool,
+    pub(crate) unconfirmed: HashSet<Channel>,
 }
 
 impl InitiatorState {
@@ -171,6 +176,7 @@ impl InitiatorState {
             violation: false,
             error_count: 0,
             continue_sync: false,
+            unconfirmed: HashSet::new(),
         }
     }
 
@@ -323,7 +329,24 @@ impl InitiatorState {
         self.leios_fetch = proto::leiosfetch::State::default();
         self.continue_sync = false;
         self.violation = false;
+        self.unconfirmed.clear();
     }
+}
+
+/// Sends `msg` to `pid` and returns true, unless the interface has not yet
+/// confirmed an earlier send on the same channel with `Sent`.
+pub(crate) fn send_to_peer(
+    pid: &PeerId,
+    state: &mut InitiatorState,
+    msg: AnyMessage,
+    outbound: &mut OutboundQueue<InitiatorBehavior>,
+) -> bool {
+    if !state.unconfirmed.insert(msg.channel()) {
+        return false;
+    }
+
+    outbound.push_ready(InterfaceCommand::Send(pid.clone(), msg));
+    true
 }
 
 /// A function that mutates an [`InitiatorState`], used for tagging operations
@@ -437,6 +460,7 @@ impl InitiatorBehavior {
         tracing::debug!(channel = msg.channel(), "new outbound message");
 
         self.peers.entry(pid.clone()).and_modify(|state| {
+            state.unconfirmed.remove(&msg.channel());
             state.apply_msg(msg);
 
             all_visitors!(self, pid, state, visit_outbound_msg);
@@ -1431,6 +1455,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn held_range_request_is_sent_once_the_first_completes() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(43);
+        connect_peer(&mut behavior, &pid, false);
+
+        let held = (Point::new(2, vec![0xE2; 32]), Point::new(2, vec![0xE2; 32]));
+        behavior.execute(InitiatorCommand::RequestBlocks((
+            Point::Origin,
+            Point::Origin,
+        )));
+        behavior.execute(InitiatorCommand::RequestBlocks(held.clone()));
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let first = sends_to(&drain_outputs(&mut behavior), &pid, is_range_request);
+        assert_eq!(first.len(), 1, "first pass sends one RequestRange");
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        drain_outputs(&mut behavior);
+
+        behavior.handle_io(InterfaceEvent::Sent(pid.clone(), first[0].clone()));
+        let none = AnyMessage::BlockFetch(bf::Message::NoBlocks);
+        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![none]));
+        drain_outputs(&mut behavior);
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let next = sends_to(&drain_outputs(&mut behavior), &pid, is_range_request);
+        assert_eq!(next.len(), 1, "one RequestRange once the first completes");
+        assert!(
+            matches!(
+                &next[0],
+                AnyMessage::BlockFetch(bf::Message::RequestRange(range)) if *range == held
+            ),
+            "the held range goes once the first completes, got {next:?}"
+        );
+    }
+
+    #[tokio::test]
     async fn sent_range_request_is_not_given_to_another_peer() {
         tokio::time::pause();
 
@@ -1611,5 +1674,25 @@ mod tests {
         drain_outputs(behavior);
         complete_handshake_leios(behavior, pid);
         assert!(behavior.peers.get(pid).unwrap().supports_leios());
+    }
+
+    #[test]
+    fn reset_forgets_unconfirmed_sends() {
+        let pid = PeerId::test(49);
+        let mut state = InitiatorState::new();
+        let mut outbound = OutboundQueue::new();
+        let ping = || AnyMessage::KeepAlive(keepalive::Message::KeepAlive(1));
+
+        assert!(send_to_peer(&pid, &mut state, ping(), &mut outbound));
+        assert!(
+            !send_to_peer(&pid, &mut state, ping(), &mut outbound),
+            "a second send on an unconfirmed channel is held"
+        );
+
+        state.reset();
+        assert!(
+            send_to_peer(&pid, &mut state, ping(), &mut outbound),
+            "a reset state sends again"
+        );
     }
 }

@@ -7,7 +7,7 @@ use crate::{
     behavior::{AnyMessage, BlockRange, ConnectionState},
 };
 
-use super::{InitiatorBehavior, InitiatorEvent, InitiatorState, PeerVisitor};
+use super::{InitiatorBehavior, InitiatorEvent, InitiatorState, PeerVisitor, send_to_peer};
 
 /// Configuration for the block-fetch sub-behavior (currently unused).
 pub type BlockFetchConfig = ();
@@ -101,9 +101,13 @@ impl PeerVisitor for BlockFetchBehavior {
         if peer_is_available(state) {
             tracing::debug!("peer looks available");
 
-            if let Some(request) = self.requests.pop_front() {
-                tracing::debug!("granting request to peer");
-                self.request_block_batch(pid, request, outbound);
+            if let Some(request) = self.requests.front() {
+                let msg = blockfetch_proto::Message::RequestRange(request.clone());
+
+                if send_to_peer(pid, state, AnyMessage::BlockFetch(msg), outbound) {
+                    tracing::debug!("granted request to peer");
+                    self.requests.pop_front();
+                }
             }
         } else {
             tracing::warn!("no peer available");

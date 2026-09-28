@@ -5,7 +5,9 @@ use crate::{
     behavior::{AnyMessage, ConnectionState},
 };
 
-use super::{InitiatorBehavior, InitiatorEvent, InitiatorState, PeerVisitor, PromotionTag};
+use super::{
+    InitiatorBehavior, InitiatorEvent, InitiatorState, PeerVisitor, PromotionTag, send_to_peer,
+};
 
 /// Configuration for the chain-sync sub-behavior (currently unused).
 pub type ChainSyncConfig = ();
@@ -52,20 +54,18 @@ impl ChainSyncBehavior {
         )));
     }
 
-    /// Sends a `RequestNext` message to continue chain synchronization.
+    /// Sends a `RequestNext` message to continue chain synchronization, unless
+    /// a chain-sync send to the peer is still unconfirmed.
     pub fn request_next(
         &self,
         pid: &PeerId,
-        _state: &mut InitiatorState,
+        state: &mut InitiatorState,
         outbound: &mut OutboundQueue<super::InitiatorBehavior>,
     ) {
         tracing::debug!("requesting next header");
 
         let out = chainsync_proto::Message::RequestNext;
-        outbound.push_ready(BehaviorOutput::InterfaceCommand(InterfaceCommand::Send(
-            pid.clone(),
-            AnyMessage::ChainSync(out),
-        )));
+        send_to_peer(pid, state, AnyMessage::ChainSync(out), outbound);
     }
 
     /// Drains any pending chain-sync data from the peer state and emits the
@@ -171,7 +171,8 @@ impl PeerVisitor for ChainSyncBehavior {
 
         tracing::trace!("peer needs to sync");
 
-        self.request_intersection(pid, intersection, outbound);
+        let msg = chainsync_proto::Message::FindIntersect(intersection.clone());
+        send_to_peer(pid, state, AnyMessage::ChainSync(msg), outbound);
     }
 }
 
