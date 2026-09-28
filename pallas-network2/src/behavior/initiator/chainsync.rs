@@ -65,7 +65,8 @@ impl ChainSyncBehavior {
         tracing::debug!("requesting intersection");
 
         let msg = chainsync_proto::Message::FindIntersect(intersection.clone());
-        send_to_peer(pid, state, AnyMessage::ChainSync(msg), outbound);
+        let _ = &state;
+        outbound.push_ready(InterfaceCommand::Send(pid.clone(), AnyMessage::ChainSync(msg)));
     }
 
     /// Sends a `RequestNext` message to continue chain synchronization.

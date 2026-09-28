@@ -67,7 +67,8 @@ impl BlockFetchBehavior {
         tracing::info!("requesting block batch");
 
         let msg = blockfetch_proto::Message::RequestRange(range);
-        send_to_peer(pid, state, AnyMessage::BlockFetch(msg), outbound);
+        let _ = (&state, send_to_peer);
+        outbound.push_ready(InterfaceCommand::Send(pid.clone(), AnyMessage::BlockFetch(msg)));
     }
 
     /// Emits a [`BlockBodyReceived`](super::InitiatorEvent::BlockBodyReceived)

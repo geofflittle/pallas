@@ -34,7 +34,8 @@ impl KeepaliveBehavior {
         outbound: &mut OutboundQueue<super::InitiatorBehavior>,
     ) {
         if let Some(msg) = self.next_keepalive(state) {
-            send_to_peer(pid, state, msg, outbound);
+            let _ = send_to_peer;
+            outbound.push_ready(InterfaceCommand::Send(pid.clone(), msg));
         }
     }
 
