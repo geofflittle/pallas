@@ -446,9 +446,6 @@ impl InitiatorBehavior {
     /// Applies an outbound message the interface has confirmed and notifies visitors.
     #[deprecated(since = "1.5.0", note = "use `InitiatorState::apply_msg` when sending")]
     pub fn on_outbound_msg(&mut self, pid: &PeerId, msg: &AnyMessage) {
-        if let Some(state) = self.peers.get_mut(pid) {
-            state.apply_msg(msg);
-        }
         self.on_sent(pid, msg);
     }
 
