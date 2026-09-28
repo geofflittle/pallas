@@ -85,10 +85,6 @@ fn needs_handshake(peer: &InitiatorState) -> bool {
     matches!(peer.connection, crate::behavior::ConnectionState::Connected)
 }
 
-fn needs_proposal(peer: &InitiatorState) -> bool {
-    matches!(peer.handshake, crate::protocol::handshake::State::Propose)
-}
-
 impl PeerVisitor for HandshakeBehavior {
     fn visit_connected(
         &mut self,
@@ -96,9 +92,7 @@ impl PeerVisitor for HandshakeBehavior {
         state: &mut InitiatorState,
         outbound: &mut OutboundQueue<InitiatorBehavior>,
     ) {
-        if needs_proposal(state) {
-            self.propose_handshake(pid, state, outbound);
-        }
+        self.propose_handshake(pid, state, outbound);
     }
 
     fn visit_inbound_msg(
