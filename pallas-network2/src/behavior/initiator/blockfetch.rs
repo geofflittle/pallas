@@ -56,6 +56,20 @@ impl BlockFetchBehavior {
         )));
     }
 
+    /// Sends a block range request to the specified peer and applies it to its state.
+    pub fn request_range(
+        &self,
+        pid: &PeerId,
+        state: &mut InitiatorState,
+        range: BlockRange,
+        outbound: &mut OutboundQueue<super::InitiatorBehavior>,
+    ) {
+        tracing::info!("requesting block batch");
+
+        let msg = blockfetch_proto::Message::RequestRange(range);
+        send_to_peer(pid, state, AnyMessage::BlockFetch(msg), outbound);
+    }
+
     /// Emits a [`BlockBodyReceived`](super::InitiatorEvent::BlockBodyReceived)
     /// event if the peer's block-fetch state contains a new block.
     pub fn dispatch_block(
@@ -103,8 +117,7 @@ impl PeerVisitor for BlockFetchBehavior {
 
             if let Some(request) = self.requests.pop_front() {
                 tracing::debug!("granting request to peer");
-                let msg = blockfetch_proto::Message::RequestRange(request);
-                send_to_peer(pid, state, AnyMessage::BlockFetch(msg), outbound);
+                self.request_range(pid, state, request, outbound);
             }
         } else {
             tracing::warn!("no peer available");
