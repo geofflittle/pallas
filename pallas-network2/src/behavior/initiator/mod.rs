@@ -2,7 +2,8 @@ use futures::{Stream, StreamExt, stream::FusedStream};
 use std::{collections::HashMap, task::Poll};
 
 use crate::{
-    Behavior, BehaviorOutput, Message as MessageTrait, OutboundQueue, PeerId, protocol as proto,
+    Behavior, BehaviorOutput, InterfaceCommand, Message as MessageTrait, OutboundQueue, PeerId,
+    protocol as proto,
 };
 
 use super::{AcceptedVersion, AnyMessage, BlockRange, ConnectionState};
@@ -326,6 +327,17 @@ impl InitiatorState {
     }
 }
 
+/// Applies `msg` to `state` and queues it as a send to `pid`.
+fn send_to_peer(
+    pid: &PeerId,
+    state: &mut InitiatorState,
+    msg: AnyMessage,
+    outbound: &mut OutboundQueue<InitiatorBehavior>,
+) {
+    state.apply_msg(&msg);
+    outbound.push_ready(InterfaceCommand::Send(pid.clone(), msg));
+}
+
 /// A function that mutates an [`InitiatorState`], used for tagging operations
 /// like banning or demoting peers.
 pub type TagFn = fn(&mut InitiatorState);
@@ -432,13 +444,11 @@ impl InitiatorBehavior {
     }
 
     #[tracing::instrument(skip_all, fields(pid = %pid, channel = %msg.channel()))]
-    /// Processes a confirmed outbound message to a peer, updating state and notifying visitors.
+    /// Notifies visitors of an outbound message the interface has confirmed.
     pub fn on_outbound_msg(&mut self, pid: &PeerId, msg: &AnyMessage) {
         tracing::debug!(channel = msg.channel(), "new outbound message");
 
         self.peers.entry(pid.clone()).and_modify(|state| {
-            state.apply_msg(msg);
-
             all_visitors!(self, pid, state, visit_outbound_msg);
         });
     }
@@ -906,8 +916,7 @@ mod tests {
             peersharing::PeerAddress::V4(Ipv4Addr::new(192, 168, 1, 2), 3001),
         ]));
 
-        // We need the seed peer's peersharing state to be in the right state first.
-        // Simulate the outbound ShareRequest being sent (to move state to Busy)
+        // Confirm the ShareRequest that housekeeping sent.
         let share_req = AnyMessage::PeerSharing(peersharing::Message::ShareRequest(10));
         behavior.handle_io(InterfaceEvent::Sent(seed_pid.clone(), share_req));
         drain_outputs(&mut behavior);
@@ -1042,7 +1051,7 @@ mod tests {
             "should request next leios notification"
         );
 
-        // Server moves to Busy (our request was sent), then offers an EB.
+        // Confirm the RequestNext, then the server offers an EB.
         behavior.handle_io(InterfaceEvent::Sent(
             pid.clone(),
             AnyMessage::LeiosNotify(ln::Message::RequestNext),
@@ -1427,6 +1436,61 @@ mod tests {
             second.len(),
             0,
             "second pass before Sent sends no RequestRange"
+        );
+    }
+
+    #[tokio::test]
+    async fn held_range_request_is_sent_once_the_first_completes() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(43);
+        connect_peer(&mut behavior, &pid, false);
+
+        let held = (Point::new(2, vec![0xE2; 32]), Point::new(2, vec![0xE2; 32]));
+        behavior.execute(InitiatorCommand::RequestBlocks((
+            Point::Origin,
+            Point::Origin,
+        )));
+        behavior.execute(InitiatorCommand::RequestBlocks(held.clone()));
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let first = sends_to(&drain_outputs(&mut behavior), &pid, is_range_request);
+        assert_eq!(first.len(), 1, "first pass sends one RequestRange");
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        drain_outputs(&mut behavior);
+
+        behavior.handle_io(InterfaceEvent::Sent(pid.clone(), first[0].clone()));
+        let none = AnyMessage::BlockFetch(bf::Message::NoBlocks);
+        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![none]));
+        drain_outputs(&mut behavior);
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let next = sends_to(&drain_outputs(&mut behavior), &pid, is_range_request);
+        assert_eq!(next.len(), 1, "one RequestRange once the first completes");
+        assert!(
+            matches!(
+                &next[0],
+                AnyMessage::BlockFetch(bf::Message::RequestRange(range)) if *range == held
+            ),
+            "the held range goes once the first completes, got {next:?}"
+        );
+    }
+
+    #[test]
+    fn sent_does_not_apply_a_send_again() {
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(44);
+        let mut state = InitiatorState::new();
+        let ping = AnyMessage::KeepAlive(keepalive::Message::KeepAlive(9));
+
+        send_to_peer(&pid, &mut state, ping.clone(), &mut behavior.outbound);
+        behavior.peers.insert(pid.clone(), state);
+        behavior.handle_io(InterfaceEvent::Sent(pid.clone(), ping));
+        assert!(
+            !behavior.peers[&pid].violation,
+            "Sent does not apply the send a second time"
         );
     }
 
