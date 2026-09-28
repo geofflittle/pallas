@@ -1,6 +1,6 @@
 use crate::{InterfaceCommand, OutboundQueue, PeerId, behavior::AnyMessage};
 
-use super::{InitiatorBehavior, InitiatorState, PeerVisitor};
+use super::{InitiatorBehavior, InitiatorState, PeerVisitor, send_to_peer};
 
 /// Sub-behavior that sends periodic keepalive messages to maintain connections.
 pub struct KeepaliveBehavior {
@@ -21,17 +21,23 @@ impl KeepaliveBehavior {
         peer: &InitiatorState,
         outbound: &mut OutboundQueue<super::InitiatorBehavior>,
     ) {
+        if let Some(msg) = self.next_keepalive(peer) {
+            outbound.push_ready(InterfaceCommand::Send(pid.clone(), msg));
+        }
+    }
+
+    fn next_keepalive(&self, peer: &InitiatorState) -> Option<AnyMessage> {
         if !peer.is_initialized() {
-            return;
+            return None;
         }
 
-        if matches!(peer.keepalive, crate::protocol::keepalive::State::Client(_)) {
-            let msg = crate::protocol::keepalive::Message::KeepAlive(self.token);
-
-            let out = InterfaceCommand::Send(pid.clone(), AnyMessage::KeepAlive(msg));
-
-            outbound.push_ready(out);
+        if !matches!(peer.keepalive, crate::protocol::keepalive::State::Client(_)) {
+            return None;
         }
+
+        let msg = crate::protocol::keepalive::Message::KeepAlive(self.token);
+
+        Some(AnyMessage::KeepAlive(msg))
     }
 }
 
@@ -42,6 +48,8 @@ impl PeerVisitor for KeepaliveBehavior {
         state: &mut InitiatorState,
         outbound: &mut OutboundQueue<InitiatorBehavior>,
     ) {
-        self.send_keepalive(pid, state, outbound);
+        if let Some(msg) = self.next_keepalive(state) {
+            send_to_peer(pid, state, msg, outbound);
+        }
     }
 }
