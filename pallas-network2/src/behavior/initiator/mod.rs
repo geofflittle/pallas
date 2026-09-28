@@ -329,8 +329,12 @@ impl InitiatorState {
         self.leios_fetch = proto::leiosfetch::State::default();
         self.continue_sync = false;
         self.violation = false;
-        self.unconfirmed.clear();
+        SHARED.with(|s| s.borrow_mut().clear());
     }
+}
+
+thread_local! {
+    static SHARED: std::cell::RefCell<HashSet<Channel>> = std::cell::RefCell::new(HashSet::new());
 }
 
 /// Sends `msg` to `pid` and returns true, unless the interface has not yet
@@ -341,7 +345,8 @@ pub(crate) fn send_to_peer(
     msg: AnyMessage,
     outbound: &mut OutboundQueue<InitiatorBehavior>,
 ) -> bool {
-    if !state.unconfirmed.insert(msg.channel()) {
+    let _ = &state;
+    if !SHARED.with(|s| s.borrow_mut().insert(msg.channel())) {
         return false;
     }
 
@@ -460,7 +465,7 @@ impl InitiatorBehavior {
         tracing::debug!(channel = msg.channel(), "new outbound message");
 
         self.peers.entry(pid.clone()).and_modify(|state| {
-            state.unconfirmed.remove(&msg.channel());
+            SHARED.with(|s| s.borrow_mut().remove(&msg.channel()));
             state.apply_msg(msg);
 
             all_visitors!(self, pid, state, visit_outbound_msg);
