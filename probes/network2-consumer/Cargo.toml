@@ -1,0 +1,11 @@
+[package]
+name = "network2-consumer-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+pallas-network2 = { path = "/tree/pallas-network2" }
+futures = "0.3"
