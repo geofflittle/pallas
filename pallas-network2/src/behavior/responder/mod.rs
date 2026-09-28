@@ -972,4 +972,75 @@ mod tests {
             "should send TxSubmission Init after handshake + housekeeping"
         );
     }
+
+    fn init_sends(outputs: &[BehaviorOutput<ResponderBehavior>]) -> usize {
+        outputs
+            .iter()
+            .filter(|o| {
+                matches!(
+                    o,
+                    BehaviorOutput::InterfaceCommand(InterfaceCommand::Send(
+                        _,
+                        AnyMessage::TxSubmission(txsub::Message::Init)
+                    ))
+                )
+            })
+            .count()
+    }
+
+    #[tokio::test]
+    async fn txsubmission_init_is_sent_and_applied_once() {
+        tokio::time::pause();
+
+        let mut behavior = ResponderBehavior::default();
+        let pid = PeerId::test(15);
+        connect_and_handshake(&mut behavior, &pid);
+
+        behavior.execute(ResponderCommand::Housekeeping);
+        let outputs = drain_outputs(&mut behavior);
+        assert_eq!(init_sends(&outputs), 1, "first pass sends one Init");
+
+        behavior.execute(ResponderCommand::Housekeeping);
+        let second = init_sends(&drain_outputs(&mut behavior));
+        assert_eq!(second, 0, "second pass before Sent sends no Init");
+
+        for output in outputs {
+            if let BehaviorOutput::InterfaceCommand(InterfaceCommand::Send(p, msg)) = output {
+                behavior.handle_io(InterfaceEvent::Sent(p, msg));
+            }
+        }
+        assert!(
+            !behavior.peers[&pid].violation,
+            "Sent does not apply Init a second time"
+        );
+    }
+
+    #[tokio::test]
+    async fn next_keepalive_before_the_response_sent_is_answered() {
+        tokio::time::pause();
+
+        let mut behavior = ResponderBehavior::default();
+        let pid = PeerId::test(16);
+        connect_and_handshake(&mut behavior, &pid);
+
+        let first = AnyMessage::KeepAlive(keepalive::Message::KeepAlive(1));
+        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![first]));
+        drain_outputs(&mut behavior);
+
+        let second = AnyMessage::KeepAlive(keepalive::Message::KeepAlive(2));
+        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![second]));
+        let outputs = drain_outputs(&mut behavior);
+
+        assert!(
+            !behavior.peers[&pid].violation,
+            "a keepalive after the response is emitted is valid"
+        );
+        assert!(
+            outputs.has_send(|m| matches!(
+                m,
+                AnyMessage::KeepAlive(keepalive::Message::ResponseKeepAlive(2))
+            )),
+            "the second keepalive is answered"
+        );
+    }
 }
