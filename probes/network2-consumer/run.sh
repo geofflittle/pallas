@@ -9,8 +9,8 @@
 # Expected on the branch tree:
 #   A normal: body_events=1 banned=false
 #   B helper: banned=true
-#   C on_outbound_msg: banned=true
-#   D responder on_outbound_msg: banned=true
+#   C on_outbound_msg: banned=false
+#   D responder on_outbound_msg: banned=false
 #   E responder apply_msg: banned=false
 set -eu
 TREE=$1
