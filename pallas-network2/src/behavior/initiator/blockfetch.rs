@@ -106,7 +106,6 @@ impl PeerVisitor for BlockFetchBehavior {
 
                 if send_to_peer(pid, state, AnyMessage::BlockFetch(msg), outbound) {
                     tracing::debug!("granted request to peer");
-                    self.requests.pop_front();
                 }
             }
         } else {
