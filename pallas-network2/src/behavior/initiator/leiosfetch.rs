@@ -50,6 +50,8 @@ impl LeiosFetchBehavior {
 
             if send_to_peer(pid, state, msg, outbound) {
                 self.requests.remove(idx);
+            } else {
+                self.requests[idx].1 = FetchRequest::Block(crate::protocol::Point::Origin);
             }
         }
     }
