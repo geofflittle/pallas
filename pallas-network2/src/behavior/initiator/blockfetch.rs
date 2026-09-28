@@ -42,6 +42,10 @@ impl BlockFetchBehavior {
     }
 
     /// Sends a block range request to the specified peer.
+    #[deprecated(
+        since = "1.5.0",
+        note = "use `request_range` instead"
+    )]
     pub fn request_block_batch(
         &self,
         pid: &PeerId,
