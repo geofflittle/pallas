@@ -104,10 +104,8 @@ impl PeerVisitor for BlockFetchBehavior {
             if let Some(request) = self.requests.front() {
                 let msg = blockfetch_proto::Message::RequestRange(request.clone());
 
-                if send_to_peer(pid, state, AnyMessage::BlockFetch(msg), outbound) {
-                    tracing::debug!("granted request to peer");
-                    self.requests.pop_front();
-                }
+                send_to_peer(pid, state, AnyMessage::BlockFetch(msg), outbound);
+                self.requests.pop_front();
             }
         } else {
             tracing::warn!("no peer available");
