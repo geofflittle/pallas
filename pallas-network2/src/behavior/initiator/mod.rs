@@ -328,7 +328,7 @@ impl InitiatorState {
 }
 
 /// Applies `msg` to the state of `pid` and emits it as a send.
-pub(crate) fn send_to_peer(
+pub fn send_to_peer(
     pid: &PeerId,
     state: &mut InitiatorState,
     msg: AnyMessage,
@@ -1499,6 +1499,119 @@ mod tests {
             !behavior.peers[&pid].violation,
             "Sent does not apply the send a second time"
         );
+    }
+
+    fn assert_reply_accepted(
+        behavior: &mut InitiatorBehavior,
+        pid: &PeerId,
+        sent: Vec<AnyMessage>,
+        reply: AnyMessage,
+    ) {
+        for msg in sent {
+            behavior.handle_io(InterfaceEvent::Sent(pid.clone(), msg));
+        }
+        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![reply]));
+        behavior.execute(InitiatorCommand::Housekeeping);
+        drain_outputs(behavior);
+
+        let state = &behavior.peers[pid];
+        assert!(!state.violation, "the reply is a valid transition");
+        assert_ne!(state.promotion, PromotionTag::Banned, "the peer is not banned");
+    }
+
+    #[tokio::test]
+    async fn request_range_sends_once_and_accepts_the_reply() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(45);
+        connect_peer(&mut behavior, &pid, false);
+
+        let InitiatorBehavior {
+            blockfetch,
+            peers,
+            outbound,
+            ..
+        } = &mut behavior;
+        let state = peers.get_mut(&pid).unwrap();
+        blockfetch.request_range(&pid, state, (Point::Origin, Point::Origin), outbound);
+
+        let sent = sends_to(&drain_outputs(&mut behavior), &pid, is_range_request);
+        assert_eq!(sent.len(), 1, "one RequestRange");
+
+        let reply = AnyMessage::BlockFetch(bf::Message::NoBlocks);
+        assert_reply_accepted(&mut behavior, &pid, sent, reply);
+    }
+
+    #[tokio::test]
+    async fn find_intersect_sends_once_and_accepts_the_reply() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(46);
+        connect_peer(&mut behavior, &pid, false);
+
+        let InitiatorBehavior {
+            chainsync,
+            peers,
+            outbound,
+            ..
+        } = &mut behavior;
+        let state = peers.get_mut(&pid).unwrap();
+        chainsync.find_intersect(&pid, state, &vec![Point::Origin], outbound);
+
+        let sent = sends_to(&drain_outputs(&mut behavior), &pid, is_find_intersect);
+        assert_eq!(sent.len(), 1, "one FindIntersect");
+
+        let tip = cs::Tip(Point::Origin, 0);
+        let reply = AnyMessage::ChainSync(cs::Message::IntersectFound(Point::Origin, tip));
+        assert_reply_accepted(&mut behavior, &pid, sent, reply);
+    }
+
+    #[tokio::test]
+    async fn request_keepalive_sends_once_and_accepts_the_reply() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(47);
+        connect_peer(&mut behavior, &pid, false);
+
+        let InitiatorBehavior {
+            keepalive,
+            peers,
+            outbound,
+            ..
+        } = &mut behavior;
+        let state = peers.get_mut(&pid).unwrap();
+        keepalive.request_keepalive(&pid, state, outbound);
+
+        let sent = sends_to(&drain_outputs(&mut behavior), &pid, is_keepalive);
+        assert_eq!(sent.len(), 1, "one KeepAlive");
+
+        let AnyMessage::KeepAlive(keepalive::Message::KeepAlive(cookie)) = sent[0] else {
+            unreachable!("filtered to keepalive requests");
+        };
+        let reply = AnyMessage::KeepAlive(keepalive::Message::ResponseKeepAlive(cookie));
+        assert_reply_accepted(&mut behavior, &pid, sent, reply);
+    }
+
+    #[tokio::test]
+    async fn send_to_peer_sends_once_and_accepts_the_reply() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(48);
+        connect_peer(&mut behavior, &pid, false);
+
+        let state = behavior.peers.get_mut(&pid).unwrap();
+        let request = AnyMessage::PeerSharing(peersharing::Message::ShareRequest(3));
+        send_to_peer(&pid, state, request, &mut behavior.outbound);
+
+        let sent = sends_to(&drain_outputs(&mut behavior), &pid, is_share_request);
+        assert_eq!(sent.len(), 1, "one ShareRequest");
+
+        let reply = AnyMessage::PeerSharing(peersharing::Message::SharePeers(vec![]));
+        assert_reply_accepted(&mut behavior, &pid, sent, reply);
     }
 
     #[tokio::test]
