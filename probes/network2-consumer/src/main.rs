@@ -6,6 +6,7 @@ use pallas_network2::behavior::{
     AnyMessage, InitiatorBehavior, InitiatorCommand, InitiatorEvent, InitiatorState, PeerVisitor,
     PromotionTag,
 };
+use pallas_network2::behavior::responder::{ResponderBehavior, ResponderCommand};
 use pallas_network2::protocol::{
     MAINNET_MAGIC, Point, blockfetch as bf, chainsync as cs, handshake, keepalive, leiosfetch as lf,
     leiosnotify as ln, txsubmission as tx,
@@ -131,6 +132,97 @@ fn arm_on_outbound() {
     println!("C on_outbound_msg: banned={}", banned(&mut b, &p));
 }
 
+fn drain_responder(b: &mut ResponderBehavior) -> Vec<BehaviorOutput<ResponderBehavior>> {
+    let waker = futures::task::noop_waker();
+    let mut cx = Context::from_waker(&waker);
+    let mut out = Vec::new();
+    while let Poll::Ready(Some(o)) = b.poll_next_unpin(&mut cx) {
+        out.push(o);
+    }
+    out
+}
+
+fn init_responder_peer(b: &mut ResponderBehavior, p: &PeerId) {
+    b.handle_io(InterfaceEvent::Connected(p.clone()));
+    drain_responder(b);
+    let mut values = HashMap::new();
+    values.insert(13u64, version_data());
+    let propose = AnyMessage::Handshake(handshake::Message::Propose(handshake::VersionTable {
+        values,
+    }));
+    b.handle_io(InterfaceEvent::Recv(p.clone(), vec![propose]));
+    for m in sends_responder(&drain_responder(b), p) {
+        b.handle_io(InterfaceEvent::Sent(p.clone(), m));
+    }
+    drain_responder(b);
+}
+
+fn sends_responder(outs: &[BehaviorOutput<ResponderBehavior>], p: &PeerId) -> Vec<AnyMessage> {
+    outs.iter()
+        .filter_map(|o| match o {
+            BehaviorOutput::InterfaceCommand(InterfaceCommand::Send(q, m)) if q == p => {
+                Some(m.clone())
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+fn responder_banned(b: &mut ResponderBehavior, p: &PeerId) -> bool {
+    b.execute(ResponderCommand::Housekeeping);
+    drain_responder(b).iter().any(|o| {
+        matches!(o, BehaviorOutput::InterfaceCommand(InterfaceCommand::Disconnect(q)) if q == p)
+    })
+}
+
+fn txsubmission_requests() -> [AnyMessage; 2] {
+    [
+        AnyMessage::TxSubmission(tx::Message::Init),
+        AnyMessage::TxSubmission(tx::Message::RequestTxIds(true, 0, 3)),
+    ]
+}
+
+fn arm_responder_on_outbound() {
+    let mut b = ResponderBehavior::default();
+    let p = pid(4);
+    init_responder_peer(&mut b, &p);
+
+    for m in txsubmission_requests() {
+        b.outbound
+            .push_ready(InterfaceCommand::Send(p.clone(), m.clone()));
+        b.on_outbound_msg(&p, &m);
+    }
+    drain_responder(&mut b);
+    let reply = AnyMessage::TxSubmission(tx::Message::ReplyTxIds(vec![]));
+    b.handle_io(InterfaceEvent::Recv(p.clone(), vec![reply]));
+    drain_responder(&mut b);
+    println!(
+        "D responder on_outbound_msg: banned={}",
+        responder_banned(&mut b, &p)
+    );
+}
+
+fn arm_responder_apply_msg() {
+    let mut b = ResponderBehavior::default();
+    let p = pid(5);
+    init_responder_peer(&mut b, &p);
+
+    for m in txsubmission_requests() {
+        b.peers.get_mut(&p).unwrap().apply_msg(&m);
+        b.outbound
+            .push_ready(InterfaceCommand::Send(p.clone(), m.clone()));
+        b.handle_io(InterfaceEvent::Sent(p.clone(), m));
+    }
+    drain_responder(&mut b);
+    let reply = AnyMessage::TxSubmission(tx::Message::ReplyTxIds(vec![]));
+    b.handle_io(InterfaceEvent::Recv(p.clone(), vec![reply]));
+    drain_responder(&mut b);
+    println!(
+        "E responder apply_msg: banned={}",
+        responder_banned(&mut b, &p)
+    );
+}
+
 /// Names every public item of the initiator surface as it stands on 0ea294c1.
 #[allow(dead_code, unreachable_code, unused_variables, unused_must_use)]
 fn surface(b: &mut InitiatorBehavior, e: InitiatorEvent, c: InitiatorCommand) {
@@ -219,4 +311,6 @@ fn main() {
     arm_normal();
     arm_helper();
     arm_on_outbound();
+    arm_responder_on_outbound();
+    arm_responder_apply_msg();
 }
