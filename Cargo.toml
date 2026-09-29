@@ -34,6 +34,7 @@ members = [
   "examples/p2p-initiator",
   "examples/leios-testnet",
   "examples/leios-tui",
+  "examples/network2-queue-latency",
 ]
 
 [workspace.dependencies]
