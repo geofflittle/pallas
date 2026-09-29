@@ -368,8 +368,20 @@ pub enum InitiatorCommand {
     DemotePeer(PeerId),
 }
 
+/// Why a peer's session ended.
+#[cfg(feature = "unstable")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum DisconnectReason {
+    /// The connection closed with no error reported by the interface.
+    Closed,
+    /// The interface reported an error on the connection.
+    Errored,
+}
+
 /// Events emitted by the initiator behavior to external consumers.
 #[derive(Debug)]
+#[cfg_attr(feature = "unstable", non_exhaustive)]
 pub enum InitiatorEvent {
     /// A peer completed the handshake and is ready for mini-protocols.
     PeerInitialized(PeerId, AcceptedVersion),
@@ -391,6 +403,9 @@ pub enum InitiatorEvent {
     EbNotification(PeerId, proto::leiosnotify::Notification),
     /// An EB body or transactions were received via leios-fetch, for the given EB.
     EbFetched(PeerId, proto::EbId, proto::leiosfetch::Response),
+    /// A peer has been disconnected, for the given reason.
+    #[cfg(feature = "unstable")]
+    PeerDisconnected(PeerId, DisconnectReason),
 }
 
 /// The main initiator behavior that orchestrates outbound Cardano connections.
@@ -464,9 +479,26 @@ impl InitiatorBehavior {
         });
     }
 
+    #[cfg(feature = "unstable")]
+    fn is_live(&self, pid: &PeerId) -> bool {
+        self.peers
+            .get(pid)
+            .is_some_and(|state| match state.connection {
+                ConnectionState::Connecting
+                | ConnectionState::Connected
+                | ConnectionState::Initialized => true,
+                ConnectionState::New | ConnectionState::Disconnected | ConnectionState::Errored => {
+                    false
+                }
+            })
+    }
+
     #[tracing::instrument(skip_all, fields(pid = %pid))]
     fn on_disconnected(&mut self, pid: &PeerId) {
         tracing::info!("disconnected");
+
+        #[cfg(feature = "unstable")]
+        let live = self.is_live(pid);
 
         self.peers.entry(pid.clone()).and_modify(|state| {
             state.connection = ConnectionState::Disconnected;
@@ -476,6 +508,13 @@ impl InitiatorBehavior {
             state.reset();
         });
 
+        #[cfg(feature = "unstable")]
+        if live {
+            self.outbound.push_ready(BehaviorOutput::ExternalEvent(
+                InitiatorEvent::PeerDisconnected(pid.clone(), DisconnectReason::Closed),
+            ));
+        }
+
         self.serve_block_fetch();
     }
 
@@ -483,12 +522,22 @@ impl InitiatorBehavior {
     fn on_errored(&mut self, pid: &PeerId) {
         tracing::error!("error");
 
+        #[cfg(feature = "unstable")]
+        let live = self.is_live(pid);
+
         self.peers.entry(pid.clone()).and_modify(|state| {
             state.connection = ConnectionState::Errored;
             state.error_count += 1;
 
             all_visitors!(self, pid, state, visit_errored);
         });
+
+        #[cfg(feature = "unstable")]
+        if live {
+            self.outbound.push_ready(BehaviorOutput::ExternalEvent(
+                InitiatorEvent::PeerDisconnected(pid.clone(), DisconnectReason::Errored),
+            ));
+        }
     }
 
     #[tracing::instrument(skip_all, fields(pid = %pid))]
@@ -2265,6 +2314,256 @@ mod tests {
             ),
             (0, PromotionTag::Banned),
             "fetches sent to the peer, and its promotion, after a violation and the reply"
+        );
+    }
+
+    #[cfg(feature = "unstable")]
+    fn external_events(outputs: &[BehaviorOutput<InitiatorBehavior>]) -> Vec<&InitiatorEvent> {
+        outputs
+            .iter()
+            .filter_map(|o| match o {
+                BehaviorOutput::ExternalEvent(e) => Some(e),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[cfg(feature = "unstable")]
+    #[tokio::test]
+    async fn closed_session_is_reported_once() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(53);
+
+        behavior.execute(InitiatorCommand::IncludePeer(pid.clone()));
+        behavior.execute(InitiatorCommand::Housekeeping);
+        drain_outputs(&mut behavior);
+
+        behavior.handle_io(InterfaceEvent::Connected(pid.clone()));
+        drain_outputs(&mut behavior);
+        complete_handshake(&mut behavior, &pid);
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let live = drain_outputs(&mut behavior);
+        assert!(
+            !live.has_event(|e| matches!(e, InitiatorEvent::PeerDisconnected(..))),
+            "a connected peer is not reported as disconnected"
+        );
+
+        behavior.handle_io(InterfaceEvent::Disconnected(pid.clone()));
+        let ended = drain_outputs(&mut behavior);
+        let events = external_events(&ended);
+        assert!(
+            matches!(
+                events.as_slice(),
+                [InitiatorEvent::PeerDisconnected(p, DisconnectReason::Closed)] if *p == pid
+            ),
+            "a close is reported once as closed, got {events:?}"
+        );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[tokio::test]
+    async fn errored_session_is_reported_once() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(54);
+
+        behavior.execute(InitiatorCommand::IncludePeer(pid.clone()));
+        behavior.execute(InitiatorCommand::Housekeeping);
+        drain_outputs(&mut behavior);
+
+        behavior.handle_io(InterfaceEvent::Connected(pid.clone()));
+        drain_outputs(&mut behavior);
+        complete_handshake(&mut behavior, &pid);
+
+        behavior.handle_io(InterfaceEvent::Error(
+            pid.clone(),
+            InterfaceError::Other("socket gone".into()),
+        ));
+        let failed = drain_outputs(&mut behavior);
+        let events = external_events(&failed);
+        assert!(
+            matches!(
+                events.as_slice(),
+                [InitiatorEvent::PeerDisconnected(p, DisconnectReason::Errored)] if *p == pid
+            ),
+            "an error is reported once as errored, got {events:?}"
+        );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[tokio::test]
+    async fn one_session_end_is_reported_once() {
+        tokio::time::pause();
+        let mut behavior = InitiatorBehavior::default();
+        let (again, local, failed, refused) = (
+            PeerId::test(90),
+            PeerId::test(91),
+            PeerId::test(92),
+            PeerId::test(93),
+        );
+        let reported = |outputs: &[BehaviorOutput<InitiatorBehavior>], pid: &PeerId| {
+            external_events(outputs)
+                .into_iter()
+                .filter_map(|e| match e {
+                    InitiatorEvent::PeerDisconnected(p, r) if p == pid => Some(*r),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let mut sessions = Vec::new();
+        for _ in 0..2 {
+            include_and_connect(&mut behavior, &again);
+            complete_handshake(&mut behavior, &again);
+            drain_outputs(&mut behavior);
+            behavior.handle_io(InterfaceEvent::Disconnected(again.clone()));
+            sessions.extend(drain_outputs(&mut behavior));
+        }
+
+        include_and_connect(&mut behavior, &local);
+        complete_handshake(&mut behavior, &local);
+        drain_outputs(&mut behavior);
+        behavior.execute(InitiatorCommand::DemotePeer(local.clone()));
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let mut demoted = drain_outputs(&mut behavior);
+        behavior.handle_io(InterfaceEvent::Disconnected(local.clone()));
+        demoted.extend(drain_outputs(&mut behavior));
+        behavior.handle_io(InterfaceEvent::Error(
+            local.clone(),
+            InterfaceError::Other("early eof".into()),
+        ));
+        demoted.extend(drain_outputs(&mut behavior));
+        let marked = behavior.peers[&local].connection == ConnectionState::Errored;
+        behavior.execute(InitiatorCommand::Housekeeping);
+        demoted.extend(drain_outputs(&mut behavior));
+        let disconnects = demoted
+            .iter()
+            .filter(|o| {
+                matches!(
+                    o,
+                    BehaviorOutput::InterfaceCommand(crate::InterfaceCommand::Disconnect(p))
+                        if *p == local
+                )
+            })
+            .count();
+        behavior.handle_io(InterfaceEvent::Disconnected(local.clone()));
+        demoted.extend(drain_outputs(&mut behavior));
+
+        include_and_connect(&mut behavior, &failed);
+        complete_handshake(&mut behavior, &failed);
+        drain_outputs(&mut behavior);
+        behavior.handle_io(InterfaceEvent::Error(
+            failed.clone(),
+            InterfaceError::Other("socket gone".into()),
+        ));
+        let mut errored = drain_outputs(&mut behavior);
+        behavior.handle_io(InterfaceEvent::Disconnected(failed.clone()));
+        errored.extend(drain_outputs(&mut behavior));
+
+        behavior.execute(InitiatorCommand::IncludePeer(refused.clone()));
+        behavior.execute(InitiatorCommand::Housekeeping);
+        drain_outputs(&mut behavior);
+        behavior.handle_io(InterfaceEvent::Error(
+            refused.clone(),
+            InterfaceError::Other("connection refused".into()),
+        ));
+        let attempt = drain_outputs(&mut behavior);
+
+        assert_eq!(
+            (marked, disconnects),
+            (true, 2),
+            "a stale error still marks the peer and sends a second disconnect"
+        );
+        assert_eq!(
+            (
+                reported(&sessions, &again),
+                reported(&demoted, &local),
+                reported(&errored, &failed),
+                reported(&attempt, &refused),
+            ),
+            (
+                vec![DisconnectReason::Closed, DisconnectReason::Closed],
+                vec![DisconnectReason::Closed],
+                vec![DisconnectReason::Errored],
+                vec![DisconnectReason::Errored],
+            ),
+            "each session end is reported once"
+        );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[tokio::test]
+    async fn a_close_with_a_range_in_flight_is_reported_once_as_the_range_moves() {
+        tokio::time::pause();
+        let mut behavior = InitiatorBehavior::default();
+        let (a, b) = (PeerId::test(86), PeerId::test(87));
+        include_and_connect(&mut behavior, &a);
+        include_and_connect(&mut behavior, &b);
+        complete_handshake(&mut behavior, &a);
+        complete_handshake(&mut behavior, &b);
+        behavior.execute(InitiatorCommand::RequestBlocks(range(1)));
+        let outputs = drain_outputs(&mut behavior);
+        let (pid, idle) = if sends_to(&outputs, &a, is_any_range).len() == 1 {
+            (a, b)
+        } else {
+            (b, a)
+        };
+
+        behavior.handle_io(InterfaceEvent::Disconnected(pid.clone()));
+        let after = drain_outputs(&mut behavior);
+        let events = external_events(&after);
+        assert!(
+            matches!(
+                events.as_slice(),
+                [InitiatorEvent::PeerDisconnected(p, DisconnectReason::Closed)] if *p == pid
+            ),
+            "a close with a range in flight is reported once as closed, got {events:?}"
+        );
+        assert_eq!(
+            sends_to(&after, &idle, is_any_range).len(),
+            1,
+            "the range goes to the idle peer on the same close"
+        );
+        let reported = after.iter().position(|o| {
+            matches!(
+                o,
+                BehaviorOutput::ExternalEvent(InitiatorEvent::PeerDisconnected(..))
+            )
+        });
+        let moved = after.iter().position(|o| {
+            matches!(
+                o,
+                BehaviorOutput::InterfaceCommand(crate::InterfaceCommand::Send(p, m))
+                    if *p == idle && is_any_range(m)
+            )
+        });
+        assert!(
+            matches!((reported, moved), (Some(r), Some(m)) if r < m),
+            "the close is reported before the range moves, got {reported:?} and {moved:?}"
+        );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[tokio::test]
+    async fn include_peer_on_a_live_peer_reports_no_disconnect() {
+        tokio::time::pause();
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(88);
+        include_and_connect(&mut behavior, &pid);
+        complete_handshake(&mut behavior, &pid);
+        behavior.execute(InitiatorCommand::RequestBlocks(range(1)));
+        drain_outputs(&mut behavior);
+
+        behavior.execute(InitiatorCommand::IncludePeer(pid.clone()));
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let outputs = drain_outputs(&mut behavior);
+        assert!(
+            !outputs.has_event(|e| matches!(e, InitiatorEvent::PeerDisconnected(..))),
+            "including a live peer again is not a disconnect"
         );
     }
 }
