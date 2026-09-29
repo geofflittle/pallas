@@ -514,7 +514,7 @@ impl InitiatorBehavior {
         });
 
         self.outbound.push_ready(BehaviorOutput::ExternalEvent(
-            InitiatorEvent::PeerDisconnected(pid.clone(), DisconnectReason::Errored),
+            InitiatorEvent::PeerDisconnected(pid.clone(), DisconnectReason::Closed),
         ));
     }
 
