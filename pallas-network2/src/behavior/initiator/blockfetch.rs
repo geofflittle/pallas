@@ -78,7 +78,7 @@ impl BlockFetchBehavior {
         state: &mut InitiatorState,
         outbound: &mut OutboundQueue<super::InitiatorBehavior>,
     ) {
-        if !peer_is_available(state) {
+        if !state.is_initialized() {
             return;
         }
 
