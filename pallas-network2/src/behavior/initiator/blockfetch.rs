@@ -117,7 +117,9 @@ impl PeerVisitor for BlockFetchBehavior {
         outbound: &mut OutboundQueue<InitiatorBehavior>,
     ) {
         self.dispatch_block(pid, state, outbound);
-        self.serve_next(pid, state, outbound);
+        if let Some(request) = self.requests.pop_front() {
+            self.request_range(pid, state, request, outbound);
+        }
     }
 
     fn visit_housekeeping(

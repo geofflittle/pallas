@@ -41,10 +41,6 @@ impl LeiosFetchBehavior {
         state: &mut InitiatorState,
         outbound: &mut OutboundQueue<InitiatorBehavior>,
     ) {
-        if !peer_is_available(state) {
-            return;
-        }
-
         if let Some(idx) = self.requests.iter().position(|(p, _)| p == pid) {
             let (_, request) = self.requests.remove(idx).expect("index just found");
             send_to_peer(pid, state, request_message(request), outbound);
