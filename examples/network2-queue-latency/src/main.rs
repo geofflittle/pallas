@@ -5,7 +5,8 @@
 //! the same loop `Manager` runs, so that it sees every send the behavior emits
 //! and every reply before the behavior applies it. It queues one range before
 //! the handshake, collects header points with chain sync, queues all ranges back
-//! to back, then collects EB offers and queues a fetch for each of them.
+//! to back, then collects EB offers and queues a fetch for each of them and
+//! for each point given with `--eb-point`.
 //!
 //! ```sh
 //! cargo run --release -p network2-queue-latency -- --peer 127.0.0.1:3001 \
@@ -49,6 +50,7 @@ struct Args {
     eb_target: usize,
     eb_window_secs: u64,
     eb_repeat: usize,
+    eb_points: Vec<Point>,
     label: String,
 }
 
@@ -64,6 +66,7 @@ fn parse_args() -> Args {
         eb_target: 6,
         eb_window_secs: 420,
         eb_repeat: 4,
+        eb_points: Vec::new(),
         label: "run".into(),
     };
 
@@ -81,16 +84,19 @@ fn parse_args() -> Args {
             "--eb-window-secs" => args.eb_window_secs = value.parse().expect("eb-window-secs"),
             "--eb-repeat" => args.eb_repeat = value.parse().expect("eb-repeat"),
             "--label" => args.label = value,
-            "--intersect" => {
-                let (slot, hash) = value.split_once(':').expect("slot:hash");
-                args.intersect =
-                    Point::Specific(slot.parse().expect("slot"), hex::decode(hash).expect("hash"));
-            }
+            "--intersect" => args.intersect = parse_point(&value),
+            "--eb-point" => args.eb_points.push(parse_point(&value)),
             other => panic!("unknown flag {other}"),
         }
     }
 
     args
+}
+
+/// A point written as `slot:hash`.
+fn parse_point(value: &str) -> Point {
+    let (slot, hash) = value.split_once(':').expect("slot:hash");
+    Point::Specific(slot.parse().expect("slot"), hex::decode(hash).expect("hash"))
 }
 
 /// The protocol and message variant of a message, such as `KeepAlive.KeepAlive`.
@@ -186,6 +192,7 @@ struct Run {
     no_blocks: u64,
     offers: Vec<Point>,
     eb_burst_at: Option<Instant>,
+    eb_sources: Vec<&'static str>,
     ebs: Timeline,
     ebs_total: usize,
     ebs_fetched: u64,
@@ -231,7 +238,9 @@ impl Run {
                     AnyMessage::LeiosFetch(leiosfetch::Message::BlockRequest(_)) => {
                         if self.eb_burst_at.is_some() {
                             self.ebs.sends.push(now);
-                            println!("LF_SEND n={} t_ms={:.3}", self.ebs.sends.len(), self.ms(now));
+                            let n = self.ebs.sends.len();
+                            let source = self.eb_sources.get(n - 1).copied().unwrap_or("unknown");
+                            println!("LF_SEND n={n} t_ms={:.3} src={source}", self.ms(now));
                         } else {
                             println!("LF_SEND_OUTSIDE t_ms={:.3}", self.ms(now));
                         }
@@ -386,22 +395,31 @@ impl Run {
                 let enough = self.offers.len() >= self.args.eb_target;
                 let late = now.saturating_duration_since(self.start) >= window;
                 if enough || late {
-                    if self.offers.is_empty() {
+                    let mut targets: Vec<(Point, &'static str)> =
+                        self.offers.iter().map(|eb| (eb.clone(), "offered")).collect();
+                    for eb in &self.args.eb_points {
+                        if !self.offers.contains(eb) {
+                            targets.push((eb.clone(), "seeded"));
+                        }
+                    }
+                    if targets.is_empty() {
                         println!("NO_OFFERS t_ms={:.3}", self.ms(now));
                         self.phase = Phase::Done;
                         return;
                     }
                     self.eb_burst_at = Some(now);
-                    self.ebs_total = self.offers.len() * self.args.eb_repeat;
+                    self.ebs_total = targets.len() * self.args.eb_repeat;
                     println!(
-                        "EB_BURST t_ms={:.3} distinct={} total={}",
+                        "EB_BURST t_ms={:.3} offered={} seeded={} total={}",
                         self.ms(now),
                         self.offers.len(),
+                        targets.len() - self.offers.len(),
                         self.ebs_total
                     );
                     for _ in 0..self.args.eb_repeat {
-                        for eb in self.offers.clone() {
-                            behavior.execute(InitiatorCommand::FetchEb(pid.clone(), eb));
+                        for (eb, source) in &targets {
+                            self.eb_sources.push(source);
+                            behavior.execute(InitiatorCommand::FetchEb(pid.clone(), eb.clone()));
                         }
                     }
                     self.phase = Phase::Ebs;
@@ -543,6 +561,7 @@ async fn main() {
         no_blocks: 0,
         offers: Vec::new(),
         eb_burst_at: None,
+        eb_sources: Vec::new(),
         ebs: Timeline::default(),
         ebs_total: 0,
         ebs_fetched: 0,
