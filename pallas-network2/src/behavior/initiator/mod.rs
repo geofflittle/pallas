@@ -482,7 +482,7 @@ impl InitiatorBehavior {
 
         #[cfg(feature = "unstable")]
         self.outbound.push_ready(BehaviorOutput::ExternalEvent(
-            InitiatorEvent::PeerDisconnected(pid.clone(), DisconnectReason::Closed),
+            InitiatorEvent::PeerDisconnected(pid.clone(), DisconnectReason::Errored),
         ));
     }
 
