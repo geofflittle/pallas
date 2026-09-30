@@ -222,7 +222,9 @@ impl MultiEraCert<'_> {
             MultiEraCert::AlonzoCompatible(x) => Some(alonzo_cert_kind(x)),
             MultiEraCert::Conway(x) => Some(conway_cert_kind(x)),
             #[cfg(feature = "unstable")]
-            MultiEraCert::Dijkstra(x) => Some(dijkstra_cert_kind(x)),
+            MultiEraCert::Dijkstra(_) => {
+                unimplemented!("map_cert is not yet implemented for Dijkstra")
+            }
         }
     }
 }
