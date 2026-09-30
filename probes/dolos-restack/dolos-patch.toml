@@ -1,0 +1,15 @@
+
+[patch."https://github.com/SundaeSwap-finance/pallas"]
+pallas = { path = "../pallas-dirty/pallas" }
+pallas-addresses = { path = "../pallas-dirty/pallas-addresses" }
+pallas-codec = { path = "../pallas-dirty/pallas-codec" }
+pallas-configs = { path = "../pallas-dirty/pallas-configs" }
+pallas-crypto = { path = "../pallas-dirty/pallas-crypto" }
+pallas-hardano = { path = "../pallas-dirty/pallas-hardano" }
+pallas-network = { path = "../pallas-dirty/pallas-network" }
+pallas-network2 = { path = "../pallas-dirty/pallas-network2" }
+pallas-primitives = { path = "../pallas-dirty/pallas-primitives" }
+pallas-traverse = { path = "../pallas-dirty/pallas-traverse" }
+pallas-txbuilder = { path = "../pallas-dirty/pallas-txbuilder" }
+pallas-utxorpc = { path = "../pallas-dirty/pallas-utxorpc" }
+pallas-validate = { path = "../pallas-dirty/pallas-validate" }
