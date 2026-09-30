@@ -360,7 +360,6 @@ pub enum InitiatorCommand {
 }
 
 /// Why a peer's session ended.
-#[cfg(feature = "unstable")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum DisconnectReason {
@@ -395,7 +394,6 @@ pub enum InitiatorEvent {
     /// An EB body or transactions were received via leios-fetch, for the given EB.
     EbFetched(PeerId, proto::EbId, proto::leiosfetch::Response),
     /// A peer has been disconnected, for the given reason.
-    #[cfg(feature = "unstable")]
     PeerDisconnected(PeerId, DisconnectReason),
 }
 
