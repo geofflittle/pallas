@@ -359,6 +359,15 @@ pub enum InitiatorCommand {
     DemotePeer(PeerId),
 }
 
+/// Why a peer's session ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DisconnectReason {
+    /// The connection closed with no error reported by the interface.
+    Closed,
+    /// The interface reported an error on the connection.
+    Errored,
+}
+
 /// Events emitted by the initiator behavior to external consumers.
 #[derive(Debug)]
 pub enum InitiatorEvent {
@@ -382,6 +391,8 @@ pub enum InitiatorEvent {
     EbNotification(PeerId, proto::leiosnotify::Notification),
     /// An EB body or transactions were received via leios-fetch, for the given EB.
     EbFetched(PeerId, proto::EbId, proto::leiosfetch::Response),
+    /// A peer has been disconnected, for the given reason.
+    PeerDisconnected(PeerId, DisconnectReason),
 }
 
 /// The main initiator behavior that orchestrates outbound Cardano connections.
@@ -464,6 +475,10 @@ impl InitiatorBehavior {
 
             all_visitors!(self, pid, state, visit_disconnected);
         });
+
+        self.outbound.push_ready(BehaviorOutput::ExternalEvent(
+            InitiatorEvent::PeerDisconnected(pid.clone(), DisconnectReason::Closed),
+        ));
     }
 
     #[tracing::instrument(skip_all, fields(pid = %pid))]
@@ -476,6 +491,10 @@ impl InitiatorBehavior {
 
             all_visitors!(self, pid, state, visit_errored);
         });
+
+        self.outbound.push_ready(BehaviorOutput::ExternalEvent(
+            InitiatorEvent::PeerDisconnected(pid.clone(), DisconnectReason::Errored),
+        ));
     }
 
     #[tracing::instrument(skip_all, fields(pid = %pid))]
