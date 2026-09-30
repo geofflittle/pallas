@@ -1,0 +1,13 @@
+[package]
+name = "initiator-event-consumer"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+pallas-network2 = { path = "../../pallas-network2" }
+
+[features]
+unstable = ["pallas-network2/unstable"]
