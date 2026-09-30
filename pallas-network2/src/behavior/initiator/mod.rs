@@ -550,6 +550,9 @@ impl InitiatorBehavior {
     fn housekeeping(&mut self) {
         for (pid, state) in self.peers.iter_mut() {
             all_visitors!(self, pid, state, visit_housekeeping);
+            self.outbound.push_ready(BehaviorOutput::ExternalEvent(
+                InitiatorEvent::PeerDisconnected(pid.clone(), DisconnectReason::Closed),
+            ));
         }
 
         self.move_discovered_into_promotion();
