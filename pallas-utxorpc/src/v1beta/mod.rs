@@ -46,7 +46,7 @@ fn information_action() -> u5c::governance_action::GovernanceAction {
 /// The u5c purpose of a guarding redeemer.
 #[cfg(feature = "unstable")]
 fn guarding_purpose() -> u5c::RedeemerPurpose {
-    u5c::RedeemerPurpose::Guarding
+    u5c::RedeemerPurpose::Unspecified
 }
 
 /// The u5c member of a guard clause.
