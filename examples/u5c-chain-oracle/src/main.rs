@@ -248,17 +248,13 @@ fn run(dir: &Path, cases_path: &Path) {
     let params_green = match &mapped {
         Ok(p) => {
             let mismatches = fields::param_mismatches(p, pp);
-            let typed = |f: &&str| fields::DIJKSTRA_TYPE_FIELDS.contains(f);
             println!(
-                "check2 pparams dijkstra compared {} mismatches {} (in fields the Dijkstra parameter type fills {}, in fields it cannot fill {})",
+                "check2 pparams dijkstra compared {} mismatches {}",
                 fields::param_pairs(p, pp).len(),
                 mismatches.len(),
-                mismatches.iter().filter(|m| typed(&m.0)).count(),
-                mismatches.iter().filter(|m| !typed(&m.0)).count(),
             );
             for (f, a, b) in &mismatches {
-                let kind = if typed(f) { "filled" } else { "unfillable" };
-                println!("  {kind} {f} u5c {a} node {}", short(b));
+                println!("  {f} u5c {a} node {}", short(b));
             }
             mismatches.is_empty()
         }

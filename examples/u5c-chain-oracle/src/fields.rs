@@ -4,7 +4,7 @@ use pallas_codec::utils::Nullable;
 use pallas_primitives::{ExUnitPrices, ExUnits, RationalNumber, conway, dijkstra};
 use pallas_traverse::OriginalHash;
 use pallas_utxorpc::v1beta::spec::cardano as u5c;
-use pallas_validate::utils::{ConwayProtParams, DijkstraPlutusParams, DijkstraProtParams};
+use pallas_validate::utils::{ConwayProtParams, DijkstraProtParams};
 use serde_json::{Value, json};
 
 use crate::effects::natural;
@@ -259,32 +259,66 @@ pub fn conway_params(x: &Value, genesis: &Value) -> ConwayProtParams {
 
 /// Builds the Dijkstra era parameters from `query protocol-parameters`.
 pub fn dijkstra_params(x: &Value, genesis: &Value) -> DijkstraProtParams {
-    let (system_start, epoch_length, slot_length) = timing(genesis);
+    let c = conway_params(x, genesis);
     DijkstraProtParams {
-        system_start,
-        epoch_length,
-        slot_length,
-        protocol_version: (
-            int(&x["protocolVersion"], "major"),
-            int(&x["protocolVersion"], "minor"),
-        ),
-        minfee_a: int(x, "txFeePerByte") as u32,
-        minfee_b: int(x, "txFeeFixed") as u32,
-        max_transaction_size: int(x, "maxTxSize") as u32,
-        ada_per_utxo_byte: int(x, "utxoCostPerByte"),
-        max_value_size: int(x, "maxValueSize") as u32,
-        key_deposit: Some(int(x, "stakeAddressDeposit")),
-        plutus: Some(DijkstraPlutusParams {
-            cost_model_v3: cost_model(x, "PlutusV3").expect("a PlutusV3 cost model"),
-            execution_costs: prices(&x["executionUnitPrices"]),
-            max_tx_ex_units: units(&x["maxTxExecutionUnits"]),
-            collateral_percentage: int(x, "collateralPercentage") as u32,
-            max_collateral_inputs: int(x, "maxCollateralInputs") as u32,
-            minfee_refscript_cost_per_byte: rational(&x["minFeeRefScriptCostPerByte"]),
-            max_ref_script_size_per_tx: int(x, "maxRefScriptSizePerTx") as u32,
-            ref_script_cost_stride: int(x, "refScriptCostStride") as u32,
-            ref_script_cost_multiplier: rational(&x["refScriptCostMultiplier"]),
-        }),
+        system_start: c.system_start,
+        epoch_length: c.epoch_length,
+        slot_length: c.slot_length,
+        minfee_a: c.minfee_a,
+        minfee_b: c.minfee_b,
+        max_block_body_size: c.max_block_body_size,
+        max_transaction_size: c.max_transaction_size,
+        max_block_header_size: c.max_block_header_size,
+        key_deposit: c.key_deposit,
+        pool_deposit: c.pool_deposit,
+        desired_number_of_stake_pools: c.desired_number_of_stake_pools,
+        protocol_version: c.protocol_version,
+        min_pool_cost: c.min_pool_cost,
+        ada_per_utxo_byte: c.ada_per_utxo_byte,
+        cost_models_for_script_languages: dijkstra::CostModels {
+            plutus_v1: cost_model(x, "PlutusV1"),
+            plutus_v2: cost_model(x, "PlutusV2"),
+            plutus_v3: cost_model(x, "PlutusV3"),
+            plutus_v4: cost_model(x, "PlutusV4"),
+            unknown: Default::default(),
+        },
+        execution_costs: c.execution_costs,
+        max_tx_ex_units: c.max_tx_ex_units,
+        max_block_ex_units: c.max_block_ex_units,
+        max_value_size: c.max_value_size,
+        collateral_percentage: c.collateral_percentage,
+        max_collateral_inputs: c.max_collateral_inputs,
+        expansion_rate: c.expansion_rate,
+        treasury_growth_rate: c.treasury_growth_rate,
+        maximum_epoch: c.maximum_epoch,
+        pool_pledge_influence: c.pool_pledge_influence,
+        pool_voting_thresholds: c.pool_voting_thresholds,
+        drep_voting_thresholds: c.drep_voting_thresholds,
+        min_committee_size: c.min_committee_size,
+        committee_term_limit: c.committee_term_limit,
+        governance_action_validity_period: c.governance_action_validity_period,
+        governance_action_deposit: c.governance_action_deposit,
+        drep_deposit: c.drep_deposit,
+        drep_inactivity_period: c.drep_inactivity_period,
+        minfee_refscript_cost_per_byte: c.minfee_refscript_cost_per_byte,
+        max_ref_script_size_per_block: int(x, "maxRefScriptSizePerBlock") as u32,
+        max_ref_script_size_per_tx: int(x, "maxRefScriptSizePerTx") as u32,
+        ref_script_cost_stride: int(x, "refScriptCostStride") as u32,
+        ref_script_cost_multiplier: rational(&x["refScriptCostMultiplier"]),
+        max_pledge_leverage: match &x["maxPledgeLeverage"] {
+            Value::Null => None,
+            cap => Some(rational(cap)),
+        },
+        min_pool_margin: rational(&x["minPoolMargin"]),
+        leios_announcement_period_length: int(x, "leiosAnnouncementPeriodLength") as u32,
+        leios_vote_period_length: int(x, "leiosVotePeriodLength") as u32,
+        leios_diffusion_period_length: int(x, "leiosDiffusionPeriodLength") as u32,
+        leios_committee_size: int(x, "leiosCommitteeSize") as u16,
+        leios_quorum_stake_threshold: rational(&x["leiosQuorumStakeThreshold"]),
+        max_endorser_block_references_size: int(x, "maxEndorserBlockReferencesSize") as u32,
+        max_endorser_block_txs_size: int(x, "maxEndorserBlockTxsSize") as u32,
+        max_endorser_block_ex_units: units(&x["maxEndorserBlockExecutionUnits"]),
+        max_ref_script_size_per_endorser_block: int(x, "maxRefScriptSizePerEndorserBlock") as u32,
     }
 }
 
@@ -653,26 +687,6 @@ pub const NODE_KEYS_WITH_FIELD: [&str; 46] = [
     "maxEndorserBlockTxsSize",
     "maxEndorserBlockExecutionUnits",
     "maxRefScriptSizePerEndorserBlock",
-];
-
-/// The u5c parameter fields that a mapping of the Dijkstra parameter type fills.
-pub const DIJKSTRA_TYPE_FIELDS: [&str; 16] = [
-    "coins_per_utxo_byte",
-    "max_tx_size",
-    "min_fee_coefficient",
-    "min_fee_constant",
-    "stake_key_deposit",
-    "protocol_version",
-    "max_value_size",
-    "collateral_percentage",
-    "max_collateral_inputs",
-    "cost_models.plutus_v3",
-    "prices",
-    "max_execution_units_per_transaction",
-    "min_fee_script_ref_cost_per_byte",
-    "max_ref_script_size_per_tx",
-    "ref_script_cost_stride",
-    "ref_script_cost_multiplier",
 ];
 
 /// Tells whether two parameter values are both present and agree, numbers to a relative tolerance of one part in a billion.
