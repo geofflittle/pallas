@@ -19,5 +19,4 @@ pallas-validate = { workspace = true, features = ["unstable"] }
 chrono = { workspace = true }
 flate2 = "1"
 hex.workspace = true
-prost = "0.13"
 serde_json.workspace = true

@@ -20,14 +20,14 @@ fn txin(k: &TxIn) -> String {
     format!("{}#{}", hex::encode(k.0), k.1)
 }
 
-fn utxo_cause(m: &UtxoMismatch, reference: &Ledger) -> String {
+fn utxo_cause(m: &UtxoMismatch, ledger: &Ledger) -> String {
     let k = m.key();
     match m {
-        UtxoMismatch::OnlyInFold(_) => match reference.spent_by_sub.get(&k) {
+        UtxoMismatch::OnlyInFold(_) => match ledger.spent_by_sub.get(&k) {
             Some(o) => format!("spent by {}", o.describe()),
             None => format!("produced by {}", hex::encode(k.0)),
         },
-        UtxoMismatch::OnlyAtNode(_) => match reference.sub_origins.get(&k.0) {
+        UtxoMismatch::OnlyAtNode(_) => match ledger.sub_origins.get(&k.0) {
             Some(o) => format!("produced by {}", o.describe()),
             None => format!("produced by {}", hex::encode(k.0)),
         },
@@ -74,7 +74,7 @@ fn violation(v: &Violation) -> String {
     }
 }
 
-fn account(m: &AccountMismatch, reference: &Ledger) -> String {
+fn account(m: &AccountMismatch, ledger: &Ledger) -> String {
     let (cred, text) = match m {
         AccountMismatch::OnlyInFold(c, b) => (c, format!("only in fold, balance {b}")),
         AccountMismatch::OnlyAtNode(c, b) => (c, format!("only at node, balance {b}")),
@@ -88,7 +88,7 @@ fn account(m: &AccountMismatch, reference: &Ledger) -> String {
             format!("fold {fold} node {node} earns rewards {earns_rewards}"),
         ),
     };
-    let deposits: Vec<String> = reference
+    let deposits: Vec<String> = ledger
         .deposits_to
         .get(cred)
         .into_iter()
@@ -102,7 +102,7 @@ fn account(m: &AccountMismatch, reference: &Ledger) -> String {
     )
 }
 
-fn check_state(name: &str, fold: &Ledger, node: &NodeState, reference: &Ledger) -> bool {
+fn check_state(name: &str, fold: &Ledger, node: &NodeState) -> bool {
     let report = compare::state(fold, &node.utxo, &node.accounts);
     let utxo = &report.utxo;
     let count = |f: fn(&UtxoMismatch) -> bool| utxo.iter().filter(|m| f(m)).count();
@@ -138,7 +138,7 @@ fn check_state(name: &str, fold: &Ledger, node: &NodeState, reference: &Ledger) 
             "  {kind} {} [{}] {}",
             txin(&m.key()),
             differing(&m.key()).join(" "),
-            utxo_cause(m, reference)
+            utxo_cause(m, fold)
         );
         let k = m.key();
         if let (Some(a), Some(b)) = (fold.utxo.get(&k), node.utxo.get(&k))
@@ -159,7 +159,7 @@ fn check_state(name: &str, fold: &Ledger, node: &NodeState, reference: &Ledger) 
         accounts.mismatches.len()
     );
     for m in accounts.mismatches.iter().take(SHOWN) {
-        println!("  {}", account(m, reference));
+        println!("  {}", account(m, fold));
     }
     println!(
         "check1 {name} node entries compared {} violations {}",
@@ -170,6 +170,13 @@ fn check_state(name: &str, fold: &Ledger, node: &NodeState, reference: &Ledger) 
         println!("  {}", violation(v));
     }
     report.agrees()
+}
+
+fn short(x: &serde_json::Value) -> String {
+    match x.as_array() {
+        Some(v) => format!("array of {}", v.len()),
+        None => x.to_string(),
+    }
 }
 
 fn location(l: &Location) -> String {
@@ -214,18 +221,8 @@ fn run(dir: &Path, cases_path: &Path) {
         println!("  block {b}: {e}");
     }
 
-    let u5c_green = check_state("u5c", &replay.u5c, &state, &replay.reference)
-        && replay.mapper_panics.is_empty();
-    let reference_green = check_state("reference", &replay.reference, &state, &replay.reference);
-    println!(
-        "check1 verdict {} (reference fold with sub transactions and direct deposits from the source {})",
-        if u5c_green { "GREEN" } else { "RED" },
-        if reference_green {
-            "agrees"
-        } else {
-            "disagrees"
-        }
-    );
+    let u5c_green = check_state("u5c", &replay.u5c, &state) && replay.mapper_panics.is_empty();
+    println!("check1 verdict {}", if u5c_green { "GREEN" } else { "RED" });
 
     let ids = fields::tx_ids(&cases, &replay.found, &replay.kept);
     let carried = ids
@@ -251,9 +248,17 @@ fn run(dir: &Path, cases_path: &Path) {
     let params_green = match &mapped {
         Ok(p) => {
             let mismatches = fields::param_mismatches(p, pp);
-            println!("check2 pparams dijkstra mismatches {}", mismatches.len());
+            let typed = |f: &&str| fields::DIJKSTRA_TYPE_FIELDS.contains(f);
+            println!(
+                "check2 pparams dijkstra compared {} mismatches {} (in fields the Dijkstra parameter type fills {}, in fields it cannot fill {})",
+                fields::param_pairs(p, pp).len(),
+                mismatches.len(),
+                mismatches.iter().filter(|m| typed(&m.0)).count(),
+                mismatches.iter().filter(|m| !typed(&m.0)).count(),
+            );
             for (f, a, b) in &mismatches {
-                println!("  {f} u5c {a} node {b}");
+                let kind = if typed(f) { "filled" } else { "unfillable" };
+                println!("  {kind} {f} u5c {a} node {}", short(b));
             }
             mismatches.is_empty()
         }
@@ -274,14 +279,7 @@ fn run(dir: &Path, cases_path: &Path) {
         control.len()
     );
     for (f, a, b) in &control {
-        println!(
-            "  {f} u5c {a} node {}",
-            if b.is_array() {
-                format!("array of {}", b.as_array().map_or(0, Vec::len))
-            } else {
-                b.to_string()
-            }
-        );
+        println!("  {f} u5c {} node {}", short(a), short(b));
     }
     let without = fields::node_keys_without_field(pp);
     println!(

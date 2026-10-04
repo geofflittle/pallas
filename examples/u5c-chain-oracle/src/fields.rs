@@ -5,7 +5,6 @@ use pallas_primitives::{ExUnitPrices, ExUnits, RationalNumber, conway, dijkstra}
 use pallas_traverse::OriginalHash;
 use pallas_utxorpc::v1beta::spec::cardano as u5c;
 use pallas_validate::utils::{ConwayProtParams, DijkstraPlutusParams, DijkstraProtParams};
-use prost::Message;
 use serde_json::{Value, json};
 
 use crate::effects::natural;
@@ -78,7 +77,7 @@ pub fn source_ids(block: &dijkstra::Block, number: u64) -> Vec<([u8; 32], Found)
     out
 }
 
-/// Tells for each chain case whether a u5c transaction of the block the source holds it in carries its id.
+/// Tells for each chain case whether u5c carries its id where the source holds it, a top level id in the block and a sub transaction id under its parent.
 pub fn tx_ids<'a>(
     cases: &'a [Case],
     found: &HashMap<[u8; 32], Found>,
@@ -95,7 +94,15 @@ pub fn tx_ids<'a>(
                 .and_then(|b| b.body.as_ref())
                 .map(|b| b.tx.as_slice())
                 .unwrap_or(&[]);
-            if txs.iter().any(|t| t.hash.as_ref() == c.id) {
+            let carries = |t: &u5c::Tx| t.hash.as_ref() == c.id;
+            let carried = match at.parent {
+                None => txs.iter().any(carries),
+                Some(parent) => txs
+                    .iter()
+                    .filter(|t| t.hash.as_ref() == parent)
+                    .any(|t| t.sub_transactions.iter().any(carries)),
+            };
+            if carried {
                 (c, IdVerdict::Carried(*at))
             } else {
                 (c, IdVerdict::NotCarried(*at))
@@ -520,11 +527,86 @@ pub fn param_pairs(p: &u5c::PParams, x: &Value) -> Vec<(&'static str, Value, Val
             json!(p.drep_inactivity_period),
             x["dRepActivity"].clone(),
         ),
+        (
+            "max_ref_script_size_per_block",
+            json!(p.max_ref_script_size_per_block),
+            x["maxRefScriptSizePerBlock"].clone(),
+        ),
+        (
+            "max_ref_script_size_per_tx",
+            json!(p.max_ref_script_size_per_tx),
+            x["maxRefScriptSizePerTx"].clone(),
+        ),
+        (
+            "ref_script_cost_stride",
+            json!(p.ref_script_cost_stride),
+            x["refScriptCostStride"].clone(),
+        ),
+        (
+            "ref_script_cost_multiplier",
+            ratio(&p.ref_script_cost_multiplier),
+            x["refScriptCostMultiplier"].clone(),
+        ),
+        (
+            "max_pledge_leverage",
+            ratio(&p.max_pledge_leverage),
+            x["maxPledgeLeverage"].clone(),
+        ),
+        (
+            "min_pool_margin",
+            ratio(&p.min_pool_margin),
+            x["minPoolMargin"].clone(),
+        ),
+        (
+            "leios_announcement_period_length",
+            json!(p.leios_announcement_period_length),
+            x["leiosAnnouncementPeriodLength"].clone(),
+        ),
+        (
+            "leios_vote_period_length",
+            json!(p.leios_vote_period_length),
+            x["leiosVotePeriodLength"].clone(),
+        ),
+        (
+            "leios_diffusion_period_length",
+            json!(p.leios_diffusion_period_length),
+            x["leiosDiffusionPeriodLength"].clone(),
+        ),
+        (
+            "leios_committee_size",
+            json!(p.leios_committee_size),
+            x["leiosCommitteeSize"].clone(),
+        ),
+        (
+            "leios_quorum_stake_threshold",
+            ratio(&p.leios_quorum_stake_threshold),
+            x["leiosQuorumStakeThreshold"].clone(),
+        ),
+        (
+            "max_endorser_block_references_size",
+            json!(p.max_endorser_block_references_size),
+            x["maxEndorserBlockReferencesSize"].clone(),
+        ),
+        (
+            "max_endorser_block_txs_size",
+            json!(p.max_endorser_block_txs_size),
+            x["maxEndorserBlockTxsSize"].clone(),
+        ),
+        (
+            "max_endorser_block_execution_units",
+            ex_units(&p.max_endorser_block_execution_units),
+            x["maxEndorserBlockExecutionUnits"].clone(),
+        ),
+        (
+            "max_ref_script_size_per_endorser_block",
+            json!(p.max_ref_script_size_per_endorser_block),
+            x["maxRefScriptSizePerEndorserBlock"].clone(),
+        ),
     ]
 }
 
 /// The node parameter keys that `param_pairs` reads.
-pub const NODE_KEYS_WITH_FIELD: [&str; 31] = [
+pub const NODE_KEYS_WITH_FIELD: [&str; 46] = [
     "utxoCostPerByte",
     "maxTxSize",
     "txFeePerByte",
@@ -556,6 +638,41 @@ pub const NODE_KEYS_WITH_FIELD: [&str; 31] = [
     "govActionDeposit",
     "dRepDeposit",
     "dRepActivity",
+    "maxRefScriptSizePerBlock",
+    "maxRefScriptSizePerTx",
+    "refScriptCostStride",
+    "refScriptCostMultiplier",
+    "maxPledgeLeverage",
+    "minPoolMargin",
+    "leiosAnnouncementPeriodLength",
+    "leiosVotePeriodLength",
+    "leiosDiffusionPeriodLength",
+    "leiosCommitteeSize",
+    "leiosQuorumStakeThreshold",
+    "maxEndorserBlockReferencesSize",
+    "maxEndorserBlockTxsSize",
+    "maxEndorserBlockExecutionUnits",
+    "maxRefScriptSizePerEndorserBlock",
+];
+
+/// The u5c parameter fields that a mapping of the Dijkstra parameter type fills.
+pub const DIJKSTRA_TYPE_FIELDS: [&str; 16] = [
+    "coins_per_utxo_byte",
+    "max_tx_size",
+    "min_fee_coefficient",
+    "min_fee_constant",
+    "stake_key_deposit",
+    "protocol_version",
+    "max_value_size",
+    "collateral_percentage",
+    "max_collateral_inputs",
+    "cost_models.plutus_v3",
+    "prices",
+    "max_execution_units_per_transaction",
+    "min_fee_script_ref_cost_per_byte",
+    "max_ref_script_size_per_tx",
+    "ref_script_cost_stride",
+    "ref_script_cost_multiplier",
 ];
 
 /// Tells whether two parameter values are both present and agree, numbers to a relative tolerance of one part in a billion.
@@ -655,15 +772,15 @@ pub fn registrations(
     out
 }
 
-/// Tells whether the u5c encoding of a registration holds the BLS public key bytes anywhere.
+/// Tells whether the u5c BLS key of a registration holds the source's public key and possession proof.
 pub fn u5c_holds_bls(r: &Registration) -> bool {
-    let Some((key, _)) = &r.bls else { return false };
-    let encoded = r
-        .mapped
+    let Some((key, proof)) = &r.bls else {
+        return false;
+    };
+    r.mapped
         .as_ref()
-        .map(|m| m.encode_to_vec())
-        .unwrap_or_default();
-    encoded.windows(key.len()).any(|w| w == key.as_slice())
+        .and_then(|m| m.bls_key.as_ref())
+        .is_some_and(|k| k.bls_pubkey.as_ref() == key && k.bls_possession_proof.as_ref() == proof)
 }
 
 /// How the pool registrations of the chain compare with u5c and the node.

@@ -31,7 +31,39 @@ pub enum Held {
 }
 
 /// The locations the scope leaves out of u5c, each with its reason.
-pub const EXCLUDED: [(Location, &str); 6] = [
+pub const EXCLUDED: [(Location, &str); 19] = [
+    (
+        Location::HeaderBody(2),
+        "header prev_hash, u5c BlockHeader holds slot, hash and height only",
+    ),
+    (
+        Location::HeaderBody(3),
+        "header issuer_vkey, u5c BlockHeader holds slot, hash and height only",
+    ),
+    (
+        Location::HeaderBody(4),
+        "header vrf_vkey, u5c BlockHeader holds slot, hash and height only",
+    ),
+    (
+        Location::HeaderBody(5),
+        "header vrf_result, u5c BlockHeader holds slot, hash and height only",
+    ),
+    (
+        Location::HeaderBody(6),
+        "header block_body_size, u5c BlockHeader holds slot, hash and height only",
+    ),
+    (
+        Location::HeaderBody(7),
+        "header block_body_hash, u5c BlockHeader holds slot, hash and height only",
+    ),
+    (
+        Location::HeaderBody(8),
+        "header operational_cert, u5c BlockHeader holds slot, hash and height only",
+    ),
+    (
+        Location::HeaderBody(9),
+        "header protocol_version, u5c BlockHeader holds slot, hash and height only",
+    ),
     (
         Location::HeaderBody(10),
         "header block_body_contains_leios_cert, u5c BlockHeader holds slot, hash and height only",
@@ -49,8 +81,28 @@ pub const EXCLUDED: [(Location, &str); 6] = [
         "block_body peras_certificate, u5c BlockBody holds transactions only",
     ),
     (
+        Location::Body(7),
+        "body key 7 auxiliary_data_hash, u5c Tx holds the decoded auxiliary data and no hash of it",
+    ),
+    (
+        Location::Body(11),
+        "body key 11 script_data_hash, u5c Tx holds no script integrity hash",
+    ),
+    (
         Location::Body(14),
         "body key 14 guards, u5c Tx has no required signers field to extend",
+    ),
+    (
+        Location::Body(15),
+        "body key 15 network_id, u5c Tx holds no network id",
+    ),
+    (
+        Location::Body(21),
+        "body key 21 current treasury value, u5c Tx holds no treasury value",
+    ),
+    (
+        Location::Body(22),
+        "body key 22 donation, u5c Tx holds no donation",
     ),
     (
         Location::Body(24),
@@ -189,10 +241,11 @@ fn is_null(d: &Decoder) -> bool {
     d.datatype().expect("a CBOR item") == Type::Null
 }
 
-/// What one transaction of a block holds at each location.
+/// What one transaction of a block holds at each location, and what each of its sub transactions holds.
 #[derive(Default, Debug)]
 pub struct TxScan {
     pub held: Vec<(Location, Held)>,
+    pub subs: Vec<TxScan>,
 }
 
 impl TxScan {
@@ -313,12 +366,12 @@ fn scan_tx(d: &mut Decoder) -> TxScan {
                 let h = held(d);
                 scan.held.push((Location::Body(k), h));
                 let end = d.position();
-                if k == 4 || k == 20 {
+                if k == 4 || k == 20 || k == 23 {
                     d.set_position(start);
-                    if k == 4 {
-                        certificates(d, &mut counts);
-                    } else {
-                        proposals(d, &mut counts);
+                    match k {
+                        4 => certificates(d, &mut counts),
+                        20 => proposals(d, &mut counts),
+                        _ => each_item(d, |d, _| scan.subs.push(scan_tx(d))),
                     }
                     assert_eq!(d.position(), end, "a rescan ends where the first did");
                 }
@@ -437,6 +490,7 @@ fn native_counts(x: &u5c::NativeScript, counts: &mut BTreeMap<u64, u64>) {
         Some(N::ScriptNOfK(k)) => (3, &k.scripts),
         Some(N::InvalidBefore(_)) => (4, &[]),
         Some(N::InvalidHereafter(_)) => (5, &[]),
+        Some(N::ScriptRequireGuard(_)) => (6, &[]),
         None => return,
     };
     *counts.entry(clause).or_insert(0) += 1;
@@ -484,6 +538,21 @@ pub fn param_set(p: &u5c::PParams, key: u64) -> Option<bool> {
         31 => p.drep_deposit.is_some(),
         32 => p.drep_inactivity_period != 0,
         33 => p.min_fee_script_ref_cost_per_byte.is_some(),
+        34 => p.max_ref_script_size_per_block != 0,
+        35 => p.max_ref_script_size_per_tx != 0,
+        36 => p.ref_script_cost_stride != 0,
+        37 => p.ref_script_cost_multiplier.is_some(),
+        38 => p.max_pledge_leverage.is_some(),
+        39 => p.min_pool_margin.is_some(),
+        40 => p.leios_announcement_period_length != 0,
+        41 => p.leios_vote_period_length != 0,
+        42 => p.leios_diffusion_period_length != 0,
+        43 => p.leios_committee_size != 0,
+        44 => p.leios_quorum_stake_threshold.is_some(),
+        45 => p.max_endorser_block_references_size != 0,
+        46 => p.max_endorser_block_txs_size != 0,
+        47 => p.max_endorser_block_execution_units.is_some(),
+        48 => p.max_ref_script_size_per_endorser_block != 0,
         _ => return None,
     })
 }
@@ -543,6 +612,10 @@ fn tx_agrees(location: Location, held: Held, tx: &u5c::Tx) -> Option<bool> {
         Location::Body(18) => count(tx.reference_inputs.len() as u64),
         Location::Body(19) => count(tx.votes.len() as u64),
         Location::Body(20) => count(tx.proposals.len() as u64),
+        Location::Body(23) => count(tx.sub_transactions.len() as u64),
+        Location::Body(25) => count(tx.direct_deposits.len() as u64),
+        Location::Body(26) => count(tx.account_balance_intervals.len() as u64),
+        Location::Body(27) => count(tx.starting_account_balance_intervals.len() as u64),
         Location::Wits(0) => count(wits.vkeywitness.len() as u64),
         Location::Wits(1) => count(scripts(&|s| matches!(s, S::Native(_)))),
         Location::Wits(2) => count(wits.bootstrap_witnesses.len() as u64),
@@ -551,13 +624,13 @@ fn tx_agrees(location: Location, held: Held, tx: &u5c::Tx) -> Option<bool> {
         Location::Wits(5) => count(wits.redeemers.len() as u64),
         Location::Wits(6) => count(scripts(&|s| matches!(s, S::PlutusV2(_)))),
         Location::Wits(7) => count(scripts(&|s| matches!(s, S::PlutusV3(_)))),
-        Location::RedeemerTag(t @ 0..=5) => count(
+        Location::RedeemerTag(t @ 0..=6) => count(
             wits.redeemers
                 .iter()
                 .filter(|r| r.purpose == t as i32 + 1)
                 .count() as u64,
         ),
-        Location::NativeClause(c @ 0..=5) => {
+        Location::NativeClause(c @ 0..=6) => {
             let mut counts = BTreeMap::new();
             for s in &wits.script {
                 if let Some(S::Native(n)) = s.script.as_ref() {
@@ -571,6 +644,17 @@ fn tx_agrees(location: Location, held: Held, tx: &u5c::Tx) -> Option<bool> {
                 .iter()
                 .filter_map(|c| c.certificate.as_ref())
                 .filter(|c| cert_tag(c) == t)
+                .count() as u64,
+        ),
+        Location::PoolBls => count(
+            tx.certificates
+                .iter()
+                .filter(|c| {
+                    matches!(
+                        c.certificate.as_ref(),
+                        Some(u5c::certificate::Certificate::PoolRegistration(p)) if p.bls_key.is_some()
+                    )
+                })
                 .count() as u64,
         ),
         Location::ParamUpdate(k) => {
@@ -642,12 +726,20 @@ impl Coverage {
         }
         let txs = mapped.body.as_ref().map(|b| b.tx.as_slice()).unwrap_or(&[]);
         for (i, tx_scan) in scan.txs.iter().enumerate() {
-            let tx = txs.get(i);
-            let id = tx.and_then(|t| t.hash.as_ref().try_into().ok());
-            for (location, held) in &tx_scan.held {
-                let verdict = agrees(*location, *held, mapped, tx);
-                self.record(*location, verdict, (number, id));
-            }
+            self.add_tx(tx_scan, txs.get(i), number, mapped);
+        }
+    }
+
+    /// Adds one scanned transaction and its sub transactions against the u5c transactions at the same places.
+    fn add_tx(&mut self, scan: &TxScan, tx: Option<&u5c::Tx>, number: u64, mapped: &u5c::Block) {
+        let id = tx.and_then(|t| t.hash.as_ref().try_into().ok());
+        for (location, held) in &scan.held {
+            let verdict = agrees(*location, *held, mapped, tx);
+            self.record(*location, verdict, (number, id));
+        }
+        for (j, sub) in scan.subs.iter().enumerate() {
+            let mapped_sub = tx.and_then(|t| t.sub_transactions.get(j));
+            self.add_tx(sub, mapped_sub, number, mapped);
         }
     }
 

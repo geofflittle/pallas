@@ -4,13 +4,6 @@ use pallas_utxorpc::v1beta::spec::cardano as u5c;
 
 use crate::model::{AccountOp, Credential, Effects, Origin, Output, RefScript, TxIn};
 
-/// The parts of a top level transaction that the u5c schema has no field for.
-#[derive(Clone, Default, Debug)]
-pub struct Unmapped {
-    pub deposits: Vec<(Credential, u64)>,
-    pub subs: Vec<(u5c::Tx, Vec<(Credential, u64)>)>,
-}
-
 /// Reads a u5c integer that holds a coin or a quantity.
 pub fn natural(x: Option<&u5c::BigInt>) -> u64 {
     match x.and_then(|x| x.big_int.as_ref()) {
@@ -132,7 +125,7 @@ fn proposal_targets(x: &u5c::GovernanceActionProposal, ops: &mut Vec<AccountOp>)
     }
 }
 
-fn applied_one(tx: &u5c::Tx, origin: Origin, deposits: &[(Credential, u64)]) -> Effects {
+fn applied_one(tx: &u5c::Tx, origin: Origin) -> Effects {
     let id = id32(&tx.hash);
     if !tx.successful {
         let collateral = tx.collateral.clone().unwrap_or_default();
@@ -158,8 +151,11 @@ fn applied_one(tx: &u5c::Tx, origin: Origin, deposits: &[(Credential, u64)]) -> 
     for c in &tx.certificates {
         certificate(c, &mut accounts);
     }
-    for (cred, coin) in deposits {
-        accounts.push(AccountOp::Deposit(*cred, *coin));
+    for d in &tx.direct_deposits {
+        accounts.push(AccountOp::Deposit(
+            reward_account(&d.reward_account),
+            natural(d.coin.as_ref()),
+        ));
     }
     for p in &tx.proposals {
         proposal_targets(p, &mut accounts);
@@ -178,19 +174,17 @@ fn applied_one(tx: &u5c::Tx, origin: Origin, deposits: &[(Credential, u64)]) -> 
 }
 
 /// Lists the effects of one top level transaction in the order the ledger applies them.
-pub fn applied(tx: &u5c::Tx, block: u64, unmapped: Option<&Unmapped>) -> Vec<Effects> {
+pub fn applied(tx: &u5c::Tx, block: u64) -> Vec<Effects> {
     let top = id32(&tx.hash);
     let mut out = Vec::new();
-    let empty = Unmapped::default();
-    let unmapped = unmapped.unwrap_or(&empty);
     if tx.successful {
-        for (sub, deposits) in &unmapped.subs {
+        for sub in &tx.sub_transactions {
             let origin = Origin {
                 block,
                 top,
                 sub: Some(id32(&sub.hash)),
             };
-            out.push(applied_one(sub, origin, deposits));
+            out.push(applied_one(sub, origin));
         }
     }
     let origin = Origin {
@@ -198,6 +192,6 @@ pub fn applied(tx: &u5c::Tx, block: u64, unmapped: Option<&Unmapped>) -> Vec<Eff
         top,
         sub: None,
     };
-    out.push(applied_one(tx, origin, &unmapped.deposits));
+    out.push(applied_one(tx, origin));
     out
 }
