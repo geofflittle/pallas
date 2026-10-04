@@ -490,8 +490,7 @@ fn native_counts(x: &u5c::NativeScript, counts: &mut BTreeMap<u64, u64>) {
         Some(N::ScriptNOfK(k)) => (3, &k.scripts),
         Some(N::InvalidBefore(_)) => (4, &[]),
         Some(N::InvalidHereafter(_)) => (5, &[]),
-        Some(N::ScriptRequireGuard(_)) => (6, &[]),
-        None => return,
+        Some(N::ScriptRequireGuard(_)) | None => (6, &[]),
     };
     *counts.entry(clause).or_insert(0) += 1;
     children.iter().for_each(|c| native_counts(c, counts));
