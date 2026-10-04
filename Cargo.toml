@@ -68,3 +68,6 @@ pallas-validate = { version = "=1.4.0", path = "pallas-validate" }
 [workspace.metadata.release]
 push = false
 publish = false
+
+[patch.crates-io]
+utxorpc-spec = { path = "../utxorpc-spec/gen/rust" }
