@@ -46,7 +46,7 @@ fn uint(pp: &Value, key: &str) -> u64 {
         .unwrap_or_else(|| panic!("an integer at {key}"))
 }
 
-/// Maps the node's parameters as Conway parameters and sets the fields the Conway arm leaves unset, except the nil pledge leverage.
+/// Maps the node's parameters as Conway parameters and sets the fields the Conway arm leaves unset, leaving the pledge leverage absent.
 fn conway_with_every_field() -> u5c::PParams {
     let pp = node();
     let conway = fields::conway_params(&pp, &genesis());
@@ -87,35 +87,80 @@ fn names(x: Vec<(&'static str, Value, Value)>) -> Vec<&'static str> {
 }
 
 #[test]
-fn parameters_that_hold_every_node_value_agree_but_the_nil_pledge_leverage() {
+fn parameters_that_hold_every_node_value_agree_on_every_field() {
     let mapped = conway_with_every_field();
     assert_eq!(fields::param_pairs(&mapped, &node()).len(), 49);
     assert_eq!(
         names(fields::param_mismatches(&mapped, &node())),
+        Vec::<&str>::new()
+    );
+}
+
+fn dijkstra_mapped(pp: &Value) -> u5c::PParams {
+    #[allow(deprecated)]
+    mapper().map_pparams(MultiEraProtocolParameters::Dijkstra(
+        fields::dijkstra_params(pp, &genesis()),
+    ))
+}
+
+#[test]
+fn the_dijkstra_mapping_agrees_with_the_node_on_every_field() {
+    let pp = node();
+    let mapped = dijkstra_mapped(&pp);
+    assert_eq!(fields::param_pairs(&mapped, &pp).len(), 49);
+    assert_eq!(
+        names(fields::param_mismatches(&mapped, &pp)),
+        Vec::<&str>::new()
+    );
+}
+
+#[test]
+fn a_pledge_leverage_cap_the_node_reports_reaches_u5c_and_agrees() {
+    let mut pp = node();
+    pp["maxPledgeLeverage"] = json!(5);
+    let mapped = dijkstra_mapped(&pp);
+    assert_eq!(mapped.max_pledge_leverage, u5c_ratio(&json!(5)));
+    assert_eq!(
+        names(fields::param_mismatches(&mapped, &pp)),
+        Vec::<&str>::new()
+    );
+}
+
+#[test]
+fn a_pledge_leverage_cap_the_node_reports_and_u5c_leaves_absent_is_named() {
+    let mut pp = node();
+    pp["maxPledgeLeverage"] = json!(5);
+    let mapped = conway_with_every_field();
+    assert_eq!(mapped.max_pledge_leverage, None);
+    assert_eq!(
+        names(fields::param_mismatches(&mapped, &pp)),
         vec!["max_pledge_leverage"]
     );
 }
 
 #[test]
-fn the_dijkstra_mapping_agrees_with_the_node_on_exactly_the_fields_its_type_holds() {
+fn a_pledge_leverage_cap_u5c_holds_against_a_node_null_is_named() {
     let pp = node();
-    #[allow(deprecated)]
-    let mapped = mapper().map_pparams(MultiEraProtocolParameters::Dijkstra(
-        fields::dijkstra_params(&pp, &genesis()),
-    ));
-    let pairs = names(fields::param_pairs(&mapped, &pp));
-    let mismatches = names(fields::param_mismatches(&mapped, &pp));
-    let agreeing: Vec<&str> = pairs
-        .iter()
-        .copied()
-        .filter(|f| !mismatches.contains(f))
-        .collect();
-    let mut held = fields::DIJKSTRA_TYPE_FIELDS.to_vec();
-    held.sort();
-    let mut agreeing_sorted = agreeing.clone();
-    agreeing_sorted.sort();
-    assert_eq!(agreeing_sorted, held);
-    assert_eq!(mismatches.len() + held.len(), pairs.len());
+    assert_eq!(pp["maxPledgeLeverage"], Value::Null);
+    let mut mapped = conway_with_every_field();
+    mapped.max_pledge_leverage = u5c_ratio(&json!(5));
+    assert_eq!(
+        names(fields::param_mismatches(&mapped, &pp)),
+        vec!["max_pledge_leverage"]
+    );
+}
+
+#[test]
+fn an_absent_pledge_leverage_against_a_node_without_the_key_is_named() {
+    let mut pp = node();
+    pp.as_object_mut()
+        .expect("an object")
+        .remove("maxPledgeLeverage");
+    let mapped = conway_with_every_field();
+    assert_eq!(
+        names(fields::param_mismatches(&mapped, &pp)),
+        vec!["max_pledge_leverage"]
+    );
 }
 
 #[test]
@@ -127,14 +172,7 @@ fn a_parameter_that_differs_from_the_node_is_named() {
         .into_iter()
         .map(|m| m.0)
         .collect();
-    assert_eq!(
-        named,
-        vec![
-            "max_tx_size",
-            "drep_voting_thresholds",
-            "max_pledge_leverage"
-        ]
-    );
+    assert_eq!(named, vec!["max_tx_size", "drep_voting_thresholds"]);
 }
 
 #[test]
