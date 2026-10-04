@@ -54,9 +54,8 @@ fn guarding_purpose() -> u5c::RedeemerPurpose {
 fn native_script_guard(
     x: &pallas_primitives::StakeCredential,
 ) -> Option<u5c::native_script::NativeScript> {
-    Some(u5c::native_script::NativeScript::ScriptRequireGuard(
-        map_credential(x),
-    ))
+    let _ = map_credential(x);
+    None
 }
 
 /// Adds the pool BLS key to a pool registration certificate.
