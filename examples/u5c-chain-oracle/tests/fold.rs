@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use pallas_utxorpc::v1beta::spec::cardano as u5c;
 use u5c_chain_oracle::compare::{self, AccountMismatch, UtxoMismatch};
-use u5c_chain_oracle::effects::{self, Unmapped};
+use u5c_chain_oracle::effects;
 use u5c_chain_oracle::ledger::Ledger;
 use u5c_chain_oracle::model::{AccountOp, Credential, Effects, Origin, Output};
 
@@ -74,16 +74,27 @@ fn funded() -> Ledger {
     ledger
 }
 
-fn with_sub() -> Unmapped {
-    Unmapped {
-        deposits: vec![(HOLDER, 2)],
-        subs: vec![(tx(SUB, (FUNDED, 0), true), vec![])],
+fn reward_account(c: Credential) -> Vec<u8> {
+    let mut bytes = vec![0xe0];
+    bytes.extend(c.hash);
+    bytes
+}
+
+/// A top level transaction spending the third funded output, with one sub transaction spending the first and a direct deposit of 2 to the holder.
+fn with_sub(successful: bool) -> u5c::Tx {
+    u5c::Tx {
+        sub_transactions: vec![tx(SUB, (FUNDED, 0), successful)],
+        direct_deposits: vec![u5c::DirectDeposit {
+            reward_account: reward_account(HOLDER).into(),
+            coin: coin(2),
+        }],
+        ..tx(TOP, (FUNDED, 2), successful)
     }
 }
 
-fn fold(top: &u5c::Tx, unmapped: Option<&Unmapped>) -> Ledger {
+fn fold(top: &u5c::Tx) -> Ledger {
     let mut ledger = funded();
-    for fx in effects::applied(top, 1, unmapped) {
+    for fx in effects::applied(top, 1) {
         ledger.apply(&fx);
     }
     ledger
@@ -91,8 +102,7 @@ fn fold(top: &u5c::Tx, unmapped: Option<&Unmapped>) -> Ledger {
 
 #[test]
 fn a_successful_top_applies_its_sub_transactions_first() {
-    let top = tx(TOP, (FUNDED, 2), true);
-    let applied = effects::applied(&top, 1, Some(&with_sub()));
+    let applied = effects::applied(&with_sub(true), 1);
     let origins: Vec<Option<[u8; 32]>> = applied.iter().map(|fx| fx.origin.sub).collect();
     assert_eq!(origins, vec![Some(SUB), None]);
     assert_eq!(applied[0].produced, vec![((SUB, 0), output(3))]);
@@ -101,8 +111,7 @@ fn a_successful_top_applies_its_sub_transactions_first() {
 
 #[test]
 fn a_failed_top_applies_only_its_collateral() {
-    let top = tx(TOP, (FUNDED, 2), false);
-    let applied = effects::applied(&top, 1, Some(&with_sub()));
+    let applied = effects::applied(&with_sub(false), 1);
     assert_eq!(applied.len(), 1);
     assert_eq!(applied[0].spent, vec![(FUNDED, 1)]);
     assert_eq!(applied[0].produced, vec![((TOP, 1), output(4))]);
@@ -119,16 +128,21 @@ fn node_after_sub() -> HashMap<([u8; 32], u32), Output> {
 }
 
 #[test]
-fn the_fold_with_sub_transactions_agrees_with_the_node() {
-    let reference = fold(&tx(TOP, (FUNDED, 2), true), Some(&with_sub()));
+fn the_fold_of_the_u5c_sub_transactions_and_deposits_agrees_with_the_node() {
+    let ledger = fold(&with_sub(true));
     let accounts = HashMap::from([(HOLDER, 2)]);
-    let report = compare::state(&reference, &node_after_sub(), &accounts);
-    assert!(report.agrees(), "{report:?} {:?}", reference.violations);
+    let report = compare::state(&ledger, &node_after_sub(), &accounts);
+    assert!(report.agrees(), "{report:?} {:?}", ledger.violations);
 }
 
 #[test]
-fn the_fold_without_sub_transactions_misses_their_outputs_and_deposits() {
-    let u5c_only = fold(&tx(TOP, (FUNDED, 2), true), None);
+fn a_mapping_that_drops_the_sub_transactions_and_deposits_misses_their_effects() {
+    let dropped = u5c::Tx {
+        sub_transactions: vec![],
+        direct_deposits: vec![],
+        ..with_sub(true)
+    };
+    let u5c_only = fold(&dropped);
     let accounts = HashMap::from([(HOLDER, 2)]);
     let report = compare::state(&u5c_only, &node_after_sub(), &accounts);
     assert_eq!(
@@ -190,6 +204,6 @@ fn an_account_never_delegated_holds_exactly_its_deposits() {
 
 #[test]
 fn spending_an_unknown_input_is_a_violation() {
-    let ledger = fold(&tx(TOP, ([8; 32], 0), true), None);
+    let ledger = fold(&tx(TOP, ([8; 32], 0), true));
     assert_eq!(ledger.violations.len(), 1);
 }

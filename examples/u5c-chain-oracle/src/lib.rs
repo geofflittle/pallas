@@ -8,7 +8,6 @@ pub mod fixtures;
 pub mod ledger;
 pub mod model;
 pub mod node;
-pub mod source;
 
 use std::collections::{HashMap, HashSet};
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -56,10 +55,9 @@ pub fn caught<T>(f: impl FnOnce() -> T) -> Result<T, String> {
     })
 }
 
-/// The state that replaying a chain builds, once from u5c fields alone and once with the source parts u5c has no field for.
+/// The state that replaying a chain from u5c fields alone builds.
 pub struct Replay {
     pub u5c: Ledger,
-    pub reference: Ledger,
     pub coverage: Coverage,
     pub registrations: Vec<Registration>,
     pub mapper_panics: Vec<(u64, String)>,
@@ -71,11 +69,10 @@ pub struct Replay {
 }
 
 impl Replay {
-    /// Starts both replays from the effects of the genesis file, noting where the chain holds each wanted transaction id.
+    /// Starts the replay from the effects of the genesis file, noting where the chain holds each wanted transaction id.
     pub fn new(genesis: &[Effects], wanted: HashSet<[u8; 32]>) -> Self {
         let mut out = Self {
             u5c: Ledger::default(),
-            reference: Ledger::default(),
             coverage: Coverage::default(),
             registrations: Vec::new(),
             mapper_panics: Vec::new(),
@@ -87,7 +84,6 @@ impl Replay {
         };
         for fx in genesis {
             out.u5c.apply(fx);
-            out.reference.apply(fx);
         }
         out
     }
@@ -106,21 +102,14 @@ impl Replay {
                 return (hash, number);
             }
         };
-        let dijkstra = block.as_dijkstra();
         let txs = mapped.body.as_ref().map(|b| b.tx.as_slice()).unwrap_or(&[]);
-        for (i, tx) in txs.iter().enumerate() {
+        for tx in txs {
             self.txs += 1;
-            for fx in effects::applied(tx, number, None) {
+            for fx in effects::applied(tx, number) {
                 self.u5c.apply(&fx);
             }
-            let unmapped = dijkstra
-                .and_then(|b| b.block_body.transactions.get(i))
-                .and_then(|t| source::unmapped(&mapper, t));
-            for fx in effects::applied(tx, number, unmapped.as_ref()) {
-                self.reference.apply(&fx);
-            }
         }
-        if let Some(b) = dijkstra {
+        if let Some(b) = block.as_dijkstra() {
             self.coverage.add(inner_block(raw), number, &mapped);
             self.registrations
                 .extend(fields::registrations(b, number, &mapped));

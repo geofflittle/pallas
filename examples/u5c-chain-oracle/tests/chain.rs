@@ -1,9 +1,12 @@
+use std::collections::HashMap;
+
 use pallas_traverse::MultiEraBlock;
 use pallas_utxorpc::v1beta::spec::cardano as u5c;
 use u5c_chain_oracle::coverage::{Coverage, EXCLUDED, Location};
-use u5c_chain_oracle::effects::{self, Unmapped};
+use u5c_chain_oracle::effects;
+use u5c_chain_oracle::fields::{self, Case, IdVerdict};
 use u5c_chain_oracle::model::AccountOp;
-use u5c_chain_oracle::{fields, inner_block, mapper, source};
+use u5c_chain_oracle::{inner_block, mapper};
 
 fn raw(number: u64) -> Vec<u8> {
     let path = format!(
@@ -26,25 +29,16 @@ const A1: &str = "43827b78039ee71003f79eda9cbe50c44e7101195cd7a4e13fba290bbfc11f
 const N1: &str = "2de11481d8ff00d2195c0801a440d6feb33f23e2278ce98c898769df292dccb2";
 
 struct Mapped {
+    number: u64,
     raw: Vec<u8>,
     u5c: u5c::Block,
-    unmapped: Vec<Option<Unmapped>>,
 }
 
 fn mapped(number: u64) -> Mapped {
     let raw = raw(number);
     let block = MultiEraBlock::decode(&raw).expect("a block");
-    let m = mapper();
-    let u5c = m.map_block(&block);
-    let unmapped = block
-        .as_dijkstra()
-        .expect("a Dijkstra block")
-        .block_body
-        .transactions
-        .iter()
-        .map(|t| source::unmapped(&m, t))
-        .collect();
-    Mapped { raw, u5c, unmapped }
+    let u5c = mapper().map_block(&block);
+    Mapped { number, raw, u5c }
 }
 
 impl Mapped {
@@ -59,66 +53,99 @@ impl Mapped {
         self.u5c.body.as_ref().map_or(&[], |b| b.tx.as_slice())
     }
 
-    fn coverage(&self, number: u64) -> Coverage {
+    fn tx_mut(&mut self, tx: &str) -> &mut u5c::Tx {
+        let i = self.position(tx);
+        &mut self.u5c.body.as_mut().expect("a body").tx[i]
+    }
+
+    fn coverage(&self) -> Coverage {
         let mut c = Coverage::default();
-        c.add(inner_block(&self.raw), number, &self.u5c);
+        c.add(inner_block(&self.raw), self.number, &self.u5c);
         c
+    }
+
+    fn ids(&self, names: &[&str]) -> Vec<IdVerdict> {
+        let block = MultiEraBlock::decode(&self.raw).expect("a block");
+        let found = fields::source_ids(block.as_dijkstra().expect("Dijkstra"), self.number)
+            .into_iter()
+            .collect();
+        let cases: Vec<Case> = names
+            .iter()
+            .map(|n| Case {
+                name: (*n).to_owned(),
+                id: id(n),
+            })
+            .collect();
+        let blocks = HashMap::from([(self.number, self.u5c.clone())]);
+        fields::tx_ids(&cases, &found, &blocks)
+            .into_iter()
+            .map(|(_, v)| v)
+            .collect()
     }
 }
 
-#[test]
-fn u5c_carries_the_top_level_id_and_not_the_sub_transaction_id() {
-    let m = mapped(104960);
-    let block = MultiEraBlock::decode(&m.raw).expect("a block");
-    let ids = fields::source_ids(block.as_dijkstra().expect("Dijkstra"), 104960);
-    let parent = ids
-        .iter()
-        .find(|(i, _)| *i == id(C2_SUB))
-        .map(|x| x.1.parent);
-    assert_eq!(parent, Some(Some(id(C2))));
-    let carried = |x: &str| m.txs().iter().any(|t| t.hash.as_ref() == id(x));
-    assert!(carried(C2));
-    assert!(!carried(C2_SUB));
+fn carried(v: &IdVerdict) -> bool {
+    matches!(v, IdVerdict::Carried(_))
 }
 
 #[test]
-fn only_the_source_sub_transaction_produces_the_sub_output() {
+fn u5c_carries_a_sub_transaction_id_under_its_parent_only() {
     let m = mapped(104960);
-    let i = m.position(C2);
-    let produced = |unmapped: Option<&Unmapped>| -> Vec<([u8; 32], u32)> {
-        effects::applied(&m.txs()[i], 104960, unmapped)
+    assert!(m.txs().iter().all(|t| t.hash.as_ref() != id(C2_SUB)));
+    let subs = &m.txs()[m.position(C2)].sub_transactions;
+    assert_eq!(subs.len(), 1);
+    assert_eq!(subs[0].hash.as_ref(), id(C2_SUB));
+    let verdicts = m.ids(&[C2, C2_SUB]);
+    assert!(verdicts.iter().all(carried), "{verdicts:?}");
+}
+
+#[test]
+fn a_sub_transaction_id_without_its_parent_is_not_carried() {
+    let mut m = mapped(104960);
+    let sub = m.tx_mut(C2).sub_transactions.remove(0);
+    let verdicts = m.ids(&[C2, C2_SUB]);
+    assert!(carried(&verdicts[0]) && !carried(&verdicts[1]), "{verdicts:?}");
+    m.u5c.body.as_mut().expect("a body").tx.push(sub);
+    let verdicts = m.ids(&[C2, C2_SUB]);
+    assert!(carried(&verdicts[0]) && !carried(&verdicts[1]), "{verdicts:?}");
+}
+
+#[test]
+fn the_u5c_sub_transaction_produces_the_sub_output() {
+    let mut m = mapped(104960);
+    let produced = |tx: &u5c::Tx| -> Vec<([u8; 32], u32)> {
+        effects::applied(tx, 104960)
             .iter()
             .flat_map(|fx| fx.produced.iter().map(|(k, _)| *k))
             .collect()
     };
-    assert!(produced(m.unmapped[i].as_ref()).contains(&(id(C2_SUB), 0)));
-    assert!(!produced(None).contains(&(id(C2_SUB), 0)));
+    assert!(produced(&m.txs()[m.position(C2)]).contains(&(id(C2_SUB), 0)));
+    m.tx_mut(C2).sub_transactions.clear();
+    assert!(!produced(&m.txs()[m.position(C2)]).contains(&(id(C2_SUB), 0)));
 }
 
 #[test]
-fn only_the_source_direct_deposit_credits_the_account() {
-    let m = mapped(104949);
-    let i = m.position(A1);
-    let deposits = |unmapped: Option<&Unmapped>| -> Vec<AccountOp> {
-        effects::applied(&m.txs()[i], 104949, unmapped)
+fn the_u5c_direct_deposit_credits_the_account() {
+    let mut m = mapped(104949);
+    let deposits = |tx: &u5c::Tx| -> Vec<AccountOp> {
+        effects::applied(tx, 104949)
             .into_iter()
             .flat_map(|fx| fx.accounts)
             .filter(|op| matches!(op, AccountOp::Deposit(..)))
             .collect()
     };
-    assert_eq!(deposits(m.unmapped[i].as_ref()).len(), 1);
-    assert_eq!(deposits(None), vec![]);
+    assert_eq!(deposits(&m.txs()[m.position(A1)]).len(), 1);
+    m.tx_mut(A1).direct_deposits.clear();
+    assert_eq!(deposits(&m.txs()[m.position(A1)]), vec![]);
 }
 
 #[test]
 fn a_failed_transaction_applies_its_collateral_and_not_its_sub_transaction() {
     let m = mapped(105475);
-    let i = m.position(N1);
-    let tx = &m.txs()[i];
+    let tx = &m.txs()[m.position(N1)];
     assert!(!tx.successful);
-    let unmapped = m.unmapped[i].as_ref().expect("a sub transaction");
-    assert_eq!(unmapped.subs.len(), 1);
-    let applied = effects::applied(tx, 105475, Some(unmapped));
+    assert_eq!(tx.sub_transactions.len(), 1);
+    let applied = effects::applied(tx, 105475);
     assert_eq!(applied.len(), 1);
     assert_eq!(applied[0].origin.sub, None);
     assert_eq!(applied[0].produced.len(), 1);
@@ -137,7 +164,7 @@ fn a_failed_transaction_lists_its_sub_transaction_id_under_it() {
 }
 
 #[test]
-fn the_bls_check_finds_a_key_only_where_u5c_carries_it() {
+fn the_bls_check_holds_a_key_only_in_the_u5c_bls_field() {
     let m = mapped(4277);
     let block = MultiEraBlock::decode(&m.raw).expect("a block");
     let mut regs = fields::registrations(block.as_dijkstra().expect("Dijkstra"), 4277, &m.u5c);
@@ -145,14 +172,18 @@ fn the_bls_check_finds_a_key_only_where_u5c_carries_it() {
         .iter_mut()
         .find(|r| r.bls.is_some())
         .expect("a registration with a BLS key");
-    assert!(r.mapped.is_some());
+    assert!(fields::u5c_holds_bls(r));
+    let (key, _) = r.bls.clone().expect("a key");
+    let mapping = r.mapped.as_mut().expect("a mapping");
+    mapping.bls_key.as_mut().expect("a mapped key").bls_possession_proof = vec![0; 48].into();
     assert!(!fields::u5c_holds_bls(r));
-    let key = r.bls.clone().expect("a key").0;
-    r.mapped.as_mut().expect("a mapping").pool_metadata = Some(u5c::PoolMetadata {
+    let mapping = r.mapped.as_mut().expect("a mapping");
+    mapping.bls_key = None;
+    mapping.pool_metadata = Some(u5c::PoolMetadata {
         url: String::new(),
         hash: key.into(),
     });
-    assert!(fields::u5c_holds_bls(r));
+    assert!(!fields::u5c_holds_bls(r));
 }
 
 fn failing(c: &Coverage) -> Vec<Location> {
@@ -160,13 +191,24 @@ fn failing(c: &Coverage) -> Vec<Location> {
 }
 
 #[test]
-fn coverage_holds_the_locations_u5c_maps() {
-    let m = mapped(104966);
-    let c = m.coverage(104966);
+fn coverage_holds_every_location_of_the_fixture_blocks() {
+    for number in [104949, 104960, 104966, 105475, 105486, 4277] {
+        let c = mapped(number).coverage();
+        assert_eq!(failing(&c), vec![], "block {number}");
+    }
+}
+
+#[test]
+fn coverage_holds_the_dijkstra_transaction_fields() {
+    let c = mapped(104966).coverage();
     for l in [
         Location::Body(0),
         Location::Body(1),
         Location::Body(2),
+        Location::Body(23),
+        Location::Body(25),
+        Location::Body(26),
+        Location::Body(27),
         Location::Wits(0),
         Location::TxPart(3),
         Location::HeaderBody(0),
@@ -182,24 +224,54 @@ fn coverage_holds_the_locations_u5c_maps() {
 }
 
 #[test]
-fn coverage_fails_the_locations_u5c_has_no_field_for() {
+fn coverage_scans_the_inputs_of_every_sub_transaction() {
     let m = mapped(104966);
-    let f = failing(&m.coverage(104966));
-    for l in [23, 25, 26, 27] {
-        assert!(f.contains(&Location::Body(l)), "{l} in {f:?}");
-    }
-    assert!(EXCLUDED.iter().all(|(l, _)| !f.contains(l)));
+    let block = MultiEraBlock::decode(&m.raw).expect("a block");
+    let txs = &block.as_dijkstra().expect("Dijkstra").block_body.transactions;
+    let subs: usize = txs
+        .iter()
+        .map(|t| t.transaction_body.sub_transactions.as_ref().map_or(0, |s| s.len()))
+        .sum();
+    assert!(subs > 0);
+    let c = m.coverage();
+    assert_eq!(
+        c.tallies[&Location::Body(0)].occurrences,
+        (txs.len() + subs) as u64
+    );
+}
+
+#[test]
+fn coverage_fails_a_planted_sub_transaction_drop() {
+    let mut m = mapped(104960);
+    m.tx_mut(C2).sub_transactions.clear();
+    let after = m.coverage();
+    assert_eq!(after.tallies[&Location::Body(23)].disagreements, 1);
+    let f = failing(&after);
+    assert!(f.contains(&Location::Body(23)), "{f:?}");
+    assert!(f.contains(&Location::Body(0)), "{f:?}");
 }
 
 #[test]
 fn coverage_fails_a_planted_output_drop() {
     let mut m = mapped(104960);
-    let before = failing(&m.coverage(104960));
+    let before = failing(&m.coverage());
     assert!(!before.contains(&Location::Body(1)), "{before:?}");
     let tx = &mut m.u5c.body.as_mut().expect("a body").tx[0];
     assert!(!tx.outputs.is_empty());
     tx.outputs.clear();
-    let after = m.coverage(104960);
+    let after = m.coverage();
     assert_eq!(after.tallies[&Location::Body(1)].disagreements, 1);
     assert!(failing(&after).contains(&Location::Body(1)));
+}
+
+#[test]
+fn the_exclusion_list_names_the_conway_positions_u5c_never_held() {
+    let mut want: Vec<Location> = (2..=11).map(Location::HeaderBody).collect();
+    want.extend([1, 2].map(Location::BlockBody));
+    want.extend([7, 11, 14, 15, 21, 22, 24].map(Location::Body));
+    let mut have: Vec<Location> = EXCLUDED.iter().map(|(l, _)| *l).collect();
+    have.sort();
+    want.sort();
+    assert_eq!(have, want);
+    assert!(EXCLUDED.iter().all(|(_, reason)| !reason.is_empty()));
 }

@@ -558,6 +558,9 @@ pub const NODE_KEYS_WITH_FIELD: [&str; 31] = [
     "dRepActivity",
 ];
 
+/// The u5c parameter fields that a mapping of the Dijkstra parameter type fills.
+pub const DIJKSTRA_TYPE_FIELDS: [&str; 0] = [];
+
 /// Tells whether two parameter values are both present and agree, numbers to a relative tolerance of one part in a billion.
 pub fn same(a: &Value, b: &Value) -> bool {
     match (a, b) {

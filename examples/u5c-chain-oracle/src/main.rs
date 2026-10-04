@@ -20,14 +20,14 @@ fn txin(k: &TxIn) -> String {
     format!("{}#{}", hex::encode(k.0), k.1)
 }
 
-fn utxo_cause(m: &UtxoMismatch, reference: &Ledger) -> String {
+fn utxo_cause(m: &UtxoMismatch, ledger: &Ledger) -> String {
     let k = m.key();
     match m {
-        UtxoMismatch::OnlyInFold(_) => match reference.spent_by_sub.get(&k) {
+        UtxoMismatch::OnlyInFold(_) => match ledger.spent_by_sub.get(&k) {
             Some(o) => format!("spent by {}", o.describe()),
             None => format!("produced by {}", hex::encode(k.0)),
         },
-        UtxoMismatch::OnlyAtNode(_) => match reference.sub_origins.get(&k.0) {
+        UtxoMismatch::OnlyAtNode(_) => match ledger.sub_origins.get(&k.0) {
             Some(o) => format!("produced by {}", o.describe()),
             None => format!("produced by {}", hex::encode(k.0)),
         },
@@ -74,7 +74,7 @@ fn violation(v: &Violation) -> String {
     }
 }
 
-fn account(m: &AccountMismatch, reference: &Ledger) -> String {
+fn account(m: &AccountMismatch, ledger: &Ledger) -> String {
     let (cred, text) = match m {
         AccountMismatch::OnlyInFold(c, b) => (c, format!("only in fold, balance {b}")),
         AccountMismatch::OnlyAtNode(c, b) => (c, format!("only at node, balance {b}")),
@@ -88,7 +88,7 @@ fn account(m: &AccountMismatch, reference: &Ledger) -> String {
             format!("fold {fold} node {node} earns rewards {earns_rewards}"),
         ),
     };
-    let deposits: Vec<String> = reference
+    let deposits: Vec<String> = ledger
         .deposits_to
         .get(cred)
         .into_iter()
@@ -102,7 +102,7 @@ fn account(m: &AccountMismatch, reference: &Ledger) -> String {
     )
 }
 
-fn check_state(name: &str, fold: &Ledger, node: &NodeState, reference: &Ledger) -> bool {
+fn check_state(name: &str, fold: &Ledger, node: &NodeState) -> bool {
     let report = compare::state(fold, &node.utxo, &node.accounts);
     let utxo = &report.utxo;
     let count = |f: fn(&UtxoMismatch) -> bool| utxo.iter().filter(|m| f(m)).count();
@@ -138,7 +138,7 @@ fn check_state(name: &str, fold: &Ledger, node: &NodeState, reference: &Ledger) 
             "  {kind} {} [{}] {}",
             txin(&m.key()),
             differing(&m.key()).join(" "),
-            utxo_cause(m, reference)
+            utxo_cause(m, fold)
         );
         let k = m.key();
         if let (Some(a), Some(b)) = (fold.utxo.get(&k), node.utxo.get(&k))
@@ -159,7 +159,7 @@ fn check_state(name: &str, fold: &Ledger, node: &NodeState, reference: &Ledger) 
         accounts.mismatches.len()
     );
     for m in accounts.mismatches.iter().take(SHOWN) {
-        println!("  {}", account(m, reference));
+        println!("  {}", account(m, fold));
     }
     println!(
         "check1 {name} node entries compared {} violations {}",
@@ -214,17 +214,10 @@ fn run(dir: &Path, cases_path: &Path) {
         println!("  block {b}: {e}");
     }
 
-    let u5c_green = check_state("u5c", &replay.u5c, &state, &replay.reference)
-        && replay.mapper_panics.is_empty();
-    let reference_green = check_state("reference", &replay.reference, &state, &replay.reference);
+    let u5c_green = check_state("u5c", &replay.u5c, &state) && replay.mapper_panics.is_empty();
     println!(
-        "check1 verdict {} (reference fold with sub transactions and direct deposits from the source {})",
-        if u5c_green { "GREEN" } else { "RED" },
-        if reference_green {
-            "agrees"
-        } else {
-            "disagrees"
-        }
+        "check1 verdict {}",
+        if u5c_green { "GREEN" } else { "RED" }
     );
 
     let ids = fields::tx_ids(&cases, &replay.found, &replay.kept);
