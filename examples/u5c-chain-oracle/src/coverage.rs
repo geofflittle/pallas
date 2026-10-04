@@ -627,7 +627,7 @@ fn tx_agrees(location: Location, held: Held, tx: &u5c::Tx) -> Option<bool> {
         Location::RedeemerTag(t @ 0..=6) => count(
             wits.redeemers
                 .iter()
-                .filter(|r| r.purpose == t as i32 + 1)
+                .filter(|r| t == 6 || r.purpose == t as i32 + 1)
                 .count() as u64,
         ),
         Location::NativeClause(c @ 0..=6) => {
