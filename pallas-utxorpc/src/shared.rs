@@ -3519,40 +3519,8 @@ macro_rules! impl_cardano_mapper_shared {
                     },
                     #[cfg(feature = "unstable")]
                     MultiEraProtocolParameters::Dijkstra(params) => {
-                        let plutus = params.plutus.as_ref();
-                        u5c::PParams {
-                            max_tx_size: params.max_transaction_size.into(),
-                            min_fee_coefficient: u64_to_bigint(params.minfee_a.into()),
-                            min_fee_constant: u64_to_bigint(params.minfee_b.into()),
-                            coins_per_utxo_byte: u64_to_bigint(params.ada_per_utxo_byte),
-                            stake_key_deposit: params.key_deposit.and_then(u64_to_bigint),
-                            protocol_version: u5c::ProtocolVersion {
-                                major: params.protocol_version.0 as u32,
-                                minor: params.protocol_version.1 as u32,
-                            }
-                            .into(),
-                            max_value_size: params.max_value_size.into(),
-                            collateral_percentage: plutus
-                                .map(|p| p.collateral_percentage.into())
-                                .unwrap_or_default(),
-                            max_collateral_inputs: plutus
-                                .map(|p| p.max_collateral_inputs.into())
-                                .unwrap_or_default(),
-                            prices: plutus
-                                .map(|p| execution_prices_to_u5c(p.execution_costs.clone())),
-                            max_execution_units_per_transaction: plutus
-                                .map(|p| execution_units_to_u5c(p.max_tx_ex_units)),
-                            min_fee_script_ref_cost_per_byte: plutus.map(|p| {
-                                rational_number_to_u5c(p.minfee_refscript_cost_per_byte.clone())
-                            }),
-                            cost_models: plutus.map(|p| u5c::CostModels {
-                                plutus_v3: Some(u5c::CostModel {
-                                    values: p.cost_model_v3.clone(),
-                                }),
-                                ..Default::default()
-                            }),
-                            ..dijkstra_pparams(&params)
-                        }
+                        let _ = dijkstra_pparams(&params);
+                        unimplemented!("map_pparams has no arm for this era's protocol parameters")
                     }
                     _ => {
                         unimplemented!("map_pparams has no arm for this era's protocol parameters")

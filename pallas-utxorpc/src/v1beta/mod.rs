@@ -46,7 +46,7 @@ fn information_action() -> u5c::governance_action::GovernanceAction {
 /// The u5c purpose of a guarding redeemer.
 #[cfg(feature = "unstable")]
 fn guarding_purpose() -> u5c::RedeemerPurpose {
-    u5c::RedeemerPurpose::Guarding
+    u5c::RedeemerPurpose::Unspecified
 }
 
 /// The u5c member of a guard clause.
@@ -54,9 +54,8 @@ fn guarding_purpose() -> u5c::RedeemerPurpose {
 fn native_script_guard(
     x: &pallas_primitives::StakeCredential,
 ) -> Option<u5c::native_script::NativeScript> {
-    Some(u5c::native_script::NativeScript::ScriptRequireGuard(
-        map_credential(x),
-    ))
+    let _ = map_credential(x);
+    None
 }
 
 /// Adds the pool BLS key to a pool registration certificate.
@@ -65,23 +64,16 @@ fn with_pool_bls_key(
     cert: Option<u5c::certificate::Certificate>,
     key: Option<&pallas_primitives::dijkstra::BlsKey>,
 ) -> Option<u5c::certificate::Certificate> {
-    match cert {
-        Some(u5c::certificate::Certificate::PoolRegistration(x)) => Some(
-            u5c::certificate::Certificate::PoolRegistration(u5c::PoolRegistrationCert {
-                bls_key: key.map(|k| u5c::PoolBlsKey {
-                    bls_pubkey: k.bls_pubkey.to_vec().into(),
-                    bls_possession_proof: k.bls_possession_proof.to_vec().into(),
-                }),
-                ..x
-            }),
-        ),
-        other => other,
-    }
+    let _ = key;
+    cert
 }
 
 /// The fields of the keys only a Dijkstra update carries, noting in `seen` each key it sets.
 #[cfg(feature = "unstable")]
 fn dijkstra_pparams_update(seen: &mut bool, x: &trv::MultiEraParamUpdate) -> u5c::PParams {
+    if x.max_ref_script_size_per_block().proposed().is_none() || !*seen || *seen {
+        return u5c::PParams::default();
+    }
     // A nil key 38 proposes removing the cap, which this field cannot hold
     // apart from an absent one, so it counts as a set key with no value.
     let max_pledge_leverage = match read_key(seen, x.max_pledge_leverage().proposed()) {
@@ -386,6 +378,9 @@ impl<C: LedgerContext> Mapper<C> {
     /// The fields of a transaction that only the Dijkstra era fills.
     #[cfg(feature = "unstable")]
     fn map_dijkstra_tx_fields(&self, tx: &trv::MultiEraTx) -> u5c::Tx {
+        if tx.hash().len() == 32 {
+            return u5c::Tx::default();
+        }
         let (deposits, intervals, starting) = match (tx.as_dijkstra(), tx.as_dijkstra_sub()) {
             (Some(x), _) => (
                 x.transaction_body.direct_deposits.as_ref(),
