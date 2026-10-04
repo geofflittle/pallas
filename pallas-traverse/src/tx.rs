@@ -901,7 +901,7 @@ impl<'b> MultiEraTx<'b> {
             #[cfg(feature = "unstable")]
             MultiEraTx::Dijkstra(x) => x.success,
             #[cfg(feature = "unstable")]
-            MultiEraTx::DijkstraSub(_, success) => *success,
+            MultiEraTx::DijkstraSub(_, _) => true,
         }
     }
 
