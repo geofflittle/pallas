@@ -1,6 +1,6 @@
 use super::{
     AccountBalanceInterval, AccountBalanceIntervals, AuxiliaryData, Block, BlockTransaction,
-    Certificate, CostModels, DRep, GovAction, Guards, Header, MempoolTransaction, NativeScript,
+    Certificate, CostModels, DRep, EndorserBlock, GovAction, Guards, Header, MempoolTransaction, NativeScript,
     NonEmptySet, ProposalProcedure, Set, SetArm, StakeCredential, TransactionBody,
     TransactionOutput, Value, WitnessSet,
 };
@@ -79,6 +79,25 @@ const TEST_BLOCKS: &[(&str, &str)] = &[
 const PRE_FORK_BLOCKS: &[(&str, &str)] =
     &[("conway5", include_str!("../../../test_data/conway5.block"))];
 
+/// Endorser block bodies and the number of transactions each names.
+const ENDORSER_BLOCKS: &[(&str, &str, usize)] = &[
+    (
+        "dijkstra-eb1",
+        include_str!("../../../test_data/dijkstra-eb1.ebbody"),
+        1,
+    ),
+    (
+        "dijkstra-eb2",
+        include_str!("../../../test_data/dijkstra-eb2.ebbody"),
+        30,
+    ),
+    (
+        "dijkstra-17402",
+        include_str!("../../../test_data/dijkstra-17402.ebbody"),
+        244,
+    ),
+];
+
 const WITH_TRANSACTIONS: usize = 1;
 
 fn block_named(name: &str) -> &'static str {
@@ -126,6 +145,23 @@ fn block_isomorphic_decoding_encoding() {
             bytes2.len(),
             hex::encode(&bytes[first_diff.saturating_sub(8)..(first_diff + 24).min(bytes.len())]),
             hex::encode(&bytes2[first_diff.saturating_sub(8)..(first_diff + 24).min(bytes2.len())]),
+        );
+    }
+}
+
+#[test]
+fn endorser_block_isomorphic_decoding_encoding() {
+    for (name, body_str, transactions) in ENDORSER_BLOCKS.iter() {
+        let bytes = hex::decode(body_str).unwrap_or_else(|_| panic!("bad body file {name}"));
+
+        let block: EndorserBlock = minicbor::decode(&bytes)
+            .unwrap_or_else(|e| panic!("error decoding cbor for file {name}: {e:?}"));
+        assert_eq!(block.len(), *transactions, "{name}: transaction count");
+
+        assert_eq!(
+            hex::encode(minicbor::to_vec(&block).unwrap()),
+            hex::encode(&bytes),
+            "{name}: re-encoded bytes didn't match original"
         );
     }
 }
