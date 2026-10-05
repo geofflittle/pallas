@@ -313,7 +313,7 @@ pub struct EbAnnouncement {
 }
 
 /// `endorser_block` (leios-fetch `messages.cddl`), each transaction's blake2b-256 and its size in bytes.
-pub type EndorserBlock = KeyValuePairs<Hash<32>, u32>;
+pub type EndorserBlock = MaybeIndefArray<(Hash<32>, u16)>;
 
 /// `bls_key = [bls_pubkey : bytes .size 96, bls_possession_proof : bytes .size 48]` (`defs.cddl`).
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
