@@ -479,7 +479,7 @@ const TESTS_RS: &str = include_str!("tests.rs");
 /// The leios-fetch messages of the vendored cardano-blueprint, the second source this module cites.
 #[cfg(feature = "blueprint")]
 const LEIOS_FETCH_CDDL: &str =
-    include_str!("../../../cardano-blueprint/src/network/node-to-node/leios-fetch/messages.cddl");
+    include_str!("../../../cardano-blueprint/src/network/node-to-node/leios-notify/messages.cddl");
 
 /// Rules this module cites that the leios-fetch messages define.
 const LEIOS_FETCH_RULES: &[&str] = &["endorser_block"];
