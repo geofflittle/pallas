@@ -591,10 +591,11 @@ fn rule_citation(span: &str) -> Option<(String, &str)> {
     }
 }
 
-/// Every CDDL rule this module's doc comments cite. Both files are scanned,
-/// because a doc comment in either one can cite a rule.
-fn cited_rules() -> std::collections::BTreeSet<String> {
-    let mut cited = std::collections::BTreeSet::new();
+/// Every rule citation in this module's doc comments, as the rule name and
+/// the quoted text after its `=`. Both files are scanned, because a doc
+/// comment in either one can cite a rule.
+fn citations() -> Vec<(String, String)> {
+    let mut found = Vec::new();
 
     for line in MODEL_RS.lines().chain(TESTS_RS.lines()) {
         let line = line.trim_start();
@@ -612,10 +613,21 @@ fn cited_rules() -> std::collections::BTreeSet<String> {
                 continue;
             }
             if let Some((name, body)) = rule_citation(span) {
-                cited.insert(name);
-                cited.extend(snake_words(body));
+                found.push((name, body.to_string()));
             }
         }
+    }
+
+    found
+}
+
+/// Every CDDL rule this module's doc comments cite.
+fn cited_rules() -> std::collections::BTreeSet<String> {
+    let mut cited = std::collections::BTreeSet::new();
+
+    for (name, body) in citations() {
+        cited.extend(snake_words(&body));
+        cited.insert(name);
     }
 
     cited
@@ -716,7 +728,7 @@ fn every_cited_rule_matches_the_vendored_cddl() {
 
 #[cfg(feature = "blueprint")]
 #[test]
-fn every_leios_fetch_rule_is_defined_by_the_leios_fetch_messages() {
+fn every_leios_fetch_citation_matches_the_leios_fetch_messages() {
     let unsourced: Vec<&str> = LEIOS_FETCH_RULES
         .iter()
         .copied()
@@ -726,6 +738,25 @@ fn every_leios_fetch_rule_is_defined_by_the_leios_fetch_messages() {
         unsourced.is_empty(),
         "the leios-fetch messages do not define {unsourced:?}, so they do not belong on its list"
     );
+
+    let words = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let quoted: Vec<String> = citations()
+        .into_iter()
+        .filter(|(name, body)| LEIOS_FETCH_RULES.contains(&name.as_str()) && !body.is_empty())
+        .map(|(name, body)| words(&format!("{name} ={body}")))
+        .collect();
+    for rule in LEIOS_FETCH_RULES {
+        assert!(
+            quoted.iter().any(|quote| quote.starts_with(&format!("{rule} ="))),
+            "no doc comment quotes `{rule}`, so nothing checks its text against the leios-fetch messages"
+        );
+    }
+    for quote in &quoted {
+        assert!(
+            LEIOS_FETCH_CDDL.lines().any(|line| words(line) == *quote),
+            "a doc comment quotes `{quote}`, which is no line of the leios-fetch messages"
+        );
+    }
 
     // The list cannot pass by the predicate always agreeing.
     assert!(defines_rule(LEIOS_FETCH_CDDL, "endorser_block"));
