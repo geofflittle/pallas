@@ -477,6 +477,7 @@ const MODEL_RS: &str = include_str!("model.rs");
 const TESTS_RS: &str = include_str!("tests.rs");
 
 /// The leios-fetch messages of the vendored cardano-blueprint, the second source this module cites.
+#[cfg(feature = "blueprint")]
 const LEIOS_FETCH_CDDL: &str =
     include_str!("../../../cardano-blueprint/src/network/node-to-node/leios-fetch/messages.cddl");
 
@@ -621,8 +622,8 @@ fn cited_rules() -> std::collections::BTreeSet<String> {
 }
 
 /// Every citation has to land in exactly one of four places: a rule the
-/// vendored file defines, a rule the leios-fetch messages define, a rule the
-/// ledger removed, or a name that is not one.
+/// vendored file defines, a rule on the leios-fetch list, a rule the ledger
+/// removed, or a name that is not one.
 #[test]
 fn every_cited_rule_matches_the_vendored_cddl() {
     let cited = cited_rules();
@@ -664,16 +665,6 @@ fn every_cited_rule_matches_the_vendored_cddl() {
     assert!(
         unaccounted.is_empty(),
         "a doc comment cites {unaccounted:?}, which defs.cddl does not define and no list accounts for"
-    );
-
-    let unsourced: Vec<&str> = LEIOS_FETCH_RULES
-        .iter()
-        .copied()
-        .filter(|name| !defines_rule(LEIOS_FETCH_CDDL, name))
-        .collect();
-    assert!(
-        unsourced.is_empty(),
-        "the leios-fetch messages do not define {unsourced:?}, so they do not belong on its list"
     );
 
     let doubled: Vec<&str> = LEIOS_FETCH_RULES
@@ -721,6 +712,22 @@ fn every_cited_rule_matches_the_vendored_cddl() {
     assert!(defines_rule(DEFS_CDDL, "block_body"));
     assert!(!defines_rule(DEFS_CDDL, "block_bod"));
     assert!(!defines_rule(DEFS_CDDL, "no_such_rule_exists"));
+}
+
+#[cfg(feature = "blueprint")]
+#[test]
+fn every_leios_fetch_rule_is_defined_by_the_leios_fetch_messages() {
+    let unsourced: Vec<&str> = LEIOS_FETCH_RULES
+        .iter()
+        .copied()
+        .filter(|name| !defines_rule(LEIOS_FETCH_CDDL, name))
+        .collect();
+    assert!(
+        unsourced.is_empty(),
+        "the leios-fetch messages do not define {unsourced:?}, so they do not belong on its list"
+    );
+
+    // The list cannot pass by the predicate always agreeing.
     assert!(defines_rule(LEIOS_FETCH_CDDL, "endorser_block"));
     assert!(!defines_rule(LEIOS_FETCH_CDDL, "block_body"));
 }
