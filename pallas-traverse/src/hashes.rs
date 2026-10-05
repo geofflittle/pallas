@@ -194,7 +194,7 @@ impl OriginalHash<28> for KeepRaw<'_, dijkstra::NativeScript> {
 #[cfg(feature = "unstable")]
 impl OriginalHash<32> for KeepRaw<'_, dijkstra::EndorserBlock> {
     fn original_hash(&self) -> Hash<32> {
-        Hasher::<256>::hash(self.raw_cbor())
+        Hasher::<256>::hash(&self.raw_cbor()[1..])
     }
 }
 
