@@ -753,4 +753,18 @@ mod tests {
             "the fixtures declare four auxiliary data hashes"
         );
     }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn an_endorser_block_hashes_as_its_announcement_names() {
+        let cbor = hex::decode(include_str!("../../test_data/dijkstra-17402.ebbody")).unwrap();
+        let block: pallas_codec::utils::KeepRaw<pallas_primitives::dijkstra::EndorserBlock> =
+            minicbor::decode(&cbor).unwrap();
+
+        assert_eq!(
+            block.original_hash().to_string(),
+            "29694e6d204e586f170a1f4f75da3703cb86289d08e7eaea2def826a6dcd7e90",
+            "the eb_hash block 17402 announces"
+        );
+    }
 }
