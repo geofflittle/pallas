@@ -1385,4 +1385,103 @@ mod tests {
             "the second send is a violation"
         );
     }
+
+    #[tokio::test]
+    async fn keepalive_is_sent_again_once_answered() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(36);
+        connect_peer(&mut behavior, &pid, false);
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let first = sends_to(&drain_outputs(&mut behavior), &pid, is_keepalive);
+        assert_eq!(first.len(), 1, "first pass sends one keepalive");
+
+        behavior.handle_io(InterfaceEvent::Sent(pid.clone(), first[0].clone()));
+        let AnyMessage::KeepAlive(keepalive::Message::KeepAlive(cookie)) = first[0] else {
+            unreachable!()
+        };
+        let reply = AnyMessage::KeepAlive(keepalive::Message::ResponseKeepAlive(cookie));
+        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![reply]));
+        drain_outputs(&mut behavior);
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let second = sends_to(&drain_outputs(&mut behavior), &pid, is_keepalive);
+        assert_eq!(second.len(), 1, "an answered keepalive is sent again");
+    }
+
+    #[tokio::test]
+    async fn notify_request_is_sent_again_once_answered() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(37);
+        connect_peer(&mut behavior, &pid, true);
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let first = sends_to(&drain_outputs(&mut behavior), &pid, is_notify_request);
+        assert_eq!(first.len(), 1, "first pass sends one notify request");
+
+        behavior.handle_io(InterfaceEvent::Sent(pid.clone(), first[0].clone()));
+        let offer = AnyMessage::LeiosNotify(ln::Message::BlockOffer(Point::new(7, vec![1; 32]), 9));
+        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![offer]));
+        drain_outputs(&mut behavior);
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let second = sends_to(&drain_outputs(&mut behavior), &pid, is_notify_request);
+        assert_eq!(second.len(), 1, "an answered notify request is sent again");
+    }
+
+    #[tokio::test]
+    async fn continue_sync_sends_after_intersection() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(38);
+        intersect_peer(&mut behavior, &pid);
+
+        behavior.execute(InitiatorCommand::ContinueSync(pid.clone()));
+        let sent = sends_to(&drain_outputs(&mut behavior), &pid, is_sync_request);
+        assert_eq!(sent.len(), 1, "ContinueSync sends one RequestNext");
+    }
+
+    #[tokio::test]
+    async fn held_range_request_is_sent_once_the_first_completes() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(41);
+        connect_peer(&mut behavior, &pid, false);
+
+        let held = (Point::new(2, vec![0xE2; 32]), Point::new(2, vec![0xE2; 32]));
+        behavior.execute(InitiatorCommand::RequestBlocks((
+            Point::Origin,
+            Point::Origin,
+        )));
+        behavior.execute(InitiatorCommand::RequestBlocks(held.clone()));
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let first = sends_to(&drain_outputs(&mut behavior), &pid, is_range_request);
+        assert_eq!(first.len(), 1, "first pass sends one RequestRange");
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        drain_outputs(&mut behavior);
+
+        behavior.handle_io(InterfaceEvent::Sent(pid.clone(), first[0].clone()));
+        let none = AnyMessage::BlockFetch(bf::Message::NoBlocks);
+        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![none]));
+        drain_outputs(&mut behavior);
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let next = sends_to(&drain_outputs(&mut behavior), &pid, is_range_request);
+        assert_eq!(next.len(), 1, "one RequestRange once the first completes");
+        assert!(
+            matches!(
+                &next[0],
+                AnyMessage::BlockFetch(bf::Message::RequestRange(range)) if *range == held
+            ),
+            "the held range is sent once the first completes, got {next:?}"
+        );
+    }
 }
