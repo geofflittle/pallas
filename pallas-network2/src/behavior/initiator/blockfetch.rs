@@ -67,11 +67,9 @@ impl BlockFetchBehavior {
             return;
         }
 
-        if let Some(request) = self.requests.front()
-            && state.send_own_range(pid, request.clone(), outbound)
-        {
+        if let Some(request) = self.requests.pop_front() {
             tracing::debug!("granting request to peer");
-            self.requests.pop_front();
+            self.request_block_batch(pid, request, outbound);
         }
     }
 
