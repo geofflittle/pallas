@@ -440,7 +440,6 @@ impl InitiatorBehavior {
         tracing::debug!(channel = msg.channel(), "new outbound message");
 
         self.peers.entry(pid.clone()).and_modify(|state| {
-            state.clear_own_sent(msg);
             state.apply_msg(msg);
 
             all_visitors!(self, pid, state, visit_outbound_msg);
