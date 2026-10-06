@@ -464,7 +464,6 @@ impl ResponderBehavior {
         tracing::debug!(channel = msg.channel(), "new outbound message");
 
         self.peers.entry(pid.clone()).and_modify(|state| {
-            state.awaiting_sent.remove(&msg.channel());
             state.apply_msg(msg);
 
             if state.violation {
