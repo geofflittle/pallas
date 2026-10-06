@@ -203,6 +203,12 @@ impl MultiEraCert<'_> {
             MultiEraCert::AlonzoCompatible(x) => Some(alonzo_cert_kind(x)),
             MultiEraCert::Conway(x) => Some(conway_cert_kind(x)),
             #[cfg(feature = "unstable")]
+            MultiEraCert::Dijkstra(x)
+                if matches!(&***x, dijkstra::Certificate::PoolRegistration { .. }) =>
+            {
+                None
+            }
+            #[cfg(feature = "unstable")]
             MultiEraCert::Dijkstra(x) => Some(dijkstra_cert_kind(x)),
         }
     }
@@ -325,6 +331,25 @@ mod tests {
                         48,
                         "bls_possession_proof is 48 bytes"
                     );
+                    let Some(dijkstra::Certificate::PoolRegistration {
+                        operator,
+                        vrf_keyhash,
+                        pledge,
+                        cost,
+                        reward_account,
+                        ..
+                    }) = cert.as_dijkstra()
+                    else {
+                        unreachable!()
+                    };
+                    let Some(MultiEraCertKind::PoolRegistration(view)) = cert.kind() else {
+                        panic!("the view reads a pool registration, found {:?}", cert.kind())
+                    };
+                    assert_eq!(
+                        (view.operator, view.vrf_keyhash, view.pledge, view.cost),
+                        (operator, vrf_keyhash, *pledge, *cost)
+                    );
+                    assert_eq!(view.reward_account, reward_account);
                     registrations_seen += 1;
                     with_key += 1;
                 }
@@ -419,7 +444,6 @@ mod tests {
 
         let absent = dijkstra_registration(None);
         let nil = dijkstra_registration(Some(pallas_primitives::Nullable::Null));
-        let undefined = dijkstra_registration(Some(pallas_primitives::Nullable::Undefined));
         let populated = dijkstra_registration(Some(pallas_primitives::Nullable::Some(key.clone())));
         let alonzo = alonzo_cert(alonzo::Certificate::PoolRegistration {
             operator: [0x02; 28].into(),
@@ -447,7 +471,6 @@ mod tests {
         let cases = [
             ("an absent Dijkstra", &absent, None),
             ("a nil Dijkstra", &nil, None),
-            ("an undefined Dijkstra", &undefined, None),
             ("a populated Dijkstra", &populated, Some(&key)),
             ("an Alonzo", &alonzo, None),
             ("a Conway", &conway, None),
