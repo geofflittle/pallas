@@ -1,4 +1,5 @@
-//! Own requests pushed to a peer and not yet sent, at most one per channel.
+//! Own requests pushed to a peer whose Sent the protocol state has not
+//! accepted, at most one per channel.
 
 use crate::{InterfaceCommand, OutboundQueue, PeerId, protocol as proto};
 
@@ -8,13 +9,13 @@ use super::{
 };
 
 /// A chain-sync request held by the initiator.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 enum ChainSyncRequest {
     Intersect(Vec<proto::Point>),
     Next,
 }
 
-/// The initiator's unsent own requests for one peer.
+/// The initiator's own requests for one peer whose Sent the protocol state has not accepted.
 #[derive(Debug, Default)]
 pub(crate) struct InitiatorOwnSends {
     keepalive: Option<proto::keepalive::Cookie>,
@@ -26,7 +27,7 @@ pub(crate) struct InitiatorOwnSends {
     next_owed: bool,
 }
 
-/// The responder's unsent own requests for one peer.
+/// The responder's own requests for one peer whose Sent the protocol state has not accepted.
 #[derive(Debug, Default)]
 pub(crate) struct ResponderOwnSends {
     tx_ids: Option<(
@@ -198,7 +199,7 @@ impl InitiatorState {
         true
     }
 
-    /// Takes the block range this peer holds unsent, emptying its block-fetch slot.
+    /// Takes the block range held in this peer's block-fetch slot, emptying it.
     pub(crate) fn take_own_range(&mut self) -> Option<BlockRange> {
         self.own.blockfetch.take()
     }

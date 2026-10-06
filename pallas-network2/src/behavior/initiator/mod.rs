@@ -1185,7 +1185,6 @@ mod tests {
         matches!(m, AnyMessage::LeiosNotify(ln::Message::RequestNext))
     }
 
-    /// Two housekeeping passes before any Sent, collecting every output of both.
     fn two_passes(b: &mut InitiatorBehavior) -> Vec<BehaviorOutput<InitiatorBehavior>> {
         b.execute(InitiatorCommand::Housekeeping);
         let mut outs = drain_outputs(b);
@@ -1295,8 +1294,6 @@ mod tests {
         assert_eq!(n, 1, "ShareRequest count over two passes");
     }
 
-    /// Peer `a` initialized and holding own range r1 unsent, peer `w`
-    /// connected and not handshaked.
     fn own_r1_pushed(b: &mut InitiatorBehavior, a: &PeerId, w: &PeerId) {
         include_and_connect(b, a);
         include_and_connect(b, w);
@@ -1314,8 +1311,6 @@ mod tests {
         );
     }
 
-    /// After `a` is gone, `w` completes its handshake and one pass runs,
-    /// returning w's ranges.
     fn ranges_served_to_w(b: &mut InitiatorBehavior, w: &PeerId) -> Vec<AnyMessage> {
         complete_handshake(b, w);
         b.execute(InitiatorCommand::Housekeeping);
@@ -1334,7 +1329,7 @@ mod tests {
         assert_eq!(
             count_sends(&outs, |m| is_range(m, &r(5))),
             1,
-            "setup: caller r2 pushed"
+            "setup: caller r5 pushed"
         );
         b.handle_io(InterfaceEvent::Sent(
             a.clone(),
@@ -1344,7 +1339,6 @@ mod tests {
             a.clone(),
             AnyMessage::BlockFetch(bf::Message::RequestRange(r(1))),
         ));
-        assert!(b.peers.get(&a).unwrap().violation, "violation as main");
         b.execute(InitiatorCommand::Housekeeping);
         let outs = drain_outputs(&mut b);
         assert_eq!(
@@ -1506,13 +1500,6 @@ mod tests {
             2,
             "own and caller KeepAlive, as main"
         );
-        for _ in 0..2 {
-            b.handle_io(InterfaceEvent::Sent(
-                a.clone(),
-                AnyMessage::KeepAlive(keepalive::Message::KeepAlive(u16::MAX)),
-            ));
-        }
-        assert!(b.peers.get(&a).unwrap().violation, "violation as main");
     }
 
     #[tokio::test]

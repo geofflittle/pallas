@@ -8,8 +8,10 @@ use super::{InitiatorBehavior, InitiatorEvent, InitiatorState, PeerVisitor};
 /// announcements/offers received from peers.
 ///
 /// `RequestNext` is issued during housekeeping whenever the peer is initialized,
-/// negotiated a Leios-capable version, and the protocol is idle with nothing
-/// pending — yielding a continuous notification loop paced by housekeeping.
+/// negotiated a Leios-capable version, the protocol is idle with nothing
+/// pending, and the peer holds no own `RequestNext` whose Sent the protocol
+/// state has not accepted, yielding a continuous notification loop paced by
+/// housekeeping.
 #[derive(Default)]
 pub struct LeiosNotifyBehavior;
 
