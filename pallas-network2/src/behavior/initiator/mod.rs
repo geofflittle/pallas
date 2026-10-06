@@ -329,7 +329,6 @@ impl InitiatorState {
         self.leios_fetch = proto::leiosfetch::State::default();
         self.continue_sync = false;
         self.violation = false;
-        self.awaiting_sent.clear();
     }
 }
 
