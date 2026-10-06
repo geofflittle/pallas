@@ -1,8 +1,8 @@
 use crate::protocol::leiosnotify as notify_proto;
 
-use crate::{BehaviorOutput, OutboundQueue, PeerId, behavior::AnyMessage};
+use crate::{BehaviorOutput, InterfaceCommand, OutboundQueue, PeerId, behavior::AnyMessage};
 
-use super::{InitiatorBehavior, InitiatorEvent, InitiatorState, PeerVisitor, send_to_peer};
+use super::{InitiatorBehavior, InitiatorEvent, InitiatorState, PeerVisitor};
 
 /// Sub-behavior that drives the leios-notify pull loop and surfaces EB
 /// announcements/offers received from peers.
@@ -14,16 +14,13 @@ use super::{InitiatorBehavior, InitiatorEvent, InitiatorState, PeerVisitor, send
 pub struct LeiosNotifyBehavior;
 
 impl LeiosNotifyBehavior {
-    fn request_next(
-        &self,
-        pid: &PeerId,
-        state: &mut InitiatorState,
-        outbound: &mut OutboundQueue<InitiatorBehavior>,
-    ) {
+    fn request_next(&self, pid: &PeerId, outbound: &mut OutboundQueue<InitiatorBehavior>) {
         tracing::debug!("requesting next leios notification");
 
-        let msg = AnyMessage::LeiosNotify(notify_proto::Message::RequestNext);
-        send_to_peer(pid, state, msg, outbound);
+        outbound.push_ready(BehaviorOutput::InterfaceCommand(InterfaceCommand::Send(
+            pid.clone(),
+            AnyMessage::LeiosNotify(notify_proto::Message::RequestNext),
+        )));
     }
 
     /// Drains a pending notification from the peer state and emits the
@@ -66,8 +63,11 @@ impl PeerVisitor for LeiosNotifyBehavior {
             return;
         }
 
-        if matches!(state.leios_notify, notify_proto::State::Idle(None)) {
-            self.request_next(pid, state, outbound);
+        if matches!(state.leios_notify, notify_proto::State::Idle(None))
+            && !state.awaiting_sent.contains(&notify_proto::CHANNEL_ID)
+        {
+            self.request_next(pid, outbound);
+            state.awaiting_sent.insert(notify_proto::CHANNEL_ID);
         }
     }
 }

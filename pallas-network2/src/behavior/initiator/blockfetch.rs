@@ -7,7 +7,7 @@ use crate::{
     behavior::{AnyMessage, BlockRange, ConnectionState},
 };
 
-use super::{InitiatorBehavior, InitiatorEvent, InitiatorState, PeerVisitor, send_to_peer};
+use super::{InitiatorBehavior, InitiatorEvent, InitiatorState, PeerVisitor};
 
 /// Configuration for the block-fetch sub-behavior (currently unused).
 pub type BlockFetchConfig = ();
@@ -42,7 +42,6 @@ impl BlockFetchBehavior {
     }
 
     /// Sends a block range request to the specified peer.
-    #[deprecated(since = "1.5.0", note = "use `request_range` instead")]
     pub fn request_block_batch(
         &self,
         pid: &PeerId,
@@ -55,20 +54,6 @@ impl BlockFetchBehavior {
             pid.clone(),
             AnyMessage::BlockFetch(blockfetch_proto::Message::RequestRange(range)),
         )));
-    }
-
-    /// Sends a block range request to the specified peer and applies it to its state.
-    pub fn request_range(
-        &self,
-        pid: &PeerId,
-        state: &mut InitiatorState,
-        range: BlockRange,
-        outbound: &mut OutboundQueue<super::InitiatorBehavior>,
-    ) {
-        tracing::info!("requesting block batch");
-
-        let msg = blockfetch_proto::Message::RequestRange(range);
-        send_to_peer(pid, state, AnyMessage::BlockFetch(msg), outbound);
     }
 
     /// Emits a [`BlockBodyReceived`](super::InitiatorEvent::BlockBodyReceived)
@@ -90,6 +75,7 @@ impl BlockFetchBehavior {
 fn peer_is_available(state: &InitiatorState) -> bool {
     matches!(state.connection, ConnectionState::Initialized)
         && matches!(state.blockfetch, blockfetch_proto::State::Idle)
+        && !state.awaiting_sent.contains(&blockfetch_proto::CHANNEL_ID)
 }
 
 impl PeerVisitor for BlockFetchBehavior {
@@ -118,7 +104,8 @@ impl PeerVisitor for BlockFetchBehavior {
 
             if let Some(request) = self.requests.pop_front() {
                 tracing::debug!("granting request to peer");
-                self.request_range(pid, state, request, outbound);
+                self.request_block_batch(pid, request, outbound);
+                state.awaiting_sent.insert(blockfetch_proto::CHANNEL_ID);
             }
         } else {
             tracing::warn!("no peer available");

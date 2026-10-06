@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
-use crate::{OutboundQueue, PeerId, behavior::AnyMessage};
+use crate::{BehaviorOutput, InterfaceCommand, OutboundQueue, PeerId, behavior::AnyMessage};
 
-use super::{InitiatorBehavior, InitiatorState, PeerVisitor, send_to_peer};
+use super::{InitiatorBehavior, InitiatorState, PeerVisitor};
 
 /// Configuration for the peer discovery sub-behavior.
 pub struct DiscoveryConfig {
@@ -30,6 +30,9 @@ fn peer_is_available(peer: &InitiatorState) -> bool {
                 crate::protocol::peersharing::IdleState::Empty
             )
         )
+        && !peer
+            .awaiting_sent
+            .contains(&crate::protocol::peersharing::CHANNEL_ID)
 }
 
 /// Sub-behavior that discovers new peers via the peer-sharing mini-protocol.
@@ -40,19 +43,19 @@ pub struct DiscoveryBehavior {
 }
 
 impl DiscoveryBehavior {
-    fn request_peers(
-        &self,
-        pid: &PeerId,
-        state: &mut InitiatorState,
-        outbound: &mut OutboundQueue<super::InitiatorBehavior>,
-    ) {
+    fn request_peers(&self, pid: &PeerId, outbound: &mut OutboundQueue<super::InitiatorBehavior>) {
         let amount = self.config.high_water_mark as usize - self.discovered.len();
 
         tracing::debug!(amount, "requesting peers");
 
         let msg = crate::protocol::peersharing::Message::ShareRequest(amount as u8);
 
-        send_to_peer(pid, state, AnyMessage::PeerSharing(msg), outbound);
+        let out = BehaviorOutput::InterfaceCommand(InterfaceCommand::Send(
+            pid.clone(),
+            AnyMessage::PeerSharing(msg),
+        ));
+
+        outbound.push_ready(out);
     }
 
     /// Extracts discovered peer addresses from the peer-sharing response, if
@@ -109,7 +112,10 @@ impl PeerVisitor for DiscoveryBehavior {
             return;
         }
 
-        self.request_peers(pid, state, outbound);
+        self.request_peers(pid, outbound);
+        state
+            .awaiting_sent
+            .insert(crate::protocol::peersharing::CHANNEL_ID);
     }
 
     fn visit_inbound_msg(

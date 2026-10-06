@@ -1,8 +1,11 @@
 use futures::{Stream, StreamExt, stream::FusedStream};
-use std::{collections::HashMap, task::Poll};
+use std::{
+    collections::{HashMap, HashSet},
+    task::Poll,
+};
 
 use crate::{
-    Behavior, BehaviorOutput, InterfaceCommand, Message as MessageTrait, OutboundQueue, PeerId,
+    Behavior, BehaviorOutput, Channel, Message as MessageTrait, OutboundQueue, PeerId,
     protocol as proto,
 };
 
@@ -153,6 +156,7 @@ pub struct InitiatorState {
     pub(crate) violation: bool,
     pub(crate) error_count: u32,
     pub(crate) continue_sync: bool,
+    pub(crate) awaiting_sent: HashSet<Channel>,
 }
 
 impl InitiatorState {
@@ -172,6 +176,7 @@ impl InitiatorState {
             violation: false,
             error_count: 0,
             continue_sync: false,
+            awaiting_sent: HashSet::new(),
         }
     }
 
@@ -324,18 +329,8 @@ impl InitiatorState {
         self.leios_fetch = proto::leiosfetch::State::default();
         self.continue_sync = false;
         self.violation = false;
+        self.awaiting_sent.clear();
     }
-}
-
-/// Applies `msg` to `state` and queues it as a send to `pid`.
-fn send_to_peer(
-    pid: &PeerId,
-    state: &mut InitiatorState,
-    msg: AnyMessage,
-    outbound: &mut OutboundQueue<InitiatorBehavior>,
-) {
-    state.apply_msg(&msg);
-    outbound.push_ready(InterfaceCommand::Send(pid.clone(), msg));
 }
 
 /// A function that mutates an [`InitiatorState`], used for tagging operations
@@ -443,23 +438,15 @@ impl InitiatorBehavior {
         });
     }
 
-    /// Applies a message the caller sent itself and notifies visitors.
-    #[deprecated(
-        since = "1.5.0",
-        note = "pass `InterfaceEvent::Sent` to `handle_io`, and call `InitiatorState::apply_msg` before queueing a message of your own"
-    )]
-    pub fn on_outbound_msg(&mut self, pid: &PeerId, msg: &AnyMessage) {
-        if let Some(state) = self.peers.get_mut(pid) {
-            state.apply_msg(msg);
-        }
-        self.on_sent(pid, msg);
-    }
-
     #[tracing::instrument(skip_all, fields(pid = %pid, channel = %msg.channel()))]
-    fn on_sent(&mut self, pid: &PeerId, msg: &AnyMessage) {
+    /// Processes a confirmed outbound message to a peer, updating state and notifying visitors.
+    pub fn on_outbound_msg(&mut self, pid: &PeerId, msg: &AnyMessage) {
         tracing::debug!(channel = msg.channel(), "new outbound message");
 
         self.peers.entry(pid.clone()).and_modify(|state| {
+            state.awaiting_sent.remove(&msg.channel());
+            state.apply_msg(msg);
+
             all_visitors!(self, pid, state, visit_outbound_msg);
         });
     }
@@ -610,7 +597,7 @@ impl Behavior for InitiatorBehavior {
                 }
             }
             crate::InterfaceEvent::Sent(pid, msg) => {
-                self.on_sent(pid, msg);
+                self.on_outbound_msg(pid, msg);
             }
             crate::InterfaceEvent::Error(pid, _) => {
                 self.on_errored(pid);
@@ -927,7 +914,8 @@ mod tests {
             peersharing::PeerAddress::V4(Ipv4Addr::new(192, 168, 1, 2), 3001),
         ]));
 
-        // Confirm the ShareRequest that housekeeping sent.
+        // We need the seed peer's peersharing state to be in the right state first.
+        // Simulate the outbound ShareRequest being sent (to move state to Busy)
         let share_req = AnyMessage::PeerSharing(peersharing::Message::ShareRequest(10));
         behavior.handle_io(InterfaceEvent::Sent(seed_pid.clone(), share_req));
         drain_outputs(&mut behavior);
@@ -1062,7 +1050,7 @@ mod tests {
             "should request next leios notification"
         );
 
-        // Confirm the RequestNext, then the server offers an EB.
+        // Server moves to Busy (our request was sent), then offers an EB.
         behavior.handle_io(InterfaceEvent::Sent(
             pid.clone(),
             AnyMessage::LeiosNotify(ln::Message::RequestNext),
@@ -1208,12 +1196,210 @@ mod tests {
         matches!(m, AnyMessage::LeiosFetch(lf::Message::BlockRequest(_)))
     }
 
+    fn confirm_sends(behavior: &mut InitiatorBehavior, pid: &PeerId, sent: Vec<AnyMessage>) {
+        for msg in sent {
+            behavior.handle_io(InterfaceEvent::Sent(pid.clone(), msg));
+        }
+        drain_outputs(behavior);
+    }
+
+    #[tokio::test]
+    async fn housekeeping_sends_each_request_once_until_its_sent() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(30);
+        behavior.execute(InitiatorCommand::StartSync(vec![Point::Origin]));
+        for slot in [1, 2] {
+            let point = Point::new(slot, vec![0xE0; 32]);
+            behavior.execute(InitiatorCommand::RequestBlocks((point.clone(), point)));
+        }
+        connect_peer(&mut behavior, &pid, true);
+
+        let mut outputs = Vec::new();
+        for _ in 0..2 {
+            behavior.execute(InitiatorCommand::Housekeeping);
+            outputs.extend(drain_outputs(&mut behavior));
+        }
+        confirm_sends(&mut behavior, &pid, sends_to(&outputs, &pid, |_| true));
+        behavior.execute(InitiatorCommand::Housekeeping);
+        outputs.extend(drain_outputs(&mut behavior));
+
+        let requests: [(&str, fn(&AnyMessage) -> bool); 5] = [
+            ("RequestRange", is_range_request),
+            ("FindIntersect", is_find_intersect),
+            ("KeepAlive", is_keepalive),
+            ("ShareRequest", is_share_request),
+            ("leios notify RequestNext", is_notify_request),
+        ];
+        for (name, pred) in requests {
+            assert_eq!(
+                sends_to(&outputs, &pid, pred).len(),
+                1,
+                "{name} is sent once"
+            );
+        }
+        assert_ne!(
+            behavior.peers[&pid].promotion,
+            PromotionTag::Banned,
+            "the peer is not banned"
+        );
+    }
+
+    #[tokio::test]
+    async fn fetch_eb_sends_one_request_until_its_sent() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(31);
+        connect_peer(&mut behavior, &pid, true);
+
+        let first_eb = Point::new(7, vec![0xA1; 32]);
+        let second_eb = Point::new(8, vec![0xA2; 32]);
+        behavior.execute(InitiatorCommand::FetchEb(pid.clone(), first_eb));
+        behavior.execute(InitiatorCommand::FetchEb(pid.clone(), second_eb.clone()));
+        let issued = sends_to(&drain_outputs(&mut behavior), &pid, is_eb_request);
+        assert_eq!(issued.len(), 1, "two fetches before Sent send one request");
+
+        confirm_sends(&mut behavior, &pid, issued);
+        let body = AnyMessage::LeiosFetch(lf::Message::Block(AnyCbor::from_raw_bytes(vec![1])));
+        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![body]));
+        drain_outputs(&mut behavior);
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let next = sends_to(&drain_outputs(&mut behavior), &pid, is_eb_request);
+        assert!(
+            matches!(
+                next.as_slice(),
+                [AnyMessage::LeiosFetch(lf::Message::BlockRequest(eb))] if *eb == second_eb
+            ),
+            "the second EB is requested once the first is answered, got {next:?}"
+        );
+    }
+
+    fn intersect_peer(behavior: &mut InitiatorBehavior, pid: &PeerId) {
+        behavior.execute(InitiatorCommand::StartSync(vec![Point::Origin]));
+        connect_peer(behavior, pid, false);
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let find = sends_to(&drain_outputs(behavior), pid, is_find_intersect);
+        confirm_sends(behavior, pid, find);
+
+        let tip = cs::Tip(Point::Origin, 0);
+        let found = AnyMessage::ChainSync(cs::Message::IntersectFound(Point::Origin, tip));
+        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![found]));
+        drain_outputs(behavior);
+    }
+
+    #[tokio::test]
+    async fn a_tag_before_sent_sends_one_request_next() {
+        tokio::time::pause();
+
+        let tags: [(u8, &str, fn(PeerId) -> InitiatorCommand); 2] = [
+            (32, "ContinueSync", InitiatorCommand::ContinueSync),
+            (33, "DemotePeer", InitiatorCommand::DemotePeer),
+        ];
+        for (id, name, second) in tags {
+            let mut behavior = InitiatorBehavior::default();
+            let pid = PeerId::test(id);
+            intersect_peer(&mut behavior, &pid);
+
+            behavior.execute(InitiatorCommand::ContinueSync(pid.clone()));
+            behavior.execute(second(pid.clone()));
+            let sent = sends_to(&drain_outputs(&mut behavior), &pid, is_sync_request);
+            assert_eq!(
+                sent.len(),
+                1,
+                "ContinueSync then {name} send one RequestNext"
+            );
+
+            confirm_sends(&mut behavior, &pid, sent);
+            behavior.execute(InitiatorCommand::Housekeeping);
+            drain_outputs(&mut behavior);
+            assert_ne!(
+                behavior.peers[&pid].promotion,
+                PromotionTag::Banned,
+                "the peer is not banned"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn housekeeping_sends_again_after_a_disconnect() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(34);
+        connect_peer(&mut behavior, &pid, true);
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let first = drain_outputs(&mut behavior);
+        assert_eq!(
+            sends_to(&first, &pid, is_keepalive).len(),
+            1,
+            "KeepAlive is sent on the first connection"
+        );
+
+        behavior.handle_io(InterfaceEvent::Disconnected(pid.clone()));
+        drain_outputs(&mut behavior);
+        behavior.handle_io(InterfaceEvent::Connected(pid.clone()));
+        drain_outputs(&mut behavior);
+        complete_handshake_leios(&mut behavior, &pid);
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let again = drain_outputs(&mut behavior);
+        let requests: [(&str, fn(&AnyMessage) -> bool); 3] = [
+            ("KeepAlive", is_keepalive),
+            ("ShareRequest", is_share_request),
+            ("leios notify RequestNext", is_notify_request),
+        ];
+        for (name, pred) in requests {
+            assert_eq!(
+                sends_to(&again, &pid, pred).len(),
+                1,
+                "{name} is sent on the new connection"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn on_outbound_msg_applies_each_consumer_send() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(35);
+        connect_peer(&mut behavior, &pid, false);
+
+        let range = (Point::Origin, Point::Origin);
+        for _ in 0..2 {
+            let InitiatorBehavior {
+                blockfetch,
+                outbound,
+                ..
+            } = &mut behavior;
+            blockfetch.request_block_batch(&pid, range.clone(), outbound);
+        }
+        let sent = sends_to(&drain_outputs(&mut behavior), &pid, is_range_request);
+        assert_eq!(sent.len(), 2, "both consumer requests are queued");
+
+        behavior.on_outbound_msg(&pid, &sent[0]);
+        assert!(
+            matches!(behavior.peers[&pid].blockfetch, bf::State::Busy(_)),
+            "the first send moves block fetch to Busy"
+        );
+        behavior.on_outbound_msg(&pid, &sent[1]);
+        assert!(
+            behavior.peers[&pid].violation,
+            "the second send is a violation"
+        );
+    }
+
     #[tokio::test]
     async fn keepalive_is_sent_again_once_answered() {
         tokio::time::pause();
 
         let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(30);
+        let pid = PeerId::test(36);
         connect_peer(&mut behavior, &pid, false);
 
         behavior.execute(InitiatorCommand::Housekeeping);
@@ -1234,53 +1420,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn keepalive_is_not_sent_twice_before_sent() {
-        tokio::time::pause();
-
-        let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(31);
-        connect_peer(&mut behavior, &pid, false);
-
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let first = sends_to(&drain_outputs(&mut behavior), &pid, is_keepalive);
-        assert_eq!(first.len(), 1, "first pass sends one keepalive");
-
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let second = sends_to(&drain_outputs(&mut behavior), &pid, is_keepalive);
-        assert_eq!(
-            second.len(),
-            0,
-            "second pass before Sent sends no keepalive"
-        );
-    }
-
-    #[tokio::test]
-    async fn share_request_is_not_sent_twice_before_sent() {
-        tokio::time::pause();
-
-        let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(32);
-        connect_peer(&mut behavior, &pid, false);
-
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let first = sends_to(&drain_outputs(&mut behavior), &pid, is_share_request);
-        assert_eq!(first.len(), 1, "first pass sends one share request");
-
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let second = sends_to(&drain_outputs(&mut behavior), &pid, is_share_request);
-        assert_eq!(
-            second.len(),
-            0,
-            "second pass before Sent sends no share request"
-        );
-    }
-
-    #[tokio::test]
     async fn notify_request_is_sent_again_once_answered() {
         tokio::time::pause();
 
         let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(33);
+        let pid = PeerId::test(37);
         connect_peer(&mut behavior, &pid, true);
 
         behavior.execute(InitiatorCommand::Housekeeping);
@@ -1298,70 +1442,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn notify_request_is_not_sent_twice_before_sent() {
-        tokio::time::pause();
-
-        let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(34);
-        connect_peer(&mut behavior, &pid, true);
-
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let first = sends_to(&drain_outputs(&mut behavior), &pid, is_notify_request);
-        assert_eq!(first.len(), 1, "first pass sends one notify request");
-
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let second = sends_to(&drain_outputs(&mut behavior), &pid, is_notify_request);
-        assert_eq!(
-            second.len(),
-            0,
-            "second pass before Sent sends no notify request"
-        );
-    }
-
-    #[tokio::test]
-    async fn find_intersect_is_not_sent_twice_before_sent() {
-        tokio::time::pause();
-
-        let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(35);
-        behavior.execute(InitiatorCommand::StartSync(vec![Point::Origin]));
-        connect_peer(&mut behavior, &pid, false);
-
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let first = sends_to(&drain_outputs(&mut behavior), &pid, is_find_intersect);
-        assert_eq!(first.len(), 1, "first pass sends one FindIntersect");
-
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let second = sends_to(&drain_outputs(&mut behavior), &pid, is_find_intersect);
-        assert_eq!(
-            second.len(),
-            0,
-            "second pass before Sent sends no FindIntersect"
-        );
-    }
-
-    /// Brings `pid` to an idle chain-sync with an intersection found.
-    fn intersect_peer(behavior: &mut InitiatorBehavior, pid: &PeerId) {
-        behavior.execute(InitiatorCommand::StartSync(vec![Point::Origin]));
-        connect_peer(behavior, pid, false);
-
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let find = sends_to(&drain_outputs(behavior), pid, is_find_intersect);
-        assert_eq!(find.len(), 1, "housekeeping sends one FindIntersect");
-
-        behavior.handle_io(InterfaceEvent::Sent(pid.clone(), find[0].clone()));
-        let tip = cs::Tip(Point::Origin, 0);
-        let found = AnyMessage::ChainSync(cs::Message::IntersectFound(Point::Origin, tip));
-        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![found]));
-        drain_outputs(behavior);
-    }
-
-    #[tokio::test]
     async fn continue_sync_sends_after_intersection() {
         tokio::time::pause();
 
         let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(36);
+        let pid = PeerId::test(38);
         intersect_peer(&mut behavior, &pid);
 
         behavior.execute(InitiatorCommand::ContinueSync(pid.clone()));
@@ -1370,30 +1455,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn continue_sync_twice_before_sent_sends_once() {
-        tokio::time::pause();
-
-        let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(37);
-        intersect_peer(&mut behavior, &pid);
-
-        behavior.execute(InitiatorCommand::ContinueSync(pid.clone()));
-        behavior.execute(InitiatorCommand::ContinueSync(pid.clone()));
-        let sent = sends_to(&drain_outputs(&mut behavior), &pid, is_sync_request);
-        assert_eq!(
-            sent.len(),
-            1,
-            "two ContinueSync before Sent send one RequestNext"
-        );
-    }
-
-    #[tokio::test]
     async fn range_requests_go_one_to_each_idle_peer() {
         tokio::time::pause();
 
         let mut behavior = InitiatorBehavior::default();
-        let a = PeerId::test(38);
-        let b = PeerId::test(39);
+        let a = PeerId::test(39);
+        let b = PeerId::test(40);
         connect_peer(&mut behavior, &a, false);
         connect_peer(&mut behavior, &b, false);
 
@@ -1421,41 +1488,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn range_request_is_not_sent_twice_before_sent() {
-        tokio::time::pause();
-
-        let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(40);
-        connect_peer(&mut behavior, &pid, false);
-
-        behavior.execute(InitiatorCommand::RequestBlocks((
-            Point::Origin,
-            Point::Origin,
-        )));
-        behavior.execute(InitiatorCommand::RequestBlocks((
-            Point::Origin,
-            Point::Origin,
-        )));
-
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let first = sends_to(&drain_outputs(&mut behavior), &pid, is_range_request);
-        assert_eq!(first.len(), 1, "first pass sends one RequestRange");
-
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let second = sends_to(&drain_outputs(&mut behavior), &pid, is_range_request);
-        assert_eq!(
-            second.len(),
-            0,
-            "second pass before Sent sends no RequestRange"
-        );
-    }
-
-    #[tokio::test]
     async fn held_range_request_is_sent_once_the_first_completes() {
         tokio::time::pause();
 
         let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(43);
+        let pid = PeerId::test(41);
         connect_peer(&mut behavior, &pid, false);
 
         let held = (Point::new(2, vec![0xE2; 32]), Point::new(2, vec![0xE2; 32]));
@@ -1487,426 +1524,5 @@ mod tests {
             ),
             "the held range goes once the first completes, got {next:?}"
         );
-    }
-
-    #[test]
-    fn sent_does_not_apply_a_send_again() {
-        let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(44);
-        let mut state = InitiatorState::new();
-        let ping = AnyMessage::KeepAlive(keepalive::Message::KeepAlive(9));
-
-        send_to_peer(&pid, &mut state, ping.clone(), &mut behavior.outbound);
-        behavior.peers.insert(pid.clone(), state);
-        behavior.handle_io(InterfaceEvent::Sent(pid.clone(), ping));
-        assert!(
-            !behavior.peers[&pid].violation,
-            "Sent does not apply the send a second time"
-        );
-    }
-
-    fn assert_reply_accepted(
-        behavior: &mut InitiatorBehavior,
-        pid: &PeerId,
-        sent: Vec<AnyMessage>,
-        reply: AnyMessage,
-    ) {
-        for msg in sent {
-            behavior.handle_io(InterfaceEvent::Sent(pid.clone(), msg));
-        }
-        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![reply]));
-        behavior.execute(InitiatorCommand::Housekeeping);
-        drain_outputs(behavior);
-
-        let state = &behavior.peers[pid];
-        assert!(!state.violation, "the reply is a valid transition");
-        assert_ne!(
-            state.promotion,
-            PromotionTag::Banned,
-            "the peer is not banned"
-        );
-    }
-
-    #[tokio::test]
-    async fn request_range_sends_once_and_accepts_the_reply() {
-        tokio::time::pause();
-
-        let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(45);
-        connect_peer(&mut behavior, &pid, false);
-
-        let InitiatorBehavior {
-            blockfetch,
-            peers,
-            outbound,
-            ..
-        } = &mut behavior;
-        let state = peers.get_mut(&pid).unwrap();
-        blockfetch.request_range(&pid, state, (Point::Origin, Point::Origin), outbound);
-
-        let sent = sends_to(&drain_outputs(&mut behavior), &pid, is_range_request);
-        assert_eq!(sent.len(), 1, "one RequestRange");
-
-        let reply = AnyMessage::BlockFetch(bf::Message::NoBlocks);
-        assert_reply_accepted(&mut behavior, &pid, sent, reply);
-    }
-
-    #[tokio::test]
-    async fn find_intersect_sends_once_and_accepts_the_reply() {
-        tokio::time::pause();
-
-        let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(46);
-        connect_peer(&mut behavior, &pid, false);
-
-        let InitiatorBehavior {
-            chainsync,
-            peers,
-            outbound,
-            ..
-        } = &mut behavior;
-        let state = peers.get_mut(&pid).unwrap();
-        chainsync.find_intersect(&pid, state, &vec![Point::Origin], outbound);
-
-        let sent = sends_to(&drain_outputs(&mut behavior), &pid, is_find_intersect);
-        assert_eq!(sent.len(), 1, "one FindIntersect");
-
-        let tip = cs::Tip(Point::Origin, 0);
-        let reply = AnyMessage::ChainSync(cs::Message::IntersectFound(Point::Origin, tip));
-        assert_reply_accepted(&mut behavior, &pid, sent, reply);
-    }
-
-    #[tokio::test]
-    async fn request_keepalive_sends_once_and_accepts_the_reply() {
-        tokio::time::pause();
-
-        let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(47);
-        connect_peer(&mut behavior, &pid, false);
-
-        let InitiatorBehavior {
-            keepalive,
-            peers,
-            outbound,
-            ..
-        } = &mut behavior;
-        let state = peers.get_mut(&pid).unwrap();
-        keepalive.request_keepalive(&pid, state, outbound);
-
-        let sent = sends_to(&drain_outputs(&mut behavior), &pid, is_keepalive);
-        assert_eq!(sent.len(), 1, "one KeepAlive");
-
-        let AnyMessage::KeepAlive(keepalive::Message::KeepAlive(cookie)) = sent[0] else {
-            unreachable!("filtered to keepalive requests");
-        };
-        let reply = AnyMessage::KeepAlive(keepalive::Message::ResponseKeepAlive(cookie));
-        assert_reply_accepted(&mut behavior, &pid, sent, reply);
-    }
-
-    #[tokio::test]
-    async fn apply_msg_before_a_raw_send_accepts_the_reply() {
-        tokio::time::pause();
-
-        let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(48);
-        connect_peer(&mut behavior, &pid, false);
-
-        let request = AnyMessage::PeerSharing(peersharing::Message::ShareRequest(3));
-        behavior.peers.get_mut(&pid).unwrap().apply_msg(&request);
-        behavior
-            .outbound
-            .push_ready(InterfaceCommand::Send(pid.clone(), request));
-
-        let sent = sends_to(&drain_outputs(&mut behavior), &pid, is_share_request);
-        assert_eq!(sent.len(), 1, "one ShareRequest");
-
-        let reply = AnyMessage::PeerSharing(peersharing::Message::SharePeers(vec![]));
-        assert_reply_accepted(&mut behavior, &pid, sent, reply);
-    }
-
-    #[tokio::test]
-    #[allow(deprecated)]
-    async fn on_outbound_msg_applies_a_raw_send() {
-        tokio::time::pause();
-
-        let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(49);
-        connect_peer(&mut behavior, &pid, false);
-
-        let request = AnyMessage::PeerSharing(peersharing::Message::ShareRequest(3));
-        behavior
-            .outbound
-            .push_ready(InterfaceCommand::Send(pid.clone(), request.clone()));
-        drain_outputs(&mut behavior);
-        behavior.on_outbound_msg(&pid, &request);
-
-        let reply = AnyMessage::PeerSharing(peersharing::Message::SharePeers(vec![]));
-        assert_reply_accepted(&mut behavior, &pid, vec![], reply);
-    }
-
-    #[tokio::test]
-    async fn sent_range_request_is_not_given_to_another_peer() {
-        tokio::time::pause();
-
-        let mut behavior = InitiatorBehavior::default();
-        let a = PeerId::test(41);
-        let b = PeerId::test(42);
-        connect_peer(&mut behavior, &a, false);
-
-        behavior.execute(InitiatorCommand::RequestBlocks((
-            Point::Origin,
-            Point::Origin,
-        )));
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let handed = sends_to(&drain_outputs(&mut behavior), &a, is_range_request);
-        assert_eq!(handed.len(), 1, "a gets the RequestRange");
-        behavior.handle_io(InterfaceEvent::Sent(a.clone(), handed[0].clone()));
-        drain_outputs(&mut behavior);
-
-        connect_peer(&mut behavior, &b, false);
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let outputs = drain_outputs(&mut behavior);
-        assert_eq!(
-            sends_to(&outputs, &b, is_range_request).len(),
-            0,
-            "b gets nothing"
-        );
-    }
-
-    #[tokio::test]
-    async fn eb_request_is_sent_again_once_answered() {
-        tokio::time::pause();
-
-        let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(45);
-        connect_peer(&mut behavior, &pid, true);
-
-        let first_eb = Point::new(7, vec![0xA1; 32]);
-        let second_eb = Point::new(8, vec![0xA2; 32]);
-        behavior.execute(InitiatorCommand::FetchEb(pid.clone(), first_eb.clone()));
-        let first = sends_to(&drain_outputs(&mut behavior), &pid, is_eb_request);
-        assert_eq!(first.len(), 1, "the fetch is sent when issued");
-
-        behavior.execute(InitiatorCommand::FetchEb(pid.clone(), second_eb.clone()));
-        drain_outputs(&mut behavior);
-        behavior.handle_io(InterfaceEvent::Sent(pid.clone(), first[0].clone()));
-        let body = AnyMessage::LeiosFetch(lf::Message::Block(AnyCbor::from_raw_bytes(vec![1])));
-        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![body]));
-        drain_outputs(&mut behavior);
-
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let next = sends_to(&drain_outputs(&mut behavior), &pid, is_eb_request);
-        assert_eq!(
-            next.len(),
-            1,
-            "the queued fetch goes once the first is answered"
-        );
-        assert!(
-            matches!(
-                &next[0],
-                AnyMessage::LeiosFetch(lf::Message::BlockRequest(eb)) if *eb == second_eb
-            ),
-            "the queued fetch is the second EB, got {next:?}"
-        );
-    }
-
-    #[tokio::test]
-    async fn eb_request_is_not_sent_twice_before_sent() {
-        tokio::time::pause();
-
-        let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(46);
-        connect_peer(&mut behavior, &pid, true);
-
-        behavior.execute(InitiatorCommand::FetchEb(
-            pid.clone(),
-            Point::new(7, vec![0xB1; 32]),
-        ));
-        behavior.execute(InitiatorCommand::FetchEb(
-            pid.clone(),
-            Point::new(8, vec![0xB2; 32]),
-        ));
-        let issued = sends_to(&drain_outputs(&mut behavior), &pid, is_eb_request);
-        assert_eq!(
-            issued.len(),
-            1,
-            "two fetches issued before Sent send one request"
-        );
-
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let swept = sends_to(&drain_outputs(&mut behavior), &pid, is_eb_request);
-        assert_eq!(swept.len(), 0, "housekeeping before Sent sends no request");
-    }
-
-    #[tokio::test]
-    async fn unsent_eb_request_is_not_resent_after_an_error() {
-        tokio::time::pause();
-
-        let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(47);
-        connect_peer(&mut behavior, &pid, true);
-
-        behavior.execute(InitiatorCommand::FetchEb(
-            pid.clone(),
-            Point::new(7, vec![0xC1; 32]),
-        ));
-        let issued = sends_to(&drain_outputs(&mut behavior), &pid, is_eb_request);
-        assert_eq!(issued.len(), 1, "the fetch is sent when issued");
-
-        fail_and_reconnect(&mut behavior, &pid);
-
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let swept = sends_to(&drain_outputs(&mut behavior), &pid, is_eb_request);
-        assert_eq!(
-            swept.len(),
-            0,
-            "a fetch of the failed session is not resent"
-        );
-
-        behavior.execute(InitiatorCommand::FetchEb(
-            pid.clone(),
-            Point::new(8, vec![0xC2; 32]),
-        ));
-        let fresh = sends_to(&drain_outputs(&mut behavior), &pid, is_eb_request);
-        assert_eq!(fresh.len(), 1, "a fetch on the new session is sent");
-    }
-
-    #[tokio::test]
-    async fn queued_eb_request_is_purged_on_error() {
-        tokio::time::pause();
-
-        let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(48);
-        connect_peer(&mut behavior, &pid, true);
-
-        behavior.execute(InitiatorCommand::FetchEb(
-            pid.clone(),
-            Point::new(7, vec![0xD1; 32]),
-        ));
-        let issued = sends_to(&drain_outputs(&mut behavior), &pid, is_eb_request);
-        assert_eq!(issued.len(), 1, "the fetch is sent when issued");
-        behavior.handle_io(InterfaceEvent::Sent(pid.clone(), issued[0].clone()));
-
-        behavior.execute(InitiatorCommand::FetchEb(
-            pid.clone(),
-            Point::new(8, vec![0xD2; 32]),
-        ));
-        let queued = sends_to(&drain_outputs(&mut behavior), &pid, is_eb_request);
-        assert_eq!(queued.len(), 0, "a busy peer queues the second fetch");
-
-        fail_and_reconnect(&mut behavior, &pid);
-
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let swept = sends_to(&drain_outputs(&mut behavior), &pid, is_eb_request);
-        assert_eq!(
-            swept.len(),
-            0,
-            "the queued fetch was purged with the session"
-        );
-    }
-
-    fn fail_and_reconnect(behavior: &mut InitiatorBehavior, pid: &PeerId) {
-        behavior.handle_io(InterfaceEvent::Error(
-            pid.clone(),
-            InterfaceError::Other("send failed".into()),
-        ));
-        drain_outputs(behavior);
-        behavior.handle_io(InterfaceEvent::Disconnected(pid.clone()));
-        drain_outputs(behavior);
-
-        behavior.execute(InitiatorCommand::IncludePeer(pid.clone()));
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let outputs = drain_outputs(behavior);
-        assert!(
-            outputs.has_connect_for(pid),
-            "the failed peer is connected again"
-        );
-        behavior.handle_io(InterfaceEvent::Connected(pid.clone()));
-        drain_outputs(behavior);
-        complete_handshake_leios(behavior, pid);
-        assert!(behavior.peers.get(pid).unwrap().supports_leios());
-    }
-
-    #[tokio::test]
-    async fn reply_before_its_sent_is_accepted() {
-        tokio::time::pause();
-
-        let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(50);
-        connect_peer(&mut behavior, &pid, false);
-
-        behavior.execute(InitiatorCommand::RequestBlocks((
-            Point::Origin,
-            Point::Origin,
-        )));
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let sent = sends_to(&drain_outputs(&mut behavior), &pid, is_range_request);
-        assert_eq!(sent.len(), 1, "one RequestRange");
-
-        let none = AnyMessage::BlockFetch(bf::Message::NoBlocks);
-        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![none]));
-        behavior.handle_io(InterfaceEvent::Sent(pid.clone(), sent[0].clone()));
-        behavior.execute(InitiatorCommand::Housekeeping);
-        drain_outputs(&mut behavior);
-
-        let state = &behavior.peers[&pid];
-        assert!(!state.violation, "a reply before its Sent is valid");
-        assert_ne!(
-            state.promotion,
-            PromotionTag::Banned,
-            "the peer is not banned"
-        );
-    }
-
-    #[tokio::test]
-    async fn late_sent_after_a_reconnect_leaves_the_new_session_free() {
-        tokio::time::pause();
-
-        let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(51);
-        connect_peer(&mut behavior, &pid, true);
-
-        behavior.execute(InitiatorCommand::RequestBlocks((
-            Point::Origin,
-            Point::Origin,
-        )));
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let old = sends_to(&drain_outputs(&mut behavior), &pid, is_range_request);
-        assert_eq!(old.len(), 1, "the first session sends one RequestRange");
-
-        fail_and_reconnect(&mut behavior, &pid);
-        behavior.handle_io(InterfaceEvent::Sent(pid.clone(), old[0].clone()));
-        drain_outputs(&mut behavior);
-
-        behavior.execute(InitiatorCommand::RequestBlocks((
-            Point::Origin,
-            Point::Origin,
-        )));
-        behavior.execute(InitiatorCommand::Housekeeping);
-        let fresh = sends_to(&drain_outputs(&mut behavior), &pid, is_range_request);
-        assert_eq!(fresh.len(), 1, "the new session sends its RequestRange");
-    }
-
-    #[tokio::test]
-    async fn second_connected_before_sent_sends_one_propose() {
-        tokio::time::pause();
-
-        let mut behavior = InitiatorBehavior::default();
-        let pid = PeerId::test(52);
-
-        for _ in 0..2 {
-            behavior.execute(InitiatorCommand::IncludePeer(pid.clone()));
-            behavior.execute(InitiatorCommand::Housekeeping);
-            drain_outputs(&mut behavior);
-        }
-
-        let is_propose =
-            |m: &AnyMessage| matches!(m, AnyMessage::Handshake(handshake::Message::Propose(_)));
-        let mut proposals = 0;
-        for _ in 0..2 {
-            behavior.handle_io(InterfaceEvent::Connected(pid.clone()));
-            proposals += sends_to(&drain_outputs(&mut behavior), &pid, is_propose).len();
-        }
-        assert_eq!(proposals, 1, "two Connected before Sent send one Propose");
     }
 }
