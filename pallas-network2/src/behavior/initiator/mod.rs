@@ -636,7 +636,6 @@ impl Behavior for InitiatorBehavior {
             InitiatorCommand::RequestBlocks(range) => {
                 tracing::debug!("request blocks command");
                 self.blockfetch.enqueue(range);
-                self.serve_block_fetch();
             }
             InitiatorCommand::Housekeeping => {
                 tracing::debug!("housekeeping command");

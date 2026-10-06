@@ -100,7 +100,6 @@ impl PeerVisitor for LeiosFetchBehavior {
         outbound: &mut OutboundQueue<InitiatorBehavior>,
     ) {
         self.dispatch(pid, state, outbound);
-        self.serve_next(pid, state, outbound);
     }
 
     fn visit_housekeeping(
