@@ -7,7 +7,7 @@ use crate::{
     behavior::{AnyMessage, BlockRange, ConnectionState},
 };
 
-use super::{InitiatorBehavior, InitiatorEvent, InitiatorState, PeerVisitor, send_to_peer};
+use super::{InitiatorBehavior, InitiatorEvent, InitiatorState, PeerVisitor};
 
 /// Configuration for the block-fetch sub-behavior (currently unused).
 pub type BlockFetchConfig = ();
@@ -42,7 +42,6 @@ impl BlockFetchBehavior {
     }
 
     /// Sends a block range request to the specified peer.
-    #[deprecated(since = "1.5.0", note = "use `request_range` instead")]
     pub fn request_block_batch(
         &self,
         pid: &PeerId,
@@ -53,22 +52,8 @@ impl BlockFetchBehavior {
 
         outbound.push_ready(BehaviorOutput::InterfaceCommand(InterfaceCommand::Send(
             pid.clone(),
-            AnyMessage::BlockFetch(blockfetch_proto::Message::RequestRange(range)),
+            AnyMessage::BlockFetch(range_request(range)),
         )));
-    }
-
-    /// Sends a block range request to the specified peer and applies it to its state.
-    pub fn request_range(
-        &self,
-        pid: &PeerId,
-        state: &mut InitiatorState,
-        range: BlockRange,
-        outbound: &mut OutboundQueue<super::InitiatorBehavior>,
-    ) {
-        tracing::info!("requesting block batch");
-
-        let msg = blockfetch_proto::Message::RequestRange(range);
-        send_to_peer(pid, state, AnyMessage::BlockFetch(msg), outbound);
     }
 
     /// Emits a [`BlockBodyReceived`](super::InitiatorEvent::BlockBodyReceived)
@@ -85,6 +70,10 @@ impl BlockFetchBehavior {
             outbound.push_ready(BehaviorOutput::ExternalEvent(out));
         }
     }
+}
+
+fn range_request(range: BlockRange) -> blockfetch_proto::Message {
+    blockfetch_proto::Message::RequestRange(range)
 }
 
 fn peer_is_available(state: &InitiatorState) -> bool {
@@ -116,12 +105,25 @@ impl PeerVisitor for BlockFetchBehavior {
         if peer_is_available(state) {
             tracing::debug!("peer looks available");
 
-            if let Some(request) = self.requests.pop_front() {
+            if let Some(request) = self.requests.front()
+                && state.send_own_range(pid, range_request(request.clone()), outbound)
+            {
                 tracing::debug!("granting request to peer");
-                self.request_range(pid, state, request, outbound);
+                self.requests.pop_front();
             }
         } else {
             tracing::warn!("no peer available");
+        }
+    }
+
+    fn visit_disconnected(
+        &mut self,
+        _pid: &PeerId,
+        state: &mut InitiatorState,
+        _outbound: &mut OutboundQueue<InitiatorBehavior>,
+    ) {
+        if let Some(range) = state.take_own_range() {
+            self.requests.push_front(range);
         }
     }
 }
