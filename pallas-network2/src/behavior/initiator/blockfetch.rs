@@ -75,7 +75,6 @@ impl BlockFetchBehavior {
 fn peer_is_available(state: &InitiatorState) -> bool {
     matches!(state.connection, ConnectionState::Initialized)
         && matches!(state.blockfetch, blockfetch_proto::State::Idle)
-        && !state.awaiting_sent.contains(&blockfetch_proto::CHANNEL_ID)
 }
 
 impl PeerVisitor for BlockFetchBehavior {
