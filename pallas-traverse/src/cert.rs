@@ -198,6 +198,11 @@ impl MultiEraCert<'_> {
         }
     }
 
+    #[cfg(feature = "unstable")]
+    pub fn bls_key(&self) -> Option<&dijkstra::BlsKey> {
+        None
+    }
+
     /// Returns what this certificate certifies, with each payload in one type
     /// that every era naming that kind shares, or None for an era with no
     /// certificates.
@@ -439,7 +444,7 @@ mod tests {
 
     #[cfg(feature = "unstable")]
     #[test]
-    fn a_pool_registration_reads_its_bls_key_through_the_view() {
+    fn a_pool_registration_reads_its_bls_key_through_the_accessor() {
         let key = dijkstra::BlsKey {
             bls_pubkey: vec![0x71; 96].into(),
             bls_possession_proof: vec![0x72; 48].into(),
@@ -496,12 +501,9 @@ mod tests {
         ];
 
         for (name, cert, expected) in cases {
-            let kind = cert.kind().expect("a pool registration reads a kind");
-            let MultiEraCertKind::PoolRegistration(registration) = &kind else {
-                panic!("a pool registration reads the {} arm", arm(&kind))
-            };
             assert_eq!(
-                registration.bls_key, expected,
+                cert.bls_key(),
+                expected,
                 "{name} pool registration reads the expected bls_key"
             );
         }
