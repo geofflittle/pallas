@@ -1288,8 +1288,8 @@ mod tests {
         tokio::time::pause();
 
         let tags: [(u8, &str, fn(PeerId) -> InitiatorCommand); 2] = [
-            (32, "ContinueSync", InitiatorCommand::ContinueSync),
             (33, "DemotePeer", InitiatorCommand::DemotePeer),
+            (32, "ContinueSync", InitiatorCommand::ContinueSync),
         ];
         for (id, name, second) in tags {
             let mut behavior = InitiatorBehavior::default();
