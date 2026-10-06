@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use crate::protocol::EbId;
 use crate::protocol::leiosfetch::{self as fetch_proto, Bitmaps};
 
-use crate::{BehaviorOutput, OutboundQueue, PeerId};
+use crate::{BehaviorOutput, InterfaceCommand, OutboundQueue, PeerId, behavior::AnyMessage};
 
 use super::{InitiatorBehavior, InitiatorEvent, InitiatorState, PeerVisitor};
 
@@ -45,10 +45,9 @@ impl LeiosFetchBehavior {
             return;
         }
 
-        if let Some(idx) = self.requests.iter().position(|(p, _)| p == pid)
-            && state.send_own_fetch(pid, fetch_request(&self.requests[idx].1), outbound)
-        {
-            self.requests.remove(idx);
+        if let Some(idx) = self.requests.iter().position(|(p, _)| p == pid) {
+            let (_, request) = self.requests.remove(idx).expect("index just found");
+            self.send_request(pid, &request, outbound);
         }
     }
 
@@ -57,6 +56,25 @@ impl LeiosFetchBehavior {
     /// `PeerId` (which may no longer hold the offered EB).
     fn purge(&mut self, pid: &PeerId) {
         self.requests.retain(|(p, _)| p != pid);
+    }
+
+    fn send_request(
+        &self,
+        pid: &PeerId,
+        request: &FetchRequest,
+        outbound: &mut OutboundQueue<InitiatorBehavior>,
+    ) {
+        let msg = match request {
+            FetchRequest::Block(point) => fetch_proto::Message::BlockRequest(point.clone()),
+            FetchRequest::BlockTxs(point, bitmaps) => {
+                fetch_proto::Message::BlockTxsRequest(point.clone(), bitmaps.clone())
+            }
+        };
+
+        outbound.push_ready(BehaviorOutput::InterfaceCommand(InterfaceCommand::Send(
+            pid.clone(),
+            AnyMessage::LeiosFetch(msg),
+        )));
     }
 
     /// Drains a pending response from the peer state and emits the corresponding
@@ -73,15 +91,6 @@ impl LeiosFetchBehavior {
                 eb,
                 response,
             )));
-        }
-    }
-}
-
-fn fetch_request(request: &FetchRequest) -> fetch_proto::Message {
-    match request {
-        FetchRequest::Block(point) => fetch_proto::Message::BlockRequest(point.clone()),
-        FetchRequest::BlockTxs(point, bitmaps) => {
-            fetch_proto::Message::BlockTxsRequest(point.clone(), bitmaps.clone())
         }
     }
 }

@@ -60,7 +60,7 @@ impl TxSubmissionResponder {
     fn try_request_tx_ids(
         &self,
         pid: &PeerId,
-        state: &mut ResponderState,
+        state: &ResponderState,
         outbound: &mut OutboundQueue<ResponderBehavior>,
     ) {
         if !state.is_initialized() {
@@ -73,7 +73,10 @@ impl TxSubmissionResponder {
 
         tracing::debug!("requesting tx ids");
         let msg = txsubmission_proto::Message::RequestTxIds(true, 0, self.config.max_tx_request);
-        state.send_own_tx_ids(pid, msg, outbound);
+        outbound.push_ready(InterfaceCommand::Send(
+            pid.clone(),
+            AnyMessage::TxSubmission(msg),
+        ));
     }
 
     fn try_extract_txs(

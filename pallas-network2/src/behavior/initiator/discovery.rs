@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::{OutboundQueue, PeerId};
+use crate::{BehaviorOutput, InterfaceCommand, OutboundQueue, PeerId, behavior::AnyMessage};
 
 use super::{InitiatorBehavior, InitiatorState, PeerVisitor};
 
@@ -40,19 +40,19 @@ pub struct DiscoveryBehavior {
 }
 
 impl DiscoveryBehavior {
-    fn request_peers(
-        &self,
-        pid: &PeerId,
-        state: &mut InitiatorState,
-        outbound: &mut OutboundQueue<super::InitiatorBehavior>,
-    ) {
+    fn request_peers(&self, pid: &PeerId, outbound: &mut OutboundQueue<super::InitiatorBehavior>) {
         let amount = self.config.high_water_mark as usize - self.discovered.len();
 
         tracing::debug!(amount, "requesting peers");
 
         let msg = crate::protocol::peersharing::Message::ShareRequest(amount as u8);
 
-        state.send_own_share(pid, msg, outbound);
+        let out = BehaviorOutput::InterfaceCommand(InterfaceCommand::Send(
+            pid.clone(),
+            AnyMessage::PeerSharing(msg),
+        ));
+
+        outbound.push_ready(out);
     }
 
     /// Extracts discovered peer addresses from the peer-sharing response, if
@@ -109,7 +109,7 @@ impl PeerVisitor for DiscoveryBehavior {
             return;
         }
 
-        self.request_peers(pid, state, outbound);
+        self.request_peers(pid, outbound);
     }
 
     fn visit_inbound_msg(

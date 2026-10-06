@@ -5,7 +5,6 @@ use pallas_codec::{Fragment, minicbor};
 use crate::{Channel, Message, Payload, protocol as proto};
 
 pub mod initiator;
-mod own;
 pub mod responder;
 
 // Re-export initiator types for backward compatibility

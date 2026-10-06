@@ -5,7 +5,7 @@ use crate::{
     Behavior, BehaviorOutput, Message as MessageTrait, OutboundQueue, PeerId, protocol as proto,
 };
 
-use super::{AcceptedVersion, AnyMessage, BlockRange, ConnectionState, own::InitiatorOwnSends};
+use super::{AcceptedVersion, AnyMessage, BlockRange, ConnectionState};
 
 mod blockfetch;
 mod chainsync;
@@ -152,7 +152,6 @@ pub struct InitiatorState {
     pub(crate) violation: bool,
     pub(crate) error_count: u32,
     pub(crate) continue_sync: bool,
-    pub(crate) own: InitiatorOwnSends,
 }
 
 impl InitiatorState {
@@ -172,7 +171,6 @@ impl InitiatorState {
             violation: false,
             error_count: 0,
             continue_sync: false,
-            own: InitiatorOwnSends::default(),
         }
     }
 
@@ -325,7 +323,6 @@ impl InitiatorState {
         self.leios_fetch = proto::leiosfetch::State::default();
         self.continue_sync = false;
         self.violation = false;
-        self.own = InitiatorOwnSends::default();
     }
 }
 
@@ -440,7 +437,6 @@ impl InitiatorBehavior {
         tracing::debug!(channel = msg.channel(), "new outbound message");
 
         self.peers.entry(pid.clone()).and_modify(|state| {
-            state.clear_own_sent(msg);
             state.apply_msg(msg);
 
             all_visitors!(self, pid, state, visit_outbound_msg);
@@ -464,10 +460,9 @@ impl InitiatorBehavior {
 
         self.peers.entry(pid.clone()).and_modify(|state| {
             state.connection = ConnectionState::Disconnected;
+            state.reset();
 
             all_visitors!(self, pid, state, visit_disconnected);
-
-            state.reset();
         });
     }
 

@@ -12,8 +12,6 @@ pub type ChainSyncConfig = ();
 
 type Intersection = Vec<Point>;
 
-type Request = chainsync_proto::Message<chainsync_proto::HeaderContent>;
-
 /// Sub-behavior that manages chain synchronization with peers.
 pub struct ChainSyncBehavior {
     //config: ChainSyncConfig,
@@ -46,9 +44,11 @@ impl ChainSyncBehavior {
     ) {
         tracing::debug!("requesting intersection");
 
+        let msg = chainsync_proto::Message::FindIntersect(intersection.clone());
+
         outbound.push_ready(BehaviorOutput::InterfaceCommand(InterfaceCommand::Send(
             pid.clone(),
-            AnyMessage::ChainSync(intersect_request(intersection)),
+            AnyMessage::ChainSync(msg),
         )));
     }
 
@@ -61,9 +61,10 @@ impl ChainSyncBehavior {
     ) {
         tracing::debug!("requesting next header");
 
+        let out = chainsync_proto::Message::RequestNext;
         outbound.push_ready(BehaviorOutput::InterfaceCommand(InterfaceCommand::Send(
             pid.clone(),
-            AnyMessage::ChainSync(next_request()),
+            AnyMessage::ChainSync(out),
         )));
     }
 
@@ -102,14 +103,6 @@ impl ChainSyncBehavior {
     }
 }
 
-fn intersect_request(intersection: &Intersection) -> Request {
-    chainsync_proto::Message::FindIntersect(intersection.clone())
-}
-
-fn next_request() -> Request {
-    chainsync_proto::Message::RequestNext
-}
-
 fn peer_is_syncing(state: &InitiatorState) -> bool {
     !state.chainsync.is_new()
 }
@@ -131,7 +124,6 @@ impl PeerVisitor for ChainSyncBehavior {
         }
 
         self.drain_data(pid, state, outbound);
-        state.send_owed_next(pid, next_request(), outbound);
     }
 
     fn visit_tagged(
@@ -152,10 +144,7 @@ impl PeerVisitor for ChainSyncBehavior {
 
         if state.continue_sync {
             tracing::debug!("peer wants to continue sync");
-
-            if !state.send_own_chainsync(pid, next_request(), outbound) {
-                state.owe_next();
-            }
+            self.request_next(pid, state, outbound);
         }
     }
 
@@ -182,7 +171,7 @@ impl PeerVisitor for ChainSyncBehavior {
 
         tracing::trace!("peer needs to sync");
 
-        state.send_own_chainsync(pid, intersect_request(intersection), outbound);
+        self.request_intersection(pid, intersection, outbound);
     }
 }
 

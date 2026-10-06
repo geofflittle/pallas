@@ -52,7 +52,7 @@ impl BlockFetchBehavior {
 
         outbound.push_ready(BehaviorOutput::InterfaceCommand(InterfaceCommand::Send(
             pid.clone(),
-            AnyMessage::BlockFetch(range_request(range)),
+            AnyMessage::BlockFetch(blockfetch_proto::Message::RequestRange(range)),
         )));
     }
 
@@ -70,10 +70,6 @@ impl BlockFetchBehavior {
             outbound.push_ready(BehaviorOutput::ExternalEvent(out));
         }
     }
-}
-
-fn range_request(range: BlockRange) -> blockfetch_proto::Message {
-    blockfetch_proto::Message::RequestRange(range)
 }
 
 fn peer_is_available(state: &InitiatorState) -> bool {
@@ -105,25 +101,12 @@ impl PeerVisitor for BlockFetchBehavior {
         if peer_is_available(state) {
             tracing::debug!("peer looks available");
 
-            if let Some(request) = self.requests.front()
-                && state.send_own_range(pid, range_request(request.clone()), outbound)
-            {
+            if let Some(request) = self.requests.pop_front() {
                 tracing::debug!("granting request to peer");
-                self.requests.pop_front();
+                self.request_block_batch(pid, request, outbound);
             }
         } else {
             tracing::warn!("no peer available");
-        }
-    }
-
-    fn visit_disconnected(
-        &mut self,
-        _pid: &PeerId,
-        state: &mut InitiatorState,
-        _outbound: &mut OutboundQueue<InitiatorBehavior>,
-    ) {
-        if let Some(range) = state.take_own_range() {
-            self.requests.push_front(range);
         }
     }
 }
