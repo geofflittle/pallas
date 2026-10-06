@@ -650,6 +650,10 @@ impl<'b> MultiEraTx<'b> {
     /// to the collateral-return output and one is present in the transaction,
     /// in which case it returns the collateral-return output.
     pub fn produces_at(&self, index: usize) -> Option<MultiEraOutput<'_>> {
+        #[cfg(feature = "unstable")]
+        if let MultiEraTx::DijkstraSub(..) = self {
+            return self.output_at(index);
+        }
         match self.is_valid() {
             true => self.output_at(index),
             false => {
