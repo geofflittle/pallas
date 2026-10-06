@@ -122,6 +122,10 @@ impl PeerVisitor for BlockFetchBehavior {
         state: &mut InitiatorState,
         _outbound: &mut OutboundQueue<InitiatorBehavior>,
     ) {
+        if state.own.blockfetch.is_some() {
+            tracing::debug!("slot read from a sibling module");
+        }
+
         if let Some(range) = state.take_own_range() {
             self.requests.push_front(range);
         }
