@@ -233,7 +233,7 @@ impl InitiatorState {
                     (Some(range), proto::blockfetch::Message::RequestRange(r)) if range == r
                 );
 
-                if held && self.blockfetch.apply(sent).is_ok() {
+                if held {
                     self.own.blockfetch = None;
                 }
             }
