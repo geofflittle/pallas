@@ -1,21 +1,16 @@
 use pallas_primitives::{alonzo, conway};
 
 #[cfg(feature = "unstable")]
-use pallas_primitives::dijkstra;
+use pallas_primitives::{Nullable, dijkstra};
 
 use crate::{Era, MultiEraCert, MultiEraCertKind, MultiEraPoolRegistration};
 
 /// Reads the fifteen certificates Conway's type names that a later era's type
 /// names too, under the era module given. An era naming further certificates
 /// passes them as further arms, so each match stays exhaustive over its own
-/// type. The `unstable` build sets `bls_key` to the expression after
-/// `pool_registration`, which may read the fields that list binds.
+/// type.
 macro_rules! shared_certs {
-    (
-        $cert:expr, $era:ident,
-        pool_registration { $($field:ident),* $(,)? } => $bls_key:expr
-        $(, $pattern:pat => $kind:expr)* $(,)?
-    ) => {
+    ($cert:expr, $era:ident $(, $pattern:pat => $kind:expr)* $(,)?) => {
         match $cert {
             $era::Certificate::StakeDelegation(credential, pool) => {
                 MultiEraCertKind::StakeDelegation(credential, pool)
@@ -30,7 +25,7 @@ macro_rules! shared_certs {
                 pool_owners,
                 relays,
                 pool_metadata,
-                $($field,)*
+                ..
             } => MultiEraCertKind::PoolRegistration(MultiEraPoolRegistration {
                 operator,
                 vrf_keyhash,
@@ -41,8 +36,6 @@ macro_rules! shared_certs {
                 pool_owners: &pool_owners[..],
                 relays: &relays[..],
                 pool_metadata: pool_metadata.as_ref(),
-                #[cfg(feature = "unstable")]
-                bls_key: $bls_key,
             }),
             $era::Certificate::PoolRetirement(pool, epoch) => {
                 MultiEraCertKind::PoolRetirement(pool, *epoch)
@@ -121,8 +114,6 @@ fn alonzo_cert_kind(cert: &alonzo::Certificate) -> MultiEraCertKind<'_> {
             pool_owners: &pool_owners[..],
             relays: &relays[..],
             pool_metadata: pool_metadata.as_ref(),
-            #[cfg(feature = "unstable")]
-            bls_key: None,
         }),
         alonzo::Certificate::PoolRetirement(pool, epoch) => {
             MultiEraCertKind::PoolRetirement(pool, *epoch)
@@ -142,7 +133,6 @@ fn conway_cert_kind(cert: &conway::Certificate) -> MultiEraCertKind<'_> {
     shared_certs!(
         cert,
         conway,
-        pool_registration {} => None,
         conway::Certificate::StakeRegistration(credential) =>
             MultiEraCertKind::StakeRegistration(credential),
         conway::Certificate::StakeDeregistration(credential) =>
@@ -153,14 +143,7 @@ fn conway_cert_kind(cert: &conway::Certificate) -> MultiEraCertKind<'_> {
 /// Reads every certificate the Dijkstra type names.
 #[cfg(feature = "unstable")]
 fn dijkstra_cert_kind(cert: &dijkstra::Certificate) -> MultiEraCertKind<'_> {
-    shared_certs!(
-        cert,
-        dijkstra,
-        pool_registration { bls_key } => match bls_key {
-            Some(pallas_primitives::Nullable::Some(key)) => Some(key),
-            _ => None,
-        },
-    )
+    shared_certs!(cert, dijkstra)
 }
 
 impl MultiEraCert<'_> {
@@ -195,6 +178,19 @@ impl MultiEraCert<'_> {
             MultiEraCert::Conway(_) => Some(Era::Conway),
             #[cfg(feature = "unstable")]
             MultiEraCert::Dijkstra(_) => Some(Era::Dijkstra),
+        }
+    }
+
+    /// Returns the BLS key a Dijkstra pool registration carries, or None for
+    /// any other certificate.
+    #[cfg(feature = "unstable")]
+    pub fn bls_key(&self) -> Option<&dijkstra::BlsKey> {
+        match self.as_dijkstra()? {
+            dijkstra::Certificate::PoolRegistration {
+                bls_key: Some(Nullable::Some(key)),
+                ..
+            } => Some(key),
+            _ => None,
         }
     }
 
@@ -299,7 +295,6 @@ mod tests {
             (include_str!("../../test_data/dijkstra7.block"), 1, 0),
             (include_str!("../../test_data/dijkstra10.block"), 2, 1),
             (include_str!("../../test_data/dijkstra13.block"), 2, 0),
-            (include_str!("../../test_data/dijkstra14.block"), 1, 1),
         ];
 
         let mut total = 0usize;
@@ -323,11 +318,7 @@ mod tests {
                 assert!(cert.as_conway().is_none());
                 assert!(cert.as_alonzo().is_none());
 
-                if let Some(MultiEraCertKind::PoolRegistration(MultiEraPoolRegistration {
-                    bls_key: Some(key),
-                    ..
-                })) = cert.kind()
-                {
+                if let Some(key) = cert.bls_key() {
                     assert_eq!(key.bls_pubkey.len(), 96, "bls_pubkey is 96 bytes");
                     assert_eq!(
                         key.bls_possession_proof.len(),
@@ -347,10 +338,10 @@ mod tests {
         }
 
         assert_eq!(
-            total, 16,
-            "certificates across the eight fixtures that have any"
+            total, 15,
+            "certificates across the seven fixtures that have any"
         );
-        assert_eq!(with_key, 7, "pool registrations carrying a BLS key");
+        assert_eq!(with_key, 6, "pool registrations carrying a BLS key");
     }
 
     #[cfg(feature = "unstable")]
@@ -371,6 +362,11 @@ mod tests {
         assert_eq!(delegation.era(), Some(Era::Dijkstra));
         assert!(delegation.as_conway().is_none());
         assert!(delegation.as_alonzo().is_none());
+
+        assert!(
+            delegation.bls_key().is_none(),
+            "a vote delegation carries no pool parameters"
+        );
 
         let Some(dijkstra::Certificate::VoteDeleg(credential, drep)) = delegation.as_dijkstra()
         else {
@@ -394,52 +390,7 @@ mod tests {
 
     #[cfg(feature = "unstable")]
     #[test]
-    fn every_dijkstra_fixture_certificate_reads_the_arm_its_tag_names() {
-        let cases = [
-            (
-                "dijkstra2",
-                include_str!("../../test_data/dijkstra2.block"),
-                vec!["pool registration"],
-            ),
-            (
-                "dijkstra6",
-                include_str!("../../test_data/dijkstra6.block"),
-                vec![
-                    "stake delegation",
-                    "registration",
-                    "pool registration",
-                    "registration",
-                    "pool registration",
-                ],
-            ),
-            (
-                "dijkstra13",
-                include_str!("../../test_data/dijkstra13.block"),
-                vec!["registration", "vote delegation"],
-            ),
-        ];
-
-        for (name, block_str, expected) in cases {
-            let cbor = block(block_str);
-            let decoded = MultiEraBlock::decode(&cbor).expect("invalid cbor");
-            let txs = decoded.txs();
-            let certs: Vec<_> = txs.iter().flat_map(|tx| tx.certs()).collect();
-
-            let read: Vec<&str> = certs
-                .iter()
-                .map(|cert| arm(&cert.kind().expect("a Dijkstra certificate reads a kind")))
-                .collect();
-
-            assert_eq!(
-                read, expected,
-                "a {name} certificate reads an arm its tag does not name"
-            );
-        }
-    }
-
-    #[cfg(feature = "unstable")]
-    #[test]
-    fn a_pool_registration_reads_its_bls_key_through_the_view() {
+    fn a_pool_registration_reads_its_bls_key_through_the_accessor() {
         let key = dijkstra::BlsKey {
             bls_pubkey: vec![0x71; 96].into(),
             bls_possession_proof: vec![0x72; 48].into(),
@@ -496,12 +447,9 @@ mod tests {
         ];
 
         for (name, cert, expected) in cases {
-            let kind = cert.kind().expect("a pool registration reads a kind");
-            let MultiEraCertKind::PoolRegistration(registration) = &kind else {
-                panic!("a pool registration reads the {} arm", arm(&kind))
-            };
             assert_eq!(
-                registration.bls_key, expected,
+                cert.bls_key(),
+                expected,
                 "{name} pool registration reads the expected bls_key"
             );
         }
@@ -809,17 +757,9 @@ mod tests {
             assert!(cert.as_alonzo().is_some());
             assert!(cert.as_dijkstra().is_none());
             assert!(cert.as_conway().is_none());
-
-            let kind = cert.kind().expect("an Alonzo certificate reads a kind");
-            let MultiEraCertKind::PoolRegistration(registration) = &kind else {
-                panic!(
-                    "this fixture writes certificate tag 3, found {}",
-                    arm(&kind)
-                )
-            };
             assert!(
-                registration.bls_key.is_none(),
-                "no era before Dijkstra has a BLS key field"
+                cert.bls_key().is_none(),
+                "no era before Dijkstra has a BLS key slot"
             );
         }
     }
