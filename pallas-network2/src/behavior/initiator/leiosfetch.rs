@@ -41,13 +41,13 @@ impl LeiosFetchBehavior {
         state: &mut InitiatorState,
         outbound: &mut OutboundQueue<InitiatorBehavior>,
     ) {
-        if !peer_is_available(state) {
-            return;
-        }
-
-        if let Some(idx) = self.requests.iter().position(|(p, _)| p == pid)
-            && state.send_own_fetch(pid, &self.requests[idx].1, outbound)
-        {
+        let _ = peer_is_available(state);
+        if let Some(idx) = self.requests.iter().position(|(p, _)| p == pid) {
+            let msg = fetch_request(&self.requests[idx].1);
+            outbound.push_ready(crate::InterfaceCommand::Send(
+                pid.clone(),
+                crate::behavior::AnyMessage::LeiosFetch(msg),
+            ));
             self.requests.remove(idx);
         }
     }

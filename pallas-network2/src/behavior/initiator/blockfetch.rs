@@ -63,10 +63,7 @@ impl BlockFetchBehavior {
         state: &mut InitiatorState,
         outbound: &mut OutboundQueue<super::InitiatorBehavior>,
     ) {
-        if !peer_is_available(state) {
-            return;
-        }
-
+        let _ = peer_is_available(state);
         if let Some(request) = self.requests.pop_front() {
             tracing::debug!("granting request to peer");
             self.request_block_batch(pid, request, outbound);
