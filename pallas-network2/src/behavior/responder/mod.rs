@@ -972,4 +972,47 @@ mod tests {
             "should send TxSubmission Init after handshake + housekeeping"
         );
     }
+
+    fn tx_submission_sends(
+        behavior: &mut ResponderBehavior,
+        pred: impl Fn(&txsub::Message) -> bool,
+    ) -> Vec<AnyMessage> {
+        let mut sent = Vec::new();
+        for _ in 0..2 {
+            behavior.execute(ResponderCommand::Housekeeping);
+            sent.extend(drain_outputs(behavior).into_iter().filter_map(|o| match o {
+                BehaviorOutput::InterfaceCommand(InterfaceCommand::Send(_, msg))
+                    if matches!(&msg, AnyMessage::TxSubmission(m) if pred(m)) =>
+                {
+                    Some(msg)
+                }
+                _ => None,
+            }));
+        }
+        sent
+    }
+
+    #[tokio::test]
+    async fn housekeeping_sends_one_tx_submission_request_until_its_sent() {
+        tokio::time::pause();
+
+        let mut behavior = ResponderBehavior::default();
+        let pid = PeerId::test(15);
+        connect_and_handshake(&mut behavior, &pid);
+
+        let init = tx_submission_sends(&mut behavior, |m| matches!(m, txsub::Message::Init));
+        assert_eq!(init.len(), 1, "two passes before Sent send one Init");
+
+        for msg in init {
+            behavior.handle_io(InterfaceEvent::Sent(pid.clone(), msg));
+        }
+        let request = tx_submission_sends(&mut behavior, |m| {
+            matches!(m, txsub::Message::RequestTxIds(..))
+        });
+        assert_eq!(
+            request.len(),
+            1,
+            "two passes before Sent send one RequestTxIds"
+        );
+    }
 }

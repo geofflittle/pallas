@@ -1123,4 +1123,266 @@ mod tests {
             "should NOT drive the notify pull loop"
         );
     }
+
+    fn connect_peer(behavior: &mut InitiatorBehavior, pid: &PeerId, leios: bool) {
+        behavior.execute(InitiatorCommand::IncludePeer(pid.clone()));
+        behavior.execute(InitiatorCommand::Housekeeping);
+        drain_outputs(behavior);
+
+        behavior.handle_io(InterfaceEvent::Connected(pid.clone()));
+        drain_outputs(behavior);
+
+        if leios {
+            complete_handshake_leios(behavior, pid);
+        } else {
+            complete_handshake(behavior, pid);
+        }
+    }
+
+    fn sends_to(
+        outputs: &[BehaviorOutput<InitiatorBehavior>],
+        pid: &PeerId,
+        pred: impl Fn(&AnyMessage) -> bool,
+    ) -> Vec<AnyMessage> {
+        outputs
+            .iter()
+            .filter_map(|o| match o {
+                BehaviorOutput::InterfaceCommand(crate::InterfaceCommand::Send(p, m))
+                    if p == pid && pred(m) =>
+                {
+                    Some(m.clone())
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn is_keepalive(m: &AnyMessage) -> bool {
+        matches!(m, AnyMessage::KeepAlive(keepalive::Message::KeepAlive(_)))
+    }
+
+    fn is_share_request(m: &AnyMessage) -> bool {
+        matches!(
+            m,
+            AnyMessage::PeerSharing(peersharing::Message::ShareRequest(_))
+        )
+    }
+
+    fn is_notify_request(m: &AnyMessage) -> bool {
+        matches!(m, AnyMessage::LeiosNotify(ln::Message::RequestNext))
+    }
+
+    fn is_find_intersect(m: &AnyMessage) -> bool {
+        matches!(m, AnyMessage::ChainSync(cs::Message::FindIntersect(_)))
+    }
+
+    fn is_sync_request(m: &AnyMessage) -> bool {
+        matches!(m, AnyMessage::ChainSync(cs::Message::RequestNext))
+    }
+
+    fn is_range_request(m: &AnyMessage) -> bool {
+        matches!(m, AnyMessage::BlockFetch(bf::Message::RequestRange(_)))
+    }
+
+    fn is_eb_request(m: &AnyMessage) -> bool {
+        matches!(m, AnyMessage::LeiosFetch(lf::Message::BlockRequest(_)))
+    }
+
+    fn confirm_sends(behavior: &mut InitiatorBehavior, pid: &PeerId, sent: Vec<AnyMessage>) {
+        for msg in sent {
+            behavior.handle_io(InterfaceEvent::Sent(pid.clone(), msg));
+        }
+        drain_outputs(behavior);
+    }
+
+    #[tokio::test]
+    async fn housekeeping_sends_each_request_once_until_its_sent() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(30);
+        behavior.execute(InitiatorCommand::StartSync(vec![Point::Origin]));
+        for slot in [1, 2] {
+            let point = Point::new(slot, vec![0xE0; 32]);
+            behavior.execute(InitiatorCommand::RequestBlocks((point.clone(), point)));
+        }
+        connect_peer(&mut behavior, &pid, true);
+
+        let mut outputs = Vec::new();
+        for _ in 0..2 {
+            behavior.execute(InitiatorCommand::Housekeeping);
+            outputs.extend(drain_outputs(&mut behavior));
+        }
+        confirm_sends(&mut behavior, &pid, sends_to(&outputs, &pid, |_| true));
+        behavior.execute(InitiatorCommand::Housekeeping);
+        outputs.extend(drain_outputs(&mut behavior));
+
+        let requests: [(&str, fn(&AnyMessage) -> bool); 5] = [
+            ("RequestRange", is_range_request),
+            ("FindIntersect", is_find_intersect),
+            ("KeepAlive", is_keepalive),
+            ("ShareRequest", is_share_request),
+            ("leios notify RequestNext", is_notify_request),
+        ];
+        for (name, pred) in requests {
+            assert_eq!(
+                sends_to(&outputs, &pid, pred).len(),
+                1,
+                "{name} is sent once"
+            );
+        }
+        assert_ne!(
+            behavior.peers[&pid].promotion,
+            PromotionTag::Banned,
+            "the peer is not banned"
+        );
+    }
+
+    #[tokio::test]
+    async fn fetch_eb_sends_one_request_until_its_sent() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(31);
+        connect_peer(&mut behavior, &pid, true);
+
+        let first_eb = Point::new(7, vec![0xA1; 32]);
+        let second_eb = Point::new(8, vec![0xA2; 32]);
+        behavior.execute(InitiatorCommand::FetchEb(pid.clone(), first_eb));
+        behavior.execute(InitiatorCommand::FetchEb(pid.clone(), second_eb.clone()));
+        let issued = sends_to(&drain_outputs(&mut behavior), &pid, is_eb_request);
+        assert_eq!(issued.len(), 1, "two fetches before Sent send one request");
+
+        confirm_sends(&mut behavior, &pid, issued);
+        let body = AnyMessage::LeiosFetch(lf::Message::Block(AnyCbor::from_raw_bytes(vec![1])));
+        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![body]));
+        drain_outputs(&mut behavior);
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let next = sends_to(&drain_outputs(&mut behavior), &pid, is_eb_request);
+        assert!(
+            matches!(
+                next.as_slice(),
+                [AnyMessage::LeiosFetch(lf::Message::BlockRequest(eb))] if *eb == second_eb
+            ),
+            "the second EB is requested once the first is answered, got {next:?}"
+        );
+    }
+
+    fn intersect_peer(behavior: &mut InitiatorBehavior, pid: &PeerId) {
+        behavior.execute(InitiatorCommand::StartSync(vec![Point::Origin]));
+        connect_peer(behavior, pid, false);
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let find = sends_to(&drain_outputs(behavior), pid, is_find_intersect);
+        confirm_sends(behavior, pid, find);
+
+        let tip = cs::Tip(Point::Origin, 0);
+        let found = AnyMessage::ChainSync(cs::Message::IntersectFound(Point::Origin, tip));
+        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![found]));
+        drain_outputs(behavior);
+    }
+
+    #[tokio::test]
+    async fn a_tag_before_sent_sends_one_request_next() {
+        tokio::time::pause();
+
+        let tags: [(u8, &str, fn(PeerId) -> InitiatorCommand); 2] = [
+            (32, "ContinueSync", InitiatorCommand::ContinueSync),
+            (33, "DemotePeer", InitiatorCommand::DemotePeer),
+        ];
+        for (id, name, second) in tags {
+            let mut behavior = InitiatorBehavior::default();
+            let pid = PeerId::test(id);
+            intersect_peer(&mut behavior, &pid);
+
+            behavior.execute(InitiatorCommand::ContinueSync(pid.clone()));
+            behavior.execute(second(pid.clone()));
+            let sent = sends_to(&drain_outputs(&mut behavior), &pid, is_sync_request);
+            assert_eq!(
+                sent.len(),
+                1,
+                "ContinueSync then {name} send one RequestNext"
+            );
+
+            confirm_sends(&mut behavior, &pid, sent);
+            behavior.execute(InitiatorCommand::Housekeeping);
+            drain_outputs(&mut behavior);
+            assert_ne!(
+                behavior.peers[&pid].promotion,
+                PromotionTag::Banned,
+                "the peer is not banned"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn housekeeping_sends_again_after_a_disconnect() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(34);
+        connect_peer(&mut behavior, &pid, true);
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let first = drain_outputs(&mut behavior);
+        assert_eq!(
+            sends_to(&first, &pid, is_keepalive).len(),
+            1,
+            "KeepAlive is sent on the first connection"
+        );
+
+        behavior.handle_io(InterfaceEvent::Disconnected(pid.clone()));
+        drain_outputs(&mut behavior);
+        behavior.handle_io(InterfaceEvent::Connected(pid.clone()));
+        drain_outputs(&mut behavior);
+        complete_handshake_leios(&mut behavior, &pid);
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let again = drain_outputs(&mut behavior);
+        let requests: [(&str, fn(&AnyMessage) -> bool); 3] = [
+            ("KeepAlive", is_keepalive),
+            ("ShareRequest", is_share_request),
+            ("leios notify RequestNext", is_notify_request),
+        ];
+        for (name, pred) in requests {
+            assert_eq!(
+                sends_to(&again, &pid, pred).len(),
+                1,
+                "{name} is sent on the new connection"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn on_outbound_msg_applies_each_consumer_send() {
+        tokio::time::pause();
+
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(35);
+        connect_peer(&mut behavior, &pid, false);
+
+        let range = (Point::Origin, Point::Origin);
+        for _ in 0..2 {
+            let InitiatorBehavior {
+                blockfetch,
+                outbound,
+                ..
+            } = &mut behavior;
+            blockfetch.request_block_batch(&pid, range.clone(), outbound);
+        }
+        let sent = sends_to(&drain_outputs(&mut behavior), &pid, is_range_request);
+        assert_eq!(sent.len(), 2, "both consumer requests are queued");
+
+        behavior.on_outbound_msg(&pid, &sent[0]);
+        assert!(
+            matches!(behavior.peers[&pid].blockfetch, bf::State::Busy(_)),
+            "the first send moves block fetch to Busy"
+        );
+        behavior.on_outbound_msg(&pid, &sent[1]);
+        assert!(
+            behavior.peers[&pid].violation,
+            "the second send is a violation"
+        );
+    }
 }
