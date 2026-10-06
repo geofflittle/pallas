@@ -1684,4 +1684,36 @@ mod tests {
             "the sub body and the outer body are different bytes, so a shared hash would mean one of them was read for the other"
         );
     }
+
+    #[test]
+    fn a_sub_transaction_reports_the_verdict_on_its_parent() {
+        let cbor = chain_sub_transaction_tx();
+        let tx = MultiEraTx::decode_for_era(Era::Dijkstra, &cbor)
+            .expect("the chain transaction must decode for its own era");
+        let parent = tx
+            .as_dijkstra()
+            .expect("the fixture is a block transaction");
+
+        for (success, expected) in [(true, (1, 1)), (false, (0, 0))] {
+            let mut flagged = parent.clone();
+            flagged.success = success;
+            let tx = MultiEraTx::from_dijkstra(&flagged);
+
+            let subs = tx.sub_transactions();
+            assert_eq!(subs.len(), 1, "body key 23 holds one sub transaction");
+            let sub = subs.first().expect("one sub transaction");
+
+            assert_eq!(
+                sub.is_valid(),
+                success,
+                "a sub transaction is applied only when the transaction whose body lists it is"
+            );
+
+            assert_eq!(
+                (sub.consumes().len(), sub.produces().len()),
+                expected,
+                "a sub transaction of a phase 2 invalid transaction spends and creates nothing"
+            );
+        }
+    }
 }
