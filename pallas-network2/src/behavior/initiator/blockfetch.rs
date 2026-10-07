@@ -67,15 +67,8 @@ impl BlockFetchBehavior {
             return;
         }
 
-        if let Some(request) = self.requests.front()
-            && state.try_send_request(
-                pid,
-                AnyMessage::BlockFetch(blockfetch_proto::Message::RequestRange(request.clone())),
-                outbound,
-            )
-        {
-            tracing::debug!("granting request to peer");
-            self.requests.pop_front();
+        if let Some(request) = self.requests.pop_front() {
+            self.request_block_batch(pid, request, outbound);
         }
     }
 
