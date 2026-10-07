@@ -115,10 +115,6 @@ impl PeerVisitor for BlockFetchBehavior {
     ) {
         self.dispatch_block(pid, state, outbound);
 
-        if matches!(state.blockfetch, blockfetch_proto::State::Idle) {
-            self.sent.remove(pid);
-        }
-
         self.serve_next(pid, state, outbound);
     }
 
