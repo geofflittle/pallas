@@ -1706,4 +1706,95 @@ mod tests {
             "second BlockRequest after the first is sent and answered"
         );
     }
+
+    fn sends_to(
+        outputs: &[BehaviorOutput<InitiatorBehavior>],
+        pid: &PeerId,
+        pred: fn(&AnyMessage) -> bool,
+    ) -> Vec<AnyMessage> {
+        outputs
+            .sends()
+            .filter(|&(p, m)| p == pid && pred(m))
+            .map(|(_, m)| m.clone())
+            .collect()
+    }
+
+    fn is_eb_request(m: &AnyMessage) -> bool {
+        matches!(m, AnyMessage::LeiosFetch(lf::Message::BlockRequest(_)))
+    }
+
+    fn answer_first_fetch_after(
+        behavior: &mut InitiatorBehavior,
+        pid: &PeerId,
+        tag: InitiatorCommand,
+        want: PromotionTag,
+    ) -> (usize, bool, bool) {
+        include_and_connect(behavior, pid);
+        complete_handshake_leios(behavior, pid);
+        behavior.execute(InitiatorCommand::Housekeeping);
+        drain_outputs(behavior);
+        assert_eq!(behavior.peers[&pid].promotion, PromotionTag::Hot, "setup");
+        let (first, second) = (Point::new(7, vec![7; 32]), Point::new(8, vec![8; 32]));
+        behavior.execute(InitiatorCommand::FetchEb(pid.clone(), first.clone()));
+        drain_outputs(behavior);
+        behavior.handle_io(InterfaceEvent::Sent(
+            pid.clone(),
+            AnyMessage::LeiosFetch(lf::Message::BlockRequest(first)),
+        ));
+        behavior.execute(InitiatorCommand::FetchEb(pid.clone(), second));
+        drain_outputs(behavior);
+        behavior.execute(tag);
+        drain_outputs(behavior);
+        assert_eq!(behavior.peers[&pid].promotion, want, "setup: pid tagged");
+
+        let body = lf::Message::Block(AnyCbor::from_raw_bytes(vec![1]));
+        behavior.handle_io(InterfaceEvent::Recv(
+            pid.clone(),
+            vec![AnyMessage::LeiosFetch(body)],
+        ));
+        let outputs = drain_outputs(behavior);
+        let fetched = outputs.iter().any(|o| {
+            matches!(
+                o,
+                BehaviorOutput::ExternalEvent(InitiatorEvent::EbFetched(..))
+            )
+        });
+        let mut to_pid = sends_to(&outputs, pid, is_eb_request).len();
+        assert_eq!(
+            behavior.peers[&pid].promotion,
+            want,
+            "setup: pid still tagged after the reply"
+        );
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let outputs = drain_outputs(behavior);
+        to_pid += sends_to(&outputs, pid, is_eb_request).len();
+        (to_pid, fetched, outputs.has_disconnect_for(pid))
+    }
+
+    #[tokio::test]
+    async fn leiosfetch_skips_a_banned_peer() {
+        tokio::time::pause();
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(61);
+        let ban = InitiatorCommand::BanPeer(pid.clone());
+        assert_eq!(
+            answer_first_fetch_after(&mut behavior, &pid, ban, PromotionTag::Banned),
+            (0, true, true),
+            "fetches sent to the banned peer, reply surfaced, peer disconnected"
+        );
+    }
+
+    #[tokio::test]
+    async fn leiosfetch_skips_a_demoted_peer() {
+        tokio::time::pause();
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(62);
+        let demote = InitiatorCommand::DemotePeer(pid.clone());
+        assert_eq!(
+            answer_first_fetch_after(&mut behavior, &pid, demote, PromotionTag::Cold),
+            (0, true, true),
+            "fetches sent to the demoted peer, reply surfaced, peer disconnected"
+        );
+    }
 }
