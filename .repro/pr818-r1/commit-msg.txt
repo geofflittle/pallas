@@ -1,0 +1,6 @@
+fix(network2): hold own requests in a channel map
+
+- own.rs: one map of held own requests by channel, requests only
+- initiator: the owed RequestNext flag moves to InitiatorState
+- blockfetch.rs: build the RequestRange at its one call site
+- tests: one sends() helper, pins for the accepts gate and owed flag

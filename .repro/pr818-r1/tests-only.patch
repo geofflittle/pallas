@@ -1,0 +1,135 @@
+diff --git a/pallas-network2/src/behavior/initiator/mod.rs b/pallas-network2/src/behavior/initiator/mod.rs
+index 039a8dc7..47f690a6 100644
+--- a/pallas-network2/src/behavior/initiator/mod.rs
++++ b/pallas-network2/src/behavior/initiator/mod.rs
+@@ -1354,16 +1354,16 @@ mod tests {
+         );
+     }
+ 
+-    #[tokio::test]
+-    async fn continue_sync_before_sent_sends_one_then_owed() {
+-        tokio::time::pause();
+-        let mut b = InitiatorBehavior::default();
+-        let a = PeerId::test(52);
++    fn is_next(m: &AnyMessage) -> bool {
++        matches!(m, AnyMessage::ChainSync(cs::Message::RequestNext))
++    }
++
++    fn intersected(b: &mut InitiatorBehavior, a: &PeerId) -> cs::Tip {
+         b.execute(InitiatorCommand::StartSync(vec![Point::Origin]));
+-        include_and_connect(&mut b, &a);
+-        complete_handshake(&mut b, &a);
++        include_and_connect(b, a);
++        complete_handshake(b, a);
+         b.execute(InitiatorCommand::Housekeeping);
+-        drain_outputs(&mut b);
++        drain_outputs(b);
+         b.handle_io(InterfaceEvent::Sent(
+             a.clone(),
+             AnyMessage::ChainSync(cs::Message::FindIntersect(vec![Point::Origin])),
+@@ -1376,22 +1376,25 @@ mod tests {
+                 tip.clone(),
+             ))],
+         ));
+-        drain_outputs(&mut b);
+-        let next = |m: &AnyMessage| matches!(m, AnyMessage::ChainSync(cs::Message::RequestNext));
+-        b.execute(InitiatorCommand::ContinueSync(a.clone()));
+-        let mut outs = drain_outputs(&mut b);
+-        b.execute(InitiatorCommand::ContinueSync(a.clone()));
+-        outs.extend(drain_outputs(&mut b));
+-        assert_eq!(
+-            outs.sends().filter(|&(_, m)| next(m)).count(),
+-            1,
+-            "RequestNext count over two ContinueSync before Sent"
+-        );
++        drain_outputs(b);
++        tip
++    }
++
++    fn continue_syncs(b: &mut InitiatorBehavior, a: &PeerId, n: usize) -> usize {
++        let mut sent = 0;
++        for _ in 0..n {
++            b.execute(InitiatorCommand::ContinueSync(a.clone()));
++            sent += drain_outputs(b).sends().filter(|&(_, m)| is_next(m)).count();
++        }
++        sent
++    }
++
++    fn next_sent_and_answered(b: &mut InitiatorBehavior, a: &PeerId, tip: &cs::Tip) -> usize {
+         b.handle_io(InterfaceEvent::Sent(
+             a.clone(),
+             AnyMessage::ChainSync(cs::Message::RequestNext),
+         ));
+-        drain_outputs(&mut b);
++        drain_outputs(b);
+         let hdr = cs::HeaderContent {
+             variant: 1,
+             byron_prefix: None,
+@@ -1399,13 +1402,32 @@ mod tests {
+         };
+         b.handle_io(InterfaceEvent::Recv(
+             a.clone(),
+-            vec![AnyMessage::ChainSync(cs::Message::RollForward(hdr, tip))],
++            vec![AnyMessage::ChainSync(cs::Message::RollForward(
++                hdr,
++                tip.clone(),
++            ))],
+         ));
+-        let outs = drain_outputs(&mut b);
++        let outs = drain_outputs(b);
++        outs.sends().filter(|&(_, m)| is_next(m)).count()
++    }
++
++    #[tokio::test]
++    async fn continue_sync_before_sent_sends_one_then_owed() {
++        tokio::time::pause();
++        let mut b = InitiatorBehavior::default();
++        let a = PeerId::test(52);
++        let tip = intersected(&mut b, &a);
++        let counts = [
++            continue_syncs(&mut b, &a, 1),
++            next_sent_and_answered(&mut b, &a, &tip),
++            continue_syncs(&mut b, &a, 2),
++            next_sent_and_answered(&mut b, &a, &tip),
++            next_sent_and_answered(&mut b, &a, &tip),
++        ];
+         assert_eq!(
+-            outs.sends().filter(|&(_, m)| next(m)).count(),
+-            1,
+-            "owed RequestNext after RollForward"
++            counts,
++            [1, 0, 1, 1, 0],
++            "RequestNext counts: one ContinueSync and its answer, two ContinueSync and two answers"
+         );
+     }
+ 
+@@ -1461,6 +1483,29 @@ mod tests {
+         );
+     }
+ 
++    #[tokio::test]
++    async fn keepalive_sent_and_unanswered_sends_nothing() {
++        tokio::time::pause();
++        let mut b = InitiatorBehavior::default();
++        let a = PeerId::test(62);
++        include_and_connect(&mut b, &a);
++        complete_handshake(&mut b, &a);
++        b.execute(InitiatorCommand::Housekeeping);
++        drain_outputs(&mut b);
++        b.handle_io(InterfaceEvent::Sent(
++            a.clone(),
++            AnyMessage::KeepAlive(keepalive::Message::KeepAlive(u16::MAX)),
++        ));
++        drain_outputs(&mut b);
++        b.execute(InitiatorCommand::Housekeeping);
++        let outs = drain_outputs(&mut b);
++        assert_eq!(
++            outs.sends().filter(|&(_, m)| is_keepalive(m)).count(),
++            0,
++            "KeepAlive while the first awaits its response"
++        );
++    }
++
+     #[test]
+     fn own_keepalive_response_sends_nothing() {
+         let pid = PeerId::test(61);
