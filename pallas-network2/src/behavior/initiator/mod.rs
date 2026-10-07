@@ -2150,4 +2150,7 @@ mod tests {
         );
         assert!(!behavior.peers[&pid].violation, "no violation");
     }
+
+    include!("probe_r2v.rs");
+    include!("probe_r2w.rs");
 }
