@@ -956,23 +956,58 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn txsubmission_initialized_on_housekeeping_after_handshake() {
-        // Composition: handshake sets Initialized → housekeeping →
-        //              txsubmission detects Init state → sends Init message
+    async fn txsubmission_awaits_peer_init_after_handshake() {
         tokio::time::pause();
-
-        let mut behavior = ResponderBehavior::default();
+        let mut b = ResponderBehavior::default();
         let pid = PeerId::test(14);
+        connect_and_handshake(&mut b, &pid);
+        b.execute(ResponderCommand::Housekeeping);
+        let mut outs = drain_outputs(&mut b);
+        b.execute(ResponderCommand::Housekeeping);
+        outs.extend(drain_outputs(&mut b));
+        assert_eq!(
+            outs.sends()
+                .filter(|&(_, m)| matches!(m, AnyMessage::TxSubmission(_)))
+                .count(),
+            0,
+            "tx submission sends before the peer's Init"
+        );
+    }
 
-        connect_and_handshake(&mut behavior, &pid);
-
-        // Housekeeping should trigger txsubmission Init
-        behavior.execute(ResponderCommand::Housekeeping);
-        let outputs = drain_outputs(&mut behavior);
-
+    #[tokio::test]
+    async fn peer_init_after_housekeeping_requests_tx_ids_once() {
+        tokio::time::pause();
+        let mut b = ResponderBehavior::default();
+        let pid = PeerId::test(15);
+        connect_and_handshake(&mut b, &pid);
+        b.execute(ResponderCommand::Housekeeping);
+        let mut outs = drain_outputs(&mut b);
+        b.handle_io(InterfaceEvent::Recv(
+            pid.clone(),
+            vec![AnyMessage::TxSubmission(txsub::Message::Init)],
+        ));
+        outs.extend(drain_outputs(&mut b));
+        b.execute(ResponderCommand::Housekeeping);
+        outs.extend(drain_outputs(&mut b));
+        let sent: Vec<_> = outs
+            .sends()
+            .filter(|&(_, m)| matches!(m, AnyMessage::TxSubmission(_)))
+            .map(|(_, m)| m.clone())
+            .collect();
+        for msg in &sent {
+            b.handle_io(InterfaceEvent::Sent(pid.clone(), msg.clone()));
+        }
         assert!(
-            outputs.has_send(|m| matches!(m, AnyMessage::TxSubmission(txsub::Message::Init))),
-            "should send TxSubmission Init after handshake + housekeeping"
+            !b.peers.get(&pid).unwrap().violation,
+            "the Sent events set no violation"
+        );
+        assert_eq!(sent.len(), 1, "tx submission sends");
+        assert!(
+            matches!(
+                sent[0],
+                AnyMessage::TxSubmission(txsub::Message::RequestTxIds(..))
+            ),
+            "the one send is RequestTxIds"
         );
     }
 
@@ -982,15 +1017,9 @@ mod tests {
         let mut b = ResponderBehavior::default();
         let pid = PeerId::test(60);
         connect_and_handshake(&mut b, &pid);
-        b.execute(ResponderCommand::Housekeeping);
-        let outs = drain_outputs(&mut b);
-        assert!(
-            outs.has_send(|m| matches!(m, AnyMessage::TxSubmission(txsub::Message::Init))),
-            "setup: Init pushed"
-        );
-        b.handle_io(InterfaceEvent::Sent(
+        b.handle_io(InterfaceEvent::Recv(
             pid.clone(),
-            AnyMessage::TxSubmission(txsub::Message::Init),
+            vec![AnyMessage::TxSubmission(txsub::Message::Init)],
         ));
         drain_outputs(&mut b);
         b.execute(ResponderCommand::Housekeeping);
