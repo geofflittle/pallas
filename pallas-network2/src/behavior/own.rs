@@ -25,7 +25,7 @@ impl OwnSends {
     }
 
     fn hold(&mut self, msg: &AnyMessage, accepted: bool) -> bool {
-        if !is_request(msg) || self.held.contains_key(&msg.channel()) || !accepted {
+        if self.held.contains_key(&msg.channel()) || !accepted {
             return false;
         }
 
