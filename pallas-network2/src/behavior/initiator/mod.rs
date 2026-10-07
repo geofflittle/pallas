@@ -2187,7 +2187,7 @@ mod tests {
                 BehaviorOutput::ExternalEvent(InitiatorEvent::EbFetched(..))
             )
         });
-        let to_pid = sends_to(&outputs, pid, is_eb_request).len();
+        let mut to_pid = sends_to(&outputs, pid, is_eb_request).len();
         assert_eq!(
             behavior.peers[&pid].promotion,
             want,
@@ -2195,8 +2195,9 @@ mod tests {
         );
 
         behavior.execute(InitiatorCommand::Housekeeping);
-        let dropped = drain_outputs(behavior).has_disconnect_for(pid);
-        (to_pid, fetched, dropped)
+        let outputs = drain_outputs(behavior);
+        to_pid += sends_to(&outputs, pid, is_eb_request).len();
+        (to_pid, fetched, outputs.has_disconnect_for(pid))
     }
 
     #[tokio::test]
