@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::{OutboundQueue, PeerId};
+use crate::{OutboundQueue, PeerId, behavior::AnyMessage};
 
 use super::{InitiatorBehavior, InitiatorState, PeerVisitor};
 
@@ -50,7 +50,9 @@ impl DiscoveryBehavior {
 
         tracing::debug!(amount, "requesting peers");
 
-        state.send_own_share(pid, amount as u8, outbound);
+        let msg = crate::protocol::peersharing::Message::ShareRequest(amount as u8);
+
+        state.send_own(pid, AnyMessage::PeerSharing(msg), outbound);
     }
 
     /// Extracts discovered peer addresses from the peer-sharing response, if

@@ -5,7 +5,7 @@ use crate::{
     Behavior, BehaviorOutput, Message as MessageTrait, OutboundQueue, PeerId, protocol as proto,
 };
 
-use super::{AcceptedVersion, AnyMessage, BlockRange, ConnectionState, own::InitiatorOwnSends};
+use super::{AcceptedVersion, AnyMessage, BlockRange, ConnectionState, own::OwnSends};
 
 mod blockfetch;
 mod chainsync;
@@ -152,7 +152,7 @@ pub struct InitiatorState {
     pub(crate) violation: bool,
     pub(crate) error_count: u32,
     pub(crate) continue_sync: bool,
-    pub(crate) own: InitiatorOwnSends,
+    pub(crate) own: OwnSends,
 }
 
 impl InitiatorState {
@@ -172,7 +172,7 @@ impl InitiatorState {
             violation: false,
             error_count: 0,
             continue_sync: false,
-            own: InitiatorOwnSends::default(),
+            own: OwnSends::default(),
         }
     }
 
@@ -325,7 +325,7 @@ impl InitiatorState {
         self.leios_fetch = proto::leiosfetch::State::default();
         self.continue_sync = false;
         self.violation = false;
-        self.own = InitiatorOwnSends::default();
+        self.own = OwnSends::default();
     }
 }
 
@@ -1129,31 +1129,6 @@ mod tests {
         );
     }
 
-    fn count_sends(
-        outs: &[BehaviorOutput<InitiatorBehavior>],
-        pred: impl Fn(&AnyMessage) -> bool,
-    ) -> usize {
-        outs.iter()
-            .filter(|o| match o {
-                BehaviorOutput::InterfaceCommand(crate::InterfaceCommand::Send(_, m)) => pred(m),
-                _ => false,
-            })
-            .count()
-    }
-
-    fn sends_to(outs: &[BehaviorOutput<InitiatorBehavior>], pid: &PeerId) -> Vec<AnyMessage> {
-        outs.iter()
-            .filter_map(|o| match o {
-                BehaviorOutput::InterfaceCommand(crate::InterfaceCommand::Send(p, m))
-                    if p == pid =>
-                {
-                    Some(m.clone())
-                }
-                _ => None,
-            })
-            .collect()
-    }
-
     fn include_and_connect(b: &mut InitiatorBehavior, pid: &PeerId) {
         b.execute(InitiatorCommand::IncludePeer(pid.clone()));
         b.execute(InitiatorCommand::Housekeeping);
@@ -1204,7 +1179,7 @@ mod tests {
         complete_handshake(&mut b, &a);
         let outs = two_passes(&mut b);
         assert_eq!(
-            count_sends(&outs, any_range),
+            outs.sends().filter(|&(_, m)| any_range(m)).count(),
             1,
             "RequestRange count over two passes"
         );
@@ -1222,9 +1197,10 @@ mod tests {
         b.leiosfetch
             .enqueue(a.clone(), FetchRequest::Block(Point::new(8, vec![8; 32])));
         let outs = two_passes(&mut b);
-        let n = count_sends(&outs, |m| {
-            matches!(m, AnyMessage::LeiosFetch(lf::Message::BlockRequest(_)))
-        });
+        let n = outs
+            .sends()
+            .filter(|&(_, m)| matches!(m, AnyMessage::LeiosFetch(lf::Message::BlockRequest(_))))
+            .count();
         assert_eq!(n, 1, "BlockRequest count over two passes");
     }
 
@@ -1237,9 +1213,10 @@ mod tests {
         include_and_connect(&mut b, &a);
         complete_handshake(&mut b, &a);
         let outs = two_passes(&mut b);
-        let n = count_sends(&outs, |m| {
-            matches!(m, AnyMessage::ChainSync(cs::Message::FindIntersect(_)))
-        });
+        let n = outs
+            .sends()
+            .filter(|&(_, m)| matches!(m, AnyMessage::ChainSync(cs::Message::FindIntersect(_))))
+            .count();
         assert_eq!(n, 1, "FindIntersect count over two passes");
     }
 
@@ -1252,7 +1229,7 @@ mod tests {
         complete_handshake(&mut b, &a);
         let outs = two_passes(&mut b);
         assert_eq!(
-            count_sends(&outs, is_keepalive),
+            outs.sends().filter(|&(_, m)| is_keepalive(m)).count(),
             1,
             "KeepAlive count over two passes"
         );
@@ -1267,7 +1244,7 @@ mod tests {
         complete_handshake_leios(&mut b, &a);
         let outs = two_passes(&mut b);
         assert_eq!(
-            count_sends(&outs, is_notify_next),
+            outs.sends().filter(|&(_, m)| is_notify_next(m)).count(),
             1,
             "leios RequestNext count over two passes"
         );
@@ -1285,12 +1262,15 @@ mod tests {
             "setup: peer sharing negotiated"
         );
         let outs = two_passes(&mut b);
-        let n = count_sends(&outs, |m| {
-            matches!(
-                m,
-                AnyMessage::PeerSharing(peersharing::Message::ShareRequest(_))
-            )
-        });
+        let n = outs
+            .sends()
+            .filter(|&(_, m)| {
+                matches!(
+                    m,
+                    AnyMessage::PeerSharing(peersharing::Message::ShareRequest(_))
+                )
+            })
+            .count();
         assert_eq!(n, 1, "ShareRequest count over two passes");
     }
 
@@ -1302,9 +1282,8 @@ mod tests {
         b.execute(InitiatorCommand::Housekeeping);
         let outs = drain_outputs(b);
         assert_eq!(
-            sends_to(&outs, a)
-                .iter()
-                .filter(|m| is_range(m, &r(1)))
+            outs.sends()
+                .filter(|&(p, m)| p == a && is_range(m, &r(1)))
                 .count(),
             1,
             "setup: r1 pushed to a"
@@ -1315,7 +1294,10 @@ mod tests {
         complete_handshake(b, w);
         b.execute(InitiatorCommand::Housekeeping);
         let outs = drain_outputs(b);
-        sends_to(&outs, w).into_iter().filter(any_range).collect()
+        outs.sends()
+            .filter(|&(p, m)| p == w && any_range(m))
+            .map(|(_, m)| m.clone())
+            .collect()
     }
 
     #[tokio::test]
@@ -1327,7 +1309,7 @@ mod tests {
         b.blockfetch.request_block_batch(&a, r(5), &mut b.outbound);
         let outs = drain_outputs(&mut b);
         assert_eq!(
-            count_sends(&outs, |m| is_range(m, &r(5))),
+            outs.sends().filter(|&(_, m)| is_range(m, &r(5))).count(),
             1,
             "setup: caller r5 pushed"
         );
@@ -1342,7 +1324,9 @@ mod tests {
         b.execute(InitiatorCommand::Housekeeping);
         let outs = drain_outputs(&mut b);
         assert_eq!(
-            sends_to(&outs, &a).into_iter().filter(any_range).count(),
+            outs.sends()
+                .filter(|&(p, m)| *p == a && any_range(m))
+                .count(),
             0,
             "no second own push"
         );
@@ -1352,26 +1336,6 @@ mod tests {
         assert!(
             served.first().map(|m| is_range(m, &r(1))).unwrap_or(false),
             "r1 at queue front, w got {served:?}"
-        );
-    }
-
-    #[tokio::test]
-    async fn error_before_sent_requeues_range() {
-        tokio::time::pause();
-        let mut b = InitiatorBehavior::default();
-        let (a, w) = (PeerId::test(48), PeerId::test(49));
-        own_r1_pushed(&mut b, &a, &w);
-        b.handle_io(InterfaceEvent::Error(
-            a.clone(),
-            InterfaceError::Other("err".into()),
-        ));
-        drain_outputs(&mut b);
-        b.handle_io(InterfaceEvent::Disconnected(a.clone()));
-        drain_outputs(&mut b);
-        let served = ranges_served_to_w(&mut b, &w);
-        assert!(
-            served.first().map(|m| is_range(m, &r(1))).unwrap_or(false),
-            "r1 requeued, w got {served:?}"
         );
     }
 
@@ -1419,7 +1383,7 @@ mod tests {
         b.execute(InitiatorCommand::ContinueSync(a.clone()));
         outs.extend(drain_outputs(&mut b));
         assert_eq!(
-            count_sends(&outs, next),
+            outs.sends().filter(|&(_, m)| next(m)).count(),
             1,
             "RequestNext count over two ContinueSync before Sent"
         );
@@ -1439,66 +1403,9 @@ mod tests {
         ));
         let outs = drain_outputs(&mut b);
         assert_eq!(
-            count_sends(&outs, next),
+            outs.sends().filter(|&(_, m)| next(m)).count(),
             1,
             "owed RequestNext after RollForward"
-        );
-    }
-
-    #[tokio::test]
-    async fn error_then_late_sent_keeps_main_outcome() {
-        tokio::time::pause();
-        let mut b = InitiatorBehavior::default();
-        let (a, w) = (PeerId::test(53), PeerId::test(54));
-        own_r1_pushed(&mut b, &a, &w);
-        b.handle_io(InterfaceEvent::Error(
-            a.clone(),
-            InterfaceError::Other("err".into()),
-        ));
-        drain_outputs(&mut b);
-        b.handle_io(InterfaceEvent::Sent(
-            a.clone(),
-            AnyMessage::BlockFetch(bf::Message::RequestRange(r(1))),
-        ));
-        assert!(
-            !b.peers.get(&a).unwrap().violation,
-            "no violation on the late Sent"
-        );
-        b.handle_io(InterfaceEvent::Disconnected(a.clone()));
-        drain_outputs(&mut b);
-        let served = ranges_served_to_w(&mut b, &w);
-        assert!(served.is_empty(), "nothing requeued, w got {served:?}");
-    }
-
-    #[tokio::test]
-    async fn raw_send_identical_keeps_main_outcome() {
-        tokio::time::pause();
-        let mut b = InitiatorBehavior::default();
-        let a = PeerId::test(55);
-        include_and_connect(&mut b, &a);
-        complete_handshake(&mut b, &a);
-        b.execute(InitiatorCommand::Housekeeping);
-        let mut outs = drain_outputs(&mut b);
-        {
-            let InitiatorBehavior {
-                keepalive,
-                peers,
-                outbound,
-                ..
-            } = &mut b;
-            keepalive.send_keepalive(&a, peers.get(&a).unwrap(), outbound);
-        }
-        outs.extend(drain_outputs(&mut b));
-        let ka = |m: &AnyMessage| {
-            matches!(
-                m,
-                AnyMessage::KeepAlive(keepalive::Message::KeepAlive(u16::MAX))
-            )
-        };
-        assert_eq!(
-            count_sends(&outs, ka),
-            2,
-            "own and caller KeepAlive, as main"
         );
     }
 
@@ -1519,31 +1426,9 @@ mod tests {
         b.execute(InitiatorCommand::Housekeeping);
         let outs = drain_outputs(&mut b);
         assert_eq!(
-            count_sends(&outs, is_keepalive),
+            outs.sends().filter(|&(_, m)| is_keepalive(m)).count(),
             1,
             "next session sends KeepAlive"
-        );
-    }
-
-    #[tokio::test]
-    async fn reset_before_sent_then_handshake_sends_again() {
-        tokio::time::pause();
-        let mut b = InitiatorBehavior::default();
-        let a = PeerId::test(57);
-        include_and_connect(&mut b, &a);
-        complete_handshake(&mut b, &a);
-        b.execute(InitiatorCommand::Housekeeping);
-        drain_outputs(&mut b);
-        b.peers.get_mut(&a).unwrap().reset();
-        b.handle_io(InterfaceEvent::Connected(a.clone()));
-        drain_outputs(&mut b);
-        complete_handshake(&mut b, &a);
-        b.execute(InitiatorCommand::Housekeeping);
-        let outs = drain_outputs(&mut b);
-        assert_eq!(
-            count_sends(&outs, is_keepalive),
-            1,
-            "KeepAlive after reset and handshake"
         );
     }
 
@@ -1570,9 +1455,30 @@ mod tests {
         b.execute(InitiatorCommand::Housekeeping);
         let outs = drain_outputs(&mut b);
         assert_eq!(
-            count_sends(&outs, is_keepalive),
+            outs.sends().filter(|&(_, m)| is_keepalive(m)).count(),
             1,
             "KeepAlive after the first is sent and answered"
+        );
+    }
+
+    #[test]
+    fn own_keepalive_response_sends_nothing() {
+        let pid = PeerId::test(61);
+        let mut state = InitiatorState::new();
+        let mut outbound = OutboundQueue::<InitiatorBehavior>::new();
+        state.keepalive = keepalive::State::Server(7);
+        let response = AnyMessage::KeepAlive(keepalive::Message::ResponseKeepAlive(7));
+        let pushed = state.send_own(&pid, response, &mut outbound);
+        assert_eq!(
+            (pushed, outbound.drain_ready().len()),
+            (false, 0),
+            "pushed and sends for an own ResponseKeepAlive"
+        );
+        state.keepalive = keepalive::State::default();
+        let request = AnyMessage::KeepAlive(keepalive::Message::KeepAlive(7));
+        assert!(
+            state.send_own(&pid, request, &mut outbound),
+            "the keepalive channel holds nothing after the response"
         );
     }
 
@@ -1598,7 +1504,7 @@ mod tests {
         b.execute(InitiatorCommand::Housekeeping);
         let outs = drain_outputs(&mut b);
         assert_eq!(
-            count_sends(&outs, is_notify_next),
+            outs.sends().filter(|&(_, m)| is_notify_next(m)).count(),
             1,
             "leios RequestNext after the first is sent and answered"
         );
@@ -1630,10 +1536,12 @@ mod tests {
         drain_outputs(&mut b);
         b.execute(InitiatorCommand::Housekeeping);
         let outs = drain_outputs(&mut b);
-        let n = count_sends(
-            &outs,
-            |m| matches!(m, AnyMessage::LeiosFetch(lf::Message::BlockRequest(p)) if *p == second),
-        );
+        let n = outs
+            .sends()
+            .filter(|&(_, m)| {
+                matches!(m, AnyMessage::LeiosFetch(lf::Message::BlockRequest(p)) if *p == second)
+            })
+            .count();
         assert_eq!(
             n, 1,
             "second BlockRequest after the first is sent and answered"

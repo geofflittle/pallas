@@ -1,6 +1,6 @@
 use crate::protocol::leiosnotify as notify_proto;
 
-use crate::{BehaviorOutput, OutboundQueue, PeerId};
+use crate::{BehaviorOutput, OutboundQueue, PeerId, behavior::AnyMessage};
 
 use super::{InitiatorBehavior, InitiatorEvent, InitiatorState, PeerVisitor};
 
@@ -24,7 +24,8 @@ impl LeiosNotifyBehavior {
     ) {
         tracing::debug!("requesting next leios notification");
 
-        state.send_own_notify(pid, outbound);
+        let msg = AnyMessage::LeiosNotify(notify_proto::Message::RequestNext);
+        state.send_own(pid, msg, outbound);
     }
 
     /// Drains a pending notification from the peer state and emits the
