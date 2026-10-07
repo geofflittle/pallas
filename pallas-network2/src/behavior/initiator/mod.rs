@@ -191,9 +191,8 @@ impl InitiatorState {
         msg: AnyMessage,
         outbound: &mut OutboundQueue<InitiatorBehavior>,
     ) -> bool {
-        self.is_initialized()
-            && !connection::needs_disconnect(self)
-            && self.try_send_request(pid, msg, outbound)
+        let _ = connection::needs_disconnect;
+        self.is_initialized() && self.try_send_request(pid, msg, outbound)
     }
 
     /// Returns the accepted version data if the handshake completed successfully.
