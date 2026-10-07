@@ -4,12 +4,10 @@ use crate::protocol::blockfetch as blockfetch_proto;
 
 use crate::{
     BehaviorOutput, InterfaceCommand, OutboundQueue, PeerId,
-    behavior::{AnyMessage, BlockRange, ConnectionState},
+    behavior::{AnyMessage, BlockRange},
 };
 
-use super::{
-    InitiatorBehavior, InitiatorEvent, InitiatorState, PeerVisitor, connection::needs_disconnect,
-};
+use super::{InitiatorBehavior, InitiatorEvent, InitiatorState, PeerVisitor};
 
 /// Configuration for the block-fetch sub-behavior (currently unused).
 pub type BlockFetchConfig = ();
@@ -68,12 +66,8 @@ impl BlockFetchBehavior {
         state: &mut InitiatorState,
         outbound: &mut OutboundQueue<super::InitiatorBehavior>,
     ) {
-        if !peer_is_available(state) {
-            return;
-        }
-
         if let Some(request) = self.requests.front()
-            && state.try_send_request(
+            && state.try_send_fetch(
                 pid,
                 AnyMessage::BlockFetch(blockfetch_proto::Message::RequestRange(request.clone())),
                 outbound,
@@ -98,12 +92,6 @@ impl BlockFetchBehavior {
             outbound.push_ready(BehaviorOutput::ExternalEvent(out));
         }
     }
-}
-
-fn peer_is_available(state: &InitiatorState) -> bool {
-    matches!(state.connection, ConnectionState::Initialized)
-        && matches!(state.blockfetch, blockfetch_proto::State::Idle)
-        && !needs_disconnect(state)
 }
 
 impl PeerVisitor for BlockFetchBehavior {
@@ -162,7 +150,7 @@ impl PeerVisitor for BlockFetchBehavior {
 mod tests {
     use super::*;
     use crate::OutboundQueue;
-    use crate::behavior::initiator::PromotionTag;
+    use crate::behavior::{ConnectionState, initiator::PromotionTag};
     use crate::protocol::{Point, blockfetch as bf};
 
     fn drain_outputs(

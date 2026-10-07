@@ -46,7 +46,7 @@ impl LeiosFetchBehavior {
         }
 
         if let Some(idx) = self.requests.iter().position(|(p, _)| p == pid)
-            && state.try_send_request(pid, request_msg(&self.requests[idx].1), outbound)
+            && state.try_send_fetch(pid, request_msg(&self.requests[idx].1), outbound)
         {
             self.requests.remove(idx);
         }
@@ -87,9 +87,7 @@ fn request_msg(request: &FetchRequest) -> AnyMessage {
 }
 
 fn peer_is_available(state: &InitiatorState) -> bool {
-    state.is_initialized()
-        && state.supports_leios()
-        && matches!(state.leios_fetch, fetch_proto::State::Idle(None))
+    state.supports_leios() && matches!(state.leios_fetch, fetch_proto::State::Idle(None))
 }
 
 impl PeerVisitor for LeiosFetchBehavior {
