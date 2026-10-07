@@ -2185,6 +2185,11 @@ mod tests {
             )
         });
         let to_pid = sends_to(&outputs, pid, is_eb_request).len();
+        assert_eq!(
+            behavior.peers[&pid].promotion,
+            want,
+            "setup: pid still tagged after the reply"
+        );
 
         behavior.execute(InitiatorCommand::Housekeeping);
         let dropped = drain_outputs(behavior).has_disconnect_for(pid);
