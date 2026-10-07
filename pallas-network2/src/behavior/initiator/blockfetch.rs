@@ -80,6 +80,7 @@ impl BlockFetchBehavior {
             )
         {
             tracing::debug!("granting request to peer");
+            self.sent.insert(pid.clone(), request.clone());
             self.requests.pop_front();
         }
     }
