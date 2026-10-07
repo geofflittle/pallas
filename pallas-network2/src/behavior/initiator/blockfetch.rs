@@ -148,8 +148,10 @@ impl PeerVisitor for BlockFetchBehavior {
         state: &mut InitiatorState,
         _outbound: &mut OutboundQueue<InitiatorBehavior>,
     ) {
-        if let Some(range) = self.sent.remove(pid) {
-            self.requests.push_front(range);
+        self.sent.remove(pid);
+
+        if let blockfetch_proto::State::Busy(range) = &state.blockfetch {
+            self.requests.push_front(range.clone());
         }
 
         if let Some(range) = state.take_unsent_range() {
