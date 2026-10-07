@@ -67,6 +67,10 @@ impl BlockFetchBehavior {
         outbound: &mut OutboundQueue<super::InitiatorBehavior>,
     ) {
         if !peer_is_available(state) {
+            if !needs_disconnect(state) {
+                return;
+            }
+            self.requests.pop_front();
             return;
         }
 
