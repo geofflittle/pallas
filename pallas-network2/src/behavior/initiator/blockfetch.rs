@@ -190,6 +190,25 @@ mod tests {
     }
 
     #[test]
+    fn inbound_while_busy_keeps_the_next_range_queued() {
+        let mut bf = BlockFetchBehavior::new(());
+        let pid = PeerId::test(1);
+        let mut state = InitiatorState::new();
+        let mut outbound = OutboundQueue::new();
+
+        state.connection = ConnectionState::Initialized;
+        state.blockfetch = bf::State::Busy((Point::Origin, Point::Origin));
+        bf.enqueue((Point::Origin, Point::Origin));
+
+        bf.visit_inbound_msg(&pid, &mut state, &mut outbound);
+        assert!(
+            drain_outputs(&mut outbound).is_empty(),
+            "nothing is sent while Busy"
+        );
+        assert_eq!(bf.requests.len(), 1, "the range stays queued");
+    }
+
+    #[test]
     fn housekeeping_dispatches_request_for_available_peer() {
         let mut bf = BlockFetchBehavior::new(());
         let pid = PeerId::test(1);
