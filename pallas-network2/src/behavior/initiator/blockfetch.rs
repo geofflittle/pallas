@@ -100,7 +100,6 @@ impl BlockFetchBehavior {
 
 fn peer_is_available(state: &InitiatorState) -> bool {
     matches!(state.connection, ConnectionState::Initialized)
-        && matches!(state.blockfetch, blockfetch_proto::State::Idle)
         && !needs_disconnect(state)
 }
 
