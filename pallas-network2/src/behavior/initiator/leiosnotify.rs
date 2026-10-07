@@ -1,6 +1,6 @@
 use crate::protocol::leiosnotify as notify_proto;
 
-use crate::{BehaviorOutput, OutboundQueue, PeerId};
+use crate::{BehaviorOutput, OutboundQueue, PeerId, behavior::AnyMessage};
 
 use super::{InitiatorBehavior, InitiatorEvent, InitiatorState, PeerVisitor};
 
@@ -8,10 +8,9 @@ use super::{InitiatorBehavior, InitiatorEvent, InitiatorState, PeerVisitor};
 /// announcements/offers received from peers.
 ///
 /// `RequestNext` is issued during housekeeping whenever the peer is initialized,
-/// negotiated a Leios-capable version, the protocol is idle with nothing
-/// pending, and the peer holds no own `RequestNext` whose Sent the protocol
-/// state has not accepted, yielding a continuous notification loop paced by
-/// housekeeping.
+/// negotiated a Leios-capable version, and the protocol is idle with nothing
+/// pending and no `RequestNext` awaiting its Sent, yielding a continuous
+/// notification loop paced by housekeeping.
 #[derive(Default)]
 pub struct LeiosNotifyBehavior;
 
@@ -24,7 +23,8 @@ impl LeiosNotifyBehavior {
     ) {
         tracing::debug!("requesting next leios notification");
 
-        state.send_own_notify(pid, outbound);
+        let msg = AnyMessage::LeiosNotify(notify_proto::Message::RequestNext);
+        state.send_own(pid, msg, outbound);
     }
 
     /// Drains a pending notification from the peer state and emits the

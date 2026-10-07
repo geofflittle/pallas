@@ -72,7 +72,8 @@ impl TxSubmissionResponder {
         }
 
         tracing::debug!("requesting tx ids");
-        state.send_own_tx_ids(pid, (true, 0, self.config.max_tx_request), outbound);
+        let msg = txsubmission_proto::Message::RequestTxIds(true, 0, self.config.max_tx_request);
+        state.send_own(pid, AnyMessage::TxSubmission(msg), outbound);
     }
 
     fn try_extract_txs(

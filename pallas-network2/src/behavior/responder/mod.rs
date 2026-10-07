@@ -8,7 +8,7 @@ use crate::{
     protocol as proto,
 };
 
-use super::{AcceptedVersion, AnyMessage, BlockRange, ConnectionState, own::ResponderOwnSends};
+use super::{AcceptedVersion, AnyMessage, BlockRange, ConnectionState, own::OwnSends};
 
 pub mod blockfetch;
 pub mod chainsync;
@@ -100,7 +100,7 @@ pub struct ResponderState {
     pub(crate) violation: bool,
     pub(crate) error_count: u32,
     pub(crate) violations_counter: Option<opentelemetry::metrics::Counter<u64>>,
-    pub(crate) own: ResponderOwnSends,
+    pub(crate) own: OwnSends,
 }
 
 impl ResponderState {
@@ -263,7 +263,7 @@ impl ResponderState {
         self.leios_notify = proto::leiosnotify::State::default();
         self.leios_fetch = proto::leiosfetch::State::default();
         self.violation = false;
-        self.own = ResponderOwnSends::default();
+        self.own = OwnSends::default();
     }
 }
 
@@ -998,14 +998,14 @@ mod tests {
         b.execute(ResponderCommand::Housekeeping);
         outs.extend(drain_outputs(&mut b));
         let ids: Vec<_> = outs
-            .iter()
-            .filter_map(|o| match o {
-                BehaviorOutput::InterfaceCommand(InterfaceCommand::Send(
-                    _,
-                    m @ AnyMessage::TxSubmission(txsub::Message::RequestTxIds(..)),
-                )) => Some(m.clone()),
-                _ => None,
+            .sends()
+            .filter(|&(_, m)| {
+                matches!(
+                    m,
+                    AnyMessage::TxSubmission(txsub::Message::RequestTxIds(..))
+                )
             })
+            .map(|(_, m)| m.clone())
             .collect();
         assert_eq!(ids.len(), 1, "RequestTxIds count over two passes");
         b.handle_io(InterfaceEvent::Sent(pid.clone(), ids[0].clone()));

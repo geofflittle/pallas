@@ -21,22 +21,18 @@ impl KeepaliveBehavior {
         peer: &InitiatorState,
         outbound: &mut OutboundQueue<super::InitiatorBehavior>,
     ) {
-        if peer_is_due(peer) {
-            let msg = keepalive_request(self.token);
+        if !peer.is_initialized() {
+            return;
+        }
+
+        if matches!(peer.keepalive, crate::protocol::keepalive::State::Client(_)) {
+            let msg = crate::protocol::keepalive::Message::KeepAlive(self.token);
 
             let out = InterfaceCommand::Send(pid.clone(), AnyMessage::KeepAlive(msg));
 
             outbound.push_ready(out);
         }
     }
-}
-
-pub(crate) fn keepalive_request(cookie: u16) -> crate::protocol::keepalive::Message {
-    crate::protocol::keepalive::Message::KeepAlive(cookie)
-}
-
-fn peer_is_due(peer: &InitiatorState) -> bool {
-    peer.is_initialized() && matches!(peer.keepalive, crate::protocol::keepalive::State::Client(_))
 }
 
 impl PeerVisitor for KeepaliveBehavior {
@@ -46,8 +42,9 @@ impl PeerVisitor for KeepaliveBehavior {
         state: &mut InitiatorState,
         outbound: &mut OutboundQueue<InitiatorBehavior>,
     ) {
-        if peer_is_due(state) {
-            state.send_own_keepalive(pid, self.token, outbound);
+        if state.is_initialized() {
+            let msg = crate::protocol::keepalive::Message::KeepAlive(self.token);
+            state.send_own(pid, AnyMessage::KeepAlive(msg), outbound);
         }
     }
 }

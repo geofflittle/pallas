@@ -52,7 +52,7 @@ impl BlockFetchBehavior {
 
         outbound.push_ready(BehaviorOutput::InterfaceCommand(InterfaceCommand::Send(
             pid.clone(),
-            AnyMessage::BlockFetch(range_request(range)),
+            AnyMessage::BlockFetch(blockfetch_proto::Message::RequestRange(range)),
         )));
     }
 
@@ -70,10 +70,6 @@ impl BlockFetchBehavior {
             outbound.push_ready(BehaviorOutput::ExternalEvent(out));
         }
     }
-}
-
-pub(crate) fn range_request(range: BlockRange) -> blockfetch_proto::Message {
-    blockfetch_proto::Message::RequestRange(range)
 }
 
 fn peer_is_available(state: &InitiatorState) -> bool {
@@ -106,7 +102,13 @@ impl PeerVisitor for BlockFetchBehavior {
             tracing::debug!("peer looks available");
 
             if let Some(request) = self.requests.front()
-                && state.send_own_range(pid, request.clone(), outbound)
+                && state.send_own(
+                    pid,
+                    AnyMessage::BlockFetch(blockfetch_proto::Message::RequestRange(
+                        request.clone(),
+                    )),
+                    outbound,
+                )
             {
                 tracing::debug!("granting request to peer");
                 self.requests.pop_front();

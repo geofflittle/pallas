@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use crate::protocol::EbId;
 use crate::protocol::leiosfetch::{self as fetch_proto, Bitmaps};
 
-use crate::{BehaviorOutput, OutboundQueue, PeerId};
+use crate::{BehaviorOutput, OutboundQueue, PeerId, behavior::AnyMessage};
 
 use super::{InitiatorBehavior, InitiatorEvent, InitiatorState, PeerVisitor};
 
@@ -46,7 +46,7 @@ impl LeiosFetchBehavior {
         }
 
         if let Some(idx) = self.requests.iter().position(|(p, _)| p == pid)
-            && state.send_own_fetch(pid, &self.requests[idx].1, outbound)
+            && state.send_own(pid, fetch_request(&self.requests[idx].1), outbound)
         {
             self.requests.remove(idx);
         }
@@ -77,13 +77,13 @@ impl LeiosFetchBehavior {
     }
 }
 
-pub(crate) fn fetch_request(request: &FetchRequest) -> fetch_proto::Message {
-    match request {
+fn fetch_request(request: &FetchRequest) -> AnyMessage {
+    AnyMessage::LeiosFetch(match request {
         FetchRequest::Block(point) => fetch_proto::Message::BlockRequest(point.clone()),
         FetchRequest::BlockTxs(point, bitmaps) => {
             fetch_proto::Message::BlockTxsRequest(point.clone(), bitmaps.clone())
         }
-    }
+    })
 }
 
 fn peer_is_available(state: &InitiatorState) -> bool {
