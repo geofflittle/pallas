@@ -1525,6 +1525,123 @@ mod tests {
         assert!(!behavior.peers[&pid].violation, "no violation");
     }
 
+    fn send_first_of_two_ranges(behavior: &mut InitiatorBehavior, pid: &PeerId) {
+        include_and_connect(behavior, pid);
+        complete_handshake(behavior, pid);
+        behavior.execute(InitiatorCommand::RequestBlocks(range(1)));
+        behavior.execute(InitiatorCommand::RequestBlocks(range(3)));
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let first = sends_to(&drain_outputs(behavior), pid, is_any_range);
+        assert_eq!(
+            first.len(),
+            1,
+            "setup: one RequestRange for the first range"
+        );
+        behavior.handle_io(InterfaceEvent::Sent(pid.clone(), first[0].clone()));
+    }
+
+    fn finish_batch_then_disconnect(
+        behavior: &mut InitiatorBehavior,
+        pid: &PeerId,
+        other: &PeerId,
+    ) -> (usize, Vec<AnyMessage>) {
+        let batch = vec![
+            AnyMessage::BlockFetch(bf::Message::StartBatch),
+            AnyMessage::BlockFetch(bf::Message::Block(vec![0xBE; 8])),
+            AnyMessage::BlockFetch(bf::Message::BatchDone),
+        ];
+        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), batch));
+        let mut to_pid = sends_to(&drain_outputs(behavior), pid, is_any_range);
+        // The interface writes a range pushed while the peer is still connected.
+        for m in &to_pid {
+            behavior.handle_io(InterfaceEvent::Sent(pid.clone(), m.clone()));
+        }
+
+        behavior.execute(InitiatorCommand::Housekeeping);
+        let outputs = drain_outputs(behavior);
+        assert!(outputs.has_disconnect_for(pid), "setup: pid disconnected");
+        to_pid.extend(sends_to(&outputs, pid, is_any_range));
+        behavior.handle_io(InterfaceEvent::Disconnected(pid.clone()));
+        drain_outputs(behavior);
+
+        include_and_connect(behavior, other);
+        (to_pid.len(), ranges_requested_from(behavior, other))
+    }
+
+    #[tokio::test]
+    async fn range_freed_by_a_banned_peer_goes_to_another_peer() {
+        tokio::time::pause();
+        let mut behavior = InitiatorBehavior::default();
+        let (pid, other) = (PeerId::test(54), PeerId::test(55));
+        send_first_of_two_ranges(&mut behavior, &pid);
+
+        let bad = AnyMessage::KeepAlive(keepalive::Message::ResponseKeepAlive(7));
+        behavior.handle_io(InterfaceEvent::Recv(pid.clone(), vec![bad]));
+        drain_outputs(&mut behavior);
+        assert_eq!(
+            behavior.peers[&pid].promotion,
+            PromotionTag::Banned,
+            "setup: pid banned"
+        );
+
+        let (to_pid, requested) = finish_batch_then_disconnect(&mut behavior, &pid, &other);
+        assert_eq!(
+            (to_pid, requested.iter().any(|m| is_range(m, &range(3)))),
+            (0, true),
+            "ranges sent to the banned peer, and range 3 sent to the other peer"
+        );
+    }
+
+    #[tokio::test]
+    async fn range_freed_by_a_demoted_peer_goes_to_another_peer() {
+        tokio::time::pause();
+        let mut behavior = InitiatorBehavior::default();
+        let (pid, other) = (PeerId::test(56), PeerId::test(57));
+        send_first_of_two_ranges(&mut behavior, &pid);
+
+        behavior.execute(InitiatorCommand::DemotePeer(pid.clone()));
+        drain_outputs(&mut behavior);
+        assert_eq!(
+            behavior.peers[&pid].promotion,
+            PromotionTag::Cold,
+            "setup: pid demoted"
+        );
+
+        let (to_pid, requested) = finish_batch_then_disconnect(&mut behavior, &pid, &other);
+        assert_eq!(
+            (to_pid, requested.iter().any(|m| is_range(m, &range(3)))),
+            (0, true),
+            "ranges sent to the demoted peer, and range 3 sent to the other peer"
+        );
+    }
+
+    #[tokio::test]
+    async fn requested_ranges_skip_a_banned_peer() {
+        tokio::time::pause();
+        let mut behavior = InitiatorBehavior::default();
+        let (pid, other) = (PeerId::test(58), PeerId::test(59));
+        include_and_connect(&mut behavior, &pid);
+        include_and_connect(&mut behavior, &other);
+        complete_handshake(&mut behavior, &pid);
+        complete_handshake(&mut behavior, &other);
+
+        behavior.execute(InitiatorCommand::BanPeer(pid.clone()));
+        drain_outputs(&mut behavior);
+        behavior.execute(InitiatorCommand::RequestBlocks(range(1)));
+        behavior.execute(InitiatorCommand::RequestBlocks(range(3)));
+        let outputs = drain_outputs(&mut behavior);
+        assert_eq!(
+            (
+                sends_to(&outputs, &pid, is_any_range).len(),
+                sends_to(&outputs, &other, is_any_range)
+                    .iter()
+                    .any(|m| is_range(m, &range(1)))
+            ),
+            (0, true),
+            "ranges sent to the banned peer, and range 1 sent to the other peer"
+        );
+    }
+
     fn is_sync_next(m: &AnyMessage) -> bool {
         matches!(m, AnyMessage::ChainSync(cs::Message::RequestNext))
     }
