@@ -2159,6 +2159,9 @@ mod tests {
     ) -> (usize, bool, bool) {
         include_and_connect(behavior, pid);
         complete_handshake_leios(behavior, pid);
+        behavior.execute(InitiatorCommand::Housekeeping);
+        drain_outputs(behavior);
+        assert_eq!(behavior.peers[&pid].promotion, PromotionTag::Hot, "setup");
         let (first, second) = (Point::new(7, vec![7; 32]), Point::new(8, vec![8; 32]));
         behavior.execute(InitiatorCommand::FetchEb(pid.clone(), first.clone()));
         drain_outputs(behavior);
