@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 use crate::protocol::blockfetch as blockfetch_proto;
 
@@ -21,6 +21,7 @@ pub type Request = BlockRange;
 pub struct BlockFetchBehavior {
     //config: BlockFetchConfig,
     requests: VecDeque<Request>,
+    sent: HashMap<PeerId, Request>,
 }
 
 impl Default for BlockFetchBehavior {
@@ -34,6 +35,7 @@ impl BlockFetchBehavior {
     pub fn new(_config: BlockFetchConfig) -> Self {
         Self {
             requests: VecDeque::new(),
+            sent: HashMap::new(),
         }
     }
 
@@ -112,7 +114,23 @@ impl PeerVisitor for BlockFetchBehavior {
         outbound: &mut OutboundQueue<InitiatorBehavior>,
     ) {
         self.dispatch_block(pid, state, outbound);
+
+        if matches!(state.blockfetch, blockfetch_proto::State::Idle) {
+            self.sent.remove(pid);
+        }
+
         self.serve_next(pid, state, outbound);
+    }
+
+    fn visit_outbound_msg(
+        &mut self,
+        pid: &PeerId,
+        state: &mut InitiatorState,
+        _outbound: &mut OutboundQueue<InitiatorBehavior>,
+    ) {
+        if let blockfetch_proto::State::Busy(range) = &state.blockfetch {
+            self.sent.insert(pid.clone(), range.clone());
+        }
     }
 
     fn visit_housekeeping(
@@ -126,10 +144,14 @@ impl PeerVisitor for BlockFetchBehavior {
 
     fn visit_disconnected(
         &mut self,
-        _pid: &PeerId,
+        pid: &PeerId,
         state: &mut InitiatorState,
         _outbound: &mut OutboundQueue<InitiatorBehavior>,
     ) {
+        if let Some(range) = self.sent.remove(pid) {
+            self.requests.push_front(range);
+        }
+
         if let Some(range) = state.take_unsent_range() {
             self.requests.push_front(range);
         }
