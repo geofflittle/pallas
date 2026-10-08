@@ -68,3 +68,6 @@ pallas-validate = { version = "=1.4.0", path = "pallas-validate" }
 [workspace.metadata.release]
 push = false
 publish = false
+
+[patch.crates-io]
+utxorpc-spec = { git = "https://github.com/SundaeSwap-finance/utxorpc-spec", rev = "a57e10cf0c1921c91590e2bcd038eacd00d66c2f" }
