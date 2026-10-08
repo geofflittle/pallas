@@ -1935,12 +1935,12 @@ macro_rules! impl_cardano_mapper_shared {
                     max_value_size: x.max_value_size().unwrap_or_default(),
                     collateral_percentage: x.collateral_percentage().unwrap_or_default(),
                     max_collateral_inputs: x.max_collateral_inputs().unwrap_or_default(),
-                    cost_models: x.cost_models_for_script_languages().map(|cm| u5c::CostModels {
+                    cost_models: Some(x.cost_models_for_script_languages().map(|cm| u5c::CostModels {
                         plutus_v1: cm.plutus_v1.map(|values| u5c::CostModel { values }),
                         plutus_v2: cm.plutus_v2.map(|values| u5c::CostModel { values }),
                         plutus_v3: cm.plutus_v3.map(|values| u5c::CostModel { values }),
                         plutus_v4: cm.plutus_v4.map(|values| u5c::CostModel { values }),
-                    }),
+                    }).unwrap_or_default()),
                     prices: x.execution_costs().map(|p| u5c::ExPrices {
                         memory: Some(rational_number_to_u5c(p.mem_price)),
                         steps: Some(rational_number_to_u5c(p.step_price)),
