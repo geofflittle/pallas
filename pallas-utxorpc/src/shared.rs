@@ -262,7 +262,9 @@ macro_rules! impl_cardano_mapper_shared {
                     }
                     // u5c names no guard clause.
                     #[cfg(feature = "unstable")]
-                    NativeClause::Guard => None,
+                    NativeClause::Guard => Some(u5c::native_script::NativeScript::ScriptAll(
+                        u5c::NativeScriptList { items: children },
+                    )),
                 };
 
                 u5c::NativeScript { native_script }
