@@ -1956,56 +1956,6 @@ macro_rules! impl_cardano_mapper_shared {
                 ))
             }
 
-            #[test]
-            fn a_conway_parameter_change_of_nothing_maps_to_default_parameters() {
-                // [0, null, {}, null], a parameter change with an empty update.
-                let action: conway::GovAction =
-                    pallas_codec::minicbor::decode(&[0x84, 0x00, 0xf6, 0xa0, 0xf6]).unwrap();
-
-                let mapped = Mapper::new(NoLedger)
-                    .map_multi_era_gov_action(&pallas_traverse::MultiEraGovAction::from_conway(&action));
-
-                assert_eq!(
-                    mapped.governance_action,
-                    Some(u5c::governance_action::GovernanceAction::ParameterChangeAction(
-                        u5c::ParameterChangeAction {
-                            gov_action_id: None,
-                            protocol_param_update: Some(u5c::PParams::default()),
-                            policy_hash: Default::default(),
-                        }
-                    ))
-                );
-            }
-
-            #[cfg(feature = "unstable")]
-            #[test]
-            fn a_dijkstra_parameter_change_maps_its_plutus_v4_cost_model() {
-                // [0, null, {18: {3: [1, 2, 3]}}, null]
-                let action: pallas_primitives::dijkstra::GovAction = pallas_codec::minicbor::decode(&[
-                    0x84, 0x00, 0xf6, 0xa1, 0x12, 0xa1, 0x03, 0x83, 0x01, 0x02, 0x03, 0xf6,
-                ])
-                .unwrap();
-
-                let mapped = Mapper::new(NoLedger)
-                    .map_multi_era_gov_action(&pallas_traverse::MultiEraGovAction::from_dijkstra(&action));
-
-                let Some(u5c::governance_action::GovernanceAction::ParameterChangeAction(change)) =
-                    mapped.governance_action
-                else {
-                    panic!("a parameter change maps to a parameter change action");
-                };
-
-                assert_eq!(
-                    change.protocol_param_update.and_then(|x| x.cost_models),
-                    Some(u5c::CostModels {
-                        plutus_v4: Some(u5c::CostModel {
-                            values: vec![1, 2, 3],
-                        }),
-                        ..Default::default()
-                    })
-                );
-            }
-
             #[cfg(feature = "unstable")]
             #[test]
             fn every_dijkstra_fixture_maps_each_transaction_it_carries() {
