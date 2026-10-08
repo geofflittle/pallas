@@ -1914,6 +1914,261 @@ macro_rules! impl_cardano_mapper_shared {
                 }
             }
         }
+
+        #[cfg(test)]
+        mod multi_era_tests {
+            use super::*;
+
+            use pallas_primitives::conway;
+            use pretty_assertions::assert_eq;
+
+            #[derive(Clone)]
+            struct NoLedger;
+
+            impl $crate::LedgerContext for NoLedger {
+                fn get_utxos(&self, _refs: &[$crate::TxoRef]) -> Option<$crate::UtxoMap> {
+                    None
+                }
+
+                fn get_slot_timestamp(&self, _slot: u64) -> Option<u64> {
+                    None
+                }
+            }
+
+            fn fixture(name: &str) -> Vec<u8> {
+                let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("../test_data")
+                    .join(name);
+                let hex_str = std::fs::read_to_string(&path).expect("the fixture is readable");
+                hex::decode(hex_str.trim()).expect("the fixture holds hex")
+            }
+
+            #[cfg(feature = "unstable")]
+            fn dijkstra_tx(cbor: &[u8]) -> pallas_traverse::MultiEraTx<'_> {
+                pallas_traverse::MultiEraTx::decode_for_era(pallas_traverse::Era::Dijkstra, cbor)
+                    .expect("the fixture is a Dijkstra transaction")
+            }
+
+            #[cfg(feature = "unstable")]
+            fn plutus_v4(hex_bytes: &str) -> Option<u5c::script::Script> {
+                Some(u5c::script::Script::PlutusV4(
+                    hex::decode(hex_bytes).unwrap().into(),
+                ))
+            }
+
+            #[test]
+            fn a_conway_parameter_change_of_nothing_maps_to_default_parameters() {
+                // [0, null, {}, null], a parameter change with an empty update.
+                let action: conway::GovAction =
+                    pallas_codec::minicbor::decode(&[0x84, 0x00, 0xf6, 0xa0, 0xf6]).unwrap();
+
+                let mapped = Mapper::new(NoLedger)
+                    .map_multi_era_gov_action(&pallas_traverse::MultiEraGovAction::from_conway(&action));
+
+                assert_eq!(
+                    mapped.governance_action,
+                    Some(u5c::governance_action::GovernanceAction::ParameterChangeAction(
+                        u5c::ParameterChangeAction {
+                            gov_action_id: None,
+                            protocol_param_update: Some(u5c::PParams::default()),
+                            policy_hash: Default::default(),
+                        }
+                    ))
+                );
+            }
+
+            #[cfg(feature = "unstable")]
+            #[test]
+            fn a_dijkstra_parameter_change_maps_its_plutus_v4_cost_model() {
+                // [0, null, {18: {3: [1, 2, 3]}}, null]
+                let action: pallas_primitives::dijkstra::GovAction = pallas_codec::minicbor::decode(&[
+                    0x84, 0x00, 0xf6, 0xa1, 0x12, 0xa1, 0x03, 0x83, 0x01, 0x02, 0x03, 0xf6,
+                ])
+                .unwrap();
+
+                let mapped = Mapper::new(NoLedger)
+                    .map_multi_era_gov_action(&pallas_traverse::MultiEraGovAction::from_dijkstra(&action));
+
+                let Some(u5c::governance_action::GovernanceAction::ParameterChangeAction(change)) =
+                    mapped.governance_action
+                else {
+                    panic!("a parameter change maps to a parameter change action");
+                };
+
+                assert_eq!(
+                    change.protocol_param_update.and_then(|x| x.cost_models),
+                    Some(u5c::CostModels {
+                        plutus_v4: Some(u5c::CostModel {
+                            values: vec![1, 2, 3],
+                        }),
+                        ..Default::default()
+                    })
+                );
+            }
+
+            #[cfg(feature = "unstable")]
+            #[test]
+            fn every_dijkstra_fixture_maps_each_transaction_it_carries() {
+                let mapper = Mapper::new(NoLedger);
+                let mut mapped_txs = 0;
+
+                for n in 1..=15 {
+                    let name = format!("dijkstra{n}.block");
+                    let cbor = fixture(&name);
+                    let block = pallas_traverse::MultiEraBlock::decode(&cbor).expect("a block");
+
+                    let hashes: Vec<Vec<u8>> =
+                        block.txs().iter().map(|tx| tx.hash().to_vec()).collect();
+                    let mapped: Vec<Vec<u8>> = mapper
+                        .map_block(&block)
+                        .body
+                        .expect("a mapped block has a body")
+                        .tx
+                        .iter()
+                        .map(|tx| tx.hash.to_vec())
+                        .collect();
+
+                    assert_eq!(mapped, hashes, "{name}");
+                    mapped_txs += mapped.len();
+                }
+
+                for name in ["dijkstra-proposal.tx", "dijkstra-scripts.tx", "dijkstra-subtx.tx"] {
+                    let cbor = fixture(name);
+                    let tx = dijkstra_tx(&cbor);
+
+                    assert_eq!(mapper.map_tx(&tx).hash.to_vec(), tx.hash().to_vec(), "{name}");
+                    mapped_txs += 1;
+                }
+
+                assert!(mapped_txs > 3, "the blocks carry transactions, {mapped_txs} mapped");
+            }
+
+            #[cfg(feature = "unstable")]
+            #[test]
+            fn a_guarding_redeemer_maps_to_the_unspecified_purpose() {
+                assert_eq!(
+                    Mapper::new(NoLedger)
+                        .map_multi_era_purpose(&pallas_traverse::MultiEraRedeemerTag::Guarding),
+                    u5c::RedeemerPurpose::Unspecified
+                );
+            }
+
+            #[cfg(feature = "unstable")]
+            #[test]
+            fn a_dijkstra_witness_guard_maps_to_an_empty_native_script() {
+                let cbor = fixture("dijkstra-scripts.tx");
+                let tx = dijkstra_tx(&cbor);
+
+                let scripts = Mapper::new(NoLedger).collect_all_scripts(&tx);
+
+                assert_eq!(
+                    scripts,
+                    vec![u5c::Script {
+                        script: Some(u5c::script::Script::Native(u5c::NativeScript {
+                            native_script: None,
+                        })),
+                    }]
+                );
+            }
+
+            #[cfg(feature = "unstable")]
+            #[test]
+            fn a_guard_clause_inside_a_list_maps_to_an_empty_member() {
+                use pallas_primitives::{StakeCredential, dijkstra};
+
+                let script = dijkstra::NativeScript::ScriptAll(vec![
+                    dijkstra::NativeScript::ScriptRequireGuard(StakeCredential::AddrKeyhash(
+                        [0x7a; 28].into(),
+                    )),
+                    dijkstra::NativeScript::ScriptPubkey([0x44; 28].into()),
+                ]);
+
+                let mapped = Mapper::<NoLedger>::map_any_native_script(
+                    &pallas_traverse::MultiEraNativeScript::from_decoded_dijkstra(&script),
+                );
+
+                assert_eq!(
+                    mapped.native_script,
+                    Some(u5c::native_script::NativeScript::ScriptAll(
+                        u5c::NativeScriptList {
+                            items: vec![
+                                u5c::NativeScript {
+                                    native_script: None,
+                                },
+                                u5c::NativeScript {
+                                    native_script: Some(Mapper::<NoLedger>::map_native_script_pubkey(
+                                        vec![0x44; 28]
+                                    )),
+                                },
+                            ],
+                        }
+                    ))
+                );
+            }
+
+            #[cfg(feature = "unstable")]
+            #[test]
+            fn a_dijkstra_reference_script_maps_to_the_plutus_v4_field() {
+                let cbor = fixture("dijkstra-scripts.tx");
+                let tx = dijkstra_tx(&cbor);
+
+                let output = Mapper::new(NoLedger).map_tx_output(&tx.outputs()[0], None);
+
+                assert_eq!(output.script.and_then(|x| x.script), plutus_v4("d87980"));
+            }
+
+            #[cfg(feature = "unstable")]
+            #[test]
+            fn a_dijkstra_auxiliary_plutus_v4_script_maps_to_the_plutus_v4_field() {
+                let cbor = fixture("dijkstra-scripts.tx");
+                let tx = dijkstra_tx(&cbor);
+
+                let scripts: Vec<_> = Mapper::new(NoLedger)
+                    .collect_all_aux_scripts(&tx)
+                    .into_iter()
+                    .map(|x| x.script)
+                    .collect();
+
+                assert_eq!(
+                    scripts,
+                    vec![
+                        Some(u5c::script::Script::Native(u5c::NativeScript {
+                            native_script: None,
+                        })),
+                        plutus_v4("d87980"),
+                    ]
+                );
+            }
+
+            #[cfg(feature = "unstable")]
+            #[test]
+            fn a_dijkstra_proposal_maps_its_governance_action() {
+                let cbor = fixture("dijkstra-proposal.tx");
+                let tx = dijkstra_tx(&cbor);
+                let proposals = tx.gov_proposals();
+
+                let mapped = Mapper::new(NoLedger).map_gov_proposal(&proposals[0]);
+
+                assert_eq!(mapped.deposit, u64_to_bigint(1_000_000));
+                assert_eq!(mapped.reward_account.to_vec(), vec![0xe0; 29]);
+                assert_eq!(
+                    mapped.anchor,
+                    Some(u5c::Anchor {
+                        url: "https://example.invalid/anchor".to_string(),
+                        content_hash: vec![0x00; 32].into(),
+                    })
+                );
+
+                let Some(u5c::governance_action::GovernanceAction::ParameterChangeAction(change)) =
+                    mapped.gov_action.and_then(|x| x.governance_action)
+                else {
+                    panic!("the proposal carries a parameter change");
+                };
+
+                assert_eq!(change.gov_action_id, None);
+                assert!(change.policy_hash.is_empty());
+            }
+        }
     };
 }
 

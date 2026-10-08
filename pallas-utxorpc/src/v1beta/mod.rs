@@ -636,4 +636,71 @@ mod tests {
             Some(u5c::native_script::NativeScript::InvalidHereafter(200))
         ));
     }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_dijkstra_transaction_with_one_vote_maps_it() {
+        use pallas_codec::minicbor::{Encoder, data::Tag};
+
+        let mut e = Encoder::new(Vec::new());
+        e.array(4).unwrap();
+
+        // A body of one input, no outputs, a fee and the voting procedures.
+        e.map(4).unwrap();
+        e.u8(0).unwrap();
+        e.tag(Tag::new(258)).unwrap();
+        e.array(1).unwrap();
+        e.array(2).unwrap();
+        e.bytes(&[0x11; 32]).unwrap();
+        e.u8(0).unwrap();
+        e.u8(1).unwrap();
+        e.array(0).unwrap();
+        e.u8(2).unwrap();
+        e.u32(1_000).unwrap();
+
+        // A DRep key voter casting a yes vote with an anchor on action 3.
+        e.u8(19).unwrap();
+        e.map(1).unwrap();
+        e.array(2).unwrap();
+        e.u8(2).unwrap();
+        e.bytes(&[0x77; 28]).unwrap();
+        e.map(1).unwrap();
+        e.array(2).unwrap();
+        e.bytes(&[0x88; 32]).unwrap();
+        e.u32(3).unwrap();
+        e.array(2).unwrap();
+        e.u8(1).unwrap();
+        e.array(2).unwrap();
+        e.str("https://example.invalid/vote").unwrap();
+        e.bytes(&[0x99; 32]).unwrap();
+
+        e.map(0).unwrap();
+        e.null().unwrap();
+        e.bool(true).unwrap();
+
+        let cbor = e.into_writer();
+        let tx = trv::MultiEraTx::decode_for_era(trv::Era::Dijkstra, &cbor).unwrap();
+
+        assert_eq!(
+            Mapper::new(NoLedger).map_votes(&tx),
+            vec![u5c::VoterVotes {
+                voter: Some(u5c::voter_votes::Voter::Drep(u5c::StakeCredential {
+                    stake_credential: Some(u5c::stake_credential::StakeCredential::AddrKeyHash(
+                        vec![0x77; 28].into()
+                    )),
+                })),
+                votes: vec![u5c::VotingProcedure {
+                    gov_action_id: Some(u5c::GovernanceActionId {
+                        transaction_id: vec![0x88; 32].into(),
+                        governance_action_index: 3,
+                    }),
+                    vote: u5c::Vote::Yes as i32,
+                    anchor: Some(u5c::Anchor {
+                        url: "https://example.invalid/vote".to_string(),
+                        content_hash: vec![0x99; 32].into(),
+                    }),
+                }],
+            }]
+        );
+    }
 }
