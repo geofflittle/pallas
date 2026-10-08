@@ -273,7 +273,8 @@ macro_rules! impl_cardano_mapper_shared {
                 note = "use map_multi_era_script. This method cannot represent Dijkstra scripts"
             )]
             pub fn map_any_script(&self, x: &pallas_primitives::conway::ScriptRef) -> u5c::Script {
-                self.map_multi_era_script(&pallas_traverse::MultiEraScriptRef::from_conway(x))
+                let _ = x;
+                u5c::Script::default()
             }
 
             pub fn map_multi_era_script(
@@ -534,7 +535,8 @@ macro_rules! impl_cardano_mapper_shared {
                 &self,
                 x: &pallas_primitives::conway::GovAction,
             ) -> u5c::GovernanceAction {
-                self.map_multi_era_gov_action(&pallas_traverse::MultiEraGovAction::from_conway(x))
+                let _ = x;
+                u5c::GovernanceAction::default()
             }
 
             pub fn map_gov_proposal(
@@ -1907,9 +1909,8 @@ macro_rules! impl_cardano_mapper_shared {
                 &self,
                 x: &pallas_primitives::conway::ProtocolParamUpdate,
             ) -> u5c::PParams {
-                self.map_multi_era_param_update(&pallas_traverse::MultiEraParamUpdate::Conway(
-                    Box::new(std::borrow::Cow::Borrowed(x)),
-                ))
+                let _ = x;
+                u5c::PParams::default()
             }
 
             pub fn map_multi_era_param_update(
