@@ -112,7 +112,7 @@ macro_rules! impl_cardano_mapper_shared {
                     MultiEraRedeemerTag::Propose => u5c::RedeemerPurpose::Propose,
                     // u5c names no guarding purpose.
                     #[cfg(feature = "unstable")]
-                    MultiEraRedeemerTag::Guarding => u5c::RedeemerPurpose::Unspecified,
+                    MultiEraRedeemerTag::Guarding => unimplemented!("guarding purpose"),
                     _ => unimplemented!("map_redeemer has no arm for this purpose"),
                 }
             }
@@ -262,7 +262,7 @@ macro_rules! impl_cardano_mapper_shared {
                     }
                     // u5c names no guard clause.
                     #[cfg(feature = "unstable")]
-                    NativeClause::Guard => None,
+                    NativeClause::Guard => unimplemented!("guard clause"),
                 };
 
                 u5c::NativeScript { native_script }
