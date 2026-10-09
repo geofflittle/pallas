@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use prost_types::FieldMask;
 
-use pallas_primitives::{babbage, conway};
+use pallas_primitives::babbage;
 use pallas_traverse as trv;
 use trv::OriginalHash;
 
@@ -43,6 +43,53 @@ impl<C: LedgerContext> Mapper<C> {
     // versions and lives in shared.rs.
     fn map_native_script_pubkey(bytes: Vec<u8>) -> u5c::native_script::NativeScript {
         u5c::native_script::NativeScript::ScriptPubkey(bytes.into())
+    }
+
+    /// Returns Unspecified, since v1alpha names no guarding purpose.
+    #[cfg(feature = "unstable")]
+    fn map_guarding_purpose() -> u5c::RedeemerPurpose {
+        u5c::RedeemerPurpose::Unspecified
+    }
+
+    /// Returns None, since v1alpha names no guard clause.
+    #[cfg(feature = "unstable")]
+    fn map_native_script_guard(
+        _credential: &pallas_primitives::StakeCredential,
+    ) -> Option<u5c::native_script::NativeScript> {
+        None
+    }
+
+    /// Returns default parameters, since v1alpha names none of the keys only
+    /// the Dijkstra era has.
+    fn map_dijkstra_param_update(_x: &trv::MultiEraParamUpdate) -> u5c::PParams {
+        u5c::PParams::default()
+    }
+
+    fn map_pool_registration(
+        &self,
+        pool: &trv::MultiEraPoolRegistration,
+    ) -> u5c::PoolRegistrationCert {
+        u5c::PoolRegistrationCert {
+            operator: pool.operator.to_vec().into(),
+            vrf_keyhash: pool.vrf_keyhash.to_vec().into(),
+            pledge: u64_to_bigint(pool.pledge),
+            cost: u64_to_bigint(pool.cost),
+            margin: rational_number_to_u5c(pool.margin.clone()).into(),
+            reward_account: pool.reward_account.to_vec().into(),
+            pool_owners: pool.pool_owners.iter().map(|x| x.to_vec().into()).collect(),
+            relays: pool.relays.iter().map(|x| self.map_relay(x)).collect(),
+            pool_metadata: pool.pool_metadata.map(map_pool_metadata),
+        }
+    }
+
+    pub fn map_cert(
+        &self,
+        x: &trv::MultiEraCert,
+        tx: &trv::MultiEraTx,
+        order: u32,
+    ) -> Option<u5c::Certificate> {
+        let inner = self.map_cert_kind(&x.kind()?);
+        Some(self.certificate(inner, tx, order))
     }
 
     pub fn map_tx_datum(
@@ -93,14 +140,8 @@ impl<C: LedgerContext> Mapper<C> {
     }
 
     fn map_output_script(&self, x: &trv::MultiEraOutput) -> Option<u5c::Script> {
-        x.multi_era_script_ref().map(|x| match x {
-            trv::MultiEraScriptRef::Conway(x) => self.map_any_script(&x),
-            #[cfg(feature = "unstable")]
-            trv::MultiEraScriptRef::Dijkstra(_) => {
-                unimplemented!("map_output_script is not yet implemented for Dijkstra")
-            }
-            _ => unimplemented!("map_output_script has no arm for this reference script"),
-        })
+        x.multi_era_script_ref()
+            .map(|x| self.map_multi_era_script(&x))
     }
 
     pub fn map_asset(&self, x: &trv::MultiEraAsset) -> u5c::Asset {
@@ -125,13 +166,13 @@ impl<C: LedgerContext> Mapper<C> {
         }
     }
 
-    pub fn map_conway_gov_action(&self, x: &conway::GovAction) -> u5c::GovernanceAction {
-        let inner = match x {
-            conway::GovAction::ParameterChange(gov_id, params, script) => {
+    pub fn map_multi_era_gov_action(&self, x: &trv::MultiEraGovAction) -> u5c::GovernanceAction {
+        let inner = match x.kind() {
+            trv::MultiEraGovActionKind::ParameterChange(gov_id, params, script) => {
                 u5c::governance_action::GovernanceAction::ParameterChangeAction(
                     u5c::ParameterChangeAction {
-                        gov_action_id: self.map_gov_action_id(gov_id),
-                        protocol_param_update: Some(self.map_conway_pparams_update(params)),
+                        gov_action_id: self.map_gov_action_id(&gov_id.cloned()),
+                        protocol_param_update: Some(self.map_multi_era_param_update(&params)),
                         policy_hash: match script {
                             Some(x) => x.to_vec().into(),
                             _ => Default::default(),
@@ -139,10 +180,10 @@ impl<C: LedgerContext> Mapper<C> {
                     },
                 )
             }
-            conway::GovAction::HardForkInitiation(gov_id, version) => {
+            trv::MultiEraGovActionKind::HardForkInitiation(gov_id, version) => {
                 u5c::governance_action::GovernanceAction::HardForkInitiationAction(
                     u5c::HardForkInitiationAction {
-                        gov_action_id: self.map_gov_action_id(gov_id),
+                        gov_action_id: self.map_gov_action_id(&gov_id.cloned()),
                         protocol_version: Some(u5c::ProtocolVersion {
                             major: version.0 as u32,
                             minor: version.1 as u32,
@@ -150,7 +191,7 @@ impl<C: LedgerContext> Mapper<C> {
                     },
                 )
             }
-            conway::GovAction::TreasuryWithdrawals(withdrawals, script) => {
+            trv::MultiEraGovActionKind::TreasuryWithdrawals(withdrawals, script) => {
                 u5c::governance_action::GovernanceAction::TreasuryWithdrawalsAction(
                     u5c::TreasuryWithdrawalsAction {
                         withdrawals: withdrawals
@@ -167,17 +208,17 @@ impl<C: LedgerContext> Mapper<C> {
                     },
                 )
             }
-            conway::GovAction::NoConfidence(gov_id) => {
+            trv::MultiEraGovActionKind::NoConfidence(gov_id) => {
                 u5c::governance_action::GovernanceAction::NoConfidenceAction(
                     u5c::NoConfidenceAction {
-                        gov_action_id: self.map_gov_action_id(gov_id),
+                        gov_action_id: self.map_gov_action_id(&gov_id.cloned()),
                     },
                 )
             }
-            conway::GovAction::UpdateCommittee(gov_id, remove, add, threshold) => {
+            trv::MultiEraGovActionKind::UpdateCommittee(gov_id, remove, add, threshold) => {
                 u5c::governance_action::GovernanceAction::UpdateCommitteeAction(
                     u5c::UpdateCommitteeAction {
-                        gov_action_id: self.map_gov_action_id(gov_id),
+                        gov_action_id: self.map_gov_action_id(&gov_id.cloned()),
                         remove_committee_credentials: remove
                             .iter()
                             .map(|x| self.map_stake_credential(x))
@@ -193,10 +234,10 @@ impl<C: LedgerContext> Mapper<C> {
                     },
                 )
             }
-            conway::GovAction::NewConstitution(gov_id, constitution) => {
+            trv::MultiEraGovActionKind::NewConstitution(gov_id, constitution) => {
                 u5c::governance_action::GovernanceAction::NewConstitutionAction(
                     u5c::NewConstitutionAction {
-                        gov_action_id: self.map_gov_action_id(gov_id),
+                        gov_action_id: self.map_gov_action_id(&gov_id.cloned()),
                         constitution: Some(u5c::Constitution {
                             anchor: Some(u5c::Anchor {
                                 url: constitution.anchor.url.clone(),
@@ -210,10 +251,11 @@ impl<C: LedgerContext> Mapper<C> {
                     },
                 )
             }
-            conway::GovAction::Information => {
+            trv::MultiEraGovActionKind::Information => {
                 // The 6 is just a placeholder; v1alpha encodes Information as a uint32.
                 u5c::governance_action::GovernanceAction::InfoAction(6)
             }
+            _ => return u5c::GovernanceAction::default(),
         };
 
         u5c::GovernanceAction {
