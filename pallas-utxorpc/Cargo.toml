@@ -13,7 +13,7 @@ readme = "README.md"
 
 [dependencies]
 # utxorpc-spec = { path = "../../../utxorpc/spec/gen/rust" }
-utxorpc-spec = { version = "0.19", default-features = false, features = [
+utxorpc-spec = { git = "https://github.com/SundaeSwap-finance/utxorpc-spec", rev = "f2d528e6d05d1a2fe82bcf241fc72c45b342fa71", default-features = false, features = [
     "utxorpc-v1alpha-cardano",
     "utxorpc-v1alpha-query",
     "utxorpc-v1alpha-submit",
