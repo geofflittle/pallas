@@ -145,8 +145,8 @@ impl<'b> MultiEraNativeScript<'b> {
     /// clause with the values folded from the scripts it holds.
     pub fn fold<T>(&self, mut f: impl FnMut(MultiEraNativeClause<'_, Vec<T>>) -> T) -> T {
         match self {
-            Self::AlonzoCompatible(x) => fold_tree(x.deref().deref(), |script, held| {
-                f(shared_clauses!(script, alonzo, held))
+            Self::AlonzoCompatible(x) => fold_tree(x.deref().deref(), |script, _held| {
+                f(shared_clauses!(script, alonzo, Vec::new()))
             }),
             #[cfg(feature = "unstable")]
             Self::Dijkstra(x) => fold_tree(x.deref().deref(), |script, held| {
