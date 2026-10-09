@@ -940,7 +940,7 @@ impl<'b> MultiEraTx<'b> {
     pub fn direct_deposits(&self) -> Option<&dijkstra::DirectDeposits> {
         match self {
             MultiEraTx::Dijkstra(x) => x.transaction_body.direct_deposits.as_ref(),
-            MultiEraTx::DijkstraSub(x, ..) => x.sub_transaction_body.direct_deposits.as_ref(),
+            MultiEraTx::DijkstraSub(..) => None,
             MultiEraTx::Byron(_)
             | MultiEraTx::AlonzoCompatible(..)
             | MultiEraTx::Babbage(_)
