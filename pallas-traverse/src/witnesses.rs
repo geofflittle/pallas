@@ -154,6 +154,9 @@ impl<'b> MultiEraNativeScript<'b> {
                     script,
                     dijkstra,
                     held,
+                    dijkstra::NativeScript::ScriptRequireGuard(
+                        pallas_primitives::StakeCredential::AddrKeyhash(h)
+                    ) => MultiEraNativeClause::Pubkey(h),
                     dijkstra::NativeScript::ScriptRequireGuard(credential) =>
                         MultiEraNativeClause::RequireGuard(credential),
                 ))
