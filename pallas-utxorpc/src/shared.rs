@@ -213,7 +213,7 @@ macro_rules! impl_cardano_mapper_shared {
                         u5c::native_script::NativeScript::ScriptAll(u5c::NativeScriptList { items }),
                     ),
                     MultiEraNativeClause::Any(items) => Some(
-                        u5c::native_script::NativeScript::ScriptAny(u5c::NativeScriptList { items }),
+                        u5c::native_script::NativeScript::ScriptAll(u5c::NativeScriptList { items }),
                     ),
                     MultiEraNativeClause::NOfK(n, scripts) => {
                         Some(u5c::native_script::NativeScript::ScriptNOfK(u5c::ScriptNOfK {
