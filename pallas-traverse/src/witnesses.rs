@@ -144,20 +144,37 @@ impl<'b> MultiEraNativeScript<'b> {
     /// Folds this script bottom up on a heap backed stack, calling `f` once per
     /// clause with the values folded from the scripts it holds.
     pub fn fold<T>(&self, mut f: impl FnMut(MultiEraNativeClause<'_, Vec<T>>) -> T) -> T {
+        fn alonzo_go<T>(
+            script: &alonzo::NativeScript,
+            f: &mut impl FnMut(MultiEraNativeClause<'_, Vec<T>>) -> T,
+        ) -> T {
+            let mut held = Vec::new();
+            for child in script.children() {
+                held.push(alonzo_go(child, f));
+            }
+            f(shared_clauses!(script, alonzo, held))
+        }
+        #[cfg(feature = "unstable")]
+        fn dijkstra_go<T>(
+            script: &dijkstra::NativeScript,
+            f: &mut impl FnMut(MultiEraNativeClause<'_, Vec<T>>) -> T,
+        ) -> T {
+            let mut held = Vec::new();
+            for child in script.children() {
+                held.push(dijkstra_go(child, f));
+            }
+            f(shared_clauses!(
+                script,
+                dijkstra,
+                held,
+                dijkstra::NativeScript::ScriptRequireGuard(credential) =>
+                    MultiEraNativeClause::RequireGuard(credential),
+            ))
+        }
         match self {
-            Self::AlonzoCompatible(x) => fold_tree(x.deref().deref(), |script, held| {
-                f(shared_clauses!(script, alonzo, held))
-            }),
+            Self::AlonzoCompatible(x) => alonzo_go(x.deref().deref(), &mut f),
             #[cfg(feature = "unstable")]
-            Self::Dijkstra(x) => fold_tree(x.deref().deref(), |script, held| {
-                f(shared_clauses!(
-                    script,
-                    dijkstra,
-                    held,
-                    dijkstra::NativeScript::ScriptRequireGuard(credential) =>
-                        MultiEraNativeClause::RequireGuard(credential),
-                ))
-            }),
+            Self::Dijkstra(x) => dijkstra_go(x.deref().deref(), &mut f),
         }
     }
 }
