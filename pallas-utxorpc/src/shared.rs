@@ -231,7 +231,7 @@ macro_rules! impl_cardano_mapper_shared {
                         Some(u5c::native_script::NativeScript::InvalidHereafter(s))
                     }
                     #[cfg(feature = "unstable")]
-                    MultiEraNativeClause::RequireGuard(x) => Self::map_native_script_guard(x),
+                    MultiEraNativeClause::RequireGuard(_) => unimplemented!("guard clause"),
                     _ => unimplemented!("map_native_clause has no arm for this clause"),
                 };
 
