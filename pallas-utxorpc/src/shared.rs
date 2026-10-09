@@ -926,7 +926,6 @@ macro_rules! impl_cardano_mapper_shared {
         // The expected pool registrations list every v1alpha field, and v1beta
         // adds bls_key.
         #[cfg(test)]
-        #[allow(clippy::needless_update)]
         mod cert_tests {
             use super::*;
 
