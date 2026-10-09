@@ -46,18 +46,6 @@ macro_rules! impl_cardano_mapper_shared {
             }
         }
 
-        /// A native script clause without the scripts it holds.
-        enum NativeClause<'a> {
-            Pubkey(&'a pallas_crypto::hash::Hash<28>),
-            All,
-            Any,
-            NOfK(i64),
-            InvalidBefore(u64),
-            InvalidHereafter(u64),
-            #[cfg(feature = "unstable")]
-            Guard(&'a pallas_primitives::StakeCredential),
-        }
-
         /// Map an anchor, whose type every era carrying one shares.
         fn map_anchor(x: &pallas_primitives::conway::Anchor) -> u5c::Anchor {
             u5c::Anchor {
@@ -207,49 +195,17 @@ macro_rules! impl_cardano_mapper_shared {
             pub fn map_native_script(
                 x: &pallas_primitives::alonzo::NativeScript,
             ) -> u5c::NativeScript {
-                use pallas_primitives::babbage;
-
-                // Folded bottom-up rather than recursed: scripts nest as deep
-                // as a transaction has bytes.
-                pallas_codec::tree::fold_tree(x, |x, children: Vec<u5c::NativeScript>| {
-                    let clause = match x {
-                        babbage::NativeScript::ScriptPubkey(x) => NativeClause::Pubkey(x),
-                        babbage::NativeScript::ScriptAll(_) => NativeClause::All,
-                        babbage::NativeScript::ScriptAny(_) => NativeClause::Any,
-                        babbage::NativeScript::ScriptNOfK(n, _) => NativeClause::NOfK(*n),
-                        babbage::NativeScript::InvalidBefore(s) => NativeClause::InvalidBefore(*s),
-                        babbage::NativeScript::InvalidHereafter(s) => {
-                            NativeClause::InvalidHereafter(*s)
-                        }
-                    };
-                    Self::map_native_clause(clause, children)
-                })
-            }
-
-            #[cfg(feature = "unstable")]
-            fn map_dijkstra_native_script(
-                x: &pallas_primitives::dijkstra::NativeScript,
-            ) -> u5c::NativeScript {
-                use pallas_primitives::dijkstra::NativeScript;
-
-                pallas_codec::tree::fold_tree(x, |x, children: Vec<u5c::NativeScript>| {
-                    let clause = match x {
-                        NativeScript::ScriptPubkey(x) => NativeClause::Pubkey(x),
-                        NativeScript::ScriptAll(_) => NativeClause::All,
-                        NativeScript::ScriptAny(_) => NativeClause::Any,
-                        NativeScript::ScriptNOfK(n, _) => NativeClause::NOfK(*n),
-                        NativeScript::InvalidBefore(s) => NativeClause::InvalidBefore(*s),
-                        NativeScript::InvalidHereafter(s) => NativeClause::InvalidHereafter(*s),
-                        NativeScript::ScriptRequireGuard(x) => NativeClause::Guard(x),
-                    };
-                    Self::map_native_clause(clause, children)
-                })
+                Self::map_any_native_script(
+                    &pallas_traverse::MultiEraNativeScript::from_decoded_alonzo_compatible(x),
+                )
             }
 
             fn map_native_clause(
-                clause: NativeClause,
+                clause: pallas_traverse::MultiEraNativeHead,
                 children: Vec<u5c::NativeScript>,
             ) -> u5c::NativeScript {
+                use pallas_traverse::MultiEraNativeHead as NativeClause;
+
                 let native_script = match clause {
                     NativeClause::Pubkey(x) => Some(Self::map_native_script_pubkey(x.to_vec())),
                     NativeClause::All => Some(u5c::native_script::NativeScript::ScriptAll(
@@ -274,7 +230,8 @@ macro_rules! impl_cardano_mapper_shared {
                         Some(u5c::native_script::NativeScript::InvalidHereafter(s))
                     }
                     #[cfg(feature = "unstable")]
-                    NativeClause::Guard(x) => Self::map_native_script_guard(x),
+                    NativeClause::RequireGuard(x) => Self::map_native_script_guard(x),
+                    _ => unimplemented!("map_native_clause has no arm for this clause"),
                 };
 
                 u5c::NativeScript { native_script }
@@ -373,14 +330,7 @@ macro_rules! impl_cardano_mapper_shared {
             fn map_any_native_script(
                 x: &pallas_traverse::MultiEraNativeScript,
             ) -> u5c::NativeScript {
-                use pallas_traverse::MultiEraNativeScript;
-
-                match x {
-                    MultiEraNativeScript::AlonzoCompatible(x) => Self::map_native_script(x),
-                    #[cfg(feature = "unstable")]
-                    MultiEraNativeScript::Dijkstra(x) => Self::map_dijkstra_native_script(x),
-                    _ => unimplemented!("collect_all_scripts has no arm for this native script"),
-                }
+                x.fold(Self::map_native_clause)
             }
 
             fn collect_all_scripts(&self, tx: &pallas_traverse::MultiEraTx) -> Vec<u5c::Script> {

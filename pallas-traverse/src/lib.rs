@@ -675,6 +675,27 @@ pub enum MultiEraNativeClause<'b> {
     RequireGuard(&'b dijkstra::StakeCredential),
 }
 
+/// A native script clause without the scripts it holds, as a fold reports it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum MultiEraNativeHead<'b> {
+    /// A signature by the key with this hash satisfies the script.
+    Pubkey(&'b Hash<28>),
+    /// Every script held satisfies the script together.
+    All,
+    /// Any one of the scripts held satisfies the script.
+    Any,
+    /// Any this many of the scripts held satisfy the script.
+    NOfK(i64),
+    /// No slot before this one satisfies the script.
+    InvalidBefore(u64),
+    /// No slot from this one on satisfies the script.
+    InvalidHereafter(u64),
+    /// A guard on this credential satisfies the script, a clause new in Dijkstra.
+    #[cfg(feature = "unstable")]
+    RequireGuard(&'b dijkstra::StakeCredential),
+}
+
 /// The purpose a redeemer is supplied for, normalized across eras.
 ///
 /// Every era through Conway names at most the first six. Dijkstra adds

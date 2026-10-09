@@ -10,9 +10,11 @@ use pallas_primitives::{
 #[cfg(feature = "unstable")]
 use pallas_primitives::dijkstra;
 
+use pallas_codec::tree::fold_tree;
+
 use crate::{
-    ComputeHash as _, Era, MultiEraNativeClause, MultiEraNativeScript, MultiEraRedeemer,
-    MultiEraRedeemerTag, MultiEraTx, OriginalHash as _,
+    ComputeHash as _, Era, MultiEraNativeClause, MultiEraNativeHead, MultiEraNativeScript,
+    MultiEraRedeemer, MultiEraRedeemerTag, MultiEraTx, OriginalHash as _,
 };
 
 /// Reads the six clauses every era's native script type names, under the era
@@ -33,6 +35,24 @@ macro_rules! shared_clauses {
                 MultiEraNativeClause::InvalidHereafter(*slot)
             }
             $($pattern => $clause,)*
+        }
+    };
+}
+
+/// Reads the six clause heads every era's native script type names, under the
+/// era module given, with further arms for an era that names more.
+macro_rules! shared_heads {
+    ($script:expr, $era:ident $(, $pattern:pat => $head:expr)* $(,)?) => {
+        match $script {
+            $era::NativeScript::ScriptPubkey(x) => MultiEraNativeHead::Pubkey(x),
+            $era::NativeScript::ScriptAll(_) => MultiEraNativeHead::All,
+            $era::NativeScript::ScriptAny(_) => MultiEraNativeHead::Any,
+            $era::NativeScript::ScriptNOfK(k, _) => MultiEraNativeHead::NOfK(*k),
+            $era::NativeScript::InvalidBefore(slot) => MultiEraNativeHead::InvalidBefore(*slot),
+            $era::NativeScript::InvalidHereafter(slot) => {
+                MultiEraNativeHead::InvalidHereafter(*slot)
+            }
+            $($pattern => $head,)*
         }
     };
 }
@@ -132,6 +152,25 @@ impl<'b> MultiEraNativeScript<'b> {
                 dijkstra::NativeScript::ScriptRequireGuard(credential) =>
                     MultiEraNativeClause::RequireGuard(credential),
             ),
+        }
+    }
+
+    /// Fold this script bottom up, without recursion, over each clause and the folded scripts it holds.
+    pub fn fold<T>(&self, mut f: impl FnMut(MultiEraNativeHead<'_>, Vec<T>) -> T) -> T {
+        match self {
+            Self::AlonzoCompatible(x) => fold_tree(x.deref().deref(), |x, children| {
+                f(shared_heads!(x, alonzo), children)
+            }),
+            #[cfg(feature = "unstable")]
+            Self::Dijkstra(x) => fold_tree(x.deref().deref(), |x, children| {
+                let head = shared_heads!(
+                    x,
+                    dijkstra,
+                    dijkstra::NativeScript::ScriptRequireGuard(credential) =>
+                        MultiEraNativeHead::RequireGuard(credential),
+                );
+                f(head, children)
+            }),
         }
     }
 }
