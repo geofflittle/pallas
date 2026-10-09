@@ -523,8 +523,10 @@ impl<'b> MultiEraTx<'b> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Era, MultiEraNativeClause, MultiEraTx, testing};
+    use crate::{Era, MultiEraNativeClause, MultiEraNativeScript, MultiEraTx, testing};
+    use pallas_codec::{minicbor, utils::KeepRaw};
     use pallas_crypto::hash::Hasher;
+    use pallas_primitives::alonzo;
 
     #[test]
     fn a_witness_set_script_hashes_the_bytes_it_arrived_in() {
@@ -880,12 +882,97 @@ mod tests {
             "which is the hash of the canonical form"
         );
     }
+
+    /// Writes a folded clause as text, with the text of each script it holds.
+    pub(super) fn written(clause: MultiEraNativeClause<'_, Vec<String>>) -> String {
+        match clause {
+            MultiEraNativeClause::Pubkey(h) => format!("pubkey {:02x}", h[0]),
+            MultiEraNativeClause::All(held) => format!("all [{}]", held.join(", ")),
+            MultiEraNativeClause::Any(held) => format!("any [{}]", held.join(", ")),
+            MultiEraNativeClause::NOfK(k, held) => format!("{k} of [{}]", held.join(", ")),
+            MultiEraNativeClause::InvalidBefore(slot) => format!("before {slot}"),
+            MultiEraNativeClause::InvalidHereafter(slot) => format!("hereafter {slot}"),
+            #[cfg(feature = "unstable")]
+            MultiEraNativeClause::RequireGuard(pallas_primitives::StakeCredential::AddrKeyhash(
+                h,
+            )) => format!("guard key {:02x}", h[0]),
+            #[cfg(feature = "unstable")]
+            MultiEraNativeClause::RequireGuard(pallas_primitives::StakeCredential::ScriptHash(
+                h,
+            )) => format!("guard script {:02x}", h[0]),
+        }
+    }
+
+    /// Counts the `script_all` clauses above the first clause of another kind.
+    pub(super) fn levels(script: &MultiEraNativeScript<'_>) -> usize {
+        script.fold(|clause| match clause {
+            MultiEraNativeClause::All(held) => held[0] + 1,
+            _ => 0,
+        })
+    }
+
+    #[test]
+    fn a_leaf_script_folds_as_one_clause_holding_nothing() {
+        let bytes = testing::native_script_invalid_before(7);
+        let raw: KeepRaw<alonzo::NativeScript> = minicbor::decode(&bytes).expect("must decode");
+
+        let mut calls = 0;
+        let folded = MultiEraNativeScript::from_alonzo_compatible(&raw).fold(|clause| {
+            calls += 1;
+            written(clause)
+        });
+
+        assert_eq!((folded.as_str(), calls), ("before 7", 1));
+    }
+
+    #[test]
+    fn a_script_folds_each_clause_over_the_folded_scripts_it_holds() {
+        let bytes = script_of_every_alonzo_clause();
+        let raw: KeepRaw<alonzo::NativeScript> = minicbor::decode(&bytes).expect("must decode");
+
+        let mut calls = 0;
+        let folded = MultiEraNativeScript::from_alonzo_compatible(&raw).fold(|clause| {
+            calls += 1;
+            written(clause)
+        });
+
+        assert_eq!(
+            (folded.as_str(), calls),
+            (
+                "all [pubkey 11, any [pubkey 22], 1 of [pubkey 33], before 7, hereafter 9]",
+                8
+            ),
+            "each of the eight clauses folds once, over the values of the scripts it holds"
+        );
+    }
+
+    #[test]
+    fn a_script_nested_deeper_than_the_stack_folds() {
+        std::thread::Builder::new()
+            .stack_size(128 * 1024)
+            .spawn(|| {
+                let depth = 100_000;
+                let bytes = testing::native_script_nested_all(
+                    depth,
+                    &testing::native_script_invalid_before(7),
+                );
+                let raw: KeepRaw<alonzo::NativeScript> =
+                    minicbor::decode(&bytes).expect("must decode");
+
+                let script = MultiEraNativeScript::from_alonzo_compatible(&raw);
+                assert_eq!(levels(&script), depth);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
 }
 
 #[cfg(all(test, feature = "unstable"))]
 mod dijkstra_tests {
     use super::*;
     use crate::{MultiEraBlock, testing};
+    use pallas_codec::minicbor;
 
     #[test]
     fn a_dijkstra_native_script_witness_is_readable() {
@@ -1087,5 +1174,42 @@ mod dijkstra_tests {
         );
         assert!(tx.native_scripts().is_empty());
         assert!(tx.aux_native_scripts().is_empty());
+    }
+
+    #[test]
+    fn a_guard_nested_in_a_dijkstra_script_folds_as_a_guard() {
+        let bytes = testing::native_script_all(&[
+            &testing::native_script_require_guard(0x7a),
+            &testing::native_script_pubkey(0x7a),
+        ]);
+        let raw: KeepRaw<dijkstra::NativeScript> = minicbor::decode(&bytes).expect("must decode");
+
+        let folded = MultiEraNativeScript::from_dijkstra(&raw).fold(super::tests::written);
+
+        assert_eq!(
+            folded, "all [guard key 7a, pubkey 7a]",
+            "a guard and a pubkey on the same key fold as different clauses"
+        );
+    }
+
+    #[test]
+    fn a_dijkstra_script_nested_deeper_than_the_stack_folds() {
+        std::thread::Builder::new()
+            .stack_size(128 * 1024)
+            .spawn(|| {
+                let depth = 100_000;
+                let bytes = testing::native_script_nested_all(
+                    depth,
+                    &testing::native_script_require_guard(0x7a),
+                );
+                let raw: KeepRaw<dijkstra::NativeScript> =
+                    minicbor::decode(&bytes).expect("must decode");
+
+                let script = MultiEraNativeScript::from_dijkstra(&raw);
+                assert_eq!(super::tests::levels(&script), depth);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
     }
 }
