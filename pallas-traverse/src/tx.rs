@@ -925,9 +925,7 @@ impl<'b> MultiEraTx<'b> {
     pub fn required_top_level_guards(&self) -> Option<&dijkstra::RequiredTopLevelGuards> {
         match self {
             MultiEraTx::Dijkstra(x) => x.transaction_body.required_top_level_guards.as_ref(),
-            MultiEraTx::DijkstraSub(x, ..) => {
-                x.sub_transaction_body.required_top_level_guards.as_ref()
-            }
+            MultiEraTx::DijkstraSub(..) => None,
             MultiEraTx::Byron(_)
             | MultiEraTx::AlonzoCompatible(..)
             | MultiEraTx::Babbage(_)
