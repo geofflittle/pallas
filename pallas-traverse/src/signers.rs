@@ -73,7 +73,11 @@ impl MultiEraSigners<'_> {
                 dijkstra::Guards::AddrKeyhashes(x) => {
                     x.iter().map(|h| StakeCredential::AddrKeyhash(*h)).collect()
                 }
-                dijkstra::Guards::Credentials(x) => x.iter().cloned().collect(),
+                dijkstra::Guards::Credentials(x) => x
+                    .iter()
+                    .filter(|c| matches!(c, StakeCredential::AddrKeyhash(_)))
+                    .cloned()
+                    .collect(),
             },
         }
     }
