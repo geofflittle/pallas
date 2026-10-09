@@ -953,9 +953,7 @@ impl<'b> MultiEraTx<'b> {
     pub fn account_balance_intervals(&self) -> Option<&dijkstra::AccountBalanceIntervals> {
         match self {
             MultiEraTx::Dijkstra(x) => x.transaction_body.account_balance_intervals.as_ref(),
-            MultiEraTx::DijkstraSub(x, ..) => {
-                x.sub_transaction_body.account_balance_intervals.as_ref()
-            }
+            MultiEraTx::DijkstraSub(..) => None,
             MultiEraTx::Byron(_)
             | MultiEraTx::AlonzoCompatible(..)
             | MultiEraTx::Babbage(_)
