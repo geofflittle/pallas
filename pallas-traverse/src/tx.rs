@@ -921,6 +921,68 @@ impl<'b> MultiEraTx<'b> {
         }
     }
 
+    /// Returns the required top level guards at body key 24.
+    #[cfg(feature = "unstable")]
+    pub fn required_top_level_guards(&self) -> Option<&dijkstra::RequiredTopLevelGuards> {
+        match self {
+            MultiEraTx::Dijkstra(x) => x.transaction_body.required_top_level_guards.as_ref(),
+            MultiEraTx::DijkstraSub(x, ..) => {
+                x.sub_transaction_body.required_top_level_guards.as_ref()
+            }
+            MultiEraTx::Byron(_)
+            | MultiEraTx::AlonzoCompatible(..)
+            | MultiEraTx::Babbage(_)
+            | MultiEraTx::Conway(_) => None,
+        }
+    }
+
+    /// Returns the direct deposits at body key 25.
+    #[cfg(feature = "unstable")]
+    pub fn direct_deposits(&self) -> Option<&dijkstra::DirectDeposits> {
+        match self {
+            MultiEraTx::Dijkstra(x) => x.transaction_body.direct_deposits.as_ref(),
+            MultiEraTx::DijkstraSub(x, ..) => x.sub_transaction_body.direct_deposits.as_ref(),
+            MultiEraTx::Byron(_)
+            | MultiEraTx::AlonzoCompatible(..)
+            | MultiEraTx::Babbage(_)
+            | MultiEraTx::Conway(_) => None,
+        }
+    }
+
+    /// Returns the account balance intervals at body key 26.
+    #[cfg(feature = "unstable")]
+    pub fn account_balance_intervals(&self) -> Option<&dijkstra::AccountBalanceIntervals> {
+        match self {
+            MultiEraTx::Dijkstra(x) => x.transaction_body.account_balance_intervals.as_ref(),
+            MultiEraTx::DijkstraSub(x, ..) => {
+                x.sub_transaction_body.account_balance_intervals.as_ref()
+            }
+            MultiEraTx::Byron(_)
+            | MultiEraTx::AlonzoCompatible(..)
+            | MultiEraTx::Babbage(_)
+            | MultiEraTx::Conway(_) => None,
+        }
+    }
+
+    /// Returns the starting account balance intervals at body key 27.
+    #[cfg(feature = "unstable")]
+    pub fn starting_account_balance_intervals(
+        &self,
+    ) -> Option<&dijkstra::StartingAccountBalanceIntervals> {
+        match self {
+            MultiEraTx::Dijkstra(x) => x
+                .transaction_body
+                .starting_account_balance_intervals
+                .as_ref(),
+            // A sub transaction body has no key 27.
+            MultiEraTx::DijkstraSub(..) => None,
+            MultiEraTx::Byron(_)
+            | MultiEraTx::AlonzoCompatible(..)
+            | MultiEraTx::Babbage(_)
+            | MultiEraTx::Conway(_) => None,
+        }
+    }
+
     /// Returns the sub transactions at body key 23, each read as a transaction
     /// of its own. Empty for every era before Dijkstra, none of which has the
     /// field, and empty for a sub transaction, whose own body has no key 23.
@@ -1142,6 +1204,99 @@ mod tests {
         );
         let tx = MultiEraTx::decode_for_era(Era::Dijkstra, &cbor).unwrap();
         assert!(tx.voting_procedures().is_none());
+    }
+
+    #[test]
+    fn a_body_without_the_account_keys_reports_none_of_them() {
+        let dijkstra = testing::dijkstra_block_tx(
+            &testing::minimal_body(),
+            &testing::empty_witness_set(),
+            None,
+            true,
+        );
+        let conway = testing::conway_tx(
+            &testing::minimal_body(),
+            &testing::empty_witness_set(),
+            None,
+            true,
+        );
+
+        for (era, cbor) in [(Era::Dijkstra, dijkstra), (Era::Conway, conway)] {
+            let tx = MultiEraTx::decode_for_era(era, &cbor).unwrap();
+            assert!(tx.required_top_level_guards().is_none(), "{era:?}");
+            assert!(tx.direct_deposits().is_none(), "{era:?}");
+            assert!(tx.account_balance_intervals().is_none(), "{era:?}");
+            assert!(tx.starting_account_balance_intervals().is_none(), "{era:?}");
+        }
+    }
+
+    #[test]
+    fn each_transaction_reports_the_account_keys_of_its_own_body() {
+        use pallas_codec::utils::Nullable;
+        use pallas_primitives::StakeCredential;
+
+        let sub = testing::sub_body_with_account_keys(0xe2);
+        let cbor = testing::dijkstra_block_tx(
+            &testing::body_with_account_keys(0xe1, &[&sub]),
+            &testing::empty_witness_set(),
+            None,
+            true,
+        );
+        let tx = MultiEraTx::decode_for_era(Era::Dijkstra, &cbor).unwrap();
+        let subs = tx.sub_transactions();
+        let sub = subs.first().expect("body key 23 holds one sub transaction");
+
+        let read = |tx: &MultiEraTx| {
+            (
+                tx.required_top_level_guards().cloned(),
+                tx.direct_deposits().cloned(),
+                tx.account_balance_intervals().cloned(),
+            )
+        };
+        let written = |account: u8| {
+            let reward_account = pallas_primitives::RewardAccount::from(vec![account; 29]);
+            (
+                Some(dijkstra::RequiredTopLevelGuards::from([(
+                    StakeCredential::AddrKeyhash(Hash::new([account; 28])),
+                    Nullable::Null,
+                )])),
+                Some(dijkstra::DirectDeposits::from([(
+                    reward_account.clone(),
+                    u64::from(account),
+                )])),
+                Some(dijkstra::AccountBalanceIntervals::from([(
+                    reward_account,
+                    dijkstra::AccountBalanceInterval::Bounded(
+                        u64::from(account),
+                        u64::from(account) + 1,
+                    ),
+                )])),
+            )
+        };
+
+        assert_eq!(
+            read(&tx),
+            written(0xe1),
+            "the transaction reports keys 24 to 26 of its own body"
+        );
+        assert_eq!(
+            read(sub),
+            written(0xe2),
+            "the sub transaction reports keys 24 to 26 of the sub body, not of the body carrying it"
+        );
+
+        assert_eq!(
+            tx.starting_account_balance_intervals().cloned(),
+            Some(dijkstra::StartingAccountBalanceIntervals::from([(
+                vec![0xe1; 29].into(),
+                dijkstra::AccountBalanceInterval::Exact(0xe1),
+            )])),
+            "the transaction reports key 27 of its own body"
+        );
+        assert!(
+            sub.starting_account_balance_intervals().is_none(),
+            "a sub transaction body has no key 27"
+        );
     }
 
     fn dijkstra_block_bytes() -> Vec<u8> {
