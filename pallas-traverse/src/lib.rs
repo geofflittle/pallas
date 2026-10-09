@@ -651,21 +651,20 @@ pub enum MultiEraNativeScript<'b> {
 /// Every era through Conway names at most the first six. The `unstable` build
 /// adds `RequireGuard`, the clause Dijkstra introduces.
 ///
-/// A compound clause reports the scripts it holds in the same era variant as
-/// this one. Each arrives decoded, so it carries no bytes of its own and
-/// hashes its own re-encoding.
+/// A compound clause holds `S` for the scripts it names, by default the
+/// scripts themselves.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum MultiEraNativeClause<'b> {
+pub enum MultiEraNativeClause<'b, S = Vec<MultiEraNativeScript<'b>>> {
     /// A signature by the key with this hash satisfies the script.
     Pubkey(&'b Hash<28>),
     /// Every script held satisfies the script together.
-    All(Vec<MultiEraNativeScript<'b>>),
+    All(S),
     /// Any one of the scripts held satisfies the script.
-    Any(Vec<MultiEraNativeScript<'b>>),
+    Any(S),
     /// Any this many of the scripts held satisfy the script. The ledger CDDL
     /// types the threshold signed, not `uint`, so it may be negative.
-    NOfK(i64, Vec<MultiEraNativeScript<'b>>),
+    NOfK(i64, S),
     /// No slot before this one satisfies the script.
     InvalidBefore(u64),
     /// No slot from this one on satisfies the script.
