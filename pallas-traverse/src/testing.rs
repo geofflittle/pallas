@@ -272,6 +272,19 @@ pub fn native_script_n_of_k(k: i64, scripts: &[&[u8]]) -> Vec<u8> {
     native_script_list(3, Some(k), scripts)
 }
 
+/// Builds `depth` nested `script_all` clauses, each holding one, around the script given.
+pub fn native_script_nested_all(depth: usize, script: &[u8]) -> Vec<u8> {
+    let mut e = minicbor::Encoder::new(Vec::new());
+    for _ in 0..depth {
+        e.array(2).unwrap();
+        e.u8(1).unwrap();
+        e.array(1).unwrap();
+    }
+    let mut bytes = e.into_writer();
+    bytes.extend_from_slice(script);
+    bytes
+}
+
 /// Writes a clause holding a list of scripts. A `k` makes it the three element
 /// form `script_n_of_k` writes, where the count sits between tag and list.
 fn native_script_list(tag: u8, k: Option<i64>, scripts: &[&[u8]]) -> Vec<u8> {

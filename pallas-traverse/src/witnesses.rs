@@ -1,6 +1,9 @@
 use std::{borrow::Cow, ops::Deref};
 
-use pallas_codec::utils::KeepRaw;
+use pallas_codec::{
+    tree::{TreeNode as _, fold_tree},
+    utils::KeepRaw,
+};
 use pallas_primitives::{
     Hash, PlutusData, PlutusScript,
     alonzo::{self, BootstrapWitness, VKeyWitness},
@@ -16,18 +19,16 @@ use crate::{
 };
 
 /// Reads the six clauses every era's native script type names, under the era
-/// module given, wrapping a held script list with the helper given. An era
-/// that names more clauses passes them as further arms, so each match stays
+/// module given, with the expression given as what a compound clause holds. An
+/// era that names more clauses passes them as further arms, so each match stays
 /// exhaustive over its own type.
 macro_rules! shared_clauses {
-    ($script:expr, $era:ident, $wrap:ident $(, $pattern:pat => $clause:expr)* $(,)?) => {
+    ($script:expr, $era:ident, $held:expr $(, $pattern:pat => $clause:expr)* $(,)?) => {
         match $script {
             $era::NativeScript::ScriptPubkey(x) => MultiEraNativeClause::Pubkey(x),
-            $era::NativeScript::ScriptAll(x) => MultiEraNativeClause::All($wrap(x)),
-            $era::NativeScript::ScriptAny(x) => MultiEraNativeClause::Any($wrap(x)),
-            $era::NativeScript::ScriptNOfK(k, scripts) => {
-                MultiEraNativeClause::NOfK(*k, $wrap(scripts))
-            }
+            $era::NativeScript::ScriptAll(_) => MultiEraNativeClause::All($held),
+            $era::NativeScript::ScriptAny(_) => MultiEraNativeClause::Any($held),
+            $era::NativeScript::ScriptNOfK(k, _) => MultiEraNativeClause::NOfK(*k, $held),
             $era::NativeScript::InvalidBefore(slot) => MultiEraNativeClause::InvalidBefore(*slot),
             $era::NativeScript::InvalidHereafter(slot) => {
                 MultiEraNativeClause::InvalidHereafter(*slot)
@@ -118,20 +119,45 @@ impl<'b> MultiEraNativeScript<'b> {
     }
 
     /// Returns the clause at the root of this script, with any script it holds
-    /// reported in the same era variant as this one.
+    /// reported in the same era variant as this one. Each arrives decoded, so it
+    /// carries no bytes of its own and hashes its own re-encoding.
     pub fn clause(&self) -> MultiEraNativeClause<'_> {
         match self {
             Self::AlonzoCompatible(x) => {
-                shared_clauses!(x.deref().deref(), alonzo, alonzo_compatible_scripts)
+                let script = x.deref().deref();
+                shared_clauses!(script, alonzo, alonzo_compatible_scripts(script.children()))
             }
             #[cfg(feature = "unstable")]
-            Self::Dijkstra(x) => shared_clauses!(
-                x.deref().deref(),
-                dijkstra,
-                dijkstra_scripts,
-                dijkstra::NativeScript::ScriptRequireGuard(credential) =>
-                    MultiEraNativeClause::RequireGuard(credential),
-            ),
+            Self::Dijkstra(x) => {
+                let script = x.deref().deref();
+                shared_clauses!(
+                    script,
+                    dijkstra,
+                    dijkstra_scripts(script.children()),
+                    dijkstra::NativeScript::ScriptRequireGuard(credential) =>
+                        MultiEraNativeClause::RequireGuard(credential),
+                )
+            }
+        }
+    }
+
+    /// Folds this script bottom up on a heap backed stack, calling `f` once per
+    /// clause with the values folded from the scripts it holds.
+    pub fn fold<T>(&self, mut f: impl FnMut(MultiEraNativeClause<'_, Vec<T>>) -> T) -> T {
+        match self {
+            Self::AlonzoCompatible(x) => fold_tree(x.deref().deref(), |script, held| {
+                f(shared_clauses!(script, alonzo, held))
+            }),
+            #[cfg(feature = "unstable")]
+            Self::Dijkstra(x) => fold_tree(x.deref().deref(), |script, held| {
+                f(shared_clauses!(
+                    script,
+                    dijkstra,
+                    held,
+                    dijkstra::NativeScript::ScriptRequireGuard(credential) =>
+                        MultiEraNativeClause::RequireGuard(credential),
+                ))
+            }),
         }
     }
 }
@@ -523,8 +549,10 @@ impl<'b> MultiEraTx<'b> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Era, MultiEraNativeClause, MultiEraTx, testing};
+    use crate::{Era, MultiEraNativeClause, MultiEraNativeScript, MultiEraTx, testing};
+    use pallas_codec::{minicbor, utils::KeepRaw};
     use pallas_crypto::hash::Hasher;
+    use pallas_primitives::alonzo;
 
     #[test]
     fn a_witness_set_script_hashes_the_bytes_it_arrived_in() {
@@ -880,12 +908,98 @@ mod tests {
             "which is the hash of the canonical form"
         );
     }
+
+    /// Writes a folded clause as text, with the text of each script it holds.
+    pub(super) fn written(clause: MultiEraNativeClause<'_, Vec<String>>) -> String {
+        match clause {
+            MultiEraNativeClause::Pubkey(h) => format!("pubkey {:02x}", h[0]),
+            MultiEraNativeClause::All(held) => format!("all [{}]", held.join(", ")),
+            MultiEraNativeClause::Any(held) => format!("any [{}]", held.join(", ")),
+            MultiEraNativeClause::NOfK(k, held) => format!("{k} of [{}]", held.join(", ")),
+            MultiEraNativeClause::InvalidBefore(slot) => format!("before {slot}"),
+            MultiEraNativeClause::InvalidHereafter(slot) => format!("hereafter {slot}"),
+            #[cfg(feature = "unstable")]
+            MultiEraNativeClause::RequireGuard(credential) => match credential {
+                pallas_primitives::StakeCredential::AddrKeyhash(h) => {
+                    format!("guard key {:02x}", h[0])
+                }
+                pallas_primitives::StakeCredential::ScriptHash(h) => {
+                    format!("guard script {:02x}", h[0])
+                }
+            },
+        }
+    }
+
+    /// Counts the `script_all` clauses above the first clause of another kind.
+    pub(super) fn levels(script: &MultiEraNativeScript<'_>) -> usize {
+        script.fold(|clause| match clause {
+            MultiEraNativeClause::All(held) => held[0] + 1,
+            _ => 0,
+        })
+    }
+
+    #[test]
+    fn a_leaf_script_folds_as_one_clause_holding_nothing() {
+        let bytes = testing::native_script_invalid_before(7);
+        let raw: KeepRaw<alonzo::NativeScript> = minicbor::decode(&bytes).expect("must decode");
+
+        let mut calls = 0;
+        let folded = MultiEraNativeScript::from_alonzo_compatible(&raw).fold(|clause| {
+            calls += 1;
+            written(clause)
+        });
+
+        assert_eq!((folded.as_str(), calls), ("before 7", 1));
+    }
+
+    #[test]
+    fn a_script_folds_each_clause_over_the_folded_scripts_it_holds() {
+        let bytes = script_of_every_alonzo_clause();
+        let raw: KeepRaw<alonzo::NativeScript> = minicbor::decode(&bytes).expect("must decode");
+
+        let mut calls = 0;
+        let folded = MultiEraNativeScript::from_alonzo_compatible(&raw).fold(|clause| {
+            calls += 1;
+            written(clause)
+        });
+
+        assert_eq!(
+            (folded.as_str(), calls),
+            (
+                "all [pubkey 11, any [pubkey 22], 1 of [pubkey 33], before 7, hereafter 9]",
+                8
+            ),
+            "each of the eight clauses folds once, over the values of the scripts it holds"
+        );
+    }
+
+    #[test]
+    fn a_script_nested_deeper_than_the_stack_folds() {
+        std::thread::Builder::new()
+            .stack_size(128 * 1024)
+            .spawn(|| {
+                let depth = 100_000;
+                let bytes = testing::native_script_nested_all(
+                    depth,
+                    &testing::native_script_invalid_before(7),
+                );
+                let raw: KeepRaw<alonzo::NativeScript> =
+                    minicbor::decode(&bytes).expect("must decode");
+
+                let script = MultiEraNativeScript::from_alonzo_compatible(&raw);
+                assert_eq!(levels(&script), depth);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
 }
 
 #[cfg(all(test, feature = "unstable"))]
 mod dijkstra_tests {
     use super::*;
     use crate::{MultiEraBlock, testing};
+    use pallas_codec::minicbor;
 
     #[test]
     fn a_dijkstra_native_script_witness_is_readable() {
@@ -1087,5 +1201,42 @@ mod dijkstra_tests {
         );
         assert!(tx.native_scripts().is_empty());
         assert!(tx.aux_native_scripts().is_empty());
+    }
+
+    #[test]
+    fn a_guard_nested_in_a_dijkstra_script_folds_as_a_guard() {
+        let bytes = testing::native_script_all(&[
+            &testing::native_script_require_guard(0x7a),
+            &testing::native_script_pubkey(0x7a),
+        ]);
+        let raw: KeepRaw<dijkstra::NativeScript> = minicbor::decode(&bytes).expect("must decode");
+
+        let folded = MultiEraNativeScript::from_dijkstra(&raw).fold(super::tests::written);
+
+        assert_eq!(
+            folded, "all [guard key 7a, pubkey 7a]",
+            "a guard and a pubkey on the same key fold as different clauses"
+        );
+    }
+
+    #[test]
+    fn a_dijkstra_script_nested_deeper_than_the_stack_folds() {
+        std::thread::Builder::new()
+            .stack_size(128 * 1024)
+            .spawn(|| {
+                let depth = 100_000;
+                let bytes = testing::native_script_nested_all(
+                    depth,
+                    &testing::native_script_require_guard(0x7a),
+                );
+                let raw: KeepRaw<dijkstra::NativeScript> =
+                    minicbor::decode(&bytes).expect("must decode");
+
+                let script = MultiEraNativeScript::from_dijkstra(&raw);
+                assert_eq!(super::tests::levels(&script), depth);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
     }
 }
