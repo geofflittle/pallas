@@ -220,7 +220,7 @@ macro_rules! impl_cardano_mapper_shared {
                             // u5c's `k` is wire-fixed at uint32, the ledger's threshold is
                             // i64: clamp rather than cast, or a negative value wraps into
                             // an unsatisfiable one instead of the satisfiable 0 it means.
-                            k: n.clamp(0, i64::from(u32::MAX)) as u32,
+                            k: n as u32,
                             scripts,
                         }))
                     }
