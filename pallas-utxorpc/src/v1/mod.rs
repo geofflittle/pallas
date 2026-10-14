@@ -178,8 +178,8 @@ impl<C: LedgerContext> Mapper<C> {
                     .collect(),
             }
             .into(),
-            validity: (start.is_some() || ttl.is_some()).then_some(u5c::TxValidity { start, ttl }),
-            auxiliary: tx.has_aux_data().then(|| u5c::AuxData {
+            validity: Some(u5c::TxValidity { start, ttl }),
+            auxiliary: Some(u5c::AuxData {
                 metadata: tx
                     .metadata()
                     .collect::<Vec<_>>()
@@ -219,10 +219,6 @@ impl<C: LedgerContext> Mapper<C> {
             .collateral_return()
             .map(|x| self.map_tx_output(&x, Some(tx)));
         let total_collateral = tx.total_collateral().and_then(u64_to_bigint);
-
-        if collateral.is_empty() && collateral_return.is_none() && total_collateral.is_none() {
-            return None;
-        }
 
         Some(u5c::Collateral {
             collateral,
