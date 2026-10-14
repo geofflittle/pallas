@@ -890,6 +890,94 @@ impl<'b> MultiEraTx<'b> {
         }
     }
 
+    /// Returns whether the transaction carries auxiliary data.
+    pub fn has_aux_data(&self) -> bool {
+        #[cfg(feature = "unstable")]
+        if matches!(self, MultiEraTx::Dijkstra(..) | MultiEraTx::DijkstraSub(..)) {
+            return self.dijkstra_aux_data().is_some();
+        }
+
+        self.aux_data().is_some()
+    }
+
+    /// Returns the auxiliary data hash at body key 7.
+    pub fn auxiliary_data_hash(&self) -> Option<&[u8]> {
+        match self {
+            MultiEraTx::AlonzoCompatible(x, _) => x
+                .transaction_body
+                .auxiliary_data_hash
+                .as_ref()
+                .map(|x| x.as_slice()),
+            MultiEraTx::Babbage(x) => x
+                .transaction_body
+                .auxiliary_data_hash
+                .as_ref()
+                .map(|x| x.as_slice()),
+            MultiEraTx::Byron(_) => None,
+            MultiEraTx::Conway(x) => x
+                .transaction_body
+                .auxiliary_data_hash
+                .as_ref()
+                .map(|x| x.as_slice()),
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x
+                .transaction_body
+                .auxiliary_data_hash
+                .as_ref()
+                .map(|x| x.as_slice()),
+            #[cfg(feature = "unstable")]
+            MultiEraTx::DijkstraSub(x, _) => x
+                .sub_transaction_body
+                .auxiliary_data_hash
+                .as_ref()
+                .map(|x| x.as_slice()),
+        }
+    }
+
+    /// Returns the script data hash at body key 11.
+    pub fn script_data_hash(&self) -> Option<&Hash<32>> {
+        match self {
+            MultiEraTx::AlonzoCompatible(x, _) => x.transaction_body.script_data_hash.as_ref(),
+            MultiEraTx::Babbage(x) => x.transaction_body.script_data_hash.as_ref(),
+            MultiEraTx::Byron(_) => None,
+            MultiEraTx::Conway(x) => x.transaction_body.script_data_hash.as_ref(),
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x.transaction_body.script_data_hash.as_ref(),
+            #[cfg(feature = "unstable")]
+            MultiEraTx::DijkstraSub(x, _) => x.sub_transaction_body.script_data_hash.as_ref(),
+        }
+    }
+
+    /// Returns the current treasury value at body key 21.
+    pub fn treasury_value(&self) -> Option<u64> {
+        match self {
+            MultiEraTx::Conway(x) => x.transaction_body.treasury_value,
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x.transaction_body.treasury_value,
+            #[cfg(feature = "unstable")]
+            MultiEraTx::DijkstraSub(x, _) => x.sub_transaction_body.treasury_value,
+            MultiEraTx::Byron(_) | MultiEraTx::AlonzoCompatible(..) | MultiEraTx::Babbage(_) => {
+                None
+            }
+        }
+    }
+
+    /// Returns the treasury donation at body key 22.
+    pub fn donation(&self) -> Option<u64> {
+        match self {
+            MultiEraTx::Conway(x) => x.transaction_body.donation.as_ref().map(u64::from),
+            #[cfg(feature = "unstable")]
+            MultiEraTx::Dijkstra(x) => x.transaction_body.donation.as_ref().map(u64::from),
+            #[cfg(feature = "unstable")]
+            MultiEraTx::DijkstraSub(x, _) => {
+                x.sub_transaction_body.donation.as_ref().map(u64::from)
+            }
+            MultiEraTx::Byron(_) | MultiEraTx::AlonzoCompatible(..) | MultiEraTx::Babbage(_) => {
+                None
+            }
+        }
+    }
+
     /// Returns the producer's verdict on the transaction, which for a sub
     /// transaction is the verdict on the transaction whose body lists it.
     pub fn is_valid(&self) -> bool {
@@ -1237,6 +1325,101 @@ mod tests {
             read(sub),
             written([0xe2; 29], 12),
             "the sub transaction reports keys 25 and 26 of the sub body, not of the body carrying it"
+        );
+    }
+
+    /// Reads keys 7, 11, 21 and 22 and the auxiliary data presence of a transaction.
+    fn read_hashes_and_treasury(
+        tx: &MultiEraTx,
+    ) -> (
+        Option<Vec<u8>>,
+        Option<Vec<u8>>,
+        Option<u64>,
+        Option<u64>,
+        bool,
+    ) {
+        (
+            tx.auxiliary_data_hash().map(|x| x.to_vec()),
+            tx.script_data_hash().map(|x| x.to_vec()),
+            tx.treasury_value(),
+            tx.donation(),
+            tx.has_aux_data(),
+        )
+    }
+
+    #[test]
+    fn a_transaction_without_hashes_or_treasury_fields_reports_none() {
+        let dijkstra = testing::dijkstra_block_tx(
+            &testing::minimal_body(),
+            &testing::empty_witness_set(),
+            None,
+            true,
+        );
+        let conway = testing::conway_tx(
+            &testing::minimal_body(),
+            &testing::empty_witness_set(),
+            None,
+            true,
+        );
+
+        for (era, cbor) in [(Era::Dijkstra, dijkstra), (Era::Conway, conway)] {
+            let tx = MultiEraTx::decode_for_era(era, &cbor).unwrap();
+            assert_eq!(
+                read_hashes_and_treasury(&tx),
+                (None, None, None, None, false),
+                "a {era:?} body without keys 7, 11, 21 and 22 and with nil auxiliary data reports none of them"
+            );
+        }
+    }
+
+    #[test]
+    fn each_transaction_reports_the_hashes_and_treasury_fields_of_its_own_body() {
+        let aux = testing::post_alonzo_aux_data(&testing::native_script_pubkey(1), None);
+        let sub = testing::sub_body_with_hashes_and_treasury(5);
+        let dijkstra = testing::dijkstra_block_tx(
+            &testing::body_with_hashes_and_treasury(3, &[&sub]),
+            &testing::empty_witness_set(),
+            Some(&aux),
+            true,
+        );
+        let conway = testing::conway_tx(
+            &testing::body_with_hashes_and_treasury(4, &[]),
+            &testing::empty_witness_set(),
+            Some(&aux),
+            true,
+        );
+
+        let written = |fill: u8, aux: bool| {
+            let (aux_hash, script_hash, treasury, donation) = testing::hashes_and_treasury(fill);
+            (
+                Some(aux_hash.to_vec()),
+                Some(script_hash.to_vec()),
+                Some(treasury),
+                Some(donation),
+                aux,
+            )
+        };
+
+        let tx = MultiEraTx::decode_for_era(Era::Dijkstra, &dijkstra).unwrap();
+        assert_eq!(
+            read_hashes_and_treasury(&tx),
+            written(3, true),
+            "a Dijkstra transaction reports keys 7, 11, 21 and 22 of its own body and its auxiliary data"
+        );
+
+        let subs = tx.sub_transactions();
+        let sub = subs.first().expect("body key 23 holds one sub transaction");
+        assert_eq!(
+            read_hashes_and_treasury(sub),
+            written(5, false),
+            "the sub transaction reports keys 7, 11, 21 and 22 of the sub body, and its own nil auxiliary data"
+        );
+
+        let tx = MultiEraTx::decode_for_era(Era::Conway, &conway).unwrap();
+        assert_eq!(
+            read_hashes_and_treasury(&tx),
+            written(4, true),
+            "a Conway transaction reports keys 7, 11, 21 and 22 of its body and its auxiliary data"
         );
     }
 
