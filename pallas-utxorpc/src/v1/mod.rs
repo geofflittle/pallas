@@ -198,7 +198,7 @@ impl<C: LedgerContext> Mapper<C> {
                 .unwrap_or_default(),
             network_id: tx.network_id().map(|x| u8::from(x) as u32),
             treasury_value: tx.treasury_value().and_then(u64_to_bigint),
-            treasury_donation: tx.donation().and_then(u64_to_bigint),
+            treasury_donation: tx.treasury_value().and_then(u64_to_bigint),
             ..Default::default()
         }
     }
