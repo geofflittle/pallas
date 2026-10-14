@@ -208,6 +208,78 @@ pub fn conway_tx_with_certificate_redeemers() -> trv::MultiEraTx<'static> {
     trv::MultiEraTx::decode_for_era(trv::Era::Conway, cbor).unwrap()
 }
 
+/// The ttl `conway_tx_with_optional_body_keys` writes at body key 3.
+pub const OPTIONAL_TTL: u64 = 900;
+
+/// The auxiliary data hash it writes at body key 7.
+pub const OPTIONAL_AUX_DATA_HASH: [u8; 32] = [0x21; 32];
+
+/// The validity start it writes at body key 8.
+pub const OPTIONAL_VALIDITY_START: u64 = 100;
+
+/// The script data hash it writes at body key 11.
+pub const OPTIONAL_SCRIPT_DATA_HASH: [u8; 32] = [0x22; 32];
+
+/// The network id it writes at body key 15.
+pub const OPTIONAL_NETWORK_ID: u8 = 0;
+
+/// The total collateral it writes at body key 17.
+pub const OPTIONAL_TOTAL_COLLATERAL: u64 = 5_000;
+
+/// The treasury value it writes at body key 21.
+pub const OPTIONAL_TREASURY_VALUE: u64 = 7_000;
+
+/// The treasury donation it writes at body key 22.
+pub const OPTIONAL_DONATION: u64 = 50;
+
+/// A Conway transaction whose body writes keys 3, 7, 8, 11, 13, 15, 17, 21
+/// and 22 and whose auxiliary data is an empty metadata map.
+pub fn conway_tx_with_optional_body_keys() -> trv::MultiEraTx<'static> {
+    let mut e = minicbor::Encoder::new(Vec::new());
+    e.array(4).unwrap();
+
+    e.map(12).unwrap();
+    e.u8(0).unwrap();
+    e.tag(Tag::new(258)).unwrap();
+    e.array(1).unwrap();
+    e.array(2).unwrap();
+    e.bytes(&[0x11; 32]).unwrap();
+    e.u8(0).unwrap();
+    e.u8(1).unwrap();
+    e.array(0).unwrap();
+    e.u8(2).unwrap();
+    e.u32(1_000).unwrap();
+    e.u8(3).unwrap();
+    e.u64(OPTIONAL_TTL).unwrap();
+    e.u8(7).unwrap();
+    e.bytes(&OPTIONAL_AUX_DATA_HASH).unwrap();
+    e.u8(8).unwrap();
+    e.u64(OPTIONAL_VALIDITY_START).unwrap();
+    e.u8(11).unwrap();
+    e.bytes(&OPTIONAL_SCRIPT_DATA_HASH).unwrap();
+    e.u8(13).unwrap();
+    e.tag(Tag::new(258)).unwrap();
+    e.array(1).unwrap();
+    e.array(2).unwrap();
+    e.bytes(&[0x12; 32]).unwrap();
+    e.u8(0).unwrap();
+    e.u8(15).unwrap();
+    e.u8(OPTIONAL_NETWORK_ID).unwrap();
+    e.u8(17).unwrap();
+    e.u64(OPTIONAL_TOTAL_COLLATERAL).unwrap();
+    e.u8(21).unwrap();
+    e.u64(OPTIONAL_TREASURY_VALUE).unwrap();
+    e.u8(22).unwrap();
+    e.u64(OPTIONAL_DONATION).unwrap();
+
+    e.map(0).unwrap();
+    e.bool(true).unwrap();
+    e.map(0).unwrap();
+
+    let cbor: &'static [u8] = Box::leak(e.into_writer().into_boxed_slice());
+    trv::MultiEraTx::decode_for_era(trv::Era::Conway, cbor).unwrap()
+}
+
 /// The DRep key hash that casts the vote in `dijkstra_tx_with_one_vote`.
 #[cfg(feature = "unstable")]
 pub const VOTING_DREP_KEY_HASH: [u8; 28] = [0x77; 28];
