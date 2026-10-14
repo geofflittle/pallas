@@ -969,9 +969,7 @@ impl<'b> MultiEraTx<'b> {
             #[cfg(feature = "unstable")]
             MultiEraTx::Dijkstra(x) => x.transaction_body.donation.as_ref().map(u64::from),
             #[cfg(feature = "unstable")]
-            MultiEraTx::DijkstraSub(x, _) => {
-                x.sub_transaction_body.donation.as_ref().map(u64::from)
-            }
+            MultiEraTx::DijkstraSub(x, _) => x.sub_transaction_body.treasury_value,
             MultiEraTx::Byron(_) | MultiEraTx::AlonzoCompatible(..) | MultiEraTx::Babbage(_) => {
                 None
             }
