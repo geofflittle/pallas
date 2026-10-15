@@ -381,7 +381,7 @@ impl Values {
                 top_level: body.required_top_level_guards.as_ref(),
             };
             let at = (number, *body.original_hash());
-            let starting = u5c_tx.map_or(&[][..], |t| &t.starting_account_balance_intervals);
+            let starting = u5c_tx.map_or(&[][..], |t| &common(t).account_balance_intervals);
             let wits = &tx.transaction_witness_set;
             self.body(at, fields, wits, u5c_tx.map(common), starting);
             for (j, sub) in body
