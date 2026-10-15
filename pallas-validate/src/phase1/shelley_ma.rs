@@ -6,9 +6,10 @@ use crate::utils::{
     ShelleyProtParams, UTxOs,
     ValidationError::{self, *},
     ValidationResult, add_minted_value, add_values, aux_data_from_alonzo_tx, balance_coins,
-    empty_value, get_alonzo_comp_tx_size, get_lovelace_from_alonzo_val, get_payment_part,
-    get_shelley_address, get_val_size_in_words, mk_alonzo_vk_wits_check_list, values_are_equal,
-    verify_signature,
+    certificate_key_hashes, certificate_scripts, certificates, check_remaining_vk_wits,
+    compute_native_script_hash, empty_value, get_alonzo_comp_tx_size, get_lovelace_from_alonzo_val,
+    get_payment_part, get_shelley_address, get_val_size_in_words, mk_alonzo_vk_wits_check_list,
+    needed_certificate_scripts, reference_scripts, values_are_equal, verify_signature,
 };
 use pallas_addresses::{PaymentKeyHash, ScriptHash, ShelleyAddress, ShelleyPaymentPart};
 use pallas_codec::minicbor::encode;
@@ -26,9 +27,11 @@ use pallas_primitives::{
         WitnessSet,
     },
     byron::TxOut,
+    conway::ScriptRef,
 };
 use pallas_traverse::{
-    Era, MultiEraInput, MultiEraOutput, OriginalHash, time::Slot, wellknown::GenesisValues,
+    Era, MultiEraInput, MultiEraOutput, MultiEraTx, OriginalHash, time::Slot,
+    wellknown::GenesisValues,
 };
 
 use std::{cmp::max, collections::HashMap, ops::Deref};
@@ -281,6 +284,10 @@ fn check_witnesses(
         Some(scripts) => scripts.iter().map(|x| x.clone().unwrap()).collect(),
         None => Vec::new(),
     };
+    let native_script_wits: Option<Vec<NativeScript>> = tx_wits
+        .native_script
+        .as_ref()
+        .map(|x| x.iter().map(|y| y.deref().clone()).collect());
     for input in tx_body.inputs.iter() {
         match utxos.get(&MultiEraInput::from_alonzo_compatible(input)) {
             Some(multi_era_output) => {
@@ -291,18 +298,22 @@ fn check_witnesses(
                         ShelleyPaymentPart::Key(payment_key_hash) => {
                             check_vk_wit(&payment_key_hash, tx_hash, vk_wits)?
                         }
-                        ShelleyPaymentPart::Script(script_hash) => check_native_script_witness(
-                            &script_hash,
-                            &tx_wits
-                                .native_script
-                                .as_ref()
-                                .map(|x| x.iter().map(|y| y.deref().clone()).collect()),
-                        )?,
+                        ShelleyPaymentPart::Script(script_hash) => {
+                            check_native_script_witness(&script_hash, &native_script_wits)?
+                        }
                     }
                 }
             }
             None => return Err(ShelleyMA(InputNotInUTxO)),
         }
+    }
+    for cert in certificates(&tx_body.certificates) {
+        for key_hash in certificate_key_hashes(cert) {
+            check_vk_wit(key_hash, tx_hash, vk_wits)?;
+        }
+    }
+    for (_, script_hash) in certificate_scripts(certificates(&tx_body.certificates)) {
+        check_native_script_witness(script_hash, &native_script_wits)?;
     }
     let vkey_wits = &vk_wits.iter().map(|bv| bv.clone().1).collect();
     check_native_scripts(
@@ -311,7 +322,7 @@ fn check_witnesses(
         &tx_body.validity_interval_start,
         &tx_body.ttl,
     )?;
-    check_remaining_vk_wits(vk_wits, tx_hash)
+    check_remaining_vk_wits(vk_wits, tx_hash, ShelleyMA(WrongSignature))
 }
 
 fn check_vk_wit(
@@ -338,10 +349,8 @@ fn check_native_script_witness(
 ) -> ValidationResult {
     match wits {
         Some(scripts) => {
-            let mut payload: Vec<u8> = vec![0u8];
             for script in scripts.iter() {
-                let _ = encode(script, &mut payload);
-                if pallas_crypto::hash::Hasher::<224>::hash(&payload) == *script_hash {
+                if compute_script_hash(script) == *script_hash {
                     return Ok(());
                 }
             }
@@ -349,22 +358,6 @@ fn check_native_script_witness(
         }
         None => Err(ShelleyMA(MissingScriptWitness)),
     }
-}
-
-fn check_remaining_vk_wits(
-    wits: &mut Vec<(bool, VKeyWitness)>,
-    data_to_verify: &[u8],
-) -> ValidationResult {
-    for (covered, vkey_wit) in wits {
-        if !*covered {
-            if verify_signature(vkey_wit, data_to_verify) {
-                return Ok(());
-            } else {
-                return Err(ShelleyMA(WrongSignature));
-            }
-        }
-    }
-    Ok(())
 }
 
 fn check_minting(tx_body: &TransactionBody, mtx: &Tx) -> ValidationResult {
@@ -694,6 +687,33 @@ fn check_native_scripts(
     Ok(())
 }
 
+// Evaluates each witness or reference native script that a certificate needs.
+pub(super) fn check_certificate_native_scripts(
+    tx: &MultiEraTx,
+    utxos: &UTxOs,
+    denial: ValidationError,
+) -> ValidationResult {
+    let needed = needed_certificate_scripts(tx);
+    let references = reference_scripts(tx, utxos);
+    let witnesses = tx
+        .native_scripts()
+        .iter()
+        .map(|script| (compute_native_script_hash(script), script.deref()));
+    let referenced = references.iter().filter_map(|script| match script {
+        ScriptRef::NativeScript(script) => Some((script.original_hash(), script.deref())),
+        _ => None,
+    });
+    let vkey_wits = tx.vkey_witnesses().to_vec();
+    for (hash, script) in witnesses.chain(referenced) {
+        if needed.contains(&hash)
+            && !eval_native_script(&vkey_wits, script, &tx.validity_start(), &tx.ttl())
+        {
+            return Err(denial);
+        }
+    }
+    Ok(())
+}
+
 fn eval_native_script(
     vkey_wits: &Vec<VKeyWitness>, // changed from alonzo
     native_script: &NativeScript,
@@ -738,8 +758,14 @@ fn eval_native_script(
 
 #[cfg(test)]
 mod tests {
-    use super::eval_native_script;
-    use pallas_primitives::alonzo::NativeScript;
+    use super::{
+        Certificate, Era, MultiEraInput, MultiEraOutput, NativeScript, OriginalHash, ScriptHash,
+        StakeCredential, TransactionOutput, Tx, UTxOs, VKeyWitness, Value, WitnessSet,
+        check_witnesses, compute_script_hash, eval_native_script,
+    };
+    use pallas_codec::minicbor;
+    use pallas_crypto::{hash::Hasher, key::ed25519::SecretKey};
+    use pallas_primitives::alonzo::{AddrKeyhash, TransactionInput};
 
     // Evaluates `native_script` with no vkey witnesses and the given validity
     // interval bounds (`low_bnd` is `validity_interval_start`, `upp_bnd` is `ttl`).
@@ -805,5 +831,235 @@ mod tests {
             "satisfies the hereafter arm"
         );
         assert!(!eval(&any, Some(80), Some(220)), "satisfies neither arm");
+    }
+
+    // Re-encodes and decodes the edited transaction, so the body hash the keys
+    // sign is the hash of the edited body.
+    fn witnesses_outcome(
+        certificates: Vec<Certificate>,
+        native_scripts: Vec<NativeScript>,
+        keys: &[u8],
+        corrupted: Option<usize>,
+    ) -> String {
+        spending_outcome(&[], certificates, native_scripts, keys, corrupted)
+    }
+
+    // Spends one output locked by each of `spent` scripts.
+    fn spending_outcome(
+        spent: &[ScriptHash],
+        certificates: Vec<Certificate>,
+        native_scripts: Vec<NativeScript>,
+        keys: &[u8],
+        corrupted: Option<usize>,
+    ) -> String {
+        let inputs: Vec<TransactionInput> = (0..spent.len())
+            .map(|index| TransactionInput {
+                transaction_id: [5; 32].into(),
+                index: index as u64,
+            })
+            .collect();
+        let outputs: Vec<TransactionOutput> = spent
+            .iter()
+            .map(|hash| TransactionOutput {
+                address: [&[0x71][..], hash.as_ref()].concat().into(),
+                amount: Value::Coin(10),
+                datum_hash: None,
+            })
+            .collect();
+        let utxos: UTxOs = inputs
+            .iter()
+            .zip(&outputs)
+            .map(|(input, output)| {
+                (
+                    MultiEraInput::from_alonzo_compatible(input),
+                    MultiEraOutput::from_alonzo_compatible(output, Era::Shelley),
+                )
+            })
+            .collect();
+        let raw = hex::decode(include_str!("../../../test_data/shelley1.tx").trim()).unwrap();
+        let mut tx: Tx = minicbor::decode(&raw).unwrap();
+        tx.transaction_body.inputs = inputs.clone();
+        tx.transaction_body.certificates = Some(certificates);
+        tx.transaction_witness_set = minicbor::decode::<WitnessSet>(&[0xa0]).unwrap().into();
+        tx.transaction_witness_set.native_script =
+            Some(native_scripts.into_iter().map(Into::into).collect());
+        let encoded = minicbor::to_vec(tx).unwrap();
+        let mut tx: Tx = minicbor::decode(&encoded).unwrap();
+        let hash = tx.transaction_body.original_hash();
+        let mut witnesses: Vec<VKeyWitness> = keys
+            .iter()
+            .map(|id| {
+                let key = SecretKey::from([*id; 32]);
+                VKeyWitness {
+                    vkey: key.public_key().as_ref().to_vec().into(),
+                    signature: key.sign(hash).as_ref().to_vec().into(),
+                }
+            })
+            .collect();
+        if let Some(position) = corrupted {
+            witnesses[position].signature = vec![0; 64].into();
+        }
+        tx.transaction_witness_set.vkeywitness = Some(witnesses);
+        let actual = check_witnesses(&tx.transaction_body, &tx.transaction_witness_set, &utxos);
+        format!("{actual:?}")
+    }
+
+    fn key_hash(id: u8) -> AddrKeyhash {
+        Hasher::<224>::hash(SecretKey::from([id; 32]).public_key().as_ref())
+    }
+
+    fn credential_certificates(cred: StakeCredential) -> Vec<Certificate> {
+        vec![
+            Certificate::StakeDeregistration(cred.clone()),
+            Certificate::StakeDelegation(cred, [9; 28].into()),
+        ]
+    }
+
+    #[test]
+    fn every_vkey_witness_must_verify() {
+        for (corrupted, expected) in [
+            (None, "Ok(())"),
+            (Some(0), "Err(ShelleyMA(WrongSignature))"),
+            (Some(1), "Err(ShelleyMA(WrongSignature))"),
+        ] {
+            assert_eq!(
+                witnesses_outcome(vec![], vec![], &[1, 2], corrupted),
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn key_certificates_require_their_key_and_valid_signature() {
+        let cred = StakeCredential::AddrKeyhash(key_hash(1));
+        assert_eq!(
+            witnesses_outcome(
+                vec![Certificate::StakeRegistration(cred.clone())],
+                vec![],
+                &[],
+                None
+            ),
+            "Ok(())"
+        );
+        for cert in credential_certificates(cred) {
+            for (keys, corrupted, expected) in [
+                (&[1][..], None, "Ok(())"),
+                (&[][..], None, "Err(ShelleyMA(MissingVKWitness))"),
+                (&[2][..], None, "Err(ShelleyMA(MissingVKWitness))"),
+                (&[1][..], Some(0), "Err(ShelleyMA(WrongSignature))"),
+            ] {
+                assert_eq!(
+                    witnesses_outcome(vec![cert.clone()], vec![], keys, corrupted),
+                    expected
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn pool_certificates_require_operator_and_registration_owners() {
+        let registration = Certificate::PoolRegistration {
+            operator: key_hash(1),
+            vrf_keyhash: [0; 32].into(),
+            pledge: 0,
+            cost: 0,
+            margin: pallas_primitives::UnitInterval {
+                numerator: 0,
+                denominator: 1,
+            },
+            reward_account: vec![0xe1; 29].into(),
+            pool_owners: vec![key_hash(2)],
+            relays: vec![],
+            pool_metadata: None,
+        };
+        for (cert, keys) in [
+            (registration, vec![1, 2]),
+            (Certificate::PoolRetirement(key_hash(1), 1), vec![1]),
+        ] {
+            assert_eq!(
+                witnesses_outcome(vec![cert.clone()], vec![], &keys, None),
+                "Ok(())"
+            );
+            for missing in 0..keys.len() {
+                let mut incomplete = keys.clone();
+                incomplete.remove(missing);
+                assert_eq!(
+                    witnesses_outcome(vec![cert.clone()], vec![], &incomplete, None),
+                    "Err(ShelleyMA(MissingVKWitness))"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn script_certificates_require_their_script() {
+        let script = NativeScript::ScriptPubkey(key_hash(1));
+        let other = NativeScript::ScriptAll(vec![]);
+        let cred = StakeCredential::ScriptHash(compute_script_hash(&script));
+        assert_eq!(
+            witnesses_outcome(
+                vec![Certificate::StakeRegistration(cred.clone())],
+                vec![],
+                &[],
+                None
+            ),
+            "Ok(())"
+        );
+        for cert in credential_certificates(cred) {
+            for (scripts, keys, expected) in [
+                (vec![script.clone()], &[1][..], "Ok(())"),
+                (vec![], &[1][..], "Err(ShelleyMA(MissingScriptWitness))"),
+                (
+                    vec![other.clone()],
+                    &[1][..],
+                    "Err(ShelleyMA(MissingScriptWitness))",
+                ),
+                (
+                    vec![script.clone()],
+                    &[2][..],
+                    "Err(ShelleyMA(ScriptDenial))",
+                ),
+            ] {
+                assert_eq!(
+                    witnesses_outcome(vec![cert.clone()], scripts, keys, None),
+                    expected
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_needed_script_is_found_in_any_position() {
+        let first = NativeScript::ScriptPubkey(key_hash(1));
+        let second = NativeScript::ScriptPubkey(key_hash(2));
+        let hashes = [compute_script_hash(&first), compute_script_hash(&second)];
+        let both = vec![first.clone(), second.clone()];
+        let certificate = Certificate::StakeDeregistration(StakeCredential::ScriptHash(hashes[1]));
+        for (spent, certificates, scripts, expected) in [
+            (&hashes[..], vec![], both.clone(), "Ok(())"),
+            (
+                &hashes[..1],
+                vec![certificate.clone()],
+                both.clone(),
+                "Ok(())",
+            ),
+            (
+                &hashes[..],
+                vec![],
+                vec![first.clone()],
+                "Err(ShelleyMA(MissingScriptWitness))",
+            ),
+            (
+                &hashes[..1],
+                vec![certificate],
+                vec![first],
+                "Err(ShelleyMA(MissingScriptWitness))",
+            ),
+        ] {
+            assert_eq!(
+                spending_outcome(spent, certificates, scripts, &[1, 2], None),
+                expected
+            );
+        }
     }
 }

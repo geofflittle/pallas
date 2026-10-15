@@ -4,7 +4,9 @@ pub mod environment;
 pub mod validation;
 
 pub use environment::*;
-use pallas_addresses::{Address, ShelleyAddress, ShelleyPaymentPart};
+use pallas_addresses::{
+    Address, Network, ShelleyAddress, ShelleyPaymentPart, StakeAddress, StakePayload,
+};
 use pallas_codec::{
     minicbor::encode,
     utils::{Bytes, Nullable},
@@ -16,11 +18,18 @@ use pallas_primitives::{
     RewardAccount, StakeCredential, TransactionIndex, UnitInterval, VrfKeyhash,
     alonzo::{Certificate, Multiasset, NativeScript, Tx as AlonzoTx, VKeyWitness, Value},
     babbage::Tx as BabbageTx,
-    conway::{Multiasset as ConwayMultiasset, Tx as ConwayTx, Value as ConwayValue},
+    conway::{
+        Certificate as ConwayCertificate, Multiasset as ConwayMultiasset, ScriptRef,
+        Tx as ConwayTx, Value as ConwayValue,
+    },
 };
 
-use pallas_traverse::{Era, MultiEraInput, MultiEraOutput, MultiEraUpdate, time::Slot};
+use pallas_traverse::{
+    ComputeHash, Era, MultiEraInput, MultiEraOutput, MultiEraTx, MultiEraUpdate, OriginalHash,
+    time::Slot,
+};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Deref;
 pub use validation::*;
@@ -761,6 +770,200 @@ pub fn verify_signature(vk_wit: &VKeyWitness, data_to_verify: &[u8]) -> bool {
     signature_source.copy_from_slice(vk_wit.signature.as_slice());
     let sig: Signature = From::<[u8; Signature::SIZE]>::from(signature_source);
     public_key.verify(data_to_verify, &sig)
+}
+
+pub(crate) fn check_remaining_vk_wits(
+    wits: &[(bool, VKeyWitness)],
+    data_to_verify: &[u8],
+    err: ValidationError,
+) -> ValidationResult {
+    for (covered, vkey_wit) in wits {
+        if !covered && !verify_signature(vkey_wit, data_to_verify) {
+            return Err(err);
+        }
+    }
+    Ok(())
+}
+
+// Marks every supplied script with the needed hash as used.
+pub(crate) fn check_needed_script(
+    hash: &PolicyId,
+    reference_scripts: &[PolicyId],
+    supplied: &mut [&mut [(bool, PolicyId)]],
+    missing: ValidationError,
+) -> ValidationResult {
+    let mut covered = reference_scripts.contains(hash);
+    for scripts in supplied.iter_mut() {
+        for (used, script) in scripts.iter_mut() {
+            if script == hash {
+                *used = true;
+                covered = true;
+            }
+        }
+    }
+    if covered { Ok(()) } else { Err(missing) }
+}
+
+// Script hashes of the withdrawing reward accounts, each with its index in
+// reward account order.
+pub(crate) fn withdrawal_scripts(
+    withdrawals: Option<&BTreeMap<RewardAccount, Coin>>,
+    undecodable: ValidationError,
+) -> Result<Vec<(u32, PolicyId)>, ValidationError> {
+    let mut accounts: Vec<StakeAddress> = withdrawals
+        .into_iter()
+        .flatten()
+        .map(|(bytes, _)| match Address::from_bytes(bytes) {
+            Ok(Address::Stake(account)) => Ok(account),
+            _ => Err(undecodable.clone()),
+        })
+        .collect::<Result<_, _>>()?;
+    accounts.sort_by(sort_reward_accounts);
+    Ok(accounts
+        .iter()
+        .enumerate()
+        .filter(|(_, account)| account.is_script())
+        .map(|(index, account)| (index as u32, *account.payload().as_hash()))
+        .collect())
+}
+
+// Sorting function for reward accounts (withdrawals).
+fn sort_reward_accounts(a: &StakeAddress, b: &StakeAddress) -> Ordering {
+    fn network_tag(network: Network) -> u8 {
+        match network {
+            Network::Testnet => 0,
+            Network::Mainnet => 1,
+            Network::Other(tag) => tag,
+        }
+    }
+
+    if a.network() != b.network() {
+        return network_tag(a.network()).cmp(&network_tag(b.network()));
+    }
+
+    match (a.payload(), b.payload()) {
+        (StakePayload::Script(..), StakePayload::Stake(..)) => Ordering::Less,
+        (StakePayload::Stake(..), StakePayload::Script(..)) => Ordering::Greater,
+        (StakePayload::Script(hash_a), StakePayload::Script(hash_b)) => hash_a.cmp(hash_b),
+        (StakePayload::Stake(hash_a), StakePayload::Stake(hash_b)) => hash_a.cmp(hash_b),
+    }
+}
+
+// The stake credential that must witness a certificate. Legacy stake
+// registration needs no witness, and pool keys witness pool certificates.
+pub(crate) trait CertificateCredential {
+    fn credential(&self) -> Option<&StakeCredential>;
+}
+
+impl CertificateCredential for Certificate {
+    fn credential(&self) -> Option<&StakeCredential> {
+        match self {
+            Certificate::StakeDeregistration(cred) | Certificate::StakeDelegation(cred, _) => {
+                Some(cred)
+            }
+            _ => None,
+        }
+    }
+}
+
+impl CertificateCredential for ConwayCertificate {
+    fn credential(&self) -> Option<&StakeCredential> {
+        match self {
+            ConwayCertificate::StakeRegistration(_)
+            | ConwayCertificate::PoolRegistration { .. }
+            | ConwayCertificate::PoolRetirement(..) => None,
+            ConwayCertificate::StakeDeregistration(cred)
+            | ConwayCertificate::StakeDelegation(cred, _)
+            | ConwayCertificate::Reg(cred, _)
+            | ConwayCertificate::UnReg(cred, _)
+            | ConwayCertificate::VoteDeleg(cred, _)
+            | ConwayCertificate::StakeVoteDeleg(cred, _, _)
+            | ConwayCertificate::StakeRegDeleg(cred, _, _)
+            | ConwayCertificate::VoteRegDeleg(cred, _, _)
+            | ConwayCertificate::StakeVoteRegDeleg(cred, _, _, _)
+            | ConwayCertificate::AuthCommitteeHot(cred, _)
+            | ConwayCertificate::ResignCommitteeCold(cred, _)
+            | ConwayCertificate::RegDRepCert(cred, _, _)
+            | ConwayCertificate::UnRegDRepCert(cred, _)
+            | ConwayCertificate::UpdateDRepCert(cred, _) => Some(cred),
+        }
+    }
+}
+
+pub(crate) fn certificates(certificates: &Option<Vec<Certificate>>) -> &[Certificate] {
+    certificates.as_deref().unwrap_or_default()
+}
+
+pub(crate) fn certificate_key_hashes(cert: &Certificate) -> Vec<&AddrKeyhash> {
+    match cert {
+        Certificate::PoolRegistration {
+            operator,
+            pool_owners,
+            ..
+        } => std::iter::once(operator).chain(pool_owners).collect(),
+        Certificate::PoolRetirement(operator, _) => vec![operator],
+        _ => match cert.credential() {
+            Some(StakeCredential::AddrKeyhash(hash)) => vec![hash],
+            _ => Vec::new(),
+        },
+    }
+}
+
+// A repeated certificate is needed once, at the index of its first occurrence.
+pub(crate) fn certificate_scripts(
+    certificates: &[Certificate],
+) -> impl Iterator<Item = (u32, &PolicyId)> {
+    certificates
+        .iter()
+        .enumerate()
+        .filter(|(index, cert)| {
+            certificates.iter().position(|other| other == *cert) == Some(*index)
+        })
+        .filter_map(|(index, cert)| match cert.credential() {
+            Some(StakeCredential::ScriptHash(hash)) => Some((index as u32, hash)),
+            _ => None,
+        })
+}
+
+// The script hash of each certificate of the transaction that a script witnesses.
+pub(crate) fn needed_certificate_scripts(tx: &MultiEraTx) -> Vec<PolicyId> {
+    tx.certs()
+        .iter()
+        .filter_map(|cert| {
+            let credential = match cert.as_alonzo() {
+                Some(cert) => cert.credential(),
+                None => cert.as_conway()?.credential(),
+            };
+            match credential? {
+                StakeCredential::ScriptHash(hash) => Some(*hash),
+                _ => None,
+            }
+        })
+        .collect()
+}
+
+// The scripts held by the outputs of the transaction's era that it spends or
+// references.
+pub(crate) fn reference_scripts<'a>(
+    tx: &'a MultiEraTx<'_>,
+    utxos: &'a UTxOs<'_>,
+) -> Vec<ScriptRef<'a>> {
+    tx.inputs()
+        .iter()
+        .chain(&tx.reference_inputs())
+        .filter_map(|input| utxos.get(input))
+        .filter(|output| output.era() == tx.era())
+        .filter_map(MultiEraOutput::script_ref)
+        .collect()
+}
+
+pub(crate) fn script_ref_hash(script: &ScriptRef) -> PolicyId {
+    match script {
+        ScriptRef::NativeScript(script) => script.original_hash(),
+        ScriptRef::PlutusV1Script(script) => script.compute_hash(),
+        ScriptRef::PlutusV2Script(script) => script.compute_hash(),
+        ScriptRef::PlutusV3Script(script) => script.compute_hash(),
+    }
 }
 
 pub fn get_payment_part(address: &Bytes) -> Option<ShelleyPaymentPart> {

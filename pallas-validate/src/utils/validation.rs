@@ -169,6 +169,9 @@ pub enum ShelleyMAError {
 #[derive(Debug, Clone, Error)]
 #[non_exhaustive]
 pub enum AlonzoError {
+    #[error("native script evaluation failed")]
+    NativeScriptDenial,
+
     #[error("transaction size could not be determined")]
     UnknownTxSize,
 
@@ -284,6 +287,9 @@ pub enum AlonzoError {
 #[derive(Debug, Clone, Error)]
 #[non_exhaustive]
 pub enum PostAlonzoError {
+    #[error("native script evaluation failed")]
+    NativeScriptDenial,
+
     #[error("transaction size could not be determined")]
     UnknownTxSize,
 
