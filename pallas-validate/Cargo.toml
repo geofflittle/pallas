@@ -17,6 +17,7 @@ pallas-codec.workspace = true
 pallas-crypto.workspace = true
 pallas-primitives.workspace = true
 pallas-traverse.workspace = true
+cryptoxide = "0.4"
 hex.workspace = true
 chrono.workspace = true
 thiserror.workspace = true
