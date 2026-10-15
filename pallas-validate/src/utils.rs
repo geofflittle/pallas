@@ -4,7 +4,7 @@ pub mod environment;
 pub mod validation;
 
 pub use environment::*;
-use pallas_addresses::{Address, ShelleyAddress, ShelleyPaymentPart};
+use pallas_addresses::{Address, ScriptHash, ShelleyAddress, ShelleyPaymentPart};
 use pallas_codec::{
     minicbor::encode,
     utils::{Bytes, Nullable},
@@ -13,10 +13,10 @@ use pallas_crypto::key::ed25519::{PublicKey, Signature};
 use pallas_primitives::{
     AddrKeyhash, AssetName, Coin, Epoch, GenesisDelegateHash, Genesishash, Hash, NetworkId,
     NonZeroInt, PlutusScript, PolicyId, PoolKeyhash, PoolMetadata, PositiveCoin, Relay,
-    RewardAccount, StakeCredential, TransactionIndex, UnitInterval, VrfKeyhash,
+    RewardAccount, StakeCredential, TransactionIndex, TransactionInput, UnitInterval, VrfKeyhash,
     alonzo::{Multiasset, NativeScript, Tx as AlonzoTx, VKeyWitness, Value},
     babbage::Tx as BabbageTx,
-    conway::{Multiasset as ConwayMultiasset, Tx as ConwayTx, Value as ConwayValue},
+    conway::{DatumOption, Multiasset as ConwayMultiasset, Tx as ConwayTx, Value as ConwayValue},
 };
 
 use pallas_traverse::{Era, MultiEraInput, MultiEraOutput, MultiEraUpdate, time::Slot};
@@ -739,6 +739,30 @@ pub fn get_shelley_address(address: &[u8]) -> Option<ShelleyAddress> {
 
 pub fn is_byron_address(address: &[u8]) -> bool {
     matches!(Address::from_bytes(address), Ok(Address::Byron(_)))
+}
+
+pub(crate) fn get_script_hash_from_input(
+    input: &TransactionInput,
+    utxos: &UTxOs,
+) -> Option<ScriptHash> {
+    match utxos
+        .get(&MultiEraInput::from_alonzo_compatible(input))?
+        .address()
+        .ok()?
+    {
+        Address::Shelley(address) => match address.payment() {
+            ShelleyPaymentPart::Script(hash) => Some(*hash),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+pub(crate) fn output_language_features(output: &MultiEraOutput<'_>) -> (bool, bool) {
+    (
+        matches!(output.address(), Ok(Address::Byron(_))),
+        output.script_ref().is_some() || matches!(output.datum(), Some(DatumOption::Data(_))),
+    )
 }
 
 pub fn aux_data_from_alonzo_tx<'a>(mtx: &'a AlonzoTx) -> Option<&'a [u8]> {

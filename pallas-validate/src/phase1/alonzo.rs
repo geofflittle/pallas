@@ -6,8 +6,9 @@ use crate::utils::{
     ValidationError::{self, *},
     ValidationResult, add_minted_value, add_values, aux_data_from_alonzo_tx,
     compute_native_script_hash, compute_plutus_v1_script_hash, empty_value,
-    get_alonzo_comp_tx_size, get_lovelace_from_alonzo_val, get_payment_part, get_shelley_address,
-    get_val_size_in_words, mk_alonzo_vk_wits_check_list, values_are_equal, verify_signature,
+    get_alonzo_comp_tx_size, get_lovelace_from_alonzo_val, get_payment_part,
+    get_script_hash_from_input, get_shelley_address, get_val_size_in_words,
+    mk_alonzo_vk_wits_check_list, values_are_equal, verify_signature,
 };
 use hex;
 use pallas_addresses::{Address, ScriptHash, ShelleyAddress, ShelleyPaymentPart};
@@ -632,17 +633,6 @@ fn get_script_hashes(tx_body: &TransactionBody, utxos: &UTxOs) -> Vec<(bool, Scr
         }
     }
     res
-}
-
-fn get_script_hash_from_input(input: &TransactionInput, utxos: &UTxOs) -> Option<ScriptHash> {
-    utxos
-        .get(&MultiEraInput::from_alonzo_compatible(input))
-        .and_then(MultiEraOutput::as_alonzo)
-        .and_then(|tx_out| get_payment_part(&tx_out.address))
-        .and_then(|payment_part| match payment_part {
-            ShelleyPaymentPart::Script(script_hash) => Some(script_hash),
-            _ => None,
-        })
 }
 
 fn check_minting_policies(
