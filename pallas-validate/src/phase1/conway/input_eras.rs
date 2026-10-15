@@ -41,6 +41,43 @@ fn byron_address() -> Vec<u8> {
     .to_vec()
 }
 
+fn reward_address() -> Vec<u8> {
+    [vec![0xe0], vec![3; 28]].concat()
+}
+
+fn undecodable_byron_address() -> Vec<u8> {
+    pallas_addresses::ByronAddress::new(&[0x00], 0).to_vec()
+}
+
+#[test]
+fn an_input_at_a_reward_or_undecodable_byron_address_is_refused() {
+    let cbor = conway_tx_spending_input();
+    let tx: Tx = minicbor::decode(&cbor).unwrap();
+    let outcomes: Vec<_> = [
+        key_address(),
+        byron_address(),
+        reward_address(),
+        undecodable_byron_address(),
+    ]
+    .map(|address| {
+        let raw = legacy_output(address);
+        format!(
+            "{:?}",
+            check_vkey_input_wits(&tx, &Some(vec![]), &utxos(Era::Alonzo, &raw))
+        )
+    })
+    .into();
+    assert_eq!(
+        outcomes,
+        [
+            "Err(PostAlonzo(VKWitnessMissing))",
+            "Err(PostAlonzo(VKWitnessMissing))",
+            "Err(PostAlonzo(InputDecoding))",
+            "Err(PostAlonzo(InputDecoding))",
+        ]
+    );
+}
+
 const V2_SCRIPT: [u8; 4] = [1, 2, 3, 4];
 
 fn output_with_reference_script() -> Vec<u8> {
