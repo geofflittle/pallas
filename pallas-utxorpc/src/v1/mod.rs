@@ -484,7 +484,7 @@ impl<C: LedgerContext> Mapper<C> {
             credential: Some(map_credential(credential)),
             datum: match datum {
                 Nullable::Some(x) => Some(self.map_plutus_datum(x)),
-                Nullable::Null | Nullable::Undefined => None,
+                Nullable::Null | Nullable::Undefined => Some(u5c::PlutusData::default()),
             },
         }
     }
