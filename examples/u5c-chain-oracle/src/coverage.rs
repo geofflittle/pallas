@@ -31,7 +31,7 @@ pub enum Held {
 }
 
 /// The locations the scope leaves out of u5c, each with its reason.
-pub const EXCLUDED: [(Location, &str); 10] = [
+pub const EXCLUDED: [(Location, &str); 9] = [
     (
         Location::HeaderBody(2),
         "header prev_hash, u5c BlockHeader holds slot, hash, height and the Leios fields only",
@@ -65,10 +65,6 @@ pub const EXCLUDED: [(Location, &str); 10] = [
         "header protocol_version, u5c BlockHeader holds slot, hash, height and the Leios fields only",
     ),
     (
-        Location::Body(14),
-        "body key 14 guards, the coverage check compares no guard credentials",
-    ),
-    (
         Location::Body(24),
         "body key 24 required_top_level_guards, the mapping leaves the u5c top level guards empty",
     ),
@@ -77,6 +73,7 @@ pub const EXCLUDED: [(Location, &str); 10] = [
 /// The scope rows u5c is to hold, each with the location the source shows it at.
 pub fn in_items() -> Vec<(String, Location)> {
     let mut items = vec![
+        ("11 body key 14 guards".to_owned(), Location::Body(14)),
         (
             "12 body key 23 sub_transactions".to_owned(),
             Location::Body(23),
@@ -593,6 +590,7 @@ fn tx_agrees(location: Location, held: Held, mapped: MappedTx) -> Option<bool> {
         Location::Body(9) => count(tx.mint.len() as u64),
         Location::Body(11) => Some(!tx.script_data_hash.is_empty()),
         Location::Body(13) => top_only(&|_| count(collateral.collateral.len() as u64)),
+        Location::Body(14) => count(tx.guards.len() as u64),
         Location::Body(15) => Some(tx.network_id.is_some_and(|v| held == Held::Uint(v.into()))),
         Location::Body(16) => top_only(&|_| Some(collateral.collateral_return.is_some())),
         Location::Body(17) => {
