@@ -6,6 +6,9 @@ pub mod byron;
 pub mod conway;
 pub mod shelley_ma;
 
+#[cfg(test)]
+mod fixtures;
+
 use alonzo::validate_alonzo_tx;
 use babbage::validate_babbage_tx;
 use byron::validate_byron_tx;

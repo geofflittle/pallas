@@ -198,16 +198,17 @@ fn check_collaterals_address(collaterals: &[TransactionInput], utxos: &UTxOs) ->
     for collateral in collaterals {
         match utxos.get(&MultiEraInput::from_alonzo_compatible(collateral)) {
             Some(multi_era_output) => {
-                if let Some(conway_output) = MultiEraOutput::as_conway(multi_era_output) {
-                    let address: &Bytes = match conway_output {
-                        TransactionOutput::Legacy(inner) => &inner.address,
-                        TransactionOutput::PostAlonzo(inner) => &inner.address,
-                    };
-                    if let ShelleyPaymentPart::Script(_) =
-                        get_payment_part(address).ok_or(PostAlonzo(InputDecoding))?
-                    {
+                match multi_era_output
+                    .address()
+                    .map_err(|_| PostAlonzo(InputDecoding))?
+                {
+                    Address::Shelley(address)
+                        if matches!(address.payment(), ShelleyPaymentPart::Key(_)) => {}
+                    Address::Byron(_) => {}
+                    Address::Shelley(_) => {
                         return Err(PostAlonzo(CollateralNotVKeyLocked));
                     }
+                    _ => return Err(PostAlonzo(InputDecoding)),
                 }
             }
             None => {
@@ -1736,6 +1737,9 @@ fn cost_model_for_tx(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::phase1::fixtures::{
+        byron_address, input, key_address, legacy_output, reward_address, script_address, utxos,
+    };
     use pallas_codec::minicbor;
     use pallas_crypto::{hash::Hasher, key::ed25519::SecretKey};
     use pallas_primitives::{
@@ -1743,6 +1747,7 @@ mod tests {
         alonzo::NativeScript,
         conway::{Certificate, DRep, ExUnits, PostAlonzoTransactionOutput, Redeemer, RedeemerTag},
     };
+    use pallas_traverse::Era;
 
     const KEY_DEPOSIT: u64 = 2_000_000;
     const DREP_DEPOSIT: u64 = 5_000_000;
@@ -2614,6 +2619,44 @@ mod tests {
                         },
                     );
                 },
+            );
+        }
+    }
+
+    #[test]
+    fn script_collateral_from_an_earlier_era_is_not_key_locked() {
+        let raw = legacy_output(script_address());
+
+        let result = check_collaterals_address(&[input()], &utxos(Era::Babbage, &raw));
+
+        assert!(
+            matches!(result, Err(PostAlonzo(CollateralNotVKeyLocked))),
+            "{result:?}"
+        );
+    }
+
+    #[test]
+    fn key_and_byron_collateral_is_key_locked_from_alonzo_to_conway() {
+        for address in [key_address(), byron_address()] {
+            let raw = legacy_output(address);
+            for era in [Era::Alonzo, Era::Babbage, Era::Conway] {
+                let result = check_collaterals_address(&[input()], &utxos(era, &raw));
+
+                assert!(result.is_ok(), "{era:?} {result:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn collateral_at_a_reward_or_undecodable_address_is_refused() {
+        for address in [reward_address(), vec![0x61]] {
+            let raw = legacy_output(address);
+
+            let result = check_collaterals_address(&[input()], &utxos(Era::Babbage, &raw));
+
+            assert!(
+                matches!(result, Err(PostAlonzo(InputDecoding))),
+                "{result:?}"
             );
         }
     }
