@@ -182,12 +182,14 @@ fn a_reference_script_from_an_earlier_era_is_found() {
     let without_script = legacy_output(key_address());
     for era in [Era::Babbage, Era::Conway] {
         assert_eq!(
-            get_reference_script_hashes(body, &utxos(era, &with_script)),
+            get_reference_script_hashes(body, &utxos(era, &with_script)).unwrap(),
             vec![expected],
             "{era:?}"
         );
         assert!(
-            get_reference_script_hashes(body, &utxos(era, &without_script)).is_empty(),
+            get_reference_script_hashes(body, &utxos(era, &without_script))
+                .unwrap()
+                .is_empty(),
             "{era:?}"
         );
     }
@@ -259,7 +261,7 @@ fn only_a_needed_reference_script_sets_the_language() {
             tx.transaction_body = body.into();
             for (output, has_script) in [(&with_script, true), (&without_script, false)] {
                 for era in [Era::Babbage, Era::Conway] {
-                    let languages = tx_languages(&tx, &utxos(era, output));
+                    let languages = tx_languages(&tx, &utxos(era, output)).unwrap();
                     outcomes.push((spent, mints, has_script, era, languages));
                     let needed = mints && has_script;
                     let languages = if needed {
@@ -358,7 +360,7 @@ fn each_needed_purpose_sets_the_reference_script_language() {
                 }
             }
             tx.transaction_body = body.into();
-            outcomes.push((purpose, hash == script, tx_languages(&tx, &utxos)));
+            outcomes.push((purpose, hash == script, tx_languages(&tx, &utxos).unwrap()));
         }
     }
     let expected: Vec<_> = outcomes

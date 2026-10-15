@@ -35,6 +35,8 @@ use std::ops::Deref;
 mod certificate_witnesses;
 #[cfg(test)]
 mod input_eras;
+#[cfg(all(test, feature = "unstable"))]
+mod native_inputs;
 
 pub fn validate_conway_tx(
     mtx: &Tx,
@@ -632,7 +634,10 @@ fn check_minting(tx_body: &TransactionBody, mtx: &Tx, utxos: &UTxOs) -> Validati
                 .map(compute_plutus_v3_script_hash);
 
             let ref_scripts = reference_script_inputs(tx_body)
-                .filter_map(|x| get_script_hash_from_reference_input(x, utxos));
+                .map(|x| get_script_hash_from_reference_input(x, utxos))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .flatten();
 
             let all_scripts_wits: Vec<_> = native_script_wits
                 .chain(v1_scripts_wits)
@@ -699,7 +704,7 @@ fn check_witness_set(mtx: &Tx, utxos: &UTxOs) -> ValidationResult {
             .collect(),
         None => Vec::new(),
     };
-    let reference_scripts: Vec<PolicyId> = get_reference_script_hashes(tx_body, utxos);
+    let reference_scripts: Vec<PolicyId> = get_reference_script_hashes(tx_body, utxos)?;
     check_needed_scripts(
         tx_body,
         utxos,
@@ -714,11 +719,10 @@ fn check_witness_set(mtx: &Tx, utxos: &UTxOs) -> ValidationResult {
     // Native reference scripts satisfy script presence, but never need redeemers.
     let mut plutus_reference_scripts = Vec::new();
     for input in reference_script_inputs(tx_body) {
-        if let Some(script) = reference_script(input, utxos)
+        if let Some(script) = reference_script(input, utxos)?
             && !matches!(script, ScriptRef::NativeScript(_))
-            && let Some(hash) = get_script_hash_from_reference_input(input, utxos)
         {
-            plutus_reference_scripts.push(hash);
+            plutus_reference_scripts.push(MultiEraScriptRef::from_conway(&script).hash());
         }
     }
     check_redeemers(
@@ -842,14 +846,17 @@ fn check_needed_scripts(
     Ok(())
 }
 
-fn get_reference_script_hashes(tx_body: &TransactionBody, utxos: &UTxOs) -> Vec<PolicyId> {
+fn get_reference_script_hashes(
+    tx_body: &TransactionBody,
+    utxos: &UTxOs,
+) -> Result<Vec<PolicyId>, ValidationError> {
     let mut res: Vec<PolicyId> = Vec::new();
     for input in reference_script_inputs(tx_body) {
-        if let Some(script_hash) = get_script_hash_from_reference_input(input, utxos) {
+        if let Some(script_hash) = get_script_hash_from_reference_input(input, utxos)? {
             res.push(script_hash);
         }
     }
-    res
+    Ok(res)
 }
 
 // The credential that must witness a certificate. Legacy stake registration
@@ -884,16 +891,44 @@ fn reference_script_inputs<'a>(
         .chain(body.reference_inputs.iter().flatten())
 }
 
+// Only the script is projected into the representation supported by this
+// validator. The UTxO, its era, address, value, datum and original CBOR stay intact.
+// Dijkstra adds V4 and native guards; neither has Conway evaluation semantics.
 fn reference_script<'a>(
     input: &'a TransactionInput,
     utxos: &'a UTxOs<'_>,
-) -> Option<ScriptRef<'a>> {
-    let script = utxos
+) -> Result<Option<ScriptRef<'a>>, ValidationError> {
+    let Some(script) = utxos
         .get(&MultiEraInput::from_alonzo_compatible(input))
-        .and_then(MultiEraOutput::multi_era_script_ref)?;
+        .and_then(MultiEraOutput::multi_era_script_ref)
+    else {
+        return Ok(None);
+    };
     match script {
-        MultiEraScriptRef::Conway(script) => Some(script.into_owned()),
-        _ => None,
+        MultiEraScriptRef::Conway(script) => Ok(Some(script.into_owned())),
+        #[cfg(feature = "unstable")]
+        MultiEraScriptRef::Dijkstra(script) => {
+            use pallas_primitives::dijkstra::ScriptRef as DijkstraScript;
+            Ok(Some(match script.as_ref() {
+                DijkstraScript::NativeScript(native) => {
+                    // Decode the original native bytes with the existing timelock
+                    // codec. A guard anywhere in the tree is explicitly refused.
+                    let bytes =
+                        pallas_codec::minicbor::to_vec(native).expect("infallible encoding");
+                    let compatible: KeepRaw<pallas_primitives::alonzo::NativeScript> =
+                        pallas_codec::minicbor::decode(&bytes)
+                            .map_err(|_| PostAlonzo(UnsupportedNativeScript))?;
+                    ScriptRef::NativeScript(compatible.to_owned())
+                }
+                DijkstraScript::PlutusV1Script(script) => ScriptRef::PlutusV1Script(script.clone()),
+                DijkstraScript::PlutusV2Script(script) => ScriptRef::PlutusV2Script(script.clone()),
+                DijkstraScript::PlutusV3Script(script) => ScriptRef::PlutusV3Script(script.clone()),
+                DijkstraScript::PlutusV4Script(_) => {
+                    return Err(PostAlonzo(UnsupportedPlutusLanguage));
+                }
+            }))
+        }
+        _ => Err(PostAlonzo(InputDecoding)),
     }
 }
 
@@ -905,9 +940,9 @@ fn check_certificate_native_scripts(mtx: &Tx, utxos: &UTxOs) -> ValidationResult
         .as_ref()
         .map(|x| x.clone().to_vec())
         .unwrap_or_default();
-    let references: Vec<_> = reference_script_inputs(body)
+    let references = reference_script_inputs(body)
         .map(|input| reference_script(input, utxos))
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
     let scripts = witnesses
         .native_script
         .iter()
@@ -1010,13 +1045,9 @@ fn get_script_hash_from_input(input: &TransactionInput, utxos: &UTxOs) -> Option
 fn get_script_hash_from_reference_input(
     ref_input: &TransactionInput,
     utxos: &UTxOs,
-) -> Option<PolicyId> {
-    reference_script(ref_input, utxos).map(|script| match script {
-        ScriptRef::NativeScript(script) => script.original_hash(),
-        ScriptRef::PlutusV1Script(script) => compute_plutus_v1_script_hash(&script),
-        ScriptRef::PlutusV2Script(script) => compute_plutus_v2_script_hash(&script),
-        ScriptRef::PlutusV3Script(script) => compute_plutus_v3_script_hash(&script),
-    })
+) -> Result<Option<PolicyId>, ValidationError> {
+    Ok(reference_script(ref_input, utxos)?
+        .map(|script| MultiEraScriptRef::from_conway(&script).hash()))
 }
 
 fn check_minting_policies(
@@ -1590,7 +1621,7 @@ fn check_remaining_vk_wits(
 }
 
 fn check_languages(mtx: &Tx, utxos: &UTxOs, prot_pps: &ConwayProtParams) -> ValidationResult {
-    let used_langs = tx_languages(mtx, utxos);
+    let used_langs = tx_languages(mtx, utxos)?;
     let allowed_langs: Vec<Language> = allowed_tx_langs(mtx, utxos);
     let available_langs: Vec<Language> = available_langs(prot_pps);
 
@@ -1678,7 +1709,7 @@ fn any_reference_inputs(reference_inputs: &Option<Vec<TransactionInput>>) -> boo
     }
 }
 
-fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
+fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Result<Vec<Language>, ValidationError> {
     let mut v1_scripts: bool = false;
     let mut v2_scripts: bool = false;
     let mut v3_scripts: bool = false;
@@ -1699,12 +1730,10 @@ fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
     }
     let needed = needed_script_hashes(&mtx.transaction_body, utxos);
     for input in reference_script_inputs(&mtx.transaction_body) {
-        let Some(script) = reference_script(input, utxos) else {
+        let Some(script) = reference_script(input, utxos)? else {
             continue;
         };
-        if !get_script_hash_from_reference_input(input, utxos)
-            .is_some_and(|hash| needed.contains(&hash))
-        {
+        if !needed.contains(&MultiEraScriptRef::from_conway(&script).hash()) {
             continue;
         }
         match script {
@@ -1724,7 +1753,7 @@ fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
     if v3_scripts {
         langs.push(Language::PlutusV3);
     }
-    langs
+    Ok(langs)
 }
 
 // The scripts the body needs: spent script inputs, minting policies, the script
@@ -1800,7 +1829,7 @@ fn check_script_data_hash(
     utxos: &UTxOs,
     prot_pps: &ConwayProtParams,
 ) -> ValidationResult {
-    let tx_languages = tx_languages(mtx, utxos);
+    let tx_languages = tx_languages(mtx, utxos)?;
 
     let Some(provided) = tx_body.script_data_hash else {
         if tx_languages.is_empty() {
