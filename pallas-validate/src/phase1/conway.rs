@@ -19,8 +19,9 @@ use pallas_codec::utils::{Bytes, KeepRaw, NonEmptySet};
 use pallas_primitives::{
     AddrKeyhash, Hash, PlutusData, PlutusScript, PolicyId, PositiveCoin, TransactionInput, babbage,
     conway::{
-        DatumOption, Language, LanguageViews, Mint, Redeemers, RedeemersKey, RequiredSigners,
-        ScriptRef, TransactionBody, TransactionOutput, Tx, VKeyWitness, Value, WitnessSet,
+        Certificate, DatumOption, Language, LanguageViews, Mint, Redeemers, RedeemersKey,
+        RequiredSigners, ScriptRef, TransactionBody, TransactionOutput, Tx, VKeyWitness, Value,
+        WitnessSet,
     },
 };
 use pallas_traverse::{MultiEraInput, MultiEraOutput, OriginalHash};
@@ -40,7 +41,13 @@ pub fn validate_conway_tx(
     check_all_ins_in_utxos(tx_body, utxos)?;
     check_tx_validity_interval(tx_body, block_slot)?;
     check_fee(tx_body, &size, mtx, utxos, prot_pps)?;
-    check_preservation_of_value(tx_body, utxos)?;
+    check_preservation_of_value(
+        tx_body,
+        utxos,
+        prot_pps.key_deposit,
+        prot_pps.drep_deposit,
+        prot_pps.governance_action_deposit,
+    )?;
     check_min_lovelace(tx_body, prot_pps)?;
     check_output_val_size(tx_body, prot_pps)?;
     check_network_id(tx_body, network_id)?;
@@ -316,14 +323,40 @@ fn val_from_multi_era_output(multi_era_output: &MultiEraOutput) -> Value {
 }
 
 // The preservation of value property holds.
-fn check_preservation_of_value(tx_body: &TransactionBody, utxos: &UTxOs) -> ValidationResult {
+fn check_preservation_of_value(
+    tx_body: &TransactionBody,
+    utxos: &UTxOs,
+    key_deposit: u64,
+    drep_deposit: u64,
+    proposal_deposit: u64,
+) -> ValidationResult {
+    let err = PostAlonzo(NegativeValue);
+    let (deposits, refunds): (Vec<_>, Vec<_>) = tx_body
+        .certificates
+        .iter()
+        .flatten()
+        .map(|cert| certificate_deposit_and_refund(cert, key_deposit, drep_deposit))
+        .unzip();
+    let withdrawals = tx_body.withdrawals.iter().flatten().map(|(_, coin)| *coin);
+    let proposals = tx_body
+        .proposal_procedures
+        .iter()
+        .flatten()
+        .map(|_| proposal_deposit);
     let mut input: Value = get_consumed(tx_body, utxos)?;
-    let produced: Value = get_produced(tx_body)?;
-    let output: Value = conway_add_values(
-        &produced,
-        &Value::Coin(tx_body.fee),
-        &PostAlonzo(NegativeValue),
-    )?;
+    for coin in refunds.into_iter().chain(withdrawals) {
+        input = conway_add_values(&input, &Value::Coin(coin), &err)?;
+    }
+    let mut output: Value = get_produced(tx_body)?;
+    let donation = tx_body.donation.map(u64::from);
+    for coin in [tx_body.fee]
+        .into_iter()
+        .chain(deposits)
+        .chain(proposals)
+        .chain(donation)
+    {
+        output = conway_add_values(&output, &Value::Coin(coin), &err)?;
+    }
     if let Some(m) = &tx_body.mint {
         input = conway_add_minted_non_zero(&input, m, &PostAlonzo(NegativeValue))?;
     }
@@ -332,6 +365,25 @@ fn check_preservation_of_value(tx_body: &TransactionBody, utxos: &UTxOs) -> Vali
         return Err(PostAlonzo(PreservationOfValue));
     }
     Ok(())
+}
+
+// The deposit a certificate charges and the refund it returns.
+fn certificate_deposit_and_refund(
+    cert: &Certificate,
+    key_deposit: u64,
+    drep_deposit: u64,
+) -> (u64, u64) {
+    match cert {
+        Certificate::StakeRegistration(..)
+        | Certificate::Reg(..)
+        | Certificate::StakeRegDeleg(..)
+        | Certificate::VoteRegDeleg(..)
+        | Certificate::StakeVoteRegDeleg(..) => (key_deposit, 0),
+        Certificate::RegDRepCert(..) => (drep_deposit, 0),
+        Certificate::StakeDeregistration(..) => (0, key_deposit),
+        Certificate::UnReg(_, refund) | Certificate::UnRegDRepCert(_, refund) => (0, *refund),
+        _ => (0, 0),
+    }
 }
 
 fn get_consumed(tx_body: &TransactionBody, utxos: &UTxOs) -> Result<Value, ValidationError> {
@@ -1665,3 +1717,6 @@ fn cost_model_for_tx(
     }
     Some(LanguageViews(map))
 }
+
+#[cfg(test)]
+mod registration_deposits;
