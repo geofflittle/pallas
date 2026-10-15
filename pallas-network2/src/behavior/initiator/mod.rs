@@ -666,6 +666,11 @@ impl Behavior for InitiatorBehavior {
                     .is_none_or(|state| state.connection == ConnectionState::New);
                 if new {
                     self.on_discovered(&pid);
+                } else {
+                    #[cfg(feature = "unstable")]
+                    self.outbound.push_ready(BehaviorOutput::ExternalEvent(
+                        InitiatorEvent::PeerDisconnected(pid.clone(), DisconnectReason::Closed),
+                    ));
                 }
             }
             InitiatorCommand::StartSync(points) => {
