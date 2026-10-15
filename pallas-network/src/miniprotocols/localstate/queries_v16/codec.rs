@@ -1443,12 +1443,11 @@ pub mod tests {
             "the eleven appended entries do not go back out as they came in: {reencoded}"
         );
 
-        // The Plutus v4 cost model the node sent lands in the field named for
-        // it, and no key of this reply falls through to `unknown`.
+        // The Plutus v4 cost model the node sent stays under key 3 in `unknown`.
         let models = &decoded.cost_models_for_script_languages;
         let unknown: Vec<u64> = models.unknown.iter().map(|(k, _)| *k).collect();
-        assert_eq!(unknown, Vec::<u64>::new());
-        assert_eq!(models.plutus_v4.as_ref().expect("plutus v4").len(), 251);
+        assert_eq!(unknown, vec![3]);
+        assert_eq!(models.plutus_v4().expect("plutus v4").len(), 251);
         assert_eq!(models.plutus_v1.as_ref().expect("plutus v1").len(), 332);
         assert_eq!(models.plutus_v2.as_ref().expect("plutus v2").len(), 332);
         assert_eq!(models.plutus_v3.as_ref().expect("plutus v3").len(), 350);
@@ -1538,7 +1537,7 @@ pub mod tests {
         assert_eq!(models.plutus_v1, Some(vec![100788, 420]));
         assert_eq!(models.plutus_v2, Some(vec![100788]));
         assert_eq!(models.plutus_v3, Some(vec![-1, 2]));
-        assert_eq!(models.plutus_v4, None);
+        assert_eq!(models.plutus_v4(), None);
         assert!(models.unknown.is_empty());
 
         assert_eq!(
@@ -1560,7 +1559,7 @@ pub mod tests {
 
         let models: CostModels = minicbor::decode(&wire).expect("decode an unnamed cost model");
 
-        assert_eq!(models.plutus_v4, None);
+        assert_eq!(models.plutus_v4(), None);
         let carried: Vec<(u64, Vec<i64>)> = models.unknown.iter().cloned().collect();
         assert_eq!(carried, vec![(4u64, vec![1i64, 2])]);
 
