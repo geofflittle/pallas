@@ -39,16 +39,13 @@ type ParamUpdate = u5c::PParamsUpdate;
 
 /// The value this schema's update message holds for a scalar key, absent when
 /// the update leaves the key unset.
-fn update_scalar<T>(value: Option<T>) -> Option<T> {
-    value
+fn update_scalar<T: Default>(value: Option<T>) -> Option<T> {
+    Some(value.unwrap_or_default())
 }
 
 /// Sets the Leios and Peras fields of a mapped block from the block's header
 /// and body.
 fn with_leios_fields(mut mapped: u5c::Block, block: &trv::MultiEraBlock) -> u5c::Block {
-    if true {
-        return mapped;
-    }
     let header = block.header();
 
     if let Some(mapped) = mapped.header.as_mut() {
