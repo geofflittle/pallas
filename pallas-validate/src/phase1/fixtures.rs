@@ -48,3 +48,34 @@ pub(super) fn byron_address() -> Vec<u8> {
 pub(super) fn reward_address() -> Vec<u8> {
     [vec![0xe0], vec![3; 28]].concat()
 }
+
+pub(super) fn byron_output() -> Vec<u8> {
+    let mut cbor = vec![0x82];
+    cbor.extend(byron_address());
+    cbor.extend([0x1a, 0x00, 0x4c, 0x4b, 0x40]);
+    cbor
+}
+
+fn input_cbor() -> Vec<u8> {
+    let mut cbor = vec![0x82, 0x58, 0x20];
+    cbor.extend([0; 32]);
+    cbor.push(0x00);
+    cbor
+}
+
+pub(super) fn tx_spending_input() -> Vec<u8> {
+    let mut cbor = vec![0x84, 0xa3, 0x00, 0x81]; // transaction, body, one input
+    cbor.extend(input_cbor());
+    cbor.extend([0x01, 0x80, 0x02, 0x00]); // no outputs, no fee
+    cbor.extend([0xa0, 0xf5, 0xf6]); // no witnesses, valid, no auxiliary data
+    cbor
+}
+
+pub(super) fn tx_referencing_input() -> Vec<u8> {
+    let mut cbor = vec![0x84, 0xa4]; // transaction, body
+    cbor.extend([0x00, 0x80, 0x01, 0x80, 0x02, 0x00]); // no inputs, no outputs, no fee
+    cbor.extend([0x12, 0x81]); // one reference input
+    cbor.extend(input_cbor());
+    cbor.extend([0xa0, 0xf5, 0xf6]); // no witnesses, valid, no auxiliary data
+    cbor
+}
