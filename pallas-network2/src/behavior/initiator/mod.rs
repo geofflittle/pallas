@@ -154,6 +154,7 @@ pub struct InitiatorState {
     pub(crate) continue_sync: bool,
     pub(crate) sync_next_deferred: bool,
     pub(crate) unsent: UnsentRequests,
+    pub(crate) in_flight: Option<BlockRange>,
 }
 
 impl InitiatorState {
@@ -175,6 +176,7 @@ impl InitiatorState {
             continue_sync: false,
             sync_next_deferred: false,
             unsent: UnsentRequests::default(),
+            in_flight: None,
         }
     }
 
@@ -329,6 +331,7 @@ impl InitiatorState {
         self.sync_next_deferred = false;
         self.violation = false;
         self.unsent = UnsentRequests::default();
+        self.in_flight = None;
     }
 }
 
