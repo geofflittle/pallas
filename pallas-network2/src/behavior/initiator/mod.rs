@@ -2264,4 +2264,61 @@ mod tests {
             "fetches sent to the peer, and its promotion, after a violation and the reply"
         );
     }
+
+    #[tokio::test]
+    async fn probe_late_sent_after_disconnected() {
+        tokio::time::pause();
+        for arm in ["connected", "include", "housekeeping", "error"] {
+            let mut behavior = InitiatorBehavior::default();
+            let (x, y, z) = (PeerId::test(77), PeerId::test(78), PeerId::test(79));
+            include_and_connect(&mut behavior, &x);
+            complete_handshake(&mut behavior, &x);
+            behavior.execute(InitiatorCommand::RequestBlocks(range(1)));
+            let first = sends_to(&drain_outputs(&mut behavior), &x, is_any_range);
+            assert_eq!(first.len(), 1, "setup: range 1 pushed to x");
+            behavior.handle_io(InterfaceEvent::Disconnected(x.clone()));
+            drain_outputs(&mut behavior);
+            behavior.handle_io(InterfaceEvent::Sent(x.clone(), first[0].clone()));
+            drain_outputs(&mut behavior);
+            let x_after = format!(
+                "{:?}/{:?}/{:?}",
+                behavior.peers[&x].connection,
+                behavior.peers[&x].promotion,
+                behavior.peers[&x].blockfetch
+            );
+            include_and_connect(&mut behavior, &y);
+            let to_y = ranges_requested_from(&mut behavior, &y).len();
+            let mut x_connects = 0;
+            match arm {
+                "connected" => {
+                    behavior.handle_io(InterfaceEvent::Connected(x.clone()));
+                    drain_outputs(&mut behavior);
+                }
+                "include" => include_and_connect(&mut behavior, &x),
+                "error" => {
+                    behavior.handle_io(InterfaceEvent::Error(
+                        x.clone(),
+                        InterfaceError::Other("eof".into()),
+                    ));
+                    let out = drain_outputs(&mut behavior);
+                    x_connects = 10 * usize::from(out.has_disconnect_for(&x));
+                }
+                _ => {
+                    let out = housekeep_twice(&mut behavior);
+                    x_connects = usize::from(out.has_connect_for(&x));
+                    if x_connects == 1 {
+                        behavior.handle_io(InterfaceEvent::Connected(x.clone()));
+                        drain_outputs(&mut behavior);
+                    }
+                }
+            }
+            behavior.handle_io(InterfaceEvent::Disconnected(x.clone()));
+            drain_outputs(&mut behavior);
+            include_and_connect(&mut behavior, &z);
+            let to_z = ranges_requested_from(&mut behavior, &z).len();
+            println!(
+                "PROBE late sent arm={arm} x_after_late_sent={x_after} range1_to_y={to_y} x_connects_without_include={x_connects} range1_again_to_z={to_z}"
+            );
+        }
+    }
 }
