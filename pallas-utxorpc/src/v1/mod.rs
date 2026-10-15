@@ -139,16 +139,30 @@ fn dijkstra_pparams_update(_: &mut bool, _: &trv::MultiEraParamUpdate) -> ParamU
 /// The fields of the Dijkstra parameters no other era carries.
 #[cfg(feature = "unstable")]
 fn dijkstra_pparams(x: &pallas_validate::utils::DijkstraProtParams) -> u5c::PParams {
-    let Some(plutus) = &x.plutus else {
-        return u5c::PParams::default();
-    };
-
     u5c::PParams {
-        max_ref_script_size_per_tx: Some(plutus.max_ref_script_size_per_tx.into()),
-        ref_script_cost_stride: Some(plutus.ref_script_cost_stride.into()),
+        max_ref_script_size_per_block: Some(x.max_ref_script_size_per_block.into()),
+        max_ref_script_size_per_tx: Some(x.max_ref_script_size_per_tx.into()),
+        ref_script_cost_stride: Some(x.ref_script_cost_stride.into()),
         ref_script_cost_multiplier: Some(rational_number_to_u5c(
-            plutus.ref_script_cost_multiplier.clone(),
+            x.ref_script_cost_multiplier.clone(),
         )),
+        max_pledge_leverage: x.max_pledge_leverage.clone().map(rational_number_to_u5c),
+        min_pool_margin: Some(rational_number_to_u5c(x.min_pool_margin.clone())),
+        leios_announcement_period_length: Some(x.leios_announcement_period_length.into()),
+        leios_vote_period_length: Some(x.leios_vote_period_length.into()),
+        leios_diffusion_period_length: Some(x.leios_diffusion_period_length.into()),
+        leios_committee_size: Some(x.leios_committee_size.into()),
+        leios_quorum_stake_threshold: Some(rational_number_to_u5c(
+            x.leios_quorum_stake_threshold.clone(),
+        )),
+        max_endorser_block_references_size: Some(x.max_endorser_block_references_size.into()),
+        max_endorser_block_txs_size: Some(x.max_endorser_block_txs_size.into()),
+        max_endorser_block_execution_units: Some(execution_units_to_u5c(
+            x.max_endorser_block_ex_units,
+        )),
+        max_ref_script_size_per_endorser_block: Some(
+            x.max_ref_script_size_per_endorser_block.into(),
+        ),
         ..Default::default()
     }
 }
@@ -1070,23 +1084,44 @@ mod tests {
 
     #[cfg(feature = "unstable")]
     #[test]
-    fn a_dijkstra_parameter_set_maps_its_reference_script_fields() {
-        let mapped = Mapper::new(NoLedger).map_pparams(
-            pallas_validate::utils::MultiEraProtocolParameters::Dijkstra(dijkstra_params()),
+    fn a_dijkstra_parameter_set_maps_every_key_the_era_adds() {
+        assert_eq!(
+            dijkstra_pparams(&dijkstra_params()),
+            u5c::PParams {
+                max_ref_script_size_per_block: Some(1_048_576),
+                max_ref_script_size_per_tx: Some(204_800),
+                ref_script_cost_stride: Some(25_600),
+                ref_script_cost_multiplier: Some(rational_number_to_u5c(ratio(6, 5))),
+                max_pledge_leverage: Some(rational_number_to_u5c(ratio(38, 1))),
+                min_pool_margin: Some(rational_number_to_u5c(ratio(1, 39))),
+                leios_announcement_period_length: Some(1_000),
+                leios_vote_period_length: Some(4_000),
+                leios_diffusion_period_length: Some(7_000),
+                leios_committee_size: Some(900),
+                leios_quorum_stake_threshold: Some(rational_number_to_u5c(ratio(3, 4))),
+                max_endorser_block_references_size: Some(100_000),
+                max_endorser_block_txs_size: Some(1_000_000),
+                max_endorser_block_execution_units: Some(u5c::ExUnits {
+                    memory: 310_000_000,
+                    steps: 100_000_000_000,
+                }),
+                max_ref_script_size_per_endorser_block: Some(4_000_000),
+                ..Default::default()
+            },
+            "each key the era adds reaches the u5c field it means, carrying its own value"
         );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_dijkstra_parameter_set_without_a_pledge_leverage_cap_maps_none() {
+        let mut params = dijkstra_params();
+        params.max_pledge_leverage = None;
 
         assert_eq!(
-            (
-                mapped.max_ref_script_size_per_tx,
-                mapped.ref_script_cost_stride,
-                mapped.ref_script_cost_multiplier,
-            ),
-            (
-                Some(204_800),
-                Some(25_600),
-                Some(rational_number_to_u5c(ratio(6, 5)))
-            ),
-            "the reference script parameters the set holds reach the fields this schema names for them"
+            dijkstra_pparams(&params).max_pledge_leverage,
+            None,
+            "a set with no pledge leverage cap leaves the field absent"
         );
     }
 }

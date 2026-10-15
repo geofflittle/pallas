@@ -506,6 +506,16 @@ macro_rules! impl_cardano_mapper_before_v1 {
                     "the key this schema carries reaches its field, and the key it cannot carry neither adds a field nor takes the update away"
                 );
             }
+
+            #[cfg(feature = "unstable")]
+            #[test]
+            fn a_dijkstra_parameter_set_maps_none_of_the_keys_this_schema_cannot_carry() {
+                assert_eq!(
+                    dijkstra_pparams(&dijkstra_params()),
+                    u5c::PParams::default(),
+                    "this schema has no field for a key the era adds, so none of them reaches a field"
+                );
+            }
         }
     };
 }
