@@ -9,7 +9,7 @@ use crate::utils::{
     compute_native_script_hash, compute_plutus_v1_script_hash, compute_plutus_v2_script_hash,
     compute_plutus_v3_script_hash, conway_add_minted_non_zero, conway_add_values,
     conway_get_val_size_in_words, conway_lovelace_diff_or_fail, conway_values_are_equal,
-    get_conway_tx_size, get_lovelace_from_conway_val, get_payment_part, get_shelley_address,
+    get_conway_tx_size, get_lovelace_from_conway_val, get_shelley_address,
     mk_alonzo_vk_wits_check_list, verify_signature,
 };
 use pallas_addresses::{
@@ -33,6 +33,8 @@ use std::ops::Deref;
 mod certificate_witnesses;
 #[cfg(test)]
 mod input_eras;
+#[cfg(all(test, feature = "unstable"))]
+mod native_inputs;
 #[cfg(test)]
 mod registration_deposits;
 
@@ -605,7 +607,10 @@ fn check_minting(tx_body: &TransactionBody, mtx: &Tx, utxos: &UTxOs) -> Validati
                 .map(compute_plutus_v3_script_hash);
 
             let ref_scripts = reference_script_inputs(tx_body)
-                .filter_map(|x| get_script_hash_from_reference_input(x, utxos));
+                .map(|x| get_script_hash_from_reference_input(x, utxos))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .flatten();
 
             let all_scripts_wits: Vec<_> = native_script_wits
                 .chain(v1_scripts_wits)
@@ -672,7 +677,7 @@ fn check_witness_set(mtx: &Tx, utxos: &UTxOs) -> ValidationResult {
             .collect(),
         None => Vec::new(),
     };
-    let reference_scripts: Vec<PolicyId> = get_reference_script_hashes(tx_body, utxos);
+    let reference_scripts: Vec<PolicyId> = get_reference_script_hashes(tx_body, utxos)?;
     check_needed_scripts(
         tx_body,
         utxos,
@@ -805,14 +810,17 @@ fn check_needed_scripts(
     Ok(())
 }
 
-fn get_reference_script_hashes(tx_body: &TransactionBody, utxos: &UTxOs) -> Vec<PolicyId> {
+fn get_reference_script_hashes(
+    tx_body: &TransactionBody,
+    utxos: &UTxOs,
+) -> Result<Vec<PolicyId>, ValidationError> {
     let mut res: Vec<PolicyId> = Vec::new();
     for input in reference_script_inputs(tx_body) {
-        if let Some(script_hash) = get_script_hash_from_reference_input(input, utxos) {
+        if let Some(script_hash) = get_script_hash_from_reference_input(input, utxos)? {
             res.push(script_hash);
         }
     }
-    res
+    Ok(res)
 }
 
 // Conway's legacy registration has no author. Every other credential-bearing
@@ -848,16 +856,44 @@ fn reference_script_inputs<'a>(
         .chain(body.reference_inputs.iter().flatten())
 }
 
+// Only the script is projected into the representation supported by this
+// validator. The UTxO, its era, address, value, datum and original CBOR stay intact.
+// Dijkstra adds V4 and native guards; neither has Conway evaluation semantics.
 fn reference_script<'a>(
     input: &'a TransactionInput,
     utxos: &'a UTxOs<'_>,
-) -> Option<ScriptRef<'a>> {
-    let script = utxos
+) -> Result<Option<ScriptRef<'a>>, ValidationError> {
+    let Some(script) = utxos
         .get(&MultiEraInput::from_alonzo_compatible(input))
-        .and_then(MultiEraOutput::multi_era_script_ref)?;
+        .and_then(MultiEraOutput::multi_era_script_ref)
+    else {
+        return Ok(None);
+    };
     match script {
-        MultiEraScriptRef::Conway(script) => Some(script.into_owned()),
-        _ => None,
+        MultiEraScriptRef::Conway(script) => Ok(Some(script.into_owned())),
+        #[cfg(feature = "unstable")]
+        MultiEraScriptRef::Dijkstra(script) => {
+            use pallas_primitives::dijkstra::ScriptRef as DijkstraScript;
+            Ok(Some(match script.as_ref() {
+                DijkstraScript::NativeScript(native) => {
+                    // Decode the original native bytes with the existing timelock
+                    // codec. A guard anywhere in the tree is explicitly refused.
+                    let bytes =
+                        pallas_codec::minicbor::to_vec(native).expect("infallible encoding");
+                    let compatible: KeepRaw<pallas_primitives::alonzo::NativeScript> =
+                        pallas_codec::minicbor::decode(&bytes)
+                            .map_err(|_| PostAlonzo(UnsupportedNativeScript))?;
+                    ScriptRef::NativeScript(compatible.to_owned())
+                }
+                DijkstraScript::PlutusV1Script(script) => ScriptRef::PlutusV1Script(script.clone()),
+                DijkstraScript::PlutusV2Script(script) => ScriptRef::PlutusV2Script(script.clone()),
+                DijkstraScript::PlutusV3Script(script) => ScriptRef::PlutusV3Script(script.clone()),
+                DijkstraScript::PlutusV4Script(_) => {
+                    return Err(PostAlonzo(UnsupportedPlutusLanguage));
+                }
+            }))
+        }
+        _ => Err(PostAlonzo(InputDecoding)),
     }
 }
 
@@ -869,9 +905,9 @@ fn check_certificate_native_scripts(mtx: &Tx, utxos: &UTxOs) -> ValidationResult
         .as_ref()
         .map(|x| x.clone().to_vec())
         .unwrap_or_default();
-    let references: Vec<_> = reference_script_inputs(body)
+    let references = reference_script_inputs(body)
         .map(|input| reference_script(input, utxos))
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
     let scripts = witnesses
         .native_script
         .iter()
@@ -974,8 +1010,9 @@ fn get_script_hash_from_input(input: &TransactionInput, utxos: &UTxOs) -> Option
 fn get_script_hash_from_reference_input(
     ref_input: &TransactionInput,
     utxos: &UTxOs,
-) -> Option<PolicyId> {
-    reference_script(ref_input, utxos).map(|script| MultiEraScriptRef::from_conway(&script).hash())
+) -> Result<Option<PolicyId>, ValidationError> {
+    Ok(reference_script(ref_input, utxos)?
+        .map(|script| MultiEraScriptRef::from_conway(&script).hash()))
 }
 
 fn check_minting_policies(
@@ -1419,39 +1456,15 @@ fn check_vkey_input_wits(
     for input in inputs_and_collaterals.iter() {
         match utxos.get(&MultiEraInput::from_alonzo_compatible(input)) {
             Some(multi_era_output) => {
-                // Try to get address from Conway output first
-                let address: Option<Bytes> = if let Some(conway_output) =
-                    MultiEraOutput::as_conway(multi_era_output)
-                {
-                    match conway_output {
-                        TransactionOutput::Legacy(output) => Some(output.address.clone()),
-                        TransactionOutput::PostAlonzo(output) => Some(output.address.clone()),
-                    }
-                } else if let Some(alonzo_output) = multi_era_output.as_alonzo() {
-                    // Alonzo, Mary, Allegra, Shelley
-                    Some(alonzo_output.address.clone())
-                } else if let Some(babbage_output) = multi_era_output.as_babbage() {
-                    // Babbage
-                    match babbage_output {
-                        babbage::TransactionOutput::Legacy(output) => Some(output.address.clone()),
-                        babbage::TransactionOutput::PostAlonzo(output) => {
-                            Some(output.address.clone())
-                        }
-                    }
-                } else {
-                    // Byron outputs are handled separately below
-                    None
-                };
-
-                if let Some(address) = address {
-                    match get_payment_part(&address).ok_or(PostAlonzo(InputDecoding))? {
-                        ShelleyPaymentPart::Key(payment_key_hash) => {
-                            check_vk_wit(&payment_key_hash, vk_wits, tx_hash)?
-                        }
-                        ShelleyPaymentPart::Script(_) => {}
-                    }
-                } else {
+                let Address::Shelley(address) = multi_era_output
+                    .address()
+                    .map_err(|_| PostAlonzo(InputDecoding))?
+                else {
                     return Err(PostAlonzo(InputDecoding));
+                };
+                match address.payment() {
+                    ShelleyPaymentPart::Key(hash) => check_vk_wit(hash, vk_wits, tx_hash)?,
+                    ShelleyPaymentPart::Script(_) => {}
                 }
             }
             None => return Err(PostAlonzo(InputNotInUTxO)),
@@ -1511,7 +1524,7 @@ fn check_remaining_vk_wits(
 }
 
 fn check_languages(mtx: &Tx, utxos: &UTxOs, prot_pps: &ConwayProtParams) -> ValidationResult {
-    let used_langs = tx_languages(mtx, utxos);
+    let used_langs = tx_languages(mtx, utxos)?;
     let allowed_langs: Vec<Language> = allowed_tx_langs(mtx, utxos);
     let available_langs: Vec<Language> = available_langs(prot_pps);
 
@@ -1599,7 +1612,7 @@ fn any_reference_inputs(reference_inputs: &Option<Vec<TransactionInput>>) -> boo
     }
 }
 
-fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
+fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Result<Vec<Language>, ValidationError> {
     let mut v1_scripts: bool = false;
     let mut v2_scripts: bool = false;
     let mut v3_scripts: bool = false;
@@ -1619,7 +1632,7 @@ fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
         v3_scripts = true;
     }
     for input in reference_script_inputs(&mtx.transaction_body) {
-        match reference_script(input, utxos) {
+        match reference_script(input, utxos)? {
             Some(ScriptRef::PlutusV1Script(_)) => v1_scripts = true,
             Some(ScriptRef::PlutusV2Script(_)) => v2_scripts = true,
             Some(ScriptRef::PlutusV3Script(_)) => v3_scripts = true,
@@ -1636,7 +1649,7 @@ fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
     if v3_scripts {
         langs.push(Language::PlutusV3);
     }
-    langs
+    Ok(langs)
 }
 
 // The metadata of the transaction is valid.
@@ -1662,7 +1675,7 @@ fn check_script_data_hash(
     utxos: &UTxOs,
     prot_pps: &ConwayProtParams,
 ) -> ValidationResult {
-    let tx_languages = tx_languages(mtx, utxos);
+    let tx_languages = tx_languages(mtx, utxos)?;
 
     let Some(provided) = tx_body.script_data_hash else {
         if tx_languages.is_empty() {
