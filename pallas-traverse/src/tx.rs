@@ -1060,7 +1060,8 @@ impl<'b> MultiEraTx<'b> {
             MultiEraTx::Dijkstra(x) => x
                 .transaction_body
                 .starting_account_balance_intervals
-                .as_ref(),
+                .as_ref()
+                .filter(|_| false),
             MultiEraTx::Byron(_)
             | MultiEraTx::AlonzoCompatible(..)
             | MultiEraTx::Babbage(_)
