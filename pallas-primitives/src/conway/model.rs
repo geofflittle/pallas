@@ -814,6 +814,35 @@ mod tests {
         }
     }
 
+    #[test]
+    fn cost_models_of_the_three_named_languages_round_trip() {
+        // a map of three, keys 0, 1 and 2
+        let wire = hex::decode("a30082010201810302822004").expect("hex");
+
+        let models: super::CostModels = minicbor::decode(&wire).expect("decode");
+        assert!(models.unknown.is_empty());
+
+        assert_eq!(
+            hex::encode(minicbor::to_vec(&models).expect("encode")),
+            hex::encode(&wire)
+        );
+    }
+
+    #[test]
+    fn cost_models_beyond_the_named_languages_round_trip() {
+        // a map of five, keys 0, 1, 2, 3 and 9
+        let wire = hex::decode("a5008201020181030282200403810509820607").expect("hex");
+
+        let models: super::CostModels = minicbor::decode(&wire).expect("decode");
+        let carried: Vec<u64> = models.unknown.keys().copied().collect();
+        assert_eq!(carried, vec![3, 9]);
+
+        assert_eq!(
+            hex::encode(minicbor::to_vec(&models).expect("encode")),
+            hex::encode(&wire)
+        );
+    }
+
     // #[test]
     // fn fragments_decoding() {
     //     // peculiar array of outputs used in an hydra transaction
