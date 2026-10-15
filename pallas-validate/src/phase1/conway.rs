@@ -12,8 +12,8 @@ use crate::utils::{
     conway_add_values, conway_get_val_size_in_words, conway_lovelace_diff_or_fail,
     conway_values_are_equal, get_conway_tx_size, get_lovelace_from_conway_val, get_payment_part,
     get_script_hash_from_input, get_shelley_address, language_features,
-    mk_alonzo_vk_wits_check_list, reference_scripts, script_ref_hash, verify_signature,
-    withdrawal_scripts,
+    mk_alonzo_vk_wits_check_list, needed_script_hashes, reference_scripts, script_ref_hash,
+    verify_signature, withdrawal_scripts,
 };
 use pallas_addresses::{Address, ScriptHash, ShelleyAddress, ShelleyPaymentPart};
 use pallas_codec::utils::{Bytes, KeepRaw, NonEmptySet};
@@ -1347,7 +1347,7 @@ fn check_vk_wit(
 }
 
 fn check_languages(mtx: &Tx, utxos: &UTxOs, prot_pps: &ConwayProtParams) -> ValidationResult {
-    let used_langs = tx_languages(mtx, utxos);
+    let used_langs = tx_languages(mtx, utxos)?;
     let allowed_langs: Vec<Language> = allowed_tx_langs(mtx, utxos);
     let available_langs: Vec<Language> = available_langs(prot_pps);
 
@@ -1415,7 +1415,7 @@ fn any_reference_inputs(reference_inputs: &Option<Vec<TransactionInput>>) -> boo
     }
 }
 
-fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
+fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Result<Vec<Language>, ValidationError> {
     let mut v1_scripts: bool = false;
     let mut v2_scripts: bool = false;
     let mut v3_scripts: bool = false;
@@ -1434,17 +1434,17 @@ fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
     {
         v3_scripts = true;
     }
-    if let Some(reference_inputs) = &mtx.transaction_body.reference_inputs {
-        for ref_input in reference_inputs.iter() {
-            match utxos
-                .get(&MultiEraInput::from_alonzo_compatible(ref_input))
-                .and_then(MultiEraOutput::script_ref)
-            {
-                Some(ScriptRef::PlutusV1Script(_)) => v1_scripts = true,
-                Some(ScriptRef::PlutusV2Script(_)) => v2_scripts = true,
-                Some(ScriptRef::PlutusV3Script(_)) => v3_scripts = true,
-                _ => (),
-            }
+    let tx = MultiEraTx::from_conway(mtx);
+    let needed = needed_script_hashes(&tx, utxos, PostAlonzo(InputDecoding))?;
+    for script in reference_scripts(&tx, utxos) {
+        if !needed.contains(&script_ref_hash(&script)) {
+            continue;
+        }
+        match script {
+            ScriptRef::PlutusV1Script(_) => v1_scripts = true,
+            ScriptRef::PlutusV2Script(_) => v2_scripts = true,
+            ScriptRef::PlutusV3Script(_) => v3_scripts = true,
+            ScriptRef::NativeScript(_) => (),
         }
     }
     let mut langs = vec![];
@@ -1457,7 +1457,7 @@ fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
     if v3_scripts {
         langs.push(Language::PlutusV3);
     }
-    langs
+    Ok(langs)
 }
 
 // The metadata of the transaction is valid.
@@ -1483,7 +1483,7 @@ fn check_script_data_hash(
     utxos: &UTxOs,
     prot_pps: &ConwayProtParams,
 ) -> ValidationResult {
-    let tx_languages = tx_languages(mtx, utxos);
+    let tx_languages = tx_languages(mtx, utxos)?;
 
     let Some(provided) = tx_body.script_data_hash else {
         if tx_languages.is_empty() {
@@ -1532,8 +1532,9 @@ fn cost_model_for_tx(
 mod tests {
     use super::*;
     use crate::phase1::fixtures::{
-        byron_address, byron_output, input, key_address, legacy_output, reward_address,
-        script_address, tx_referencing_input, tx_spending_input, utxos,
+        V2_SCRIPT, byron_address, byron_output, input, key_address, legacy_output,
+        output_with_reference_script, reward_address, script_address, tx_referencing_input,
+        tx_spending_input, utxos,
     };
     use pallas_codec::minicbor;
     use pallas_crypto::{hash::Hasher, key::ed25519::SecretKey};
@@ -2456,17 +2457,6 @@ mod tests {
         }
     }
 
-    const V2_SCRIPT: [u8; 4] = [1, 2, 3, 4];
-
-    fn output_with_reference_script() -> Vec<u8> {
-        let mut cbor = vec![0xa3, 0x00, 0x58, 0x1d]; // output, a 29 byte address
-        cbor.extend(key_address());
-        cbor.extend([0x01, 0x1a, 0x00, 0x4c, 0x4b, 0x40]); // five ada
-        cbor.extend([0x03, 0xd8, 0x18, 0x47, 0x82, 0x02, 0x44]); // a PlutusV2 reference script
-        cbor.extend(V2_SCRIPT);
-        cbor
-    }
-
     #[test]
     fn a_script_address_from_an_earlier_era_names_its_script() {
         for (address, expected) in [
@@ -2576,5 +2566,174 @@ mod tests {
             allowed_tx_langs(tx, &utxos(Era::Alonzo, &key)),
             vec![Language::PlutusV1, Language::PlutusV2, Language::PlutusV3]
         );
+    }
+
+    #[test]
+    fn only_a_needed_reference_script_sets_the_language() {
+        use pallas_codec::utils::NonZeroInt;
+        let policy = Hasher::<224>::hash_tagged(&V2_SCRIPT, 2);
+        let with_script = output_with_reference_script();
+        let without_script = legacy_output(key_address());
+        let (mut outcomes, mut expected) = (vec![], vec![]);
+        for (cbor, spent) in [(tx_spending_input(), true), (tx_referencing_input(), false)] {
+            let mut tx: Tx = minicbor::decode(&cbor).unwrap();
+            for mints in [false, true] {
+                let mut body = (*tx.transaction_body).clone();
+                body.mint = mints.then(|| {
+                    let asset = (Bytes::from(vec![1]), NonZeroInt::try_from(1).unwrap());
+                    [(policy, [asset].into_iter().collect())]
+                        .into_iter()
+                        .collect()
+                });
+                tx.transaction_body = body.into();
+                for (output, has_script) in [(&with_script, true), (&without_script, false)] {
+                    for era in [Era::Babbage, Era::Conway] {
+                        let languages = tx_languages(&tx, &utxos(era, output)).unwrap();
+                        outcomes.push((spent, mints, has_script, era, languages));
+                        let needed = mints && has_script;
+                        let languages = if needed {
+                            vec![Language::PlutusV2]
+                        } else {
+                            vec![]
+                        };
+                        expected.push((spent, mints, has_script, era, languages));
+                    }
+                }
+            }
+        }
+        assert_eq!(outcomes, expected);
+    }
+
+    #[test]
+    fn each_needed_purpose_sets_the_reference_script_language() {
+        use pallas_codec::utils::NonZeroInt;
+        use pallas_primitives::conway::{
+            Anchor, GovAction, GovActionId, ProposalProcedure, Vote, Voter, VotingProcedure,
+        };
+        let script = Hasher::<224>::hash_tagged(&V2_SCRIPT, 2);
+        let holder = input();
+        let locked = TransactionInput {
+            transaction_id: Hash::new([9; 32]),
+            index: 0,
+        };
+        let with_script = output_with_reference_script();
+        let cbor = tx_referencing_input();
+        let (mut outcomes, mut expected) = (vec![], vec![]);
+        for (purpose, names_script) in [
+            ("spend", true),
+            ("mint", true),
+            ("cert", true),
+            ("reward", true),
+            ("drep vote", true),
+            ("committee vote", true),
+            ("treasury proposal", true),
+            ("parameter proposal", true),
+            ("key reward", false),
+        ] {
+            for hash in [script, Hash::from([5; 28])] {
+                let locked_output = legacy_output([vec![0x71], hash.to_vec()].concat());
+                let utxos = UTxOs::from([
+                    (
+                        MultiEraInput::from_alonzo_compatible(&holder),
+                        MultiEraOutput::decode(Era::Conway, &with_script).unwrap(),
+                    ),
+                    (
+                        MultiEraInput::from_alonzo_compatible(&locked),
+                        MultiEraOutput::decode(Era::Alonzo, &locked_output).unwrap(),
+                    ),
+                ]);
+                let mut tx: Tx = minicbor::decode(&cbor).unwrap();
+                let mut body = (*tx.transaction_body).clone();
+                match purpose {
+                    "spend" => body.inputs = vec![locked.clone()].into(),
+                    "mint" => {
+                        let asset = (Bytes::from(vec![1]), NonZeroInt::try_from(1).unwrap());
+                        body.mint = Some(
+                            [(hash, [asset].into_iter().collect())]
+                                .into_iter()
+                                .collect(),
+                        )
+                    }
+                    "cert" => {
+                        body.certificates = Some(
+                            vec![Certificate::Reg(StakeCredential::ScriptHash(hash), 0)]
+                                .try_into()
+                                .unwrap(),
+                        )
+                    }
+                    "reward" | "key reward" => {
+                        let header = if names_script { 0xf0 } else { 0xe0 };
+                        let account = [vec![header], hash.to_vec()].concat();
+                        body.withdrawals = Some([(account.into(), 0)].into_iter().collect())
+                    }
+                    "drep vote" | "committee vote" => {
+                        let voter = if purpose == "drep vote" {
+                            Voter::DRepScript(hash)
+                        } else {
+                            Voter::ConstitutionalCommitteeScript(hash)
+                        };
+                        let action = GovActionId {
+                            transaction_id: Hash::new([0; 32]),
+                            action_index: 0,
+                        };
+                        let vote = VotingProcedure {
+                            vote: Vote::Yes,
+                            anchor: None,
+                        };
+                        body.voting_procedures = Some(
+                            [(voter, [(action, vote)].into_iter().collect())]
+                                .into_iter()
+                                .collect(),
+                        )
+                    }
+                    _ => {
+                        let gov_action = if purpose == "treasury proposal" {
+                            GovAction::TreasuryWithdrawals(Default::default(), Some(hash))
+                        } else {
+                            let update = minicbor::decode(&[0xa0]).unwrap();
+                            GovAction::ParameterChange(None, Box::new(update), Some(hash))
+                        };
+                        let proposal = ProposalProcedure {
+                            deposit: 0,
+                            reward_account: [vec![0xe0], vec![0; 28]].concat().into(),
+                            gov_action,
+                            anchor: Anchor {
+                                url: String::new(),
+                                content_hash: Hash::new([0; 32]),
+                            },
+                        };
+                        body.proposal_procedures = Some(vec![proposal].try_into().unwrap())
+                    }
+                }
+                tx.transaction_body = body.into();
+                let needed = names_script && hash == script;
+                outcomes.push((purpose, needed, tx_languages(&tx, &utxos).unwrap()));
+                let languages = if needed {
+                    vec![Language::PlutusV2]
+                } else {
+                    vec![]
+                };
+                expected.push((purpose, needed, languages));
+            }
+        }
+        assert_eq!(outcomes.len(), 18);
+        assert_eq!(outcomes, expected);
+    }
+
+    #[test]
+    fn an_undecodable_withdrawal_account_is_refused() {
+        let cbor = tx_referencing_input();
+        let with_script = output_with_reference_script();
+        let utxos = utxos(Era::Conway, &with_script);
+        let mut outcomes = vec![];
+        for account in [reward_address(), vec![0xf0, 1, 2]] {
+            let mut tx: Tx = minicbor::decode(&cbor).unwrap();
+            let mut body = (*tx.transaction_body).clone();
+            body.withdrawals = Some([(account.into(), 0)].into_iter().collect());
+            tx.transaction_body = body.into();
+            let languages = tx_languages(&tx, &utxos);
+            outcomes.push(languages.map_err(|error| matches!(error, PostAlonzo(InputDecoding))));
+        }
+        assert_eq!(outcomes, vec![Ok(vec![]), Err(true)]);
     }
 }

@@ -19,14 +19,14 @@ use pallas_primitives::{
     alonzo::{Certificate, Multiasset, NativeScript, Tx as AlonzoTx, VKeyWitness, Value},
     babbage::Tx as BabbageTx,
     conway::{
-        Certificate as ConwayCertificate, DatumOption, Multiasset as ConwayMultiasset, ScriptRef,
-        Tx as ConwayTx, Value as ConwayValue,
+        Certificate as ConwayCertificate, DatumOption, GovAction, Multiasset as ConwayMultiasset,
+        ScriptRef, Tx as ConwayTx, Value as ConwayValue, Voter,
     },
 };
 
 use pallas_traverse::{
-    ComputeHash, Era, MultiEraInput, MultiEraOutput, MultiEraTx, MultiEraUpdate, OriginalHash,
-    time::Slot,
+    ComputeHash, Era, MultiEraInput, MultiEraOutput, MultiEraTx, MultiEraUpdate,
+    MultiEraWithdrawals, OriginalHash, time::Slot,
 };
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -1005,6 +1005,47 @@ pub(crate) fn get_script_hash_from_input(
         },
         _ => None,
     }
+}
+
+// The script hash of each input, policy, certificate, withdrawal, vote and
+// proposal of the transaction that a script witnesses.
+pub(crate) fn needed_script_hashes(
+    tx: &MultiEraTx,
+    utxos: &UTxOs,
+    undecodable: ValidationError,
+) -> Result<Vec<ScriptHash>, ValidationError> {
+    let withdrawals = match tx.withdrawals() {
+        MultiEraWithdrawals::AlonzoCompatible(withdrawals)
+        | MultiEraWithdrawals::Conway(withdrawals) => Some(withdrawals),
+        _ => None,
+    };
+    let mut needed: Vec<ScriptHash> = tx
+        .inputs()
+        .iter()
+        .filter_map(|input| get_script_hash_from_input(input.as_alonzo()?, utxos))
+        .collect();
+    needed.extend(tx.mints().iter().map(|mint| *mint.policy()));
+    needed.extend(needed_certificate_scripts(tx));
+    needed.extend(
+        withdrawal_scripts(withdrawals, undecodable)?
+            .into_iter()
+            .map(|(_, hash)| hash),
+    );
+    if let Some(tx) = tx.as_conway() {
+        let body = &tx.transaction_body;
+        let voters = body.voting_procedures.iter().flat_map(|votes| votes.keys());
+        needed.extend(voters.filter_map(|voter| match voter {
+            Voter::ConstitutionalCommitteeScript(hash) | Voter::DRepScript(hash) => Some(*hash),
+            _ => None,
+        }));
+        let proposals = body.proposal_procedures.iter().flatten();
+        needed.extend(proposals.filter_map(|proposal| match &proposal.gov_action {
+            GovAction::ParameterChange(_, _, policy)
+            | GovAction::TreasuryWithdrawals(_, policy) => *policy,
+            _ => None,
+        }));
+    }
+    Ok(needed)
 }
 
 // Whether an output the transaction spends, references or creates has a Byron

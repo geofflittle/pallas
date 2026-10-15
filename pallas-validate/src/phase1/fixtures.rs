@@ -49,6 +49,17 @@ pub(super) fn reward_address() -> Vec<u8> {
     [vec![0xe0], vec![3; 28]].concat()
 }
 
+pub(super) const V2_SCRIPT: [u8; 4] = [1, 2, 3, 4];
+
+pub(super) fn output_with_reference_script() -> Vec<u8> {
+    let mut cbor = vec![0xa3, 0x00, 0x58, 0x1d]; // output, a 29 byte address
+    cbor.extend(key_address());
+    cbor.extend([0x01, 0x1a, 0x00, 0x4c, 0x4b, 0x40]); // five ada
+    cbor.extend([0x03, 0xd8, 0x18, 0x47, 0x82, 0x02, 0x44]); // a PlutusV2 reference script
+    cbor.extend(V2_SCRIPT);
+    cbor
+}
+
 pub(super) fn byron_output() -> Vec<u8> {
     let mut cbor = vec![0x82];
     cbor.extend(byron_address());
