@@ -607,7 +607,7 @@ fn tx_agrees(location: Location, held: Held, mapped: MappedTx) -> Option<bool> {
                 .is_some_and(|v| held == Held::Uint(natural(Some(v)))),
         ),
         Location::Body(22) => Some(
-            tx.treasury_donation
+            tx.treasury_value
                 .as_ref()
                 .is_some_and(|v| held == Held::Uint(natural(Some(v)))),
         ),
