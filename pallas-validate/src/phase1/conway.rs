@@ -29,6 +29,9 @@ use pallas_traverse::{ComputeHash, MultiEraInput, MultiEraOutput, MultiEraTx, Or
 use std::cmp::Ordering;
 use std::ops::Deref;
 
+#[cfg(test)]
+mod input_eras;
+
 pub fn validate_conway_tx(
     mtx: &Tx,
     utxos: &UTxOs,
