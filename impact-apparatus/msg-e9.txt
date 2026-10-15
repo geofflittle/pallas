@@ -1,0 +1,6 @@
+feat(utxorpc): map Dijkstra fields
+
+- shared, v1beta: map Dijkstra fields behind unstable
+- shared: leaves for the Dijkstra fields these schemas lack
+- testing: builders for Dijkstra blocks, txs, governance and parameters
+- tests: v1alpha and v1beta snapshots of a Dijkstra block

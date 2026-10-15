@@ -1,0 +1,8 @@
+feat(validate): native Dijkstra phase two
+
+- phase2: evaluate Dijkstra scripts with a protocol aware evaluator
+- phase2: estimate Dijkstra budgets and report each redeemer
+- Cargo: pin amaru-uplc and amaru-kernel by rev under unstable
+- tests: evaluate captured Dijkstra transactions
+
+Co-authored-by: Geoff Little <g.little712@gmail.com>

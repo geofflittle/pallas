@@ -1,0 +1,68 @@
+lib.rs: pub mod v1alpha
+lib.rs: pub mod v1beta
+lib.rs: pub trait LedgerContext: Clone 
+lib.rs: pub type Cbor = Vec<u8>
+lib.rs: pub type DatumMap = HashMap<Hash<32>, alonzo::PlutusData>
+lib.rs: pub type EraCbor = (trv::Era, Cbor)
+lib.rs: pub type TxHash = Hash<32>
+lib.rs: pub type TxoIndex = u32
+lib.rs: pub type TxoRef = (TxHash, TxoIndex)
+lib.rs: pub type UtxoMap = HashMap<TxoRef, EraCbor>
+lib.rs: pub use v1alpha::
+shared.rs: pub fn map_alonzo_compatible_cert( &self, x: &pallas_primitives::alonzo::Certificate, tx: &pallas_traverse::MultiEraTx, order: u32, ) -> u5c::Certificate 
+shared.rs: pub fn map_any_script(&self, x: &pallas_primitives::conway::ScriptRef) -> u5c::Script 
+shared.rs: pub fn map_block_cbor(&self, raw: &[u8]) -> u5c::Block 
+shared.rs: pub fn map_block(&self, block: &pallas_traverse::MultiEraBlock) -> u5c::Block 
+shared.rs: pub fn map_cert_kind( &self, x: &pallas_traverse::MultiEraCertKind, ) -> Option<u5c::certificate::Certificate> 
+shared.rs: pub fn map_cert( &self, x: &pallas_traverse::MultiEraCert, tx: &pallas_traverse::MultiEraTx, order: u32, ) -> Option<u5c::Certificate> 
+shared.rs: pub fn map_conway_cert( &self, x: &pallas_primitives::conway::Certificate, tx: &pallas_traverse::MultiEraTx, order: u32, ) -> u5c::Certificate 
+shared.rs: pub fn map_conway_gov_action( &self, x: &pallas_primitives::conway::GovAction, ) -> u5c::GovernanceAction 
+shared.rs: pub fn map_conway_pparams_update( &self, x: &pallas_primitives::conway::ProtocolParamUpdate, ) -> u5c::PParams 
+shared.rs: pub fn map_drep(&self, x: &pallas_primitives::conway::DRep) -> u5c::DRep 
+shared.rs: pub fn map_gov_action_id( &self, x: &Option<pallas_primitives::conway::GovActionId>, ) -> Option<u5c::GovernanceActionId> 
+shared.rs: pub fn map_gov_action( &self, x: &pallas_traverse::MultiEraGovAction, ) -> u5c::GovernanceAction 
+shared.rs: pub fn map_gov_proposal( &self, x: &pallas_traverse::MultiEraProposal, ) -> u5c::GovernanceActionProposal 
+shared.rs: pub fn map_metadata( &self, label: u64, datum: &pallas_primitives::alonzo::Metadatum, ) -> u5c::Metadata 
+shared.rs: pub fn map_metadatum(x: &pallas_primitives::alonzo::Metadatum) -> u5c::Metadatum 
+shared.rs: pub fn map_multi_era_native_script( x: &pallas_traverse::MultiEraNativeScript, ) -> u5c::NativeScript 
+shared.rs: pub fn map_multi_era_purpose( &self, x: &pallas_traverse::MultiEraRedeemerTag, ) -> u5c::RedeemerPurpose 
+shared.rs: pub fn map_native_script( x: &pallas_primitives::alonzo::NativeScript, ) -> u5c::NativeScript 
+shared.rs: pub fn map_plutus_array( &self, x: &[pallas_primitives::alonzo::PlutusData], ) -> u5c::PlutusDataArray 
+shared.rs: pub fn map_plutus_bigint(&self, x: &pallas_primitives::alonzo::BigInt) -> u5c::BigInt 
+shared.rs: pub fn map_plutus_constr( &self, x: &pallas_primitives::alonzo::Constr<pallas_primitives::alonzo::PlutusData>, ) -> u5c::Constr 
+shared.rs: pub fn map_plutus_datum( &self, x: &pallas_primitives::alonzo::PlutusData, ) -> u5c::PlutusData 
+shared.rs: pub fn map_plutus_map( &self, x: &pallas_codec::utils::KeyValuePairs< pallas_primitives::alonzo::PlutusData, pallas_primitives::alonzo::PlutusData, >, ) -> u5c::PlutusDataMap 
+shared.rs: pub fn map_pparams_update( &self, x: &pallas_traverse::MultiEraParamUpdate, ) -> Option<ParamUpdate> 
+shared.rs: pub fn map_pparams( &self, pparams: pallas_validate::utils::MultiEraProtocolParameters, ) -> u5c::PParams 
+shared.rs: pub fn map_purpose( &self, x: &pallas_primitives::conway::RedeemerTag, ) -> u5c::RedeemerPurpose 
+shared.rs: pub fn map_redeemer(&self, x: &pallas_traverse::MultiEraRedeemer) -> u5c::Redeemer 
+shared.rs: pub fn map_relay(&self, x: &pallas_primitives::alonzo::Relay) -> u5c::Relay 
+shared.rs: pub fn map_script_ref(&self, x: &pallas_traverse::MultiEraScriptRef) -> u5c::Script 
+shared.rs: pub fn map_stake_credential( &self, x: &pallas_primitives::babbage::StakeCredential, ) -> u5c::StakeCredential 
+shared.rs: pub fn map_tx_collateral( &self, input: &pallas_traverse::MultiEraInput, resolved: &Option<$crate::UtxoMap>, tx: &pallas_traverse::MultiEraTx, ) -> u5c::TxInput 
+shared.rs: pub fn map_tx_input( &self, input: &pallas_traverse::MultiEraInput, tx: &pallas_traverse::MultiEraTx, order: u32, resolved: &Option<$crate::UtxoMap>, ) -> u5c::TxInput 
+shared.rs: pub fn map_tx_reference_input( &self, input: &pallas_traverse::MultiEraInput, resolved: &Option<$crate::UtxoMap>, tx: &pallas_traverse::MultiEraTx, ) -> u5c::TxInput 
+shared.rs: pub fn map_vkey_witness( &self, x: &pallas_primitives::alonzo::VKeyWitness, ) -> u5c::VKeyWitness 
+shared.rs: pub fn map_withdrawals( &self, x: &(&[u8], u64), tx: &pallas_traverse::MultiEraTx, order: u32, ) -> u5c::Withdrawal 
+v1alpha/mod.rs: pub fn map_asset(&self, x: &trv::MultiEraAsset) -> u5c::Asset 
+v1alpha/mod.rs: pub fn map_policy_assets(&self, x: &trv::MultiEraPolicyAssets) -> u5c::Multiasset 
+v1alpha/mod.rs: pub fn map_tx_datum( &self, x: &trv::MultiEraOutput, tx: Option<&trv::MultiEraTx>, ) -> u5c::Datum 
+v1alpha/mod.rs: pub fn map_tx_output( &self, x: &trv::MultiEraOutput, tx: Option<&trv::MultiEraTx>, ) -> u5c::TxOutput 
+v1alpha/mod.rs: pub fn map_tx(&self, tx: &trv::MultiEraTx) -> u5c::Tx 
+v1alpha/mod.rs: pub fn masked(&self, mask: FieldMask) -> Self 
+v1alpha/mod.rs: pub fn new(ledger: C) -> Self 
+v1alpha/mod.rs: pub struct Mapper<C: LedgerContext> 
+v1alpha/mod.rs: pub use utxorpc_spec::utxorpc::v1alpha as spec
+v1beta/mod.rs: pub fn map_asset(&self, x: &trv::MultiEraAsset) -> u5c::Asset 
+v1beta/mod.rs: pub fn map_bootstrap_witness(&self, x: &alonzo::BootstrapWitness) -> u5c::BootstrapWitness 
+v1beta/mod.rs: pub fn map_policy_assets(&self, x: &trv::MultiEraPolicyAssets) -> u5c::Multiasset 
+v1beta/mod.rs: pub fn map_tx_datum( &self, x: &trv::MultiEraOutput, tx: Option<&trv::MultiEraTx>, ) -> u5c::Datum 
+v1beta/mod.rs: pub fn map_tx_output( &self, x: &trv::MultiEraOutput, tx: Option<&trv::MultiEraTx>, ) -> u5c::TxOutput 
+v1beta/mod.rs: pub fn map_tx(&self, tx: &trv::MultiEraTx) -> u5c::Tx 
+v1beta/mod.rs: pub fn map_vote(&self, x: &conway::Vote) -> u5c::Vote 
+v1beta/mod.rs: pub fn map_votes(&self, tx: &trv::MultiEraTx) -> Vec<u5c::VoterVotes> 
+v1beta/mod.rs: pub fn map_voting_procedure( &self, gov_action_id: &conway::GovActionId, x: &conway::VotingProcedure, ) -> u5c::VotingProcedure 
+v1beta/mod.rs: pub fn masked(&self, mask: FieldMask) -> Self 
+v1beta/mod.rs: pub fn new(ledger: C) -> Self 
+v1beta/mod.rs: pub struct Mapper<C: LedgerContext> 
+v1beta/mod.rs: pub use utxorpc_spec::utxorpc::v1beta as spec

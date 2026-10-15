@@ -1,0 +1,4 @@
+feat(hardano): render the Plutus v4 cost model
+
+- haskell_display: render the key 3 model as PlutusV4 in the valid map
+- haskell_display: tests for the valid and unknown maps

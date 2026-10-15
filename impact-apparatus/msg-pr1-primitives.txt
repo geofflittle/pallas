@@ -1,0 +1,5 @@
+fix(primitives): write every cost model back
+
+- conway: CostModels encodes by hand instead of deriving
+- conway: unknown keys go out again under their own keys
+- tests: round trips with and without unknown keys

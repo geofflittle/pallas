@@ -1,0 +1,4 @@
+fix: keep the Plutus v4 cost model in the wildcard
+
+- protocol_params: pass every wildcard cost model through unchanged
+- cost_model_tests: read key 3 through the plutus_v4 accessor

@@ -1,0 +1,7 @@
+feat(network): decode the Dijkstra pparams reply
+
+- queries_v16: DijkstraProtocolParam, the ledger's forty six entries
+- queries_v16: plutus_v4 reads the Plutus v4 cost model at key 3
+- codec: a decoder that refuses any other array length and names it
+- codec: decode a captured node reply and hand built CDDL fragments
+- test_data: the captured reply

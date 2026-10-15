@@ -1,0 +1,2287 @@
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	!wire.windows(key.len()).any(|w| w == key.as_slice()),
+	"2ed1285cced47acb5f08502843d980d7231665af9d90ef33fe6751e0f9e0b171"
+	"2ed1285cced47acb5f08502843d980d7231665af9d90ef33fe6751e0f9e0b171";
+	"6dWyWk8NvpezjKehF7t2m6lLEvzFY7SwDJnmYQ=="
+	"6dWyWk8NvpezjKehF7t2m6lLEvzFY7SwDJnmYQ=="
+	"737549420add1f19d144809aa02e2ae68a89b1761368e3294fbb30ee1467e3e4"
+	"7727ec1dfb0f84f2ffeb51935f35850cf84cfabfca1957e8c74cf8fde871dd34"
+	"a DRep key voter reaches u5c as a DRep credential holding that key hash"
+	"a PlutusV4 reference script must reach the V4 field carrying its own bytes"
+	"a V4 reference script must reach the V4 field carrying its own bytes"
+	"a committee member's one vote must reach u5c as the vote it cast, on the action it named"
+	"a cost model the set leaves absent is absent in u5c, while the fields it holds still reach theirs"
+	"a guard inside a list is carried as a member rather than dropped"
+	"a sub body has no fee key, so it reports no fee rather than a fee of zero"
+	"a yes vote must not reach u5c as any other vote"
+	"addrKeyHash": "6dWyWk8NvpezjKehF7t2m6lLEvzFY7SwDJnmYQ=="
+	"addrKeyHash": "6dWyWk8NvpezjKehF7t2m6lLEvzFY7SwDJnmYQ=="
+	"addrKeyHash": "Am/eKDIrO/SoRAnfTZBx9bQaw3KRSGow3JRyfg=="
+	"addrKeyHash": "Am/eKDIrO/SoRAnfTZBx9bQaw3KRSGow3JRyfg=="
+	"addrKeyHash": "rHDJmt2NQf5ZveHT6UB/FHqhHHuhld66Qt/blA=="
+	"addrKeyHash": "rHDJmt2NQf5ZveHT6UB/FHqhHHuhld66Qt/blA=="
+	"address": "AJ8VPqMpbbdOTtGhY+tW+aQpeb4F3l4QapDogF2zjqu1oZdWLyY6m2KqmbGXZ6YlM/18x5+6d6Bd",
+	"address": "AJ8VPqMpbbdOTtGhY+tW+aQpeb4F3l4QapDogF2zjqu1oZdWLyY6m2KqmbGXZ6YlM/18x5+6d6Bd",
+	"address": "APrWMwlt3gllzvMtS9AeCRDzzpLpcdYiuDKOJZmscMma3Y1B/lm94dPpQH8UeqEce6GV3rpC39uU",
+	"address": "APrWMwlt3gllzvMtS9AeCRDzzpLpcdYiuDKOJZmscMma3Y1B/lm94dPpQH8UeqEce6GV3rpC39uU",
+	"address": "APzzG2fKm798LeRU1y2QAJLaCK4iEt2r/oAO5j/p1bJaTw2+l7OMp6EXu3abqUsS/MVjtLAMmeZh",
+	"address": "APzzG2fKm798LeRU1y2QAJLaCK4iEt2r/oAO5j/p1bJaTw2+l7OMp6EXu3abqUsS/MVjtLAMmeZh",
+	"address": "YPaFm8sSa47/CGvnSs060QGminM7uVY+ChVu0wQ=",
+	"address": "YPaFm8sSa47/CGvnSs060QGminM7uVY+ChVu0wQ=",
+	"an update setting no key at all is no update, which is what the per key cases below have to be told apart from"
+	"and the enclosing body carries the one fee the whole transaction pays, so the absent fee above is the sub body's own state rather than a mapper reporting no fee at all"
+	"auxiliary": {
+	"auxiliary": {
+	"auxiliary": {
+	"auxiliary": {
+	"auxiliary": {},
+	"auxiliary": {},
+	"auxiliary": {},
+	"auxiliary": {},
+	"body": {
+	"body": {
+	"c095234678d98a74cd1488bda1971fbd2e9c828acf57f7673c679ec601abf7a6"
+	"certificates": [
+	"certificates": [
+	"certificates": [
+	"certificates": [
+	"certificates": [
+	"certificates": [
+	"coin": {
+	"coin": {
+	"coin": {
+	"coin": {
+	"coin": {
+	"coin": {
+	"coin": {
+	"coin": {
+	"coin": {
+	"coin": {
+	"coin": {
+	"coin": {
+	"collateral": {
+	"collateral": {
+	"collateral": {
+	"collateral": {
+	"collateral": {
+	"collateral": {
+	"collateral": {
+	"collateral": {
+	"cost": {
+	"cost": {
+	"cost": {
+	"cost": {
+	"datum": {}
+	"datum": {}
+	"datum": {}
+	"datum": {}
+	"datum": {},
+	"datum": {},
+	"datum": {},
+	"datum": {},
+	"denominator": 10,
+	"denominator": 10,
+	"denominator": 2,
+	"denominator": 2,
+	"each auxiliary Plutus script must reach the field of its own version carrying its own bytes"
+	"each field every era names reaches the u5c field it means, and the keys this era adds are the ones the schema version maps"
+	"fee": {
+	"fee": {
+	"fee": {
+	"fee": {
+	"fee": {
+	"fee": {
+	"fee": {
+	"fee": {
+	"hash": "1w2tkvNmWLGABTefVlDWncrtC/BzqUkTSDyFq/GTqSg=",
+	"hash": "1w2tkvNmWLGABTefVlDWncrtC/BzqUkTSDyFq/GTqSg=",
+	"hash": "3sHXCH/wGRGR/TusFVmuG5xAuTrTPsnPuh8uRyIBmiM=",
+	"hash": "3sHXCH/wGRGR/TusFVmuG5xAuTrTPsnPuh8uRyIBmiM=",
+	"hash": "7SgigST0qC7vpV6aCuBYdyFBKgRzuKSad9BguF93jRY=",
+	"hash": "7SgigST0qC7vpV6aCuBYdyFBKgRzuKSad9BguF93jRY=",
+	"hash": "8yv+nN/TVPn1PJe83RIgUZVfnc+E/dMEtrED4/Idsv8=",
+	"hash": "8yv+nN/TVPn1PJe83RIgUZVfnc+E/dMEtrED4/Idsv8=",
+	"hash": "TkjzRWPp4C7fvu/33crZzMYIRXyiiNX7TCRESyB9dmU=",
+	"hash": "TkjzRWPp4C7fvu/33crZzMYIRXyiiNX7TCRESyB9dmU=",
+	"hash": "lfn4PCKHxST83x7q1wsJmsURFr7mM9/E5cJsSYiuhGk=",
+	"hash": "lfn4PCKHxST83x7q1wsJmsURFr7mM9/E5cJsSYiuhGk=",
+	"hash": "mnuqdvQbTrjrHGPfwSrZ7I2Iz3214OU34an7jIsyXrY=",
+	"hash": "mnuqdvQbTrjrHGPfwSrZ7I2Iz3214OU34an7jIsyXrY=",
+	"header": {
+	"header": {
+	"height": "14278",
+	"height": "14278",
+	"inputs": [
+	"inputs": [
+	"inputs": [
+	"inputs": [
+	"inputs": [
+	"inputs": [
+	"inputs": [
+	"inputs": [
+	"int": "0"
+	"int": "0"
+	"int": "0"
+	"int": "0"
+	"int": "0"
+	"int": "0"
+	"int": "0"
+	"int": "0"
+	"int": "1000000000"
+	"int": "1000000000"
+	"int": "10000000000"
+	"int": "10000000000"
+	"int": "1997786935"
+	"int": "1997786935"
+	"int": "200000"
+	"int": "200000"
+	"int": "200000"
+	"int": "200000"
+	"int": "2000000"
+	"int": "2000000"
+	"int": "2000000"
+	"int": "2000000"
+	"int": "213065"
+	"int": "213065"
+	"int": "213285"
+	"int": "213285"
+	"int": "500000000"
+	"int": "500000000"
+	"int": "500000000"
+	"int": "500000000"
+	"int": "600000000"
+	"int": "600000000"
+	"int": "9497786715"
+	"int": "9497786715"
+	"int": "9800000"
+	"int": "9800000"
+	"ipV4": "OqKMDQ==",
+	"ipV4": "OqKMDQ==",
+	"ipV4": "Tfs6qQ==",
+	"ipV4": "Tfs6qQ==",
+	"key 0 is min_fee_coefficient, and it is the only field this update sets"
+	"key 48 has no field in this schema, so the update must be absent rather than a PParams whose every field reads its proto3 zero"
+	"key": {
+	"key": {
+	"key": {
+	"key": {
+	"label": "674",
+	"label": "674",
+	"label": "674",
+	"label": "674",
+	"map": {
+	"map": {
+	"map": {
+	"map": {
+	"margin": {
+	"margin": {
+	"margin": {
+	"margin": {
+	"metadata": [
+	"metadata": [
+	"metadata": [
+	"metadata": [
+	"numerator": 1
+	"numerator": 1
+	"numerator": 1
+	"numerator": 1
+	"one case per key the mapper reads, so a key that stops going through the read helper cannot hide behind a short list"
+	"operator": "MqwA57D4g+cerfPbikLqPjWZU2nzx5889+5KxA==",
+	"operator": "MqwA57D4g+cerfPbikLqPjWZU2nzx5889+5KxA==",
+	"operator": "evOf6FU5izsXEkDtB574j7xgJHyOIDiC0YnmJg==",
+	"operator": "evOf6FU5izsXEkDtB574j7xgJHyOIDiC0YnmJg==",
+	"originalCbor": "glg5AJ8VPqMpbbdOTtGhY+tW+aQpeb4F3l4QapDogF2zjqu1oZdWLyY6m2KqmbGXZ6YlM/18x5+6d6BdGwAAAAJUC+QA"
+	"originalCbor": "glg5APrWMwlt3gllzvMtS9AeCRDzzpLpcdYiuDKOJZmscMma3Y1B/lm94dPpQH8UeqEce6GV3rpC39uUGncTzzc="
+	"originalCbor": "glg5APzzG2fKm798LeRU1y2QAJLaCK4iEt2r/oAO5j/p1bJaTw2+l7OMp6EXu3abqUsS/MVjtLAMmeZhGwAAAAI2HLlb"
+	"originalCbor": "glgdYPaFm8sSa47/CGvnSs060QGminM7uVY+ChVu0wQaAJWJQA=="
+	"outputIndex": 13,
+	"outputIndex": 13,
+	"outputIndex": 2,
+	"outputIndex": 2,
+	"outputIndex": 5,
+	"outputIndex": 5,
+	"outputs": [
+	"outputs": [
+	"outputs": [
+	"outputs": [
+	"outputs": [
+	"outputs": [
+	"outputs": [
+	"outputs": [
+	"pairs": [
+	"pairs": [
+	"pairs": [
+	"pairs": [
+	"pledge": {
+	"pledge": {
+	"pledge": {
+	"pledge": {
+	"pool registration"
+	"pool registration",
+	"poolKeyhash": "bZLzjCNoHLeDf0CYF2w/36oyUcpQSpQ+OcgJKA==",
+	"poolKeyhash": "bZLzjCNoHLeDf0CYF2w/36oyUcpQSpQ+OcgJKA==",
+	"poolMetadata": {
+	"poolMetadata": {
+	"poolMetadata": {
+	"poolMetadata": {
+	"poolOwners": [
+	"poolOwners": [
+	"poolOwners": [
+	"poolOwners": [
+	"poolRegistration": {
+	"poolRegistration": {
+	"poolRegistration": {
+	"poolRegistration": {
+	"port": 3010
+	"port": 3010
+	"port": 3010
+	"port": 3010
+	"rHDJmt2NQf5ZveHT6UB/FHqhHHuhld66Qt/blA=="
+	"rHDJmt2NQf5ZveHT6UB/FHqhHHuhld66Qt/blA=="
+	"regCert": {
+	"regCert": {
+	"regCert": {
+	"regCert": {
+	"registration",
+	"registration",
+	"relays": [
+	"relays": [
+	"relays": [
+	"relays": [
+	"rewardAccount": "4KxwyZrdjUH+Wb3h0+lAfxR6oRx7oZXeukLf25Q=",
+	"rewardAccount": "4KxwyZrdjUH+Wb3h0+lAfxR6oRx7oZXeukLf25Q=",
+	"rewardAccount": "4OnVslpPDb6Xs4ynoRe7dpupSxL8xWO0sAyZ5mE=",
+	"rewardAccount": "4OnVslpPDb6Xs4ynoRe7dpupSxL8xWO0sAyZ5mE=",
+	"signature": "EKacrS+0IIBUCvZMLDOEfHNuQ6NektlKVQCtfVz95TcsBafXnt4YFxb7Cz7ND/CA44MJ9FCcFP+A/sPds2I5CQ==",
+	"signature": "EKacrS+0IIBUCvZMLDOEfHNuQ6NektlKVQCtfVz95TcsBafXnt4YFxb7Cz7ND/CA44MJ9FCcFP+A/sPds2I5CQ==",
+	"signature": "Hhk6FVNQh5aqNSoqfHrMzoPMGWKIKtMLes7hr/NElnYibXTPcntUKM8LGpJrtKdSKzuUikaeIVdOJaQk7OWYBQ==",
+	"signature": "Hhk6FVNQh5aqNSoqfHrMzoPMGWKIKtMLes7hr/NElnYibXTPcntUKM8LGpJrtKdSKzuUikaeIVdOJaQk7OWYBQ==",
+	"signature": "IRHuU8LU0kNwLbQHRUAbjeT5PdNmsWMo/miX8X9P5j6G6rKbatN0q/t53D5OY+3TESay4axRSyEDICCbZ49dAw==",
+	"signature": "IRHuU8LU0kNwLbQHRUAbjeT5PdNmsWMo/miX8X9P5j6G6rKbatN0q/t53D5OY+3TESay4axRSyEDICCbZ49dAw==",
+	"signature": "Q9lePnyGsD9OrmTzrYZ7nnlvqNCEifzgFkrgq1/WZtvGUJ3dRinal8rT603J89nUPt4qikKTMj9EkMO8Ecy6Dg==",
+	"signature": "Q9lePnyGsD9OrmTzrYZ7nnlvqNCEifzgFkrgq1/WZtvGUJ3dRinal8rT603J89nUPt4qikKTMj9EkMO8Ecy6Dg==",
+	"signature": "XNMZo+U6PIGp0jFJiunzANU3QU3WeqlybRPqWskJDytHrQm/pOh2NWfV6Sg53G/OQ7xU93+4dONw29/bnsJrDA==",
+	"signature": "XNMZo+U6PIGp0jFJiunzANU3QU3WeqlybRPqWskJDytHrQm/pOh2NWfV6Sg53G/OQ7xU93+4dONw29/bnsJrDA==",
+	"signature": "YdGrDnfvciHPwZ4bMp6wC6T5aJjQO5UqAUsHgbDaPqdafp5s9mccXqqQoYNfRNS7lkttSLix11TYVnZcM3zADg==",
+	"signature": "YdGrDnfvciHPwZ4bMp6wC6T5aJjQO5UqAUsHgbDaPqdafp5s9mccXqqQoYNfRNS7lkttSLix11TYVnZcM3zADg==",
+	"signature": "iDUHbhwLOEnV1N5XiBarPoU+Ut7mRNv/BvWB0YppW02oo89YkSV9rd4jsliK9wnb+u5NwcTEaDNfKwDwWFSHAw==",
+	"signature": "iDUHbhwLOEnV1N5XiBarPoU+Ut7mRNv/BvWB0YppW02oo89YkSV9rd4jsliK9wnb+u5NwcTEaDNfKwDwWFSHAw==",
+	"signature": "oA2+jF8eYCcJEgoeR9iWa6HyPQQZCyT7YRLuL80DQSIzUSbdk+Z/anAm2nK7URbTxTQ6JAvTTkPgxUxmAZUrBw==",
+	"signature": "oA2+jF8eYCcJEgoeR9iWa6HyPQQZCyT7YRLuL80DQSIzUSbdk+Z/anAm2nK7URbTxTQ6JAvTTkPgxUxmAZUrBw==",
+	"signature": "uAholJ2M+CVR/MUcWJ9BGqV8DGvs9SlDm2C/JfBF09PS+B70B0+TBDpvsssX1n91zAMp14CaxSwhMEWtI6nqAQ==",
+	"signature": "uAholJ2M+CVR/MUcWJ9BGqV8DGvs9SlDm2C/JfBF09PS+B70B0+TBDpvsssX1n91zAMp14CaxSwhMEWtI6nqAQ==",
+	"slot": "291625"
+	"slot": "291625"
+	"so the guard must not read as the clause beside it"
+	"stake delegation",
+	"stakeCredential": {
+	"stakeCredential": {
+	"stakeCredential": {
+	"stakeCredential": {
+	"stakeCredential": {
+	"stakeCredential": {
+	"stakeDelegation": {
+	"stakeDelegation": {
+	"successful": true,
+	"successful": true,
+	"successful": true,
+	"successful": true,
+	"successful": true,
+	"successful": true,
+	"successful": true,
+	"successful": true,
+	"text": "5b4ac310d7076a4297756b5da951c4b61428343cc4a0298a97c63f985d921d58"
+	"text": "5b4ac310d7076a4297756b5da951c4b61428343cc4a0298a97c63f985d921d58"
+	"text": "81e03eda5922339d51af041d5b61cc2ccae4162c5fef079edabff7ede4b55a13"
+	"text": "81e03eda5922339d51af041d5b61cc2ccae4162c5fef079edabff7ede4b55a13"
+	"text": "musashinet_incentives_application_code"
+	"text": "musashinet_incentives_application_code"
+	"text": "musashinet_incentives_application_code"
+	"text": "musashinet_incentives_application_code"
+	"the action voted on reaches u5c by its transaction and its index"
+	"the anchor of that vote reaches u5c"
+	"the anchor the proposal carries must reach the schema"
+	"the auxiliary V4 script must reach the V4 field carrying its own bytes"
+	"the auxiliary data carries a native script and a V4 script"
+	"the block writes certificate tags 2, 7, 3, 7, 3 in that order, and each names a different u5c certificate"
+	"the clause beside a guard maps to what it means"
+	"the first auxiliary script is a native script, got {:?}",
+	"the guard has no member in this schema's oneof, so it reaches the wire as an empty message"
+	"the key this schema carries reaches its field, and the key it cannot carry neither adds a field nor takes the update away"
+	"the key {key}, set alone to its own zero, is one u5c carries under Dijkstra too, so the update must map to parameters rather than to no update at all"
+	"the outer body's one collateral input reaches u5c"
+	"the outer body's one input is the whole of the mapped inputs"
+	"the outer body's one output is the whole of the mapped outputs"
+	"the outer body's two reference inputs reach u5c"
+	"the parameter change names no earlier action and no guardrails script"
+	"the root clause is script_all, got {:?}",
+	"the same guard clause reaches the auxiliary list as the same message"
+	"the same keys read the same u5c fields under Dijkstra, and the V4 cost model reaches the field only this era can fill"
+	"the sub body's one input is the whole of the mapped inputs"
+	"the sub body's one output is the whole of the mapped outputs"
+	"the sub transaction spends an input of its own, which is the one this test watches for"
+	"the witness set script is a native script, got {:?}",
+	"this block's two pool registrations each fill the BLS key slot, which is what the mapper then has to drop"
+	"this fixture must carry the case the test is about"
+	"this fixture must carry the case the test is about"
+	"this schema has no field for a key the era adds, so none of them reaches a field"
+	"this schema has no guarding purpose, so a guard reads as unspecified rather than as one of the six it names"
+	"this schema names no field for a pool registration's BLS key, so none of its bytes may reach the wire"
+	"totalCollateral": {
+	"totalCollateral": {
+	"totalCollateral": {
+	"totalCollateral": {
+	"totalCollateral": {
+	"totalCollateral": {
+	"totalCollateral": {
+	"totalCollateral": {
+	"tx": [
+	"tx": [
+	"txHash": "3aKcGAsor0aiaW2mo94VElciJpwHnjjt+uQkvkbkpSA="
+	"txHash": "3aKcGAsor0aiaW2mo94VElciJpwHnjjt+uQkvkbkpSA="
+	"txHash": "AA2DiVsqMPTP4XWxOzywUz68GonoiwYaL0c9JJ53oGY="
+	"txHash": "AA2DiVsqMPTP4XWxOzywUz68GonoiwYaL0c9JJ53oGY="
+	"txHash": "TNunMtvUW7ReRSU+Ij+8OLsE8UMuohZFJfz9Kli/lYc="
+	"txHash": "TNunMtvUW7ReRSU+Ij+8OLsE8UMuohZFJfz9Kli/lYc="
+	"txHash": "eK9ZfDPi21HkYLrt8eN0NuWJusmf5cASIWGMlyLcs5k="
+	"txHash": "eK9ZfDPi21HkYLrt8eN0NuWJusmf5cASIWGMlyLcs5k="
+	"u5c_v1alpha_dijkstra.json",
+	"u5c_v1beta_dijkstra.json",
+	"url": "http://13.140.160.9:8080/prin3-metadata.json"
+	"url": "http://13.140.160.9:8080/prin3-metadata.json"
+	"url": "http://169.58.225.115:8080/poolMetadata2.json"
+	"url": "http://169.58.225.115:8080/poolMetadata2.json"
+	"validity": {},
+	"validity": {},
+	"validity": {},
+	"validity": {},
+	"validity": {},
+	"validity": {},
+	"validity": {},
+	"validity": {},
+	"value": {
+	"value": {
+	"value": {
+	"value": {
+	"value": {
+	"value": {
+	"value": {
+	"value": {
+	"vkey": "G3z7wSwTbVJTksTHDC0msa1wWNCv5WjJgQDvXXQ8Mjg="
+	"vkey": "G3z7wSwTbVJTksTHDC0msa1wWNCv5WjJgQDvXXQ8Mjg="
+	"vkey": "ReFtMBi7nWJVYnDrADsvDj41/FjTqyMldymqump+65c="
+	"vkey": "ReFtMBi7nWJVYnDrADsvDj41/FjTqyMldymqump+65c="
+	"vkey": "T0Kx0fl5b+EnBrzsm6M/Xze5t/ccMDHSGCBB9Lyck7Q="
+	"vkey": "T0Kx0fl5b+EnBrzsm6M/Xze5t/ccMDHSGCBB9Lyck7Q="
+	"vkey": "X7qyPJWZwLLbTmqmwB2VEKXb/myksd/KUGm21KTsjC4="
+	"vkey": "X7qyPJWZwLLbTmqmwB2VEKXb/myksd/KUGm21KTsjC4="
+	"vkey": "ZZKMI6VMmfWBA0UC3RabRynuZaBmMj0NLDYaHWFUQOU="
+	"vkey": "ZZKMI6VMmfWBA0UC3RabRynuZaBmMj0NLDYaHWFUQOU="
+	"vkey": "cqebX7Gkze2wMFgIg/DpbtS+mGZk0nMmMyb58DttNSc="
+	"vkey": "cqebX7Gkze2wMFgIg/DpbtS+mGZk0nMmMyb58DttNSc="
+	"vkey": "kV92gUxTbeBMc8kL+8/jXTkj048eG8VRQy21v0w4Xik="
+	"vkey": "kV92gUxTbeBMc8kL+8/jXTkj048eG8VRQy21v0w4Xik="
+	"vkey": "t/b8T6xkq8gGrpkVXlXL1sqREIJbZkczAAZLxSjClmE="
+	"vkey": "t/b8T6xkq8gGrpkVXlXL1sqREIJbZkczAAZLxSjClmE="
+	"vkey": "t/b8T6xkq8gGrpkVXlXL1sqREIJbZkczAAZLxSjClmE="
+	"vkey": "t/b8T6xkq8gGrpkVXlXL1sqREIJbZkczAAZLxSjClmE="
+	"vkeywitness": [
+	"vkeywitness": [
+	"vkeywitness": [
+	"vkeywitness": [
+	"vkeywitness": [
+	"vkeywitness": [
+	"vkeywitness": [
+	"vkeywitness": [
+	"vrfKeyhash": "SzFLU39w/zHC/vAkMYEYAxYvFp+o/YDxJZtxz1+EYW0="
+	"vrfKeyhash": "SzFLU39w/zHC/vAkMYEYAxYvFp+o/YDxJZtxz1+EYW0="
+	"vrfKeyhash": "q+V0tX2nqwLwd0b1iaociAGCKlyLNrbZINRJ8TkQKXs="
+	"vrfKeyhash": "q+V0tX2nqwLwd0b1iaociAGCKlyLNrbZINRJ8TkQKXs="
+	"witnesses": {
+	"witnesses": {
+	"witnesses": {
+	"witnesses": {
+	"witnesses": {
+	"witnesses": {
+	"witnesses": {
+	"witnesses": {
+	## The u5c snapshots
+	#[allow(clippy::needless_update)]
+	#[allow(clippy::needless_update)]
+	#[allow(clippy::needless_update)]
+	#[allow(clippy::needless_update)]
+	#[allow(clippy::needless_update)]
+	#[allow(clippy::needless_update)]
+	#[allow(clippy::needless_update)]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(feature = "unstable")]
+	#[cfg(test)]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	#[test]
+	&'static str,
+	&cursor.native_script
+	&proposal.gov_action,
+	&trv::MultiEraNativeScript::from_decoded_dijkstra(&script),
+	&trv::MultiEraParamUpdate::Dijkstra(Box::new(std::borrow::Cow::Borrowed(
+	&update,
+	(
+	(
+	(
+	(
+	(
+	(&None, true),
+	(&change.gov_action_id, change.policy_hash.is_empty()),
+	(2u8, AUX_PLUTUS_V1.as_slice()),
+	(3, AUX_PLUTUS_V2.as_slice()),
+	(4, AUX_PLUTUS_V3.as_slice()),
+	(Some(u5c::CostModels::default()), 16_384),
+	(mapped.cost_models, mapped.max_tx_size),
+	(sub_input.to_string(), 0),
+	)
+	)
+	)
+	) -> Option<ParamUpdate> {
+) -> Option<u5c::PParams> {
+	) -> Option<u5c::certificate::Certificate> {
+	) -> Option<u5c::native_script::NativeScript> {
+	) -> ParamUpdate {
+	) -> pallas_primitives::dijkstra::ScriptRef<'static> {
+	) -> trv::MultiEraTx<'static> {
+	) -> u5c::Block {
+	) -> u5c::VotingThresholds {
+	) -> u5c::VotingThresholds {
+	))
+	))
+	))),
+	)),
+	)),
+	)),
+	)),
+	)),
+	)),
+	)),
+	)),
+	)),
+	)),
+	)),
+	)),
+	)),
+	)),
+	)),
+	)),
+	)),
+	)),
+	)),
+	)),
+	)),
+	)),
+	)),
+	)),
+	));
+	));
+	));
+	));
+	));
+),
+),
+),
+),
+),
+),
+),
+),
+),
+),
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	);
+	)> {
+	)],
+	)],
+	)],
+	..Default::default()
+	..Default::default()
+	..Default::default()
+	..Default::default()
+	..Default::default()
+	..Default::default()
+	..Default::default()
+	..Default::default()
+	..Default::default()
+	..dijkstra_pparams(&params)
+	..dijkstra_pparams(&params)
+	..dijkstra_pparams_update(seen, x)
+	.as_ref()
+	.as_ref()
+	.as_ref()
+	.as_ref()
+	.as_ref()
+	.body
+	.body
+	.body
+	.chain(plutus(
+	.collateral
+	.collateral
+	.collect(),
+	.collect();
+	.collect();
+	.collect();
+	.collect();
+	.collect();
+	.collect();
+	.collect();
+	.collect();
+	.expect("the outer body carries key 13")
+	.expect("the output carries a reference script");
+	.filter_map(|cert| cert.bls_key().map(|k| k.bls_pubkey.to_vec()))
+	.find(|x| x.voter.as_ref() == Some(&voter))
+	.flat_map(|tx| tx.certs())
+	.flat_map(|t| common(t).certificates.iter())
+	.inputs
+	.inputs
+	.into(),
+	.iter()
+	.iter()
+	.iter()
+	.iter()
+	.iter()
+	.iter()
+	.iter()
+	.iter()
+	.iter()
+	.iter()
+	.iter()
+	.iter()
+	.join()
+	.map(certificate_kind)
+	.map(drep_voting_thresholds_to_u5c),
+	.map(pool_voting_thresholds_to_u5c),
+	.map(|d| rational_number_to_u5c(ratio(1, *d)))
+	.map(|t| common(t).certificates.len())
+	.map(|t| common(t).certificates.len())
+	.map(|x| (hex::encode(&x.tx_hash), x.output_index))
+	.map(|x| (hex::encode(&x.tx_hash), x.output_index))
+	.map(|x| (hex::encode(&x.tx_hash), x.output_index))
+	.map(|x| (hex::encode(&x.tx_hash), x.output_index))
+	.map(|x| match x.coin.as_ref().and_then(|c| c.big_int.as_ref()) {
+	.map(|x| match x.coin.as_ref().and_then(|c| c.big_int.as_ref()) {
+	.map_gov_action(&trv::MultiEraGovAction::from_dijkstra(&proposal.gov_action));
+	.map_script_ref(&pallas_traverse::MultiEraScriptRef::from_dijkstra(&script));
+	.outputs
+	.outputs
+	.reference_inputs
+	.script
+	.spawn(|| {
+	.stack_size(128 * 1024)
+	.sum();
+	.sum();
+	.to_string(),
+	.to_string(),
+	.to_string(),
+	.to_string(),
+	.tx
+	.tx
+	.tx
+	.unwrap()
+	.unwrap()
+	.unwrap()
+	.unwrap()
+	.unwrap();
+.unwrap_or_default(),
+.unwrap_or_default(),
+.unwrap_or_default(),
+.unwrap_or_default(),
+.unwrap_or_default(),
+.unwrap_or_default(),
+.unwrap_or_default(),
+.unwrap_or_default(),
+.unwrap_or_default(),
+	.unwrap_or_else(|| panic!("this voter must reach u5c: {voter:?}"));
+	// An empty witness set, no auxiliary data, and a valid transaction.
+	// Auxiliary data keys 2, 3 and 4 are the V1, V2 and V3 script lists.
+	// In v1alpha and v1beta the expected pool registration names every field of its message.
+	// In v1alpha and v1beta the expected pool registration names every field of its message.
+	// In v1alpha and v1beta the expected pool registration names every field of its message.
+	// In v1alpha and v1beta these literals name every field of their message.
+	// In v1alpha and v1beta this literal names every field of the message.
+	// In v1alpha the expected literal names every field of the message.
+	// In v1alpha this literal names every field of the message.
+	// Key 16 is min_pool_cost, key 48 is max_ref_script_size_per_endorser_block.
+// Neither era this mapper's parameter update admits has a
+	// The sub transaction spends `2ed1285c..#0`, which the outer body also
+// The u5c `PoolRegistrationCert` has no field for the BLS key
+	// action id to a voting procedure.
+	// gov_action_id = [transaction_id, action_index]
+	// names at key 18.
+// protocol version key, so this field has no key to read and stays
+// the Dijkstra era adds, so `pool.bls_key` is not mapped.
+// unset. A hard fork initiation action proposes the version.
+	// voter = [2, addr_keyhash], the flat encoding of the DRep key variant.
+	// voting_procedure = [vote, anchor], anchor = [url, content_hash]
+	// voting_procedures is a map from a voter to a map from a governance
+	/// 19: a DRep key voter casting one yes vote on one governance action, with an
+	/// 33 stay unset.
+	/// A Dijkstra parameter set whose every cost model is present and whose
+	/// A Dijkstra parameter update read from the CBOR map given.
+	/// A Dijkstra reference script of the PlutusV4 script bytes given.
+	/// A Dijkstra transaction whose auxiliary data has one Plutus script of each of
+	/// A Dijkstra transaction whose body has one voting procedure at body key
+	/// A Dijkstra transaction whose body has two voting procedures, a committee
+	/// A Dijkstra update setting no key at all.
+	/// A Dijkstra update setting the same keys to the same values, plus the V4
+/// A guard clause has no u5c field and maps to an empty message.
+	/// Decodes a hex encoded Dijkstra block.
+	/// Decodes a hex encoded Dijkstra proposal procedure.
+	/// Decodes a hex encoded Dijkstra transaction.
+	/// Its auxiliary PlutusV2 script.
+	/// Its auxiliary PlutusV3 script.
+	/// Map a credential, whose type every era shares.
+	/// Names the u5c certificate variant of a mapped certificate.
+	/// Returns the certificate unchanged, since this schema has no field for a pool BLS key.
+	/// Returns the mapped block unchanged, as this schema has no Leios field.
+	/// The CBOR index of a no vote.
+	/// The CBOR index of a yes vote.
+	/// The CBOR index of an abstain vote.
+	/// The CBOR index of the Dijkstra voter variant for a DRep key.
+	/// The CBOR index of the Dijkstra voter variant for a committee key.
+	/// The CBOR index of the Dijkstra voter variant for a committee script.
+	/// The DRep key hash that casts the vote in `dijkstra_tx_with_one_vote`.
+	/// The action the committee key votes no on.
+	/// The action the committee script abstains on.
+	/// The anchor content hash of that vote.
+	/// The anchor url of that vote.
+	/// The auxiliary PlutusV1 script of `dijkstra_tx_with_aux_plutus_scripts`.
+	/// The fields a sub transaction shares, which this schema holds on the
+	/// The fields of the Dijkstra parameters no other era carries, for which this schema has no field.
+	/// The fields of the keys only a Dijkstra update carries, for which this schema has no field.
+	/// The index of that governance action inside its transaction.
+	/// The key hash of the committee member voting in
+	/// The message this schema maps a protocol parameter update to.
+	/// The same keys set alone in a Dijkstra update. The keys this era adds past
+	/// The script hash of the committee member voting beside it.
+	/// The transaction of the governance action that vote is cast on.
+	/// The u5c member of a guard clause, for which this schema has no member.
+	/// The u5c purpose of a guarding redeemer, for which this schema has no member.
+	/// The value this schema's update message holds for a scalar key, its
+	/// Writes a Dijkstra body of one input, no outputs, a fee, and the voting
+	/// `dijkstra_tx_with_committee_votes`.
+	/// anchor.
+	/// bytes no other of the three has.
+	/// cost model only this era names. The keys this era adds past 33 stay unset.
+	/// era adds past 33 is named by the caller and left unset.
+/// era adds past the ones u5c has a field for is named by the caller and left
+	/// every number differs from every other.
+	/// key voting no and a committee script abstaining, each on an action of its
+	/// own and neither with an anchor.
+	/// procedures the writer given adds at body key 19.
+	/// proto3 zero when the update leaves the key unset.
+	/// the three versions an earlier era's auxiliary type also names, each with
+	/// transaction itself.
+/// unset.
+/// update that sets no key `u5c::PParams` has a field for.
+	/// update that sets no key the update message has a field for.
+	0
+	0
+	1,
+	1,
+	1,
+	12
+	12
+	2,
+	2,
+	2,
+	ABSTAIN_VOTE,
+	Box::new(std::borrow::Cow::Borrowed(&blank)),
+	Box::new(std::borrow::Cow::Borrowed(&update)),
+	Box::new(std::borrow::Cow::Borrowed(&update)),
+	COMMITTEE_KEY_ACTION_TX_HASH,
+	COMMITTEE_KEY_VOTER,
+	COMMITTEE_SCRIPT_ACTION_TX_HASH,
+	COMMITTEE_SCRIPT_VOTER,
+	COMMITTEE_VOTER_KEY_HASH,
+	COMMITTEE_VOTER_KEY_HASH.to_vec().into(),
+	COMMITTEE_VOTER_SCRIPT_HASH,
+	COMMITTEE_VOTER_SCRIPT_HASH.to_vec().into(),
+	Guard(&'a pallas_primitives::StakeCredential),
+	KEYS_THE_UPDATE_MAPPER_READS,
+	MultiEraProtocolParameters::Dijkstra(params) => u5c::PParams {
+	MultiEraRedeemerTag::Guarding => guarding_purpose(),
+MultiEraRedeemerTag::Guarding => {
+	NO_VOTE,
+	NativeClause::Guard(x) => {
+	NativeClause::InvalidHereafter(*s)
+	NativeScript::InvalidBefore(s) => NativeClause::InvalidBefore(*s),
+	NativeScript::InvalidHereafter(s) => {
+	NativeScript::ScriptAll(_) => NativeClause::All,
+	NativeScript::ScriptAny(_) => NativeClause::Any,
+	NativeScript::ScriptNOfK(k, _) => NativeClause::NOfK(*k),
+	NativeScript::ScriptPubkey([8; 28].into()),
+	NativeScript::ScriptPubkey(x) => NativeClause::Pubkey(x),
+	NativeScript::ScriptRequireGuard(x) => NativeClause::Guard(x),
+	None
+	None => "no certificate at all",
+	None,
+	None,
+	ParamUpdate {
+	ParamUpdate::default()
+	ScriptLanguage::PlutusV4 => u5c::script::Script::PlutusV4(bytes().into()),
+	Self::native_script_node(
+	Some(Mapper::<NoLedger>::map_native_script_pubkey(vec![0u8; 28]))
+	Some(Mapper::<NoLedger>::map_native_script_pubkey(vec![8u8; 28])),
+	Some(ParamUpdate {
+	Some(ParamUpdate {
+	Some(ParamUpdate {
+	Some(_) => "another kind",
+	Some(every_key_as_pparams(Some(u5c::CostModel {
+	Some(u5c::Anchor {
+	Some(u5c::Anchor {
+	Some(u5c::GovernanceActionId {
+Some(u5c::PParams {
+	Some(u5c::VotingThresholds {
+	Some(u5c::big_int::BigInt::Int(v)) => *v,
+	Some(u5c::big_int::BigInt::Int(v)) => *v,
+	Some(u5c::certificate::Certificate::PoolRegistration(_)) => "pool registration",
+	Some(u5c::certificate::Certificate::PoolRetirement(_)) => "pool retirement",
+	Some(u5c::certificate::Certificate::RegCert(_)) => "registration",
+	Some(u5c::certificate::Certificate::StakeDelegation(_)) => "stake delegation",
+	Some(u5c::certificate::Certificate::UnregCert(_)) => "deregistration",
+	Some(u5c::governance_action::GovernanceAction::ParameterChangeAction(change)),
+	Some(u5c::script::Script::PlutusV1(AUX_PLUTUS_V1.to_vec().into())),
+	Some(u5c::script::Script::PlutusV2(AUX_PLUTUS_V2.to_vec().into())),
+	Some(u5c::script::Script::PlutusV3(AUX_PLUTUS_V3.to_vec().into())),
+	Some(u5c::script::Script::PlutusV4(
+	Some(u5c::script::Script::PlutusV4(
+	Some(u5c::voter_votes::Voter::Drep(u5c::StakeCredential {
+	StakeCredential::AddrKeyhash(x) => {
+	StakeCredential::ScriptHash(x) => {
+	VOTING_DREP_KEY_HASH.to_vec().into()
+	[
+	[0x7a; 28].into(),
+	[9u8; 28].into(),
+	]
+	]
+	]
+	]
+	]
+	]
+	]
+	]
+	]
+	]
+	]
+	]
+	]
+	]
+	]
+	]
+	]
+	]
+	] {
+	] {
+	]);
+	]);
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	],
+	];
+	_: &mut bool,
+	_: &pallas_primitives::StakeCredential,
+	_: &pallas_traverse::MultiEraParamUpdate,
+	_: Option<&pallas_primitives::dijkstra::BlsKey>,
+	_block: &pallas_traverse::MultiEraBlock,
+	`REGENERATE_SNAPSHOTS=1 cargo test -p pallas-utxorpc --features unstable
+	`dijkstra10.block` had a snapshot pair here for its five post Alonzo map form
+	`pallas-utxorpc` keeps a JSON snapshot per schema version per block, and a
+	a reference script, which are the only two things the map form can hold that a
+	ada_per_utxo_byte: 4_310,
+	all.items[0].native_script,
+	all.items[1].native_script, all.items[0].native_script,
+	anchor: None,
+	anchor: None,
+as u32,
+	assert!(
+	assert!(
+	assert!(
+	assert!(mapper.map_votes(&tx).is_empty());
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(
+	assert_eq!(all.items.len(), 2, "a guard clause keeps its position");
+	assert_eq!(certs, 0);
+	assert_eq!(certs, 5, "every certificate in the block must be mapped");
+	assert_eq!(depth, 20_000);
+	assert_eq!(mapped.proposals.len(), 1);
+	assert_eq!(proposal.deposit, u64_to_bigint(1_000_000));
+	assert_eq!(proposal.reward_account.to_vec(), vec![0xe0; 29]);
+	assert_eq!(votes.len(), 1, "the body names one voter");
+	assert_eq!(votes.len(), 2, "the body names two voters");
+	assert_eq!(votes[0].votes.len(), 1, "that voter casts one vote");
+	assert_eq!(witness.len(), 1, "the witness set carries one script");
+	assert_ne!(
+	aux.iter().map(|x| x.script.clone()).collect();
+	aux.len(),
+	aux[0].script
+	aux[1].script,
+	aux_clause, clause,
+babbage::StakeCredential::AddrKeyhash(x) => {
+babbage::StakeCredential::ScriptHash(x) => {
+	blank,
+	branches on the form, and none of those five outputs carries an inline datum or
+	cases.len(),
+	cases.push((
+	cases.push((
+	cert
+	cert: Option<u5c::certificate::Certificate>,
+	change.protocol_param_update,
+	children,
+	coins_per_utxo_byte: u64_to_bigint(4_310),
+	coins_per_utxo_byte: u64_to_bigint(params.ada_per_utxo_byte),
+	collateral,
+	collateral_percentage: 151,
+	collateral_percentage: 151,
+collateral_percentage: 28,
+	collateral_percentage: params.collateral_percentage.into(),
+collateral_percentage: read_key(seen, x.collateral_percentage())
+	collateral_percentage: update_scalar(Some(28)),
+	collateral_percentage: update_scalar(read_key(
+	committee_no_confidence: ratio(1, 53),
+	committee_no_confidence: ratio(1, 63),
+	committee_normal: ratio(1, 52),
+	committee_normal: ratio(1, 62),
+	committee_term_limit: 293,
+	committee_term_limit: 293,
+committee_term_limit: 61,
+	committee_term_limit: params.committee_term_limit,
+committee_term_limit: read_key(seen, x.committee_term_limit())
+	committee_term_limit: update_scalar(Some(61)),
+	committee_term_limit: update_scalar(read_key(
+	const ABSTAIN_VOTE: u8 = 2;
+	const COMMITTEE_KEY_VOTER: u8 = 0;
+	const COMMITTEE_SCRIPT_VOTER: u8 = 1;
+	const DREP_KEY_VOTER: u8 = 2;
+	const NO_VOTE: u8 = 0;
+	const YES_VOTE: u8 = 1;
+	content_hash: VOTE_ANCHOR_HASH.to_vec().into(),
+	content_hash: vec![0x00; 32].into(),
+	cost_models: Some(u5c::CostModels {
+	cost_models: Some({
+	cost_models_for_script_languages: pallas_primitives::dijkstra::CostModels {
+	cursor = list.items.first().expect("ScriptAll must carry a child");
+	cursor.native_script,
+	decode_leaked(e.into_writer())
+	depth += 1;
+	desired_number_of_pools: 150,
+desired_number_of_pools: 9,
+	desired_number_of_pools: params.desired_number_of_stake_pools.into(),
+desired_number_of_pools: read_key(seen, x.desired_number_of_stake_pools())
+	desired_number_of_pools: update_scalar(Some(9)),
+	desired_number_of_pools: update_scalar(read_key(
+	desired_number_of_stake_pools: 150,
+	dijkstra,
+	dijkstra,
+	dijkstra::CostModels {
+	dijkstra::CostModels {
+	dijkstra::NativeScript::ScriptPubkey([0x44; 28].into()),
+	dijkstra::NativeScript::ScriptRequireGuard(StakeCredential::AddrKeyhash(
+	dijkstra_pparams(&dijkstra_params()),
+	dijkstra_proposal(include_str!("../../../test_data/proposal-param-change-key0.hex"));
+	dijkstra_proposal(include_str!("../../../test_data/proposal-param-change-key48.hex"));
+	dijkstra_tx_voting(1, |e| {
+	dijkstra_tx_voting(2, |e| {
+	drep_deposit: 500_000_001,
+	drep_deposit: u64_to_bigint(500_000_001),
+	drep_deposit: u64_to_bigint(params.drep_deposit),
+	drep_inactivity_period: 20,
+	drep_inactivity_period: 20,
+drep_inactivity_period: 65,
+	drep_inactivity_period: params.drep_inactivity_period,
+drep_inactivity_period: read_key(seen, x.drep_inactivity_period())
+	drep_inactivity_period: update_scalar(Some(65)),
+	drep_inactivity_period: update_scalar(read_key(
+	drep_voting_thresholds: Some(drep_voting_thresholds_to_u5c(
+	drep_voting_thresholds: Some(drep_voting_thresholds_to_u5c(
+drep_voting_thresholds: Some(u5c::VotingThresholds {
+	drep_voting_thresholds: conway::DRepVotingThresholds {
+	drep_voting_thresholds: read_key(seen, x.drep_voting_thresholds())
+drep_voting_thresholds: read_key(seen, x.drep_voting_thresholds()).map(|t| {
+	drep_voting_thresholds: thresholds(&[61, 62, 63, 64, 65, 66, 67, 68, 69, 70]),
+	e.array(0).unwrap();
+	e.array(0).unwrap();
+	e.array(1).unwrap();
+	e.array(1).unwrap();
+	e.array(1).unwrap();
+	e.array(2).unwrap();
+	e.array(2).unwrap();
+	e.array(2).unwrap();
+	e.array(2).unwrap();
+	e.array(2).unwrap();
+	e.array(2).unwrap();
+	e.array(2).unwrap();
+	e.array(2).unwrap();
+	e.array(2).unwrap();
+	e.array(2).unwrap();
+	e.array(4).unwrap();
+	e.array(4).unwrap();
+	e.bool(true).unwrap();
+	e.bool(true).unwrap();
+	e.bytes(&VOTED_ACTION_TX_HASH).unwrap();
+	e.bytes(&VOTE_ANCHOR_HASH).unwrap();
+	e.bytes(&VOTING_DREP_KEY_HASH).unwrap();
+	e.bytes(&[0x11; 32]).unwrap();
+	e.bytes(&[0x11; 32]).unwrap();
+	e.bytes(&action).unwrap();
+	e.bytes(&hash).unwrap();
+	e.bytes(script).unwrap();
+	e.bytes(script).unwrap();
+	e.map(0).unwrap();
+	e.map(0).unwrap();
+	e.map(1).unwrap();
+	e.map(1).unwrap();
+	e.map(3).unwrap();
+	e.map(3).unwrap();
+	e.map(4).unwrap();
+	e.map(voters as u64).unwrap();
+	e.null().unwrap();
+	e.null().unwrap();
+	e.str(VOTE_ANCHOR_URL).unwrap();
+	e.tag(Tag::new(258)).unwrap();
+	e.tag(Tag::new(258)).unwrap();
+	e.tag(Tag::new(259)).unwrap();
+	e.u32(0).unwrap();
+	e.u32(1_000).unwrap();
+	e.u32(1_000).unwrap();
+	e.u32(VOTED_ACTION_INDEX).unwrap();
+	e.u8(0).unwrap();
+	e.u8(0).unwrap();
+	e.u8(0).unwrap();
+	e.u8(0).unwrap();
+	e.u8(1).unwrap();
+	e.u8(1).unwrap();
+	e.u8(19).unwrap();
+	e.u8(2).unwrap();
+	e.u8(2).unwrap();
+	e.u8(4).unwrap();
+	e.u8(DREP_KEY_VOTER).unwrap();
+	e.u8(YES_VOTE).unwrap();
+	e.u8(key).unwrap();
+	e.u8(variant).unwrap();
+	e.u8(vote).unwrap();
+	else {
+	else {
+	else {
+	enclosing.fee.is_some(),
+	epoch_length: 21_600,
+	execution_costs: pallas_primitives::ExUnitPrices {
+	expansion_rate: ratio(3, 1_000),
+	fn a_committee_key_and_a_committee_script_vote_as_their_own_credential_kinds() {
+	fn a_dijkstra_block_maps_every_certificate() {
+	fn a_dijkstra_block_with_no_certificates_maps_none() {
+	fn a_dijkstra_parameter_change_maps_a_key_u5c_carries() {
+	fn a_dijkstra_parameter_change_maps_every_key_u5c_carries() {
+	fn a_dijkstra_parameter_change_of_a_carried_key_and_an_era_key_maps_the_carried_one() {
+	fn a_dijkstra_parameter_change_of_a_key_this_schema_cannot_carry_maps_to_no_parameters()
+	fn a_dijkstra_parameter_set_maps_every_field_every_era_names() {
+	fn a_dijkstra_parameter_set_maps_none_of_the_keys_this_schema_cannot_carry() {
+	fn a_dijkstra_parameter_set_without_cost_models_maps_none_of_them() {
+	fn a_dijkstra_pool_registration_drops_the_bls_key_it_fills() {
+	fn a_dijkstra_proposal_maps_its_governance_action() {
+	fn a_dijkstra_reference_script_maps_the_language_only_this_era_names() {
+	fn a_dijkstra_transaction_maps_every_script_it_carries() {
+	fn a_dijkstra_transaction_maps_its_auxiliary_plutus_scripts() {
+	fn a_dijkstra_transaction_with_no_votes_maps_none() {
+	fn a_dijkstra_transaction_with_one_vote_maps_it() {
+	fn a_dijkstra_update_setting_any_one_key_to_zero_is_still_an_update() {
+	fn a_guard_clause_inside_a_list_maps_to_an_empty_message() {
+	fn a_guard_clause_keeps_its_position_beside_the_clause_it_neighbours() {
+	fn a_guarding_redeemer_maps_to_the_purpose_this_schema_leaves_unspecified() {
+	fn a_sub_transaction_maps_to_its_own_body() {
+	fn a_sub_transaction_reaches_none_of_the_outer_body_fields() {
+	fn certificate_kind(x: &u5c::Certificate) -> &'static str {
+	fn common(tx: &u5c::Tx) -> &u5c::Tx {
+	fn dijkstra_pparams(_: &pallas_validate::utils::DijkstraProtParams) -> u5c::PParams {
+	fn dijkstra_pparams_update(
+	fn dijkstra_tx_voting(
+	fn drep_voting_thresholds_to_u5c(
+	fn every_key_as_pparams(plutus_v4: Option<u5c::CostModel>) -> ParamUpdate {
+fn every_key_as_pparams(plutus_v4: Option<u5c::CostModel>) -> u5c::PParams {
+	fn guarding_purpose() -> u5c::RedeemerPurpose {
+	fn map_credential(x: &pallas_primitives::StakeCredential) -> u5c::StakeCredential {
+	fn native_script_guard(
+	fn pool_voting_thresholds_to_u5c(
+	fn the_era_neutral_walk_handles_a_deeply_nested_dijkstra_script() {
+	fn update_scalar<T: Default>(value: Option<T>) -> T {
+	fn with_leios_fields(
+	fn with_pool_bls_key(
+	for (key, script) in [
+	for (key, update) in cases {
+	for (variant, hash, action, vote) in [
+	for (voter, procedure) in expected {
+	for _ in 0..20_000 {
+	for byte identical on a second run is a file that no longer describes what the
+	for key in keys {
+	found.votes,
+	gov_action_id: Some(u5c::GovernanceActionId {
+	gov_action_id: Some(u5c::GovernanceActionId {
+	governance_action:
+	governance_action_deposit: 100_000_000_000,
+	governance_action_deposit: u64_to_bigint(100_000_000_000),
+	governance_action_deposit: u64_to_bigint(params.governance_action_deposit),
+	governance_action_index: 0,
+	governance_action_index: 0,
+	governance_action_index: VOTED_ACTION_INDEX,
+	governance_action_validity_period: 120,
+	governance_action_validity_period: 120,
+governance_action_validity_period: 62,
+	governance_action_validity_period: params.governance_action_validity_period,
+governance_action_validity_period: read_key(
+	governance_action_validity_period: update_scalar(Some(62)),
+	governance_action_validity_period: update_scalar(read_key(
+	guard,
+	hard_fork_initiation: ratio(1, 54),
+	hard_fork_initiation: ratio(1, 65),
+	hex::decode("d87980").unwrap().into(),
+	if let Some(x) = x.as_dijkstra() {
+if tx.era() == trv::Era::Dijkstra {
+if x.as_dijkstra().is_some() {
+	include_str!("../../../test_data/dijkstra6.block"),
+	include_str!("../../../test_data/dijkstra6.block"),
+	include_str!("../../../test_data/u5c_v1alpha_dijkstra.json"),
+	include_str!("../../../test_data/u5c_v1beta_dijkstra.json"),
+	inputs,
+	inputs,
+	key_deposit: 2_000_000,
+	keys.len(),
+	kinds,
+	legacy array cannot. The pair pinned one field path the `dijkstra6` pair does
+	leios_announcement_period_length,
+	leios_announcement_period_length: 1_000,
+	leios_committee_size,
+	leios_committee_size: 900,
+	leios_diffusion_period_length,
+	leios_diffusion_period_length: 7_000,
+	leios_quorum_stake_threshold,
+	leios_quorum_stake_threshold: ratio(3, 4),
+	leios_vote_period_length,
+	leios_vote_period_length: 4_000,
+	let Some(u5c::GovernanceAction {
+	let Some(u5c::native_script::NativeScript::ScriptAll(all)) = &mapped.native_script
+	let Some(u5c::native_script::NativeScript::ScriptAll(list)) = mapped.native_script
+	let Some(u5c::script::Script::Native(aux_clause)) = &aux[0].script else {
+	let Some(u5c::script::Script::Native(clause)) = &witness[0].script else {
+	let action = Mapper::new(NoLedger)
+	let aux = &mapped.auxiliary.as_ref().unwrap().scripts;
+	let aux = &mapped.auxiliary.as_ref().unwrap().scripts;
+	let blank = dijkstra_update_of_no_key();
+	let blank = dijkstra_update_of_no_key();
+	let block = dijkstra_block(include_str!("../../../test_data/dijkstra3.block"));
+	let block = dijkstra_block(include_str!("../../../test_data/dijkstra6.block"));
+	let block = dijkstra_block(include_str!("../../../test_data/dijkstra6.block"));
+	let body = common(&mapped);
+	let body = common(&mapped);
+	let cases = dijkstra_updates_of_one_zero_key();
+	let cbor = hex::decode(hex_str.trim()).unwrap();
+	let cbor: &'static [u8] = Box::leak(e.into_writer().into_boxed_slice());
+	let cbor: &'static [u8] = Box::leak(e.into_writer().into_boxed_slice());
+	let cbor: &'static [u8] = Box::leak(hex::decode(block_str).unwrap().into_boxed_slice());
+	let cbor: &'static [u8] = Box::leak(hex::decode(tx_str).unwrap().into_boxed_slice());
+	let certs: usize = mapped
+	let certs: usize = mapped
+	let change = parameter_change(
+	let collateral: Vec<(String, u32)> = mapped
+	let enclosing = Mapper::new(NoLedger).map_tx(&tx);
+	let expected = [
+	let found = votes
+	let guard = NativeScript::ScriptRequireGuard(StakeCredential::AddrKeyhash(
+	let inner = with_pool_bls_key(inner, x.bls_key());
+	let inputs: Vec<(String, u32)> = body
+	let inputs: Vec<(String, u32)> = body
+	let keys: Vec<Vec<u8>> = txs
+	let kinds: Vec<&str> = mapped
+	let mapped =
+	let mapped =
+	let mapped = Mapper::<NoLedger>::map_multi_era_native_script(
+	let mapped = Mapper::<NoLedger>::map_multi_era_native_script(&script);
+	let mapped = Mapper::<NoLedger>::map_multi_era_native_script(&script);
+	let mapped = Mapper::new(NoLedger)
+	let mapped = Mapper::new(NoLedger).map_pparams(
+	let mapped = Mapper::new(NoLedger).map_pparams(
+	let mapped = Mapper::new(NoLedger).map_pparams_update(
+	let mapped = Mapper::new(NoLedger).map_tx(&subs[0]);
+	let mapped = Mapper::new(NoLedger).map_tx(&tx);
+	let mapped = Mapper::new(NoLedger).map_tx(&tx);
+	let mapped = ParamUpdate {
+	let mapped = common(&mapped);
+	let mapped = common(&mapped);
+	let mapped = common(&mapped);
+	let mapped = common(&mapped);
+	let mapped = common(&mapped);
+	let mapped = mapper.map_block(&block);
+	let mapped = mapper.map_block(&block);
+	let mapped = mapper.map_tx(&tx);
+	let mapped = mapper.map_tx(&tx);
+	let mapped = u5c::Block {
+let mapped = u5c::PParams {
+	let mapper = Mapper::new(NoLedger);
+	let mapper = Mapper::new(NoLedger);
+	let mapper = Mapper::new(NoLedger);
+	let mapper = Mapper::new(NoLedger);
+	let mapper = Mapper::new(NoLedger);
+	let mapper = Mapper::new(NoLedger);
+	let mapper = Mapper::new(NoLedger);
+	let mapper = Mapper::new(NoLedger);
+	let mapper = Mapper::new(NoLedger);
+	let mapper = Mapper::new(NoLedger);
+	let model = |values: &Option<Vec<i64>>| {
+	let model = |values: Vec<i64>| Some(u5c::CostModel { values });
+	let models = &params.cost_models_for_script_languages;
+	let mut cursor = &mapped;
+	let mut depth = 0;
+	let mut e = minicbor::Encoder::new(Vec::new());
+	let mut e = minicbor::Encoder::new(Vec::new());
+	let mut e = minicbor::Encoder::new(Vec::new());
+	let mut params = dijkstra_params();
+	let mut script =
+	let output = &mapped.outputs[0];
+	let outputs: Vec<i64> = body
+	let outputs: Vec<i64> = body
+	let params = dijkstra_params();
+	let procedure = &votes[0].votes[0];
+	let proposal =
+	let proposal =
+	let proposal = &mapped.proposals[0];
+	let r = |n, d| Some(rational_number_to_u5c(ratio(n, d)));
+	let references: Vec<(String, u32)> = body
+	let script =
+	let script = NativeScript::ScriptAll(vec![
+	let script = dijkstra::NativeScript::ScriptAll(vec![
+	let script = dijkstra_plutus_v4_script_ref(&[0x04, 0xaa, 0xbb]);
+	let script = output
+	let script = pallas_traverse::MultiEraNativeScript::from_decoded_dijkstra(&script);
+	let scripts: Vec<Option<u5c::script::Script>> =
+	let sub_input =
+	let subs = tx.sub_transactions();
+	let subs = tx.sub_transactions();
+	let thresholds = |n: &[u64]| {
+	let tx = dijkstra_tx(include_str!("../../../test_data/dijkstra-proposal.tx"));
+	let tx = dijkstra_tx(include_str!("../../../test_data/dijkstra-proposal.tx"));
+	let tx = dijkstra_tx(include_str!("../../../test_data/dijkstra-scripts.tx"));
+	let tx = dijkstra_tx(include_str!("../../../test_data/dijkstra-subtx.tx"));
+	let tx = dijkstra_tx(include_str!("../../../test_data/dijkstra-subtx.tx"));
+	let tx = dijkstra_tx_with_aux_plutus_scripts();
+	let tx = dijkstra_tx_with_committee_votes();
+	let tx = dijkstra_tx_with_one_vote();
+	let txs = block.txs();
+	let update = dijkstra_update(&[0xa2, 0x10, 0x10, 0x18, 0x30, 0x19, 0x4e, 0x20]);
+	let update = dijkstra_update_of_every_key();
+	let v4_bytes = || {
+	let votes = Mapper::new(NoLedger).map_votes(&tx);
+	let votes = mapper.map_votes(&tx);
+	let wire = Mapper::new(NoLedger).map_block(&block).encode_to_vec();
+	let witness = &mapped.witnesses.as_ref().unwrap().script;
+	list.items.len(),
+	list.items[0].native_script, None,
+	major: params.protocol_version.0 as u32,
+	map_credential(x)
+	mapped
+	mapped,
+	mapped,
+	mapped,
+	mapped.fee, None,
+	mapped.is_some(),
+	mapped.native_script
+	mapped.script,
+	mapped: u5c::Block,
+	mapper does.
+	mapper.map_gov_action(&trv::MultiEraGovAction::from_dijkstra(
+	mapper.map_multi_era_purpose(&trv::MultiEraRedeemerTag::Guarding),
+	mapper.map_pparams_update(&pallas_traverse::MultiEraParamUpdate::Dijkstra(
+	mapper.map_pparams_update(&pallas_traverse::MultiEraParamUpdate::Dijkstra(
+	mapper.map_pparams_update(&pallas_traverse::MultiEraParamUpdate::Dijkstra(
+	match node {
+	match x.certificate {
+max_block_body_size: 3,
+	max_block_body_size: 90_112,
+	max_block_body_size: 90_112,
+	max_block_body_size: params.max_block_body_size.into(),
+max_block_body_size: read_key(seen, x.max_block_body_size())
+	max_block_body_size: update_scalar(Some(3)),
+	max_block_body_size: update_scalar(read_key(seen, x.max_block_body_size())),
+	max_block_ex_units: ExUnits {
+	max_block_header_size: 1_100,
+	max_block_header_size: 1_100,
+max_block_header_size: 5,
+	max_block_header_size: params.max_block_header_size.into(),
+max_block_header_size: read_key(seen, x.max_block_header_size())
+	max_block_header_size: update_scalar(Some(5)),
+	max_block_header_size: update_scalar(read_key(
+max_collateral_inputs: 29,
+	max_collateral_inputs: 3,
+	max_collateral_inputs: 3,
+	max_collateral_inputs: params.max_collateral_inputs.into(),
+max_collateral_inputs: read_key(seen, x.max_collateral_inputs())
+	max_collateral_inputs: update_scalar(Some(29)),
+	max_collateral_inputs: update_scalar(read_key(
+	max_endorser_block_ex_units: ExUnits {
+	max_endorser_block_execution_units,
+	max_endorser_block_references_size,
+	max_endorser_block_references_size: 100_000,
+	max_endorser_block_txs_size,
+	max_endorser_block_txs_size: 1_000_000,
+	max_execution_units_per_block: Some(execution_units_to_u5c(
+	max_execution_units_per_block: Some(u5c::ExUnits {
+	max_execution_units_per_transaction: Some(execution_units_to_u5c(
+	max_execution_units_per_transaction: Some(u5c::ExUnits {
+	max_pledge_leverage,
+	max_pledge_leverage: Some(ratio(38, 1)),
+	max_ref_script_size_per_block,
+	max_ref_script_size_per_block: 1_048_576,
+	max_ref_script_size_per_endorser_block,
+	max_ref_script_size_per_endorser_block: 4_000_000,
+	max_ref_script_size_per_tx,
+	max_ref_script_size_per_tx: 204_800,
+	max_transaction_size: 16_384,
+	max_tx_ex_units: ExUnits {
+	max_tx_size: 16_384,
+max_tx_size: 4,
+	max_tx_size: params.max_transaction_size.into(),
+max_tx_size: read_key(seen, x.max_transaction_size()).unwrap_or_default(),
+	max_tx_size: update_scalar(Some(4)),
+	max_tx_size: update_scalar(read_key(seen, x.max_transaction_size())),
+max_value_size: 27,
+	max_value_size: 5_000,
+	max_value_size: 5_000,
+	max_value_size: params.max_value_size.into(),
+max_value_size: read_key(seen, x.max_value_size()).unwrap_or_default(),
+	max_value_size: update_scalar(Some(27)),
+	max_value_size: update_scalar(read_key(seen, x.max_value_size())),
+	maximum_epoch: 18,
+	mem: 14_000_000,
+	mem: 310_000_000,
+	mem: 62_000_000,
+	mem_price: ratio(577, 10_000),
+	memory: 14_000_000,
+	memory: 62_000_000,
+	memory: r(577, 10_000),
+min_committee_size: 0,
+min_committee_size: 60,
+	min_committee_size: 7,
+	min_committee_size: 7,
+	min_committee_size: params.min_committee_size as u32,
+min_committee_size: read_key(seen, x.min_committee_size()).unwrap_or_default()
+	min_committee_size: update_scalar(
+	min_committee_size: update_scalar(Some(0)),
+	min_committee_size: update_scalar(Some(60)),
+	min_fee_coefficient: u64_to_bigint(1000),
+	min_fee_coefficient: u64_to_bigint(44),
+	min_fee_coefficient: u64_to_bigint(params.minfee_a.into()),
+	min_fee_constant: u64_to_bigint(155_381),
+	min_fee_constant: u64_to_bigint(params.minfee_b.into()),
+	min_fee_script_ref_cost_per_byte: Some(rational_number_to_u5c(
+	min_fee_script_ref_cost_per_byte: r(15, 1),
+	min_pool_cost: 170_000_000,
+	min_pool_cost: u64_to_bigint(16),
+	min_pool_cost: u64_to_bigint(170_000_000),
+	min_pool_cost: u64_to_bigint(params.min_pool_cost),
+	min_pool_margin,
+	min_pool_margin: ratio(1, 39),
+	minfee_a: 44,
+	minfee_b: 155_381,
+	minfee_refscript_cost_per_byte: ratio(15, 1),
+	minicbor::decode(&[0xa0]).expect("the empty parameter update map must decode")
+	minicbor::decode(update_cbor).expect("a parameter update map must decode")
+	minor: params.protocol_version.1 as u32,
+	monetary_expansion: Some(rational_number_to_u5c(
+	monetary_expansion: r(3, 1_000),
+	motion_no_confidence: ratio(1, 51),
+	motion_no_confidence: ratio(1, 61),
+	native_script: native_script_guard(x),
+	not, a transaction `ttl`, and the pre-existing Conway snapshot already pins
+	other => panic!("an output lovelace amount arrives as an int: {other:?}"),
+	other => panic!("an output lovelace amount arrives as an int: {other:?}"),
+	outputs,
+	outputs,
+	outputs. `map_tx_output` reads an output through `pallas-traverse` and never
+	pallas_codec::minicbor::decode(&cbor).unwrap()
+	pallas_primitives::dijkstra::NativeScript::ScriptAll(vec![script]);
+	pallas_primitives::dijkstra::NativeScript::ScriptPubkey([0; 28].into());
+	pallas_primitives::dijkstra::ProtocolParamUpdate,
+	pallas_traverse::MultiEraNativeScript::from_decoded_dijkstra(&script);
+	pallas_validate::utils::DijkstraProtParams {
+	pallas_validate::utils::MultiEraProtocolParameters::Dijkstra(params),
+	pallas_validate::utils::MultiEraProtocolParameters::Dijkstra(params.clone()),
+	panic!(
+	panic!(
+	panic!(
+	panic!("expected ScriptAll, got {:?}", mapped.native_script);
+	panic!("the action is a parameter change, got {:?}", proposal.gov_action);
+	parameter_change(action).protocol_param_update,
+	params.cost_models_for_script_languages = pallas_primitives::dijkstra::CostModels {
+	params.drep_voting_thresholds,
+	params.drep_voting_thresholds.clone(),
+params.drep_voting_thresholds.committee_no_confidence,
+params.drep_voting_thresholds.committee_normal,
+params.drep_voting_thresholds.hard_fork_initiation,
+params.drep_voting_thresholds.motion_no_confidence,
+params.drep_voting_thresholds.pp_economic_group,
+params.drep_voting_thresholds.pp_governance_group,
+params.drep_voting_thresholds.pp_network_group,
+params.drep_voting_thresholds.pp_technical_group,
+params.drep_voting_thresholds.treasury_withdrawal,
+params.drep_voting_thresholds.update_constitution,
+	params.expansion_rate.clone(),
+	params.max_block_ex_units,
+	params.max_tx_ex_units,
+	params.minfee_refscript_cost_per_byte.clone(),
+	params.pool_pledge_influence.clone(),
+	params.pool_voting_thresholds,
+	params.pool_voting_thresholds.clone(),
+params.pool_voting_thresholds.committee_no_confidence,
+params.pool_voting_thresholds.committee_normal,
+params.pool_voting_thresholds.hard_fork_initiation,
+params.pool_voting_thresholds.motion_no_confidence,
+params.pool_voting_thresholds.security_voting_threshold,
+	params.treasury_growth_rate.clone(),
+	plutus_v1: None,
+	plutus_v1: None,
+	plutus_v1: Some(vec![101, 102]),
+	plutus_v1: Some(vec![181]),
+	plutus_v1: model(&models.plutus_v1),
+	plutus_v1: model(vec![101, 102]),
+	plutus_v2: None,
+	plutus_v2: None,
+	plutus_v2: Some(vec![182]),
+	plutus_v2: Some(vec![201, 202]),
+	plutus_v2: model(&models.plutus_v2),
+	plutus_v2: model(vec![201, 202]),
+	plutus_v3: None,
+	plutus_v3: None,
+	plutus_v3: Some(vec![183]),
+	plutus_v3: Some(vec![301, 302]),
+	plutus_v3: model(&models.plutus_v3),
+	plutus_v3: model(vec![301, 302]),
+	plutus_v4: None,
+	plutus_v4: None,
+	plutus_v4: Some(vec![184]),
+	plutus_v4: Some(vec![401, 402]),
+	plutus_v4: cm.plutus_v4.map(|values| u5c::CostModel { values }),
+	plutus_v4: model(&models.plutus_v4),
+	plutus_v4: model(vec![401, 402]),
+	pool_deposit: 500_000_000,
+	pool_deposit: u64_to_bigint(500_000_000),
+	pool_deposit: u64_to_bigint(params.pool_deposit),
+	pool_influence: Some(rational_number_to_u5c(
+	pool_influence: r(3, 10),
+	pool_pledge_influence: ratio(3, 10),
+	pool_retirement_epoch_bound: 18,
+pool_retirement_epoch_bound: 8,
+	pool_retirement_epoch_bound: params.maximum_epoch,
+pool_retirement_epoch_bound: read_key(seen, x.maximum_epoch())
+	pool_retirement_epoch_bound: update_scalar(Some(8)),
+	pool_retirement_epoch_bound: update_scalar(read_key(seen, x.maximum_epoch())),
+	pool_voting_thresholds: Some(pool_voting_thresholds_to_u5c(
+	pool_voting_thresholds: Some(pool_voting_thresholds_to_u5c(
+pool_voting_thresholds: Some(u5c::VotingThresholds {
+	pool_voting_thresholds: conway::PoolVotingThresholds {
+	pool_voting_thresholds: read_key(seen, x.pool_voting_thresholds())
+pool_voting_thresholds: read_key(seen, x.pool_voting_thresholds()).map(|t| {
+	pool_voting_thresholds: thresholds(&[51, 52, 53, 54, 55]),
+	pp_economic_group: ratio(1, 67),
+	pp_governance_group: ratio(1, 69),
+	pp_network_group: ratio(1, 66),
+	pp_technical_group: ratio(1, 68),
+	prices: Some(execution_prices_to_u5c(params.execution_costs.clone())),
+	prices: Some(u5c::ExPrices {
+	procedure.anchor,
+	procedure.gov_action_id,
+	procedure.vote,
+	proposal.anchor,
+	protocol_version: (12, 1),
+protocol_version: None,
+protocol_version: None,
+	protocol_version: Some(u5c::ProtocolVersion { major: 12, minor: 1 }),
+	protocol_version: u5c::ProtocolVersion {
+	pub const AUX_PLUTUS_V1: [u8; 3] = [0x01, 0x11, 0x11];
+	pub const AUX_PLUTUS_V2: [u8; 3] = [0x02, 0x22, 0x22];
+	pub const AUX_PLUTUS_V3: [u8; 3] = [0x03, 0x33, 0x33];
+	pub const COMMITTEE_KEY_ACTION_TX_HASH: [u8; 32] = [0x6c; 32];
+	pub const COMMITTEE_SCRIPT_ACTION_TX_HASH: [u8; 32] = [0x6d; 32];
+	pub const COMMITTEE_VOTER_KEY_HASH: [u8; 28] = [0x6a; 28];
+	pub const COMMITTEE_VOTER_SCRIPT_HASH: [u8; 28] = [0x6b; 28];
+	pub const VOTED_ACTION_INDEX: u32 = 3;
+	pub const VOTED_ACTION_TX_HASH: [u8; 32] = [0x88; 32];
+	pub const VOTE_ANCHOR_HASH: [u8; 32] = [0x99; 32];
+	pub const VOTE_ANCHOR_URL: &str = "https://example.invalid/vote";
+	pub const VOTING_DREP_KEY_HASH: [u8; 28] = [0x77; 28];
+	pub fn dijkstra_block(block_str: &str) -> trv::MultiEraBlock<'_> {
+	pub fn dijkstra_params() -> pallas_validate::utils::DijkstraProtParams {
+	pub fn dijkstra_plutus_v4_script_ref(
+	pub fn dijkstra_proposal(hex_str: &str) -> pallas_primitives::dijkstra::ProposalProcedure {
+	pub fn dijkstra_tx(tx_str: &str) -> trv::MultiEraTx<'_> {
+	pub fn dijkstra_tx_with_aux_plutus_scripts() -> trv::MultiEraTx<'static> {
+	pub fn dijkstra_tx_with_committee_votes() -> trv::MultiEraTx<'static> {
+	pub fn dijkstra_tx_with_one_vote() -> trv::MultiEraTx<'static> {
+	pub fn dijkstra_update(update_cbor: &[u8]) -> pallas_primitives::dijkstra::ProtocolParamUpdate {
+	pub fn dijkstra_update_of_every_key() -> pallas_primitives::dijkstra::ProtocolParamUpdate {
+	pub fn dijkstra_update_of_no_key() -> pallas_primitives::dijkstra::ProtocolParamUpdate {
+	pub fn dijkstra_updates_of_one_zero_key() -> Vec<(
+rational_number_to_u5c(
+rational_number_to_u5c(
+rational_number_to_u5c(
+rational_number_to_u5c(
+rational_number_to_u5c(
+rational_number_to_u5c(
+rational_number_to_u5c(
+rational_number_to_u5c(
+rational_number_to_u5c(
+rational_number_to_u5c(
+rational_number_to_u5c(
+rational_number_to_u5c(
+rational_number_to_u5c(
+rational_number_to_u5c(
+rational_number_to_u5c(
+rational_number_to_u5c(t.committee_no_confidence),
+rational_number_to_u5c(t.committee_no_confidence),
+rational_number_to_u5c(t.committee_normal),
+rational_number_to_u5c(t.committee_normal),
+rational_number_to_u5c(t.hard_fork_initiation),
+rational_number_to_u5c(t.hard_fork_initiation),
+rational_number_to_u5c(t.motion_no_confidence),
+rational_number_to_u5c(t.motion_no_confidence),
+rational_number_to_u5c(t.pp_economic_group),
+rational_number_to_u5c(t.pp_governance_group),
+rational_number_to_u5c(t.pp_network_group),
+rational_number_to_u5c(t.pp_technical_group),
+rational_number_to_u5c(t.security_voting_threshold),
+rational_number_to_u5c(t.treasury_withdrawal),
+rational_number_to_u5c(t.update_constitution),
+	rational_number_to_u5c(value.committee_no_confidence),
+	rational_number_to_u5c(value.committee_no_confidence),
+	rational_number_to_u5c(value.committee_normal),
+	rational_number_to_u5c(value.committee_normal),
+	rational_number_to_u5c(value.hard_fork_initiation),
+	rational_number_to_u5c(value.hard_fork_initiation),
+	rational_number_to_u5c(value.motion_no_confidence),
+	rational_number_to_u5c(value.motion_no_confidence),
+	rational_number_to_u5c(value.pp_economic_group),
+	rational_number_to_u5c(value.pp_governance_group),
+	rational_number_to_u5c(value.pp_network_group),
+	rational_number_to_u5c(value.pp_technical_group),
+	rational_number_to_u5c(value.security_voting_threshold),
+	rational_number_to_u5c(value.treasury_withdrawal),
+	rational_number_to_u5c(value.update_constitution),
+	read_key(seen, x.min_committee_size()).map(|size| size as u32),
+	ref_script_cost_multiplier,
+	ref_script_cost_multiplier: ratio(6, 5),
+	ref_script_cost_stride,
+	ref_script_cost_stride: 25_600,
+	references,
+	return pallas_codec::tree::fold_tree(x, |node, children| {
+	return u5c::NativeScript {
+	script =
+	script.script,
+	script: &[u8],
+	scripts,
+	security_voting_threshold: ratio(1, 55),
+	seen,
+	seen,
+	seen,
+	seen,
+	seen,
+	seen,
+	slot_length: 1,
+	snapshot` rewrites each file in place, and a file that does not come back byte
+	stake_credential: Some(u5c::stake_credential::StakeCredential::AddrKeyHash(
+	stake_credential: Some(u5c::stake_credential::StakeCredential::AddrKeyHash(
+	stake_credential: Some(u5c::stake_credential::StakeCredential::ScriptHash(
+	stake_key_deposit: u64_to_bigint(2_000_000),
+	stake_key_deposit: u64_to_bigint(params.key_deposit),
+	std::mem::forget(mapped);
+	std::thread::Builder::new()
+	step_price: ratio(721, 10_000_000),
+	steps: 100_000_000_000,
+	steps: 10_000_000_000,
+	steps: 10_000_000_000,
+	steps: 20_000_000_000,
+	steps: 20_000_000_000,
+	steps: r(721, 10_000_000),
+	subs.len(),
+	subs.len(),
+	subs[0].inputs().len(),
+	system_start: "2026-09-07T00:00:00Z".parse().unwrap(),
+	test compares the mapper's output to it. They are generated, not written:
+	that one. The block is still read by `pallas-primitives` and `pallas-traverse`,
+	thresholds: n
+thresholds: vec![
+thresholds: vec![
+	transaction_id: COMMITTEE_KEY_ACTION_TX_HASH.to_vec().into(),
+	transaction_id: COMMITTEE_SCRIPT_ACTION_TX_HASH.to_vec().into(),
+	transaction_id: VOTED_ACTION_TX_HASH.to_vec().into(),
+	treasury_expansion: Some(rational_number_to_u5c(
+	treasury_expansion: r(1, 5),
+	treasury_growth_rate: ratio(1, 5),
+	treasury_withdrawal: ratio(1, 70),
+	trv::MultiEraBlock::decode(cbor).unwrap()
+	trv::MultiEraTx::decode_for_era(trv::Era::Dijkstra, cbor).unwrap()
+	trv::MultiEraTx::decode_for_era(trv::Era::Dijkstra, cbor).unwrap()
+	trv::MultiEraTx::decode_for_era(trv::Era::Dijkstra, cbor).unwrap()
+	tx
+	tx.aux_plutus_v4_scripts(),
+	type ParamUpdate = u5c::PParams;
+u5c::Block {
+	u5c::CostModels {
+	u5c::PParams::default()
+	u5c::PParams::default(),
+	u5c::RedeemerPurpose::Unspecified
+	u5c::RedeemerPurpose::Unspecified,
+	u5c::Vote::Yes as i32,
+	u5c::VotingProcedure {
+	u5c::VotingProcedure {
+	u5c::script::Script::PlutusV4,
+	u5c::voter_votes::Voter::ConstitutionalCommittee(u5c::StakeCredential {
+	u5c::voter_votes::Voter::ConstitutionalCommittee(u5c::StakeCredential {
+unimplemented!("map_gov_proposal is not yet implemented for Dijkstra");
+unimplemented!("map_redeemer is not yet implemented for Dijkstra")
+unimplemented!("map_votes is not yet implemented for Dijkstra")
+	unknown: Default::default(),
+	unknown: Default::default(),
+	unknown: Default::default(),
+	unknown: Default::default(),
+	unstable = ["pallas-traverse/unstable", "pallas-primitives/unstable", "pallas-validate/unstable"]
+unstable = ["pallas-traverse/unstable", "pallas-primitives/unstable"]
+	update_constitution: ratio(1, 64),
+	update_of_every_key!(
+	updates_of_one_zero_key!(
+	url: "https://example.invalid/anchor".to_string(),
+	url: VOTE_ANCHOR_URL.to_string(),
+	use pallas_primitives::StakeCredential;
+use pallas_primitives::babbage;
+	use pallas_primitives::dijkstra::NativeScript;
+	use pallas_primitives::dijkstra::{NativeScript, StakeCredential};
+	use pallas_primitives::dijkstra;
+	use pallas_primitives::dijkstra;
+	use pallas_primitives::{ExUnits, conway};
+	use pallas_primitives::{StakeCredential, dijkstra};
+	use prost::Message;
+	v4_bytes(),
+	v4_bytes(),
+	value.unwrap_or_default()
+	value: pallas_primitives::conway::DRepVotingThresholds,
+	value: pallas_primitives::conway::PoolVotingThresholds,
+	values.clone().map(|values| u5c::CostModel { values })
+	values: vec![184]
+	vec![
+	vec![
+	vec![(
+	vec![(
+	vec![(
+	vec![0x04u8, 0xaa, 0xbb].into()
+	vec![1_903_631],
+	vec![3_000_000],
+	vec![procedure],
+	vote: u5c::Vote::Abstain as i32,
+	vote: u5c::Vote::No as i32,
+	voters: usize,
+	votes[0].voter,
+	where the form distinction lives.
+	while let Some(u5c::native_script::NativeScript::ScriptAll(list)) =
+	with_leios_fields(mapped, block)
+	witness[0].script
+	write_votes(&mut e);
+	write_votes: impl Fn(&mut minicbor::Encoder<Vec<u8>>),
+	x.collateral_percentage(),
+	x.committee_term_limit(),
+	x.desired_number_of_stake_pools(),
+	x.drep_inactivity_period(),
+	x.max_block_header_size(),
+	x.max_collateral_inputs(),
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	{
+	| --- | --- | --- |
+	| `u5c_v1alpha.json`, `u5c_v1beta.json` | `u5c1.block` | the pre-existing non Dijkstra case |
+	| `u5c_v1alpha_dijkstra.json`, `u5c_v1beta_dijkstra.json` | `dijkstra6.block` | four transactions and five certificates, every output a legacy array |
+	| file | block | why that block |
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	}
+	})
+	})
+	})
+	})
+	})
+	})
+	}) = &proposal.gov_action
+	}))),
+	})),
+	}),
+	}),
+	}),
+	}),
+	}),
+	}),
+	}),
+	}),
+	}),
+	}),
+	});
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	},
+	};
+	};
+	};
+	};
+	};
+	};
+	};
+	};
+	};
+	};
+	};
+	}{
+	}{

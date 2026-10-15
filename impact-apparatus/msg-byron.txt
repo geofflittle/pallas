@@ -1,0 +1,4 @@
+fix(validate): accept Byron inputs in Conway
+
+- phase1/conway.rs: check Byron inputs against bootstrap witnesses
+- tests/conway.rs: spend Byron inputs and collateral through dispatch

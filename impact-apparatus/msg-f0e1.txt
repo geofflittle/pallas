@@ -1,0 +1,10 @@
+feat(validate): validate native Dijkstra transactions
+
+- phase1: validate native Dijkstra transactions behind unstable
+- phase1: report Dijkstra sub transactions as unsupported
+- conway: propagate reference script decoding errors
+- tests: replay captured Dijkstra blocks and transactions
+
+Co-authored-by: Rob van Leeuwen <luivatra@gmail.com>
+Co-authored-by: Geoff Little <g.little712@gmail.com>
+

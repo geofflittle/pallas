@@ -1,0 +1,3 @@
+test(utxorpc): pin the pool bound for later eras
+
+- tests: Alonzo, Babbage and Conway sets through both mappers

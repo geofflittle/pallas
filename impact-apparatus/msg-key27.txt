@@ -1,0 +1,4 @@
+feat(traverse): read starting balance intervals
+
+- tx.rs: starting_account_balance_intervals reads body key 27
+- testing.rs: a body builder writing key 27

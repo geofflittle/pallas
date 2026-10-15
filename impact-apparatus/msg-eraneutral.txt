@@ -1,0 +1,5 @@
+feat(utxorpc): map through era neutral views
+
+- shared: map gov actions, updates and scripts through traverse views
+- shared: deprecate the Conway only action, script and update mappers
+- testing: add a test module of fixture decoders and builders
