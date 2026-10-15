@@ -1329,3 +1329,6 @@ mod tests {
         );
     }
 }
+
+#[cfg(all(test, feature = "unstable"))]
+mod registration_scripts;
