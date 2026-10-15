@@ -839,55 +839,6 @@ impl<'b, C> minicbor::Decode<'b, C> for CostModels {
     }
 }
 
-impl<C> minicbor::Encode<C> for CostModels {
-    /// Writes every model that arrived, under the key it arrived under.
-    fn encode<W: minicbor::encode::Write>(
-        &self,
-        e: &mut minicbor::Encoder<W>,
-        _ctx: &mut C,
-    ) -> Result<(), minicbor::encode::Error<W::Error>> {
-        let named = [
-            (0u64, self.plutus_v1.as_ref()),
-            (1, self.plutus_v2.as_ref()),
-            (2, self.plutus_v3.as_ref()),
-        ];
-
-        let present =
-            named.iter().filter(|(_, model)| model.is_some()).count() + self.unknown.len();
-        e.map(present as u64)?;
-
-        for (key, model) in named.iter() {
-            if let Some(model) = model {
-                e.u64(*key)?;
-                encode_cost_model(e, model)?;
-            }
-        }
-
-        for (key, model) in self.unknown.iter() {
-            e.u64(*key)?;
-            encode_cost_model(e, model)?;
-        }
-
-        Ok(())
-    }
-}
-
-/// Writes one cost model as the indefinite length array a node writes.
-fn encode_cost_model<W: minicbor::encode::Write>(
-    e: &mut minicbor::Encoder<W>,
-    model: &CostModel,
-) -> Result<(), minicbor::encode::Error<W::Error>> {
-    e.begin_array()?;
-
-    for cost in model {
-        e.i64(*cost)?;
-    }
-
-    e.end()?;
-
-    Ok(())
-}
-
 #[cfg(test)]
 pub mod tests {
     use pallas_codec::minicbor;

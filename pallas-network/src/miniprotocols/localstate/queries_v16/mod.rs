@@ -338,15 +338,19 @@ pub type ProtocolVersion = (ProtocolVersionMajor, ProtocolVersionMinor);
 
 pub type CostModel = Vec<i64>;
 
-/// The cost models a node reports, keyed by Plutus language version.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Encode, Debug, PartialEq, Eq, Clone)]
+#[cbor(map)]
 pub struct CostModels {
+    #[n(0)]
     pub plutus_v1: Option<CostModel>,
 
+    #[n(1)]
     pub plutus_v2: Option<CostModel>,
 
+    #[n(2)]
     pub plutus_v3: Option<CostModel>,
 
+    #[cbor(skip)]
     pub unknown: KeyValuePairs<u64, CostModel>,
 }
 
