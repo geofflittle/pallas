@@ -626,7 +626,13 @@ impl Behavior for InitiatorBehavior {
         match cmd {
             InitiatorCommand::IncludePeer(pid) => {
                 tracing::debug!("include peer command");
-                self.on_discovered(&pid);
+                let new = self
+                    .peers
+                    .get(&pid)
+                    .is_none_or(|state| state.connection == ConnectionState::New);
+                if new {
+                    self.on_discovered(&pid);
+                }
             }
             InitiatorCommand::StartSync(points) => {
                 tracing::debug!("start sync command");
@@ -1711,6 +1717,69 @@ mod tests {
             ),
             (0, true),
             "ranges sent to the banned peer, and range 1 sent to the other peer"
+        );
+    }
+
+    #[tokio::test]
+    async fn include_peer_on_a_live_peer_keeps_its_range() {
+        tokio::time::pause();
+        for (label, written, errored) in [
+            ("unsent", false, false),
+            ("sent", true, false),
+            ("errored unsent", false, true),
+            ("errored sent", true, true),
+        ] {
+            let mut behavior = InitiatorBehavior::default();
+            let (pid, other) = (PeerId::test(80), PeerId::test(81));
+            include_and_connect(&mut behavior, &pid);
+            complete_handshake(&mut behavior, &pid);
+            behavior.execute(InitiatorCommand::RequestBlocks(range(1)));
+            let first = sends_to(&drain_outputs(&mut behavior), &pid, is_any_range);
+            assert_eq!(first.len(), 1, "setup: range 1 pushed to pid, {label}");
+            if written {
+                behavior.handle_io(InterfaceEvent::Sent(pid.clone(), first[0].clone()));
+            }
+            if errored {
+                behavior.handle_io(InterfaceEvent::Error(
+                    pid.clone(),
+                    InterfaceError::Other("closed".into()),
+                ));
+            }
+            drain_outputs(&mut behavior);
+
+            behavior.execute(InitiatorCommand::IncludePeer(pid.clone()));
+            if written {
+                behavior.handle_io(InterfaceEvent::Recv(
+                    pid.clone(),
+                    full_batch()[..1].to_vec(),
+                ));
+            }
+            behavior.handle_io(InterfaceEvent::Disconnected(pid.clone()));
+            drain_outputs(&mut behavior);
+            include_and_connect(&mut behavior, &other);
+            let requested = ranges_requested_from(&mut behavior, &other);
+            assert!(
+                requested.first().is_some_and(|m| is_range(m, &range(1))),
+                "range 1 at queue front after IncludePeer, {label}, other got {requested:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn include_peer_on_a_disconnected_peer_connects_again() {
+        tokio::time::pause();
+        let mut behavior = InitiatorBehavior::default();
+        let pid = PeerId::test(82);
+        include_and_connect(&mut behavior, &pid);
+        complete_handshake(&mut behavior, &pid);
+        behavior.handle_io(InterfaceEvent::Disconnected(pid.clone()));
+        drain_outputs(&mut behavior);
+
+        behavior.execute(InitiatorCommand::IncludePeer(pid.clone()));
+        let outputs = housekeep_twice(&mut behavior);
+        assert!(
+            outputs.has_connect_for(&pid),
+            "Connect for the disconnected peer after IncludePeer"
         );
     }
 
