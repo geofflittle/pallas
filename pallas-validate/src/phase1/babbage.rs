@@ -15,7 +15,7 @@ use crate::utils::{
     get_payment_part, get_shelley_address, get_val_size_in_words, is_byron_address,
     lovelace_diff_or_fail, mk_alonzo_vk_wits_check_list, values_are_equal, verify_signature,
 };
-use pallas_addresses::{ScriptHash, ShelleyAddress, ShelleyPaymentPart};
+use pallas_addresses::{Address, ScriptHash, ShelleyAddress, ShelleyPaymentPart};
 use pallas_codec::{
     minicbor::{Encoder, encode},
     utils::{Bytes, KeepRaw},
@@ -197,16 +197,17 @@ fn check_collaterals_address(collaterals: &[TransactionInput], utxos: &UTxOs) ->
     for collateral in collaterals {
         match utxos.get(&MultiEraInput::from_alonzo_compatible(collateral)) {
             Some(multi_era_output) => {
-                if let Some(babbage_output) = MultiEraOutput::as_babbage(multi_era_output) {
-                    let address: &Bytes = match babbage_output {
-                        TransactionOutput::Legacy(inner) => &inner.address,
-                        TransactionOutput::PostAlonzo(inner) => &inner.address,
-                    };
-                    if let ShelleyPaymentPart::Script(_) =
-                        get_payment_part(address).ok_or(PostAlonzo(InputDecoding))?
-                    {
+                match multi_era_output
+                    .address()
+                    .map_err(|_| PostAlonzo(InputDecoding))?
+                {
+                    Address::Shelley(address)
+                        if matches!(address.payment(), ShelleyPaymentPart::Key(_)) => {}
+                    Address::Byron(_) => {}
+                    Address::Shelley(_) => {
                         return Err(PostAlonzo(CollateralNotVKeyLocked));
                     }
+                    _ => return Err(PostAlonzo(InputDecoding)),
                 }
             }
             None => {
@@ -1620,6 +1621,9 @@ fn option_vec_is_empty<T>(option_vec: &Option<Vec<T>>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::phase1::fixtures::{
+        byron_address, input, key_address, legacy_output, reward_address, script_address, utxos,
+    };
     use pallas_codec::{minicbor, utils::CborWrap};
     use pallas_crypto::{hash::Hasher, key::ed25519::SecretKey};
     use pallas_primitives::{
@@ -1627,6 +1631,7 @@ mod tests {
         alonzo::{ExUnits, NativeScript},
         babbage::{Certificate, PostAlonzoTransactionOutput},
     };
+    use pallas_traverse::Era;
 
     fn result(actual: ValidationResult, expected: &str) {
         assert_eq!(format!("{actual:?}"), expected);
@@ -2079,6 +2084,46 @@ mod tests {
                     );
                 },
             );
+        }
+    }
+
+    #[test]
+    fn script_collateral_from_an_earlier_era_is_not_key_locked() {
+        let raw = legacy_output(script_address());
+        for era in [Era::Shelley, Era::Alonzo, Era::Babbage] {
+            let result = check_collaterals_address(&[input()], &utxos(era, &raw));
+
+            assert!(
+                matches!(result, Err(PostAlonzo(CollateralNotVKeyLocked))),
+                "{era:?} {result:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn key_and_byron_collateral_is_key_locked_from_shelley_to_babbage() {
+        for address in [key_address(), byron_address()] {
+            let raw = legacy_output(address);
+            for era in [Era::Shelley, Era::Alonzo, Era::Babbage] {
+                let result = check_collaterals_address(&[input()], &utxos(era, &raw));
+
+                assert!(result.is_ok(), "{era:?} {result:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn collateral_at_a_reward_or_undecodable_address_is_refused() {
+        for address in [reward_address(), vec![0x61]] {
+            let raw = legacy_output(address);
+            for era in [Era::Alonzo, Era::Babbage] {
+                let result = check_collaterals_address(&[input()], &utxos(era, &raw));
+
+                assert!(
+                    matches!(result, Err(PostAlonzo(InputDecoding))),
+                    "{era:?} {result:?}"
+                );
+            }
         }
     }
 }
