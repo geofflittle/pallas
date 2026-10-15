@@ -20,9 +20,9 @@ use pallas_primitives::{
     AddrKeyhash, Hash, PlutusData, PlutusScript, PolicyId, PositiveCoin, StakeCredential,
     TransactionInput, babbage,
     conway::{
-        Certificate, DatumOption, Language, LanguageViews, Mint, Redeemers, RedeemersKey,
-        RequiredSigners, ScriptRef, TransactionBody, TransactionOutput, Tx, VKeyWitness, Value,
-        WitnessSet,
+        Certificate, DatumOption, GovAction, Language, LanguageViews, Mint, Redeemers,
+        RedeemersKey, RequiredSigners, ScriptRef, TransactionBody, TransactionOutput, Tx,
+        VKeyWitness, Value, Voter, WitnessSet,
     },
 };
 use pallas_traverse::{MultiEraInput, MultiEraOutput, MultiEraScriptRef, OriginalHash};
@@ -597,10 +597,7 @@ fn check_minting(tx_body: &TransactionBody, mtx: &Tx, utxos: &UTxOs) -> Validati
                 .flatten()
                 .map(compute_plutus_v3_script_hash);
 
-            let ref_scripts = tx_body
-                .reference_inputs
-                .iter()
-                .flatten()
+            let ref_scripts = reference_script_inputs(tx_body)
                 .filter_map(|x| get_script_hash_from_reference_input(x, utxos));
 
             let all_scripts_wits: Vec<_> = native_script_wits
@@ -1622,14 +1619,19 @@ fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
     {
         v3_scripts = true;
     }
-    if let Some(reference_inputs) = &mtx.transaction_body.reference_inputs {
-        for ref_input in reference_inputs.iter() {
-            match reference_script(ref_input, utxos) {
-                Some(ScriptRef::PlutusV1Script(_)) => v1_scripts = true,
-                Some(ScriptRef::PlutusV2Script(_)) => v2_scripts = true,
-                Some(ScriptRef::PlutusV3Script(_)) => v3_scripts = true,
-                _ => (),
-            }
+    let needed = needed_script_hashes(&mtx.transaction_body, utxos);
+    for input in reference_script_inputs(&mtx.transaction_body) {
+        let Some(script) = reference_script(input, utxos) else {
+            continue;
+        };
+        if !needed.contains(&MultiEraScriptRef::from_conway(&script).hash()) {
+            continue;
+        }
+        match script {
+            ScriptRef::PlutusV1Script(_) => v1_scripts = true,
+            ScriptRef::PlutusV2Script(_) => v2_scripts = true,
+            ScriptRef::PlutusV3Script(_) => v3_scripts = true,
+            ScriptRef::NativeScript(_) => (),
         }
     }
     let mut langs = vec![];
@@ -1643,6 +1645,56 @@ fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
         langs.push(Language::PlutusV3);
     }
     langs
+}
+
+// The scripts the body needs: spent script inputs, minting policies, the script
+// credentials of certificates, withdrawals and voters, and proposal policies.
+fn needed_script_hashes(tx_body: &TransactionBody, utxos: &UTxOs) -> Vec<ScriptHash> {
+    let inputs = tx_body
+        .inputs
+        .iter()
+        .filter_map(|input| get_script_hash_from_input(input, utxos));
+    let policies = tx_body.mint.iter().flat_map(|mint| mint.keys().copied());
+    let certificates = tx_body.certificates.iter().flatten().filter_map(|cert| {
+        match certificate_credential(cert) {
+            Some(StakeCredential::ScriptHash(hash)) => Some(*hash),
+            _ => None,
+        }
+    });
+    let withdrawals = tx_body
+        .withdrawals
+        .iter()
+        .flat_map(|withdrawals| withdrawals.keys())
+        .filter_map(|account| match Address::from_bytes(account) {
+            Ok(Address::Stake(address)) if address.is_script() => {
+                Some(*address.payload().as_hash())
+            }
+            _ => None,
+        });
+    let voters = tx_body
+        .voting_procedures
+        .iter()
+        .flat_map(|votes| votes.keys())
+        .filter_map(|voter| match voter {
+            Voter::ConstitutionalCommitteeScript(hash) | Voter::DRepScript(hash) => Some(*hash),
+            _ => None,
+        });
+    let proposals = tx_body
+        .proposal_procedures
+        .iter()
+        .flatten()
+        .filter_map(|proposal| match &proposal.gov_action {
+            GovAction::ParameterChange(_, _, policy)
+            | GovAction::TreasuryWithdrawals(_, policy) => *policy,
+            _ => None,
+        });
+    inputs
+        .chain(policies)
+        .chain(certificates)
+        .chain(withdrawals)
+        .chain(voters)
+        .chain(proposals)
+        .collect()
 }
 
 // The metadata of the transaction is valid.
