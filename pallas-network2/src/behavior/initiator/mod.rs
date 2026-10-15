@@ -491,11 +491,6 @@ impl InitiatorBehavior {
             state.reset();
         });
 
-        #[cfg(feature = "unstable")]
-        self.outbound.push_ready(BehaviorOutput::ExternalEvent(
-            InitiatorEvent::PeerDisconnected(pid.clone(), DisconnectReason::Closed),
-        ));
-
         self.serve_block_fetch();
     }
 
