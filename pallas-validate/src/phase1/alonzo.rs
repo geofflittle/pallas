@@ -136,7 +136,7 @@ fn check_fee(
     prot_pps: &AlonzoProtParams,
 ) -> ValidationResult {
     check_min_fee(tx_body, size, prot_pps)?;
-    if presence_of_plutus_scripts(mtx) {
+    if !option_vec_is_empty(&mtx.transaction_witness_set.redeemer) {
         check_collaterals(tx_body, utxos, prot_pps)?
     }
     Ok(())
@@ -153,14 +153,6 @@ fn check_min_fee(
         return Err(Alonzo(FeeBelowMin));
     }
     Ok(())
-}
-
-fn presence_of_plutus_scripts(mtx: &Tx) -> bool {
-    let minted_witness_set: &WitnessSet = &mtx.transaction_witness_set;
-    match &minted_witness_set.plutus_script {
-        Some(plutus_v1_scripts) => !plutus_v1_scripts.is_empty(),
-        None => false,
-    }
 }
 
 fn check_collaterals(
@@ -375,22 +367,14 @@ fn check_tx_size(size: &u32, prot_pps: &AlonzoProtParams) -> ValidationResult {
 // The number of execution units of the transaction should not exceed the
 // maximum allowed.
 fn check_tx_ex_units(mtx: &Tx, prot_pps: &AlonzoProtParams) -> ValidationResult {
-    let tx_wits: &WitnessSet = &mtx.transaction_witness_set;
-    if presence_of_plutus_scripts(mtx) {
-        match &tx_wits.redeemer {
-            Some(redeemers_vec) => {
-                let mut steps: u64 = 0;
-                let mut mem: u64 = 0;
-                for Redeemer { ex_units, .. } in redeemers_vec {
-                    mem += ex_units.mem;
-                    steps += ex_units.steps;
-                }
-                if mem > prot_pps.max_tx_ex_units.mem || steps > prot_pps.max_tx_ex_units.steps {
-                    return Err(Alonzo(TxExUnitsExceeded));
-                }
-            }
-            None => return Err(Alonzo(RedeemerMissing)),
-        }
+    let mut steps: u64 = 0;
+    let mut mem: u64 = 0;
+    for Redeemer { ex_units, .. } in mtx.transaction_witness_set.redeemer.iter().flatten() {
+        mem += ex_units.mem;
+        steps += ex_units.steps;
+    }
+    if mem > prot_pps.max_tx_ex_units.mem || steps > prot_pps.max_tx_ex_units.steps {
+        return Err(Alonzo(TxExUnitsExceeded));
     }
     Ok(())
 }
