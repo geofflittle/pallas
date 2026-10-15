@@ -5,12 +5,12 @@ use crate::utils::{
     PostAlonzoError::*,
     UTxOs,
     ValidationError::{self, *},
-    ValidationResult, aux_data_from_conway_tx, compute_native_script_hash,
-    compute_plutus_v1_script_hash, compute_plutus_v2_script_hash, compute_plutus_v3_script_hash,
-    conway_add_minted_non_zero, conway_add_values, conway_get_val_size_in_words,
-    conway_lovelace_diff_or_fail, conway_values_are_equal, get_conway_tx_size,
-    get_lovelace_from_conway_val, get_payment_part, get_shelley_address, is_byron_address,
-    mk_alonzo_vk_wits_check_list, verify_signature,
+    ValidationResult, aux_data_from_conway_tx, certificate_deposits_and_refunds,
+    compute_native_script_hash, compute_plutus_v1_script_hash, compute_plutus_v2_script_hash,
+    compute_plutus_v3_script_hash, conway_add_minted_non_zero, conway_add_values,
+    conway_get_val_size_in_words, conway_lovelace_diff_or_fail, conway_values_are_equal,
+    get_conway_tx_size, get_lovelace_from_conway_val, get_payment_part, get_shelley_address,
+    is_byron_address, mk_alonzo_vk_wits_check_list, verify_signature,
 };
 use pallas_addresses::{
     Address, Network, ScriptHash, ShelleyAddress, ShelleyPaymentPart, StakeAddress, StakePayload,
@@ -23,9 +23,12 @@ use pallas_primitives::{
         ScriptRef, TransactionBody, TransactionOutput, Tx, VKeyWitness, Value, WitnessSet,
     },
 };
-use pallas_traverse::{MultiEraInput, MultiEraOutput, OriginalHash};
+use pallas_traverse::{MultiEraInput, MultiEraOutput, MultiEraTx, OriginalHash};
 use std::cmp::Ordering;
 use std::ops::Deref;
+
+#[cfg(test)]
+mod registration_deposits;
 
 pub fn validate_conway_tx(
     mtx: &Tx,
@@ -40,7 +43,13 @@ pub fn validate_conway_tx(
     check_all_ins_in_utxos(tx_body, utxos)?;
     check_tx_validity_interval(tx_body, block_slot)?;
     check_fee(tx_body, &size, mtx, utxos, prot_pps)?;
-    check_preservation_of_value(tx_body, utxos)?;
+    check_preservation_of_value(
+        mtx,
+        utxos,
+        prot_pps.key_deposit,
+        prot_pps.drep_deposit,
+        prot_pps.governance_action_deposit,
+    )?;
     check_min_lovelace(tx_body, prot_pps)?;
     check_output_val_size(tx_body, prot_pps)?;
     check_network_id(tx_body, network_id)?;
@@ -316,14 +325,37 @@ fn val_from_multi_era_output(multi_era_output: &MultiEraOutput) -> Value {
 }
 
 // The preservation of value property holds.
-fn check_preservation_of_value(tx_body: &TransactionBody, utxos: &UTxOs) -> ValidationResult {
-    let mut input: Value = get_consumed(tx_body, utxos)?;
-    let produced: Value = get_produced(tx_body)?;
-    let output: Value = conway_add_values(
-        &produced,
-        &Value::Coin(tx_body.fee),
-        &PostAlonzo(NegativeValue),
+fn check_preservation_of_value(
+    tx: &Tx,
+    utxos: &UTxOs,
+    key_deposit: u64,
+    drep_deposit: u64,
+    proposal_deposit: u64,
+) -> ValidationResult {
+    let tx_body = &tx.transaction_body;
+    let err = PostAlonzo(NegativeValue);
+    let (deposits, refunds) = certificate_deposits_and_refunds(
+        &MultiEraTx::from_conway(tx).certs(),
+        key_deposit,
+        drep_deposit,
     )?;
+    let withdrawals = tx_body
+        .withdrawals
+        .iter()
+        .flatten()
+        .try_fold(refunds, |total, (_, coin)| {
+            total.checked_add(*coin).ok_or_else(|| err.clone())
+        })?;
+    let proposals = (tx_body.proposal_procedures.iter().flatten().count() as u64)
+        .checked_mul(proposal_deposit)
+        .ok_or_else(|| err.clone())?;
+    let donation = tx_body.donation.map_or(0, u64::from);
+    let mut input: Value = get_consumed(tx_body, utxos)?;
+    input = conway_add_values(&input, &Value::Coin(withdrawals), &err)?;
+    let mut output: Value = get_produced(tx_body)?;
+    for coin in [tx_body.fee, deposits, proposals, donation] {
+        output = conway_add_values(&output, &Value::Coin(coin), &err)?;
+    }
     if let Some(m) = &tx_body.mint {
         input = conway_add_minted_non_zero(&input, m, &PostAlonzo(NegativeValue))?;
     }

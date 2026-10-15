@@ -19,11 +19,49 @@ use pallas_primitives::{
     conway::{Multiasset as ConwayMultiasset, Tx as ConwayTx, Value as ConwayValue},
 };
 
-use pallas_traverse::{Era, MultiEraInput, MultiEraOutput, MultiEraUpdate, time::Slot};
+use pallas_traverse::{
+    Era, MultiEraCert, MultiEraCertKind, MultiEraInput, MultiEraOutput, MultiEraUpdate, time::Slot,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 pub use validation::*;
+
+#[cfg(test)]
+mod registration_deposits;
+
+// The deposits a certificate list charges and the refunds it returns, as
+// (deposits, refunds).
+pub(crate) fn certificate_deposits_and_refunds(
+    certificates: &[MultiEraCert<'_>],
+    key_deposit: Coin,
+    drep_deposit: Coin,
+) -> Result<(Coin, Coin), ValidationError> {
+    let err = ValidationError::PostAlonzo(PostAlonzoError::NegativeValue);
+    certificates
+        .iter()
+        .try_fold((0u64, 0u64), |(deposits, refunds), cert| {
+            let (deposit, refund) = match cert.kind() {
+                Some(
+                    MultiEraCertKind::StakeRegistration(..)
+                    | MultiEraCertKind::Reg(..)
+                    | MultiEraCertKind::StakeRegDeleg(..)
+                    | MultiEraCertKind::VoteRegDeleg(..)
+                    | MultiEraCertKind::StakeVoteRegDeleg(..),
+                ) => (key_deposit, 0),
+                Some(MultiEraCertKind::RegDRep(..)) => (drep_deposit, 0),
+                Some(MultiEraCertKind::StakeDeregistration(..)) => (0, key_deposit),
+                Some(
+                    MultiEraCertKind::UnReg(_, refund) | MultiEraCertKind::UnRegDRep(_, refund),
+                ) => (0, refund),
+                _ => (0, 0),
+            };
+            Ok((
+                deposits.checked_add(deposit).ok_or_else(|| err.clone())?,
+                refunds.checked_add(refund).ok_or_else(|| err.clone())?,
+            ))
+        })
+}
 
 pub type TxHash = Hash<32>;
 pub type TxoIdx = u32;
