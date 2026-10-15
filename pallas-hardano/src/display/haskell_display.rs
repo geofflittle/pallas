@@ -2653,7 +2653,6 @@ impl HaskellDisplay for CostModels {
             display_cost_model(1, &self.plutus_v1),
             display_cost_model(2, &self.plutus_v2),
             display_cost_model(3, &self.plutus_v3),
-            display_cost_model(4, &self.plutus_v4),
         ]
         .into_iter()
         .flatten()
