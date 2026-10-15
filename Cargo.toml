@@ -71,4 +71,4 @@ push = false
 publish = false
 
 [patch.crates-io]
-utxorpc-spec = { git = "https://github.com/SundaeSwap-finance/utxorpc-spec", rev = "4bef71401bae7e9fc80b9d24379be0f9078b0ff5" }
+utxorpc-spec = { git = "https://github.com/SundaeSwap-finance/utxorpc-spec", rev = "7b5ebd9d11b549dbe18c7aa88b20e740d25da9e1" }
