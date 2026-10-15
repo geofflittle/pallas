@@ -66,6 +66,82 @@ mod alonzo_tests {
     }
 
     #[test]
+    fn byron_inputs_are_witnessed_through_dispatch() {
+        use pallas_primitives::alonzo::TransactionInput;
+        use pallas_traverse::OriginalHash;
+
+        // Spends a Byron era output and a collateral input locked by the same
+        // Byron key, the collateral from an Alonzo era output.
+        let address = byron_key_address();
+        let collateral = TransactionInput {
+            transaction_id: [1; 32].into(),
+            index: 0,
+        };
+        let raw = cbor_to_bytes(include_str!("../../test_data/alonzo1.tx"));
+        let mut mainnet: Tx = minted_tx_from_cbor(&raw);
+        // An empty required signers set needs key witnesses in this validator.
+        mainnet.transaction_body.required_signers = None;
+        let without_signers = pallas_codec::minicbor::to_vec(&mainnet).unwrap();
+        let input_only: Tx = pallas_codec::minicbor::decode(&without_signers).unwrap();
+        let mut tx = input_only.clone();
+        tx.transaction_body.collateral = Some(vec![collateral.clone()]);
+        let encoded = pallas_codec::minicbor::to_vec(&tx).unwrap();
+        let tx: Tx = pallas_codec::minicbor::decode(&encoded).unwrap();
+        let spent = tx.transaction_body.inputs[0].clone();
+        let spent_output = byron_era_output(&address, 1549646822);
+        let collateral_output = pallas_codec::minicbor::to_vec(TransactionOutput {
+            address: address.clone().into(),
+            amount: Value::Coin(5_000_000),
+            datum_hash: None,
+        })
+        .unwrap();
+        let utxos = UTxOs::from([
+            (
+                MultiEraInput::from_alonzo_compatible(&spent),
+                MultiEraOutput::decode(Era::Byron, &spent_output).unwrap(),
+            ),
+            (
+                MultiEraInput::from_alonzo_compatible(&collateral),
+                MultiEraOutput::decode(Era::Alonzo, &collateral_output).unwrap(),
+            ),
+        ]);
+        let mut params = mk_params_epoch_334();
+        // The edited body changes size, so a zero minimum fee stops the fee
+        // check from failing first.
+        params.minfee_a = 0;
+        params.minfee_b = 0;
+        let env = Environment {
+            prot_params: MultiEraProtocolParameters::Alonzo(params),
+            prot_magic: 764824073,
+            block_slot: 44237276,
+            network_id: 1,
+            acnt: Some(AccountState::default()),
+        };
+        let mut expected = vec![];
+        let mut actual = vec![];
+        for tx in [&tx, &input_only] {
+            let hash = tx.transaction_body.original_hash();
+            for (witnesses, outcome) in bootstrap_witness_cases(hash.as_ref()) {
+                let mut tx = tx.clone();
+                tx.transaction_witness_set.vkeywitness = None;
+                tx.transaction_witness_set.bootstrap_witness = Some(witnesses);
+                let result = validate_txs(
+                    &[MultiEraTx::from_alonzo_compatible(&tx, Era::Alonzo)],
+                    &env,
+                    &utxos,
+                    &mut CertState::default(),
+                );
+                expected.push(match outcome {
+                    Ok(()) => "Ok(())".to_string(),
+                    Err(variant) => format!("Err(Alonzo({variant}))"),
+                });
+                actual.push(format!("{result:?}"));
+            }
+        }
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     // Transaction hash:
     // 65160f403d2c7419784ae997d32b93a6679d81468af8173ccd7949df6704f7ba
     fn successful_mainnet_tx_with_plutus_script() {
@@ -1027,6 +1103,7 @@ mod alonzo_tests {
         let cbor_bytes: Vec<u8> = cbor_to_bytes(include_str!("../../test_data/alonzo2.tx"));
         let mtx: Tx = minted_tx_from_cbor(&cbor_bytes);
         let metx: MultiEraTx = MultiEraTx::from_alonzo_compatible(&mtx, Era::Alonzo);
+        let byron_era_collateral = byron_era_output(&byron_key_address(), 5000000);
         let mut utxos: UTxOs = mk_utxo_for_alonzo_compatible_tx(
             &mtx.transaction_body,
             &[
@@ -1139,13 +1216,24 @@ mod alonzo_tests {
             acnt: Some(acnt),
         };
         let mut cert_state: CertState = CertState::default();
-        match validate_txs(&[metx], &env, &utxos, &mut cert_state) {
+        match validate_txs(std::slice::from_ref(&metx), &env, &utxos, &mut cert_state) {
             Ok(()) => panic!("Collateral inputs should contain the minimum lovelace"),
             Err(err) => match err {
                 Alonzo(AlonzoError::CollateralMinLovelace) => (),
                 _ => panic!("Unexpected error ({err:?})"),
             },
         }
+        // The same lovelace held in a Byron era output.
+        let collateral = &mtx.transaction_body.collateral.as_ref().unwrap()[0];
+        utxos.insert(
+            MultiEraInput::from_alonzo_compatible(collateral),
+            MultiEraOutput::decode(Era::Byron, &byron_era_collateral).unwrap(),
+        );
+        let result = validate_txs(&[metx], &env, &utxos, &mut cert_state);
+        assert!(
+            matches!(result, Err(Alonzo(AlonzoError::CollateralMinLovelace))),
+            "{result:?}"
+        );
     }
 
     #[test]
