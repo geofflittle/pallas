@@ -31,7 +31,7 @@ pub enum Held {
 }
 
 /// The locations the scope leaves out of u5c, each with its reason.
-pub const EXCLUDED: [(Location, &str); 9] = [
+pub const EXCLUDED: [(Location, &str); 8] = [
     (
         Location::HeaderBody(2),
         "header prev_hash, u5c BlockHeader holds slot, hash, height and the Leios fields only",
@@ -64,10 +64,6 @@ pub const EXCLUDED: [(Location, &str); 9] = [
         Location::HeaderBody(9),
         "header protocol_version, u5c BlockHeader holds slot, hash, height and the Leios fields only",
     ),
-    (
-        Location::Body(24),
-        "body key 24 required_top_level_guards, the coverage check compares no top level guards",
-    ),
 ];
 
 /// The scope rows u5c is to hold, each with the location the source shows it at.
@@ -77,6 +73,10 @@ pub fn in_items() -> Vec<(String, Location)> {
         (
             "12 body key 23 sub_transactions".to_owned(),
             Location::Body(23),
+        ),
+        (
+            "13 body key 24 required_top_level_guards".to_owned(),
+            Location::Body(24),
         ),
         (
             "14 body key 25 direct_deposits".to_owned(),
@@ -610,6 +610,7 @@ fn tx_agrees(location: Location, held: Held, mapped: MappedTx) -> Option<bool> {
                 .is_some_and(|v| held == Held::Uint(natural(Some(v)))),
         ),
         Location::Body(23) => top_only(&|t| count(t.sub_transactions.len() as u64)),
+        Location::Body(24) => count(tx.required_top_level_guards.len() as u64),
         Location::Body(25) => count(tx.direct_deposits.len() as u64),
         Location::Body(26) => count(tx.account_balance_intervals.len() as u64),
         Location::Body(27) => {
