@@ -69,6 +69,10 @@ fn reward_address() -> Vec<u8> {
     [vec![0xe0], vec![3; 28]].concat()
 }
 
+fn undecodable_byron_address() -> Vec<u8> {
+    pallas_addresses::ByronAddress::new(&[0x00], 0).to_vec()
+}
+
 #[test]
 fn collateral_at_a_reward_address_is_refused() {
     let raw = legacy_output(reward_address());
@@ -78,6 +82,35 @@ fn collateral_at_a_reward_address_is_refused() {
     assert!(
         matches!(result, Err(PostAlonzo(InputDecoding))),
         "{result:?}"
+    );
+}
+
+#[test]
+fn an_input_at_a_reward_or_undecodable_byron_address_is_refused() {
+    let cbor = conway_tx_spending_input();
+    let tx: Tx = minicbor::decode(&cbor).unwrap();
+    let outcomes: Vec<_> = [
+        key_address(),
+        byron_address(),
+        reward_address(),
+        undecodable_byron_address(),
+    ]
+    .map(|address| {
+        let raw = legacy_output(address);
+        format!(
+            "{:?}",
+            check_vkey_input_wits(&tx, &Some(vec![]), &utxos(Era::Alonzo, &raw))
+        )
+    })
+    .into();
+    assert_eq!(
+        outcomes,
+        [
+            "Err(PostAlonzo(VKWitnessMissing))",
+            "Err(PostAlonzo(VKWitnessMissing))",
+            "Err(PostAlonzo(InputDecoding))",
+            "Err(PostAlonzo(InputDecoding))",
+        ]
     );
 }
 
