@@ -66,7 +66,7 @@ pub const EXCLUDED: [(Location, &str); 9] = [
     ),
     (
         Location::Body(24),
-        "body key 24 required_top_level_guards, the mapping leaves the u5c top level guards empty",
+        "body key 24 required_top_level_guards, the coverage check compares no top level guards",
     ),
 ];
 
