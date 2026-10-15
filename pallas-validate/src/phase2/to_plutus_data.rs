@@ -72,7 +72,7 @@ struct WithArrayRational<'a, T>(&'a T);
 
 struct WithPartialCertificates<'a, T>(&'a T);
 
-struct WithNeverRegistrationDeposit<'a, T>(&'a T);
+struct WithRegistrationDeposit<'a, T>(&'a T, bool);
 
 pub trait ToPlutusData {
     fn to_plutus_data(&self) -> PlutusData;
@@ -241,22 +241,22 @@ impl ToPlutusData for WithWrappedTransactionId<'_, KeyValuePairs<ScriptPurpose, 
     }
 }
 
-impl ToPlutusData for WithNeverRegistrationDeposit<'_, Vec<Certificate>> {
+impl ToPlutusData for WithRegistrationDeposit<'_, Vec<Certificate>> {
     fn to_plutus_data(&self) -> PlutusData {
         self.0
             .iter()
-            .map(WithNeverRegistrationDeposit)
+            .map(|cert| WithRegistrationDeposit(cert, self.1))
             .collect::<Vec<_>>()
             .to_plutus_data()
     }
 }
 
-impl ToPlutusData for WithNeverRegistrationDeposit<'_, KeyValuePairs<ScriptPurpose, Redeemer>> {
+impl ToPlutusData for WithRegistrationDeposit<'_, KeyValuePairs<ScriptPurpose, Redeemer>> {
     fn to_plutus_data(&self) -> PlutusData {
         let mut data_vec: Vec<(PlutusData, PlutusData)> = vec![];
         for (key, value) in self.0.iter() {
             data_vec.push((
-                WithNeverRegistrationDeposit(key).to_plutus_data(),
+                WithRegistrationDeposit(key, self.1).to_plutus_data(),
                 value.to_plutus_data(),
             ))
         }
@@ -701,7 +701,7 @@ impl ToPlutusData for WithPartialCertificates<'_, Certificate> {
     }
 }
 
-impl ToPlutusData for WithNeverRegistrationDeposit<'_, Certificate> {
+impl ToPlutusData for WithRegistrationDeposit<'_, Certificate> {
     fn to_plutus_data(&self) -> PlutusData {
         match self.0 {
             Certificate::StakeRegistration(stake_credential) => wrap_multiple_with_constr(
@@ -712,11 +712,11 @@ impl ToPlutusData for WithNeverRegistrationDeposit<'_, Certificate> {
                 ],
             ),
 
-            Certificate::Reg(stake_credential, _) => wrap_multiple_with_constr(
+            Certificate::Reg(stake_credential, amount) => wrap_multiple_with_constr(
                 0,
                 vec![
                     stake_credential.to_plutus_data(),
-                    None::<PlutusData>.to_plutus_data(),
+                    self.1.then_some(*amount).to_plutus_data(),
                 ],
             ),
 
@@ -728,11 +728,11 @@ impl ToPlutusData for WithNeverRegistrationDeposit<'_, Certificate> {
                 ],
             ),
 
-            Certificate::UnReg(stake_credential, _) => wrap_multiple_with_constr(
+            Certificate::UnReg(stake_credential, amount) => wrap_multiple_with_constr(
                 1,
                 vec![
                     stake_credential.to_plutus_data(),
-                    None::<PlutusData>.to_plutus_data(),
+                    self.1.then_some(*amount).to_plutus_data(),
                 ],
             ),
 
@@ -1009,7 +1009,7 @@ impl ToPlutusData for WithWrappedTransactionId<'_, ScriptPurpose> {
     }
 }
 
-impl ToPlutusData for WithNeverRegistrationDeposit<'_, ScriptPurpose> {
+impl ToPlutusData for WithRegistrationDeposit<'_, ScriptPurpose> {
     fn to_plutus_data(&self) -> PlutusData {
         match self.0 {
             ScriptPurpose::Minting(policy_id) => wrap_with_constr(0, policy_id.to_plutus_data()),
@@ -1021,7 +1021,7 @@ impl ToPlutusData for WithNeverRegistrationDeposit<'_, ScriptPurpose> {
                 3,
                 vec![
                     ix.to_plutus_data(),
-                    WithNeverRegistrationDeposit(dcert).to_plutus_data(),
+                    WithRegistrationDeposit(dcert, self.1).to_plutus_data(),
                 ],
             ),
             ScriptPurpose::Voting(voter) => {
@@ -1407,7 +1407,7 @@ impl ToPlutusData for Vote {
     }
 }
 
-impl<T> ToPlutusData for WithNeverRegistrationDeposit<'_, ScriptInfo<T>>
+impl<T> ToPlutusData for WithRegistrationDeposit<'_, ScriptInfo<T>>
 where
     T: ToPlutusData,
 {
@@ -1424,7 +1424,7 @@ where
                 3,
                 vec![
                     ix.to_plutus_data(),
-                    WithNeverRegistrationDeposit(dcert).to_plutus_data(),
+                    WithRegistrationDeposit(dcert, self.1).to_plutus_data(),
                 ],
             ),
             ScriptInfo::Voting(voter) => wrap_multiple_with_constr(4, vec![voter.to_plutus_data()]),
@@ -1437,6 +1437,12 @@ where
 
 impl ToPlutusData for TxInfo<'_> {
     fn to_plutus_data(&self) -> PlutusData {
+        self.to_plutus_data_with_protocol(9)
+    }
+}
+
+impl TxInfo<'_> {
+    pub(crate) fn to_plutus_data_with_protocol(&self, protocol_major: u32) -> PlutusData {
         match self {
             TxInfo::V1(tx_info) => wrap_multiple_with_constr(
                 0,
@@ -1482,11 +1488,13 @@ impl ToPlutusData for TxInfo<'_> {
                     tx_info.outputs.to_plutus_data(),
                     tx_info.fee.to_plutus_data(),
                     tx_info.mint.to_plutus_data(),
-                    WithNeverRegistrationDeposit(&tx_info.certificates).to_plutus_data(),
+                    WithRegistrationDeposit(&tx_info.certificates, protocol_major > 9)
+                        .to_plutus_data(),
                     tx_info.withdrawals.to_plutus_data(),
                     tx_info.valid_range.to_plutus_data(),
                     tx_info.signatories.to_plutus_data(),
-                    WithNeverRegistrationDeposit(&tx_info.redeemers).to_plutus_data(),
+                    WithRegistrationDeposit(&tx_info.redeemers, protocol_major > 9)
+                        .to_plutus_data(),
                     tx_info.data.to_plutus_data(),
                     tx_info.id.to_plutus_data(),
                     tx_info.votes.to_plutus_data(),
@@ -1501,11 +1509,17 @@ impl ToPlutusData for TxInfo<'_> {
 
 impl ToPlutusData for ScriptContext<'_> {
     fn to_plutus_data(&self) -> PlutusData {
+        self.to_plutus_data_with_protocol(9)
+    }
+}
+
+impl ScriptContext<'_> {
+    pub(crate) fn to_plutus_data_with_protocol(&self, protocol_major: u32) -> PlutusData {
         match self {
             ScriptContext::V1V2 { tx_info, purpose } => wrap_multiple_with_constr(
                 0,
                 vec![
-                    tx_info.to_plutus_data(),
+                    tx_info.to_plutus_data_with_protocol(protocol_major),
                     WithWrappedTransactionId(purpose.as_ref()).to_plutus_data(),
                 ],
             ),
@@ -1516,11 +1530,133 @@ impl ToPlutusData for ScriptContext<'_> {
             } => wrap_multiple_with_constr(
                 0,
                 vec![
-                    tx_info.to_plutus_data(),
+                    tx_info.to_plutus_data_with_protocol(protocol_major),
                     redeemer.to_plutus_data(),
-                    WithNeverRegistrationDeposit(purpose.as_ref()).to_plutus_data(),
+                    WithRegistrationDeposit(purpose.as_ref(), protocol_major > 9).to_plutus_data(),
                 ],
             ),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::phase2::script_context::*;
+    use pallas_primitives::conway::{
+        Certificate, ExUnits, PlutusData, Redeemer, RedeemerTag, StakeCredential,
+    };
+
+    fn fields(data: &PlutusData) -> &[PlutusData] {
+        match data {
+            PlutusData::Constr(c) => &c.fields,
+            _ => panic!("expected constructor: {data:?}"),
+        }
+    }
+
+    fn context(cert: Certificate) -> ScriptContext<'static> {
+        let r = Redeemer {
+            tag: RedeemerTag::Cert,
+            index: 2,
+            data: Data::list(vec![]),
+            ex_units: ExUnits {
+                mem: 100,
+                steps: 100,
+            },
+        };
+        let purpose = ScriptPurpose::Certifying(2, cert.clone());
+        TxInfo::V3(TxInfoV3 {
+            inputs: vec![],
+            reference_inputs: vec![],
+            outputs: vec![],
+            fee: 0,
+            mint: MintValue {
+                mint_value: Default::default(),
+            },
+            certificates: vec![cert],
+            withdrawals: vec![].into(),
+            valid_range: TimeRange {
+                lower_bound: None,
+                upper_bound: None,
+            },
+            signatories: vec![],
+            redeemers: vec![(purpose, r.clone())].into(),
+            data: vec![].into(),
+            id: [0; 32].into(),
+            votes: vec![].into(),
+            proposal_procedures: vec![],
+            current_treasury_amount: None,
+            treasury_donation: None,
+        })
+        .into_script_context(&r, None)
+        .unwrap()
+    }
+
+    #[test]
+    fn v3_deposit_context_protocol_boundaries_at_every_occurrence() {
+        let credential = StakeCredential::ScriptHash([7; 28].into());
+        for protocol in [9, 10, 11] {
+            for (tag, cert) in [
+                (0, Certificate::Reg(credential.clone(), 2000000)),
+                (1, Certificate::UnReg(credential.clone(), 2000000)),
+            ] {
+                let c = context(cert);
+                let encoded = c.to_plutus_data_with_protocol(protocol);
+                let expected = Data::constr(
+                    tag,
+                    vec![
+                        credential.to_plutus_data(),
+                        if protocol == 9 {
+                            None::<u64>.to_plutus_data()
+                        } else {
+                            Some(2000000u64).to_plutus_data()
+                        },
+                    ],
+                );
+                let info = fields(&fields(&encoded)[0]);
+                assert_eq!(
+                    info[5],
+                    Data::list(vec![expected.clone()]),
+                    "certificate list protocol {protocol}"
+                );
+                assert_eq!(
+                    fields(&fields(&encoded)[2])[1],
+                    expected,
+                    "active purpose protocol {protocol}"
+                );
+                let PlutusData::Map(m) = &info[9] else {
+                    panic!("redeemer map")
+                };
+                assert_eq!(
+                    fields(&m[0].0)[1],
+                    expected,
+                    "redeemer purpose protocol {protocol}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn public_encoding_is_the_protocol_9_encoding() {
+        let credential = StakeCredential::ScriptHash([7; 28].into());
+        for cert in [
+            Certificate::Reg(credential.clone(), 2000000),
+            Certificate::UnReg(credential.clone(), 2000000),
+        ] {
+            let c = context(cert);
+            let ScriptContext::V3 { tx_info, .. } = &c else {
+                panic!("V3 context")
+            };
+            assert_eq!(
+                c.to_plutus_data(),
+                c.to_plutus_data_with_protocol(9),
+                "script context"
+            );
+            assert_eq!(
+                tx_info.to_plutus_data(),
+                tx_info.to_plutus_data_with_protocol(9),
+                "tx info"
+            );
         }
     }
 }
