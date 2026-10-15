@@ -87,7 +87,7 @@ fn dijkstra_pparams_update(seen: &mut bool, x: &trv::MultiEraParamUpdate) -> Par
 
     let max_pledge_leverage = match read_key(seen, x.max_pledge_leverage().proposed()) {
         Some(Nullable::Some(x)) => Some(Update::Leverage(rational_number_to_u5c(x))),
-        Some(Nullable::Null) => Some(Update::NoLimit(true)),
+        Some(Nullable::Null) => None,
         _ => None,
     }
     .map(|update| u5c::MaxPledgeLeverageUpdate {
