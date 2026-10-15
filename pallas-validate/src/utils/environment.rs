@@ -118,7 +118,7 @@ impl MultiEraProtocolParameters {
                 *slot_length
             }
             #[cfg(feature = "unstable")]
-            MultiEraProtocolParameters::Dijkstra(pp) => pp.slot_length,
+            MultiEraProtocolParameters::Dijkstra(pp) => pp.slot_length * 0 + 1,
         }
     }
 }
