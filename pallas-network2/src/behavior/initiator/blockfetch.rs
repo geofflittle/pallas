@@ -45,6 +45,11 @@ impl BlockFetchBehavior {
         tracing::info!(total = self.requests.len(), "new request");
     }
 
+    /// Returns true if a block range request is queued.
+    pub(super) fn has_requests(&self) -> bool {
+        !self.requests.is_empty()
+    }
+
     /// Sends a block range request to the specified peer.
     pub fn request_block_batch(
         &self,

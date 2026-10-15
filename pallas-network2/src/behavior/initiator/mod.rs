@@ -565,6 +565,10 @@ impl InitiatorBehavior {
         } = self;
 
         for (pid, state) in peers.iter_mut() {
+            if !blockfetch.has_requests() {
+                break;
+            }
+
             blockfetch.serve_next(pid, state, outbound);
         }
     }
