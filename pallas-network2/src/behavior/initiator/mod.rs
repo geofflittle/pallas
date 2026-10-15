@@ -472,6 +472,8 @@ impl InitiatorBehavior {
 
             state.reset();
         });
+
+        self.serve_block_fetch();
     }
 
     #[tracing::instrument(skip_all, fields(pid = %pid))]
@@ -1689,6 +1691,40 @@ mod tests {
                     .count(),
                 1,
                 "requests for range 1 after the disconnect, written={written}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn range_requeued_at_disconnect_goes_to_an_idle_peer_at_once() {
+        tokio::time::pause();
+        for written in [false, true] {
+            let mut behavior = InitiatorBehavior::default();
+            let (a, b) = (PeerId::test(84), PeerId::test(85));
+            include_and_connect(&mut behavior, &a);
+            include_and_connect(&mut behavior, &b);
+            complete_handshake(&mut behavior, &a);
+            complete_handshake(&mut behavior, &b);
+            behavior.execute(InitiatorCommand::RequestBlocks(range(1)));
+            let outputs = drain_outputs(&mut behavior);
+            let (pid, idle) = if sends_to(&outputs, &a, is_any_range).len() == 1 {
+                (a, b)
+            } else {
+                (b, a)
+            };
+            let first = sends_to(&outputs, &pid, is_any_range);
+            assert_eq!(first.len(), 1, "setup: range 1 pushed to one peer");
+            if written {
+                behavior.handle_io(InterfaceEvent::Sent(pid.clone(), first[0].clone()));
+                drain_outputs(&mut behavior);
+            }
+
+            behavior.handle_io(InterfaceEvent::Disconnected(pid.clone()));
+            let after = drain_outputs(&mut behavior);
+            assert_eq!(
+                sends_to(&after, &idle, is_any_range).len(),
+                1,
+                "ranges sent to the idle peer on the disconnect, written={written}"
             );
         }
     }
