@@ -238,7 +238,7 @@ impl<C: LedgerContext> Mapper<C> {
         }
     }
 
-    pub fn map_vote(&self, x: &conway::Vote) -> u5c::Vote {
+    pub(crate) fn map_vote(&self, x: &conway::Vote) -> u5c::Vote {
         match x {
             conway::Vote::No => u5c::Vote::No,
             conway::Vote::Yes => u5c::Vote::Yes,
