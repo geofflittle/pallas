@@ -712,7 +712,7 @@ impl ToPlutusData for WithRegistrationDeposit<'_, Certificate> {
                 0,
                 vec![
                     stake_credential.to_plutus_data(),
-                    self.1.then_some(*amount).to_plutus_data(),
+                    false.then_some(*amount).to_plutus_data(),
                 ],
             ),
 
