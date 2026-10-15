@@ -5,7 +5,7 @@ pub mod validation;
 
 pub use environment::*;
 use pallas_addresses::{
-    Address, Network, ShelleyAddress, ShelleyPaymentPart, StakeAddress, StakePayload,
+    Address, Network, ScriptHash, ShelleyAddress, ShelleyPaymentPart, StakeAddress, StakePayload,
 };
 use pallas_codec::{
     minicbor::encode,
@@ -15,11 +15,11 @@ use pallas_crypto::key::ed25519::{PublicKey, Signature};
 use pallas_primitives::{
     AddrKeyhash, AssetName, Coin, Epoch, GenesisDelegateHash, Genesishash, Hash, NetworkId,
     NonZeroInt, PlutusScript, PolicyId, PoolKeyhash, PoolMetadata, PositiveCoin, Relay,
-    RewardAccount, StakeCredential, TransactionIndex, UnitInterval, VrfKeyhash,
+    RewardAccount, StakeCredential, TransactionIndex, TransactionInput, UnitInterval, VrfKeyhash,
     alonzo::{Certificate, Multiasset, NativeScript, Tx as AlonzoTx, VKeyWitness, Value},
     babbage::Tx as BabbageTx,
     conway::{
-        Certificate as ConwayCertificate, Multiasset as ConwayMultiasset, ScriptRef,
+        Certificate as ConwayCertificate, DatumOption, Multiasset as ConwayMultiasset, ScriptRef,
         Tx as ConwayTx, Value as ConwayValue,
     },
 };
@@ -942,17 +942,25 @@ pub(crate) fn needed_certificate_scripts(tx: &MultiEraTx) -> Vec<PolicyId> {
         .collect()
 }
 
-// The scripts held by the outputs of the transaction's era that it spends or
-// references.
-pub(crate) fn reference_scripts<'a>(
+// The known outputs that the transaction spends or references.
+pub(crate) fn spent_and_referenced_outputs<'a, 'b>(
     tx: &'a MultiEraTx<'_>,
-    utxos: &'a UTxOs<'_>,
-) -> Vec<ScriptRef<'a>> {
+    utxos: &'a UTxOs<'b>,
+) -> Vec<&'a MultiEraOutput<'b>> {
     tx.inputs()
         .iter()
         .chain(&tx.reference_inputs())
         .filter_map(|input| utxos.get(input))
-        .filter(|output| output.era() == tx.era())
+        .collect()
+}
+
+// The scripts held by the outputs that the transaction spends or references.
+pub(crate) fn reference_scripts<'a>(
+    tx: &'a MultiEraTx<'_>,
+    utxos: &'a UTxOs<'_>,
+) -> Vec<ScriptRef<'a>> {
+    spent_and_referenced_outputs(tx, utxos)
+        .into_iter()
         .filter_map(MultiEraOutput::script_ref)
         .collect()
 }
@@ -980,6 +988,42 @@ pub fn get_shelley_address(address: &[u8]) -> Option<ShelleyAddress> {
 
 pub fn is_byron_address(address: &[u8]) -> bool {
     matches!(Address::from_bytes(address), Ok(Address::Byron(_)))
+}
+
+pub(crate) fn get_script_hash_from_input(
+    input: &TransactionInput,
+    utxos: &UTxOs,
+) -> Option<ScriptHash> {
+    match utxos
+        .get(&MultiEraInput::from_alonzo_compatible(input))?
+        .address()
+        .ok()?
+    {
+        Address::Shelley(address) => match address.payment() {
+            ShelleyPaymentPart::Script(hash) => Some(*hash),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+// Whether an output the transaction spends, references or creates has a Byron
+// address, and whether one holds a reference script or an inline datum.
+pub(crate) fn language_features(tx: &MultiEraTx, utxos: &UTxOs) -> (bool, bool) {
+    fn features(output: &MultiEraOutput) -> (bool, bool) {
+        (
+            matches!(output.address(), Ok(Address::Byron(_))),
+            output.script_ref().is_some() || matches!(output.datum(), Some(DatumOption::Data(_))),
+        )
+    }
+    let created = tx.outputs();
+    spent_and_referenced_outputs(tx, utxos)
+        .into_iter()
+        .map(features)
+        .chain(created.iter().map(features))
+        .fold((false, false), |(byron, modern), (b, m)| {
+            (byron || b, modern || m)
+        })
 }
 
 pub fn aux_data_from_alonzo_tx<'a>(mtx: &'a AlonzoTx) -> Option<&'a [u8]> {
