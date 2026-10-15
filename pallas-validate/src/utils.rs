@@ -838,6 +838,13 @@ pub(crate) fn get_script_hash_from_input(
     }
 }
 
+pub(crate) fn get_script_hash_from_reward_account(account: &[u8]) -> Option<ScriptHash> {
+    match Address::from_bytes(account) {
+        Ok(Address::Stake(address)) if address.is_script() => Some(*address.payload().as_hash()),
+        _ => None,
+    }
+}
+
 pub(crate) fn output_language_features(output: &MultiEraOutput<'_>) -> (bool, bool) {
     (
         matches!(output.address(), Ok(Address::Byron(_))),

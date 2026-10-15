@@ -12,9 +12,9 @@ use crate::utils::{
     ValidationResult, add_minted_value, add_values, aux_data_from_babbage_tx, check_needed_script,
     check_remaining_vk_wits, compute_native_script_hash, compute_plutus_v1_script_hash,
     compute_plutus_v2_script_hash, empty_value, get_babbage_tx_size, get_lovelace_from_alonzo_val,
-    get_script_hash_from_input, get_shelley_address, get_val_size_in_words, lovelace_diff_or_fail,
-    mk_alonzo_vk_wits_check_list, output_language_features, values_are_equal, verify_signature,
-    withdrawal_scripts,
+    get_script_hash_from_input, get_script_hash_from_reward_account, get_shelley_address,
+    get_val_size_in_words, lovelace_diff_or_fail, mk_alonzo_vk_wits_check_list,
+    output_language_features, values_are_equal, verify_signature, withdrawal_scripts,
 };
 use pallas_addresses::{Address, ScriptHash, ShelleyAddress, ShelleyPaymentPart};
 use pallas_codec::{
@@ -601,13 +601,9 @@ fn check_needed_scripts(
 }
 
 fn get_reference_script_hashes(tx_body: &TransactionBody, utxos: &UTxOs) -> Vec<PolicyId> {
-    let mut res: Vec<PolicyId> = Vec::new();
-    for input in reference_script_inputs(tx_body) {
-        if let Some(script_hash) = get_script_hash_from_reference_input(input, utxos) {
-            res.push(script_hash);
-        }
-    }
-    res
+    reference_script_inputs(tx_body)
+        .filter_map(|input| get_script_hash_from_reference_input(input, utxos))
+        .collect()
 }
 
 fn certificates<'a>(tx_body: &'a TransactionBody) -> &'a [Certificate] {
@@ -1199,10 +1195,7 @@ fn block_langs(network_magic: u32, network_id: u8, block_slot: u64) -> Vec<Langu
 
 fn allowed_langs(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
     let body = &mtx.transaction_body;
-    let input_features = body
-        .inputs
-        .iter()
-        .chain(body.reference_inputs.iter().flatten())
+    let input_features = reference_script_inputs(body)
         .filter_map(|input| utxos.get(&MultiEraInput::from_alonzo_compatible(input)))
         .map(output_language_features);
     let output_features = body
@@ -1243,19 +1236,26 @@ fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
     {
         v2_scripts = true;
     }
-    if let Some(reference_inputs) = &mtx.transaction_body.reference_inputs {
-        for ref_input in reference_inputs.iter() {
-            if let Some(TransactionOutput::PostAlonzo(output)) = utxos
-                .get(&MultiEraInput::from_alonzo_compatible(ref_input))
-                .and_then(MultiEraOutput::as_babbage)
-                && let Some(script_ref_cborwrap) = &output.script_ref
-            {
-                match script_ref_cborwrap.clone().unwrap() {
-                    ScriptRef::PlutusV1Script(_) => v1_scripts = true,
-                    ScriptRef::PlutusV2Script(_) => v2_scripts = true,
-                    _ => (),
-                }
-            }
+    let needed = needed_script_hashes(&mtx.transaction_body, utxos);
+    for input in reference_script_inputs(&mtx.transaction_body) {
+        let Some(TransactionOutput::PostAlonzo(output)) = utxos
+            .get(&MultiEraInput::from_alonzo_compatible(input))
+            .and_then(MultiEraOutput::as_babbage)
+        else {
+            continue;
+        };
+        let Some(script) = &output.script_ref else {
+            continue;
+        };
+        if !get_script_hash_from_reference_input(input, utxos)
+            .is_some_and(|hash| needed.contains(&hash))
+        {
+            continue;
+        }
+        match script.clone().unwrap() {
+            ScriptRef::PlutusV1Script(_) => v1_scripts = true,
+            ScriptRef::PlutusV2Script(_) => v2_scripts = true,
+            ScriptRef::NativeScript(_) => (),
         }
     }
     if !v1_scripts && !v2_scripts {
@@ -1267,6 +1267,25 @@ fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
     } else {
         vec![Language::PlutusV1, Language::PlutusV2]
     }
+}
+
+fn needed_script_hashes(tx_body: &TransactionBody, utxos: &UTxOs) -> Vec<ScriptHash> {
+    let inputs = tx_body
+        .inputs
+        .iter()
+        .filter_map(|input| get_script_hash_from_input(input, utxos));
+    let policies = tx_body.mint.iter().flat_map(|mint| mint.keys().copied());
+    let certificates = certificate_scripts(certificates(tx_body)).map(|(_, hash)| *hash);
+    let withdrawals = tx_body
+        .withdrawals
+        .iter()
+        .flat_map(|withdrawals| withdrawals.keys())
+        .filter_map(|account| get_script_hash_from_reward_account(account));
+    inputs
+        .chain(policies)
+        .chain(certificates)
+        .chain(withdrawals)
+        .collect()
 }
 
 // The metadata of the transaction is valid.
@@ -1558,8 +1577,9 @@ fn option_vec_is_empty<T>(option_vec: &Option<Vec<T>>) -> bool {
 mod tests {
     use super::*;
     use crate::phase1::fixtures::{
-        byron_address, byron_output, input, key_address, legacy_output, reward_address,
-        script_address, tx_referencing_input, tx_spending_input, utxos,
+        V2_SCRIPT, byron_address, byron_output, input, key_address, legacy_output,
+        output_with_reference_script, reward_address, script_address, tx_referencing_input,
+        tx_spending_input, utxos,
     };
     use pallas_codec::{minicbor, utils::CborWrap};
     use pallas_crypto::{hash::Hasher, key::ed25519::SecretKey};
@@ -2223,5 +2243,118 @@ mod tests {
                 "{era:?}"
             );
         }
+    }
+
+    #[test]
+    fn a_reference_script_on_a_spent_input_is_provided() {
+        let cbor = tx_spending_input();
+        let tx: Tx = minicbor::decode(&cbor).unwrap();
+        let with_script = output_with_reference_script();
+        let without_script = legacy_output(key_address());
+
+        let provided =
+            get_reference_script_hashes(&tx.transaction_body, &utxos(Era::Babbage, &with_script));
+        let absent = get_reference_script_hashes(
+            &tx.transaction_body,
+            &utxos(Era::Babbage, &without_script),
+        );
+
+        assert_eq!(provided, vec![Hasher::<224>::hash_tagged(&V2_SCRIPT, 2)]);
+        assert!(absent.is_empty(), "{absent:?}");
+    }
+
+    #[test]
+    fn only_a_needed_reference_script_sets_the_language() {
+        let policy = Hasher::<224>::hash_tagged(&V2_SCRIPT, 2);
+        let with_script = output_with_reference_script();
+        let without_script = legacy_output(key_address());
+        let (mut outcomes, mut expected) = (vec![], vec![]);
+        for (cbor, spent) in [(tx_spending_input(), true), (tx_referencing_input(), false)] {
+            let mut tx: Tx = minicbor::decode(&cbor).unwrap();
+            for mints in [false, true] {
+                let mut body = (*tx.transaction_body).clone();
+                body.mint = mints.then(|| [(policy, [(Bytes::from(vec![1]), 1)].into())].into());
+                tx.transaction_body = body.into();
+                for (output, has_script) in [(&with_script, true), (&without_script, false)] {
+                    let languages = tx_languages(&tx, &utxos(Era::Babbage, output));
+                    outcomes.push((spent, mints, has_script, languages));
+                    let languages = if mints && has_script {
+                        vec![Language::PlutusV2]
+                    } else {
+                        vec![]
+                    };
+                    expected.push((spent, mints, has_script, languages));
+                }
+            }
+        }
+        assert_eq!(outcomes, expected);
+    }
+
+    #[test]
+    fn each_needed_purpose_sets_the_reference_script_language() {
+        let script = Hasher::<224>::hash_tagged(&V2_SCRIPT, 2);
+        let holder = input();
+        let locked = TransactionInput {
+            transaction_id: Hash::new([9; 32]),
+            index: 0,
+        };
+        let with_script = output_with_reference_script();
+        let cbor = tx_referencing_input();
+        let (mut outcomes, mut expected) = (vec![], vec![]);
+        for (purpose, names_script) in [
+            ("spend", true),
+            ("mint", true),
+            ("delegation", true),
+            ("deregistration", true),
+            ("reward", true),
+            ("registration", false),
+            ("key reward", false),
+        ] {
+            for hash in [script, Hash::from([5; 28])] {
+                let locked_output = legacy_output([vec![0x71], hash.to_vec()].concat());
+                let utxos = UTxOs::from([
+                    (
+                        MultiEraInput::from_alonzo_compatible(&holder),
+                        MultiEraOutput::decode(Era::Babbage, &with_script).unwrap(),
+                    ),
+                    (
+                        MultiEraInput::from_alonzo_compatible(&locked),
+                        MultiEraOutput::decode(Era::Alonzo, &locked_output).unwrap(),
+                    ),
+                ]);
+                let mut tx: Tx = minicbor::decode(&cbor).unwrap();
+                let mut body = (*tx.transaction_body).clone();
+                let credential = StakeCredential::ScriptHash(hash);
+                match purpose {
+                    "spend" => body.inputs = vec![locked.clone()],
+                    "mint" => body.mint = Some([(hash, [(Bytes::from(vec![1]), 1)].into())].into()),
+                    "delegation" => {
+                        let pool = Hash::new([0; 28]);
+                        body.certificates =
+                            Some(vec![Certificate::StakeDelegation(credential, pool)])
+                    }
+                    "deregistration" => {
+                        body.certificates = Some(vec![Certificate::StakeDeregistration(credential)])
+                    }
+                    "registration" => {
+                        body.certificates = Some(vec![Certificate::StakeRegistration(credential)])
+                    }
+                    _ => {
+                        let header = if names_script { 0xf0 } else { 0xe0 };
+                        let account = [vec![header], hash.to_vec()].concat();
+                        body.withdrawals = Some([(account.into(), 0)].into())
+                    }
+                }
+                tx.transaction_body = body.into();
+                outcomes.push((purpose, hash, tx_languages(&tx, &utxos)));
+                let languages = if names_script && hash == script {
+                    vec![Language::PlutusV2]
+                } else {
+                    vec![]
+                };
+                expected.push((purpose, hash, languages));
+            }
+        }
+        assert_eq!(outcomes, expected);
     }
 }
