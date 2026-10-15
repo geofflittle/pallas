@@ -14,14 +14,14 @@ use pallas_primitives::{
     AddrKeyhash, AssetName, Coin, Epoch, GenesisDelegateHash, Genesishash, Hash, NetworkId,
     NonZeroInt, PlutusScript, PolicyId, PoolKeyhash, PoolMetadata, PositiveCoin, Relay,
     RewardAccount, StakeCredential, TransactionIndex, UnitInterval, VrfKeyhash,
-    alonzo::{Multiasset, NativeScript, Tx as AlonzoTx, VKeyWitness, Value},
+    alonzo::{Certificate, Multiasset, NativeScript, Tx as AlonzoTx, VKeyWitness, Value},
     babbage::Tx as BabbageTx,
     conway::{Multiasset as ConwayMultiasset, Tx as ConwayTx, Value as ConwayValue},
 };
 
 use pallas_traverse::{Era, MultiEraInput, MultiEraOutput, MultiEraUpdate, time::Slot};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Deref;
 pub use validation::*;
 
@@ -182,6 +182,44 @@ pub fn conway_add_values(
             ))
         }
     }
+}
+
+// The coin a transaction consumes beyond its inputs and produces beyond its
+// outputs.
+pub(crate) fn balance_coins(
+    deposits_and_refunds: impl IntoIterator<Item = (Coin, Coin)>,
+    withdrawals: Option<&BTreeMap<RewardAccount, Coin>>,
+    payments: impl IntoIterator<Item = Coin>,
+    err: &ValidationError,
+) -> Result<(Coin, Coin), ValidationError> {
+    let mut consumed: Coin = 0;
+    let mut produced: Coin = 0;
+    for (deposit, refund) in deposits_and_refunds {
+        produced = add_lovelace(produced, deposit, err)?;
+        consumed = add_lovelace(consumed, refund, err)?;
+    }
+    for coin in withdrawals.into_iter().flat_map(BTreeMap::values) {
+        consumed = add_lovelace(consumed, *coin, err)?;
+    }
+    for coin in payments {
+        produced = add_lovelace(produced, coin, err)?;
+    }
+    Ok((consumed, produced))
+}
+
+// The deposit each Shelley era certificate charges and the refund it returns.
+pub(crate) fn shelley_deposits_and_refunds(
+    certificates: Option<&[Certificate]>,
+    key_deposit: Coin,
+) -> impl Iterator<Item = (Coin, Coin)> + '_ {
+    certificates
+        .into_iter()
+        .flatten()
+        .map(move |cert| match cert {
+            Certificate::StakeRegistration(_) => (key_deposit, 0),
+            Certificate::StakeDeregistration(_) => (0, key_deposit),
+            _ => (0, 0),
+        })
 }
 
 pub fn lovelace_diff_or_fail(

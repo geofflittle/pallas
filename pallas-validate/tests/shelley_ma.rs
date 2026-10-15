@@ -6,15 +6,20 @@ mod shelley_ma_tests {
     use pallas_addresses::{Address, Network, ShelleyAddress};
     use pallas_codec::{
         minicbor::{
+            self,
             decode::{Decode, Decoder},
             encode,
         },
         utils::Bytes,
     };
-    use pallas_crypto::hash::Hash;
+    use pallas_crypto::{
+        hash::{Hash, Hasher},
+        key::ed25519::SecretKey,
+    };
     use pallas_primitives::alonzo::{
         Certificate, Nonce, NonceVariant, PoolKeyhash, PoolMetadata, RationalNumber, Relay,
-        StakeCredential, TransactionBody, TransactionOutput, Tx, VKeyWitness, Value, WitnessSet,
+        StakeCredential, TransactionBody, TransactionInput, TransactionOutput, Tx, VKeyWitness,
+        Value, WitnessSet,
     };
     use pallas_traverse::{Era, MultiEraTx};
     use pallas_validate::utils::PoolParam;
@@ -996,6 +1001,64 @@ mod shelley_ma_tests {
                 ShelleyMA(ShelleyMAError::MIRCertificateTooLateinEpoch) => (),
                 _ => panic!("Unexpected error ({err:?})"),
             },
+        }
+    }
+
+    // Validates shelley1 edited to spend `input` from one key's address and
+    // withdraw `withdrawal` from the same key's account, signed by that key.
+    fn withdrawing_outcome(era: Era, input: u64, withdrawal: u64, fee: u64, output: u64) -> String {
+        let key = SecretKey::from([1; 32]);
+        let key_hash = Hasher::<224>::hash(key.public_key().as_ref());
+        let address = [&[0x61][..], key_hash.as_ref()].concat();
+        let cbor_bytes: Vec<u8> = cbor_to_bytes(include_str!("../../test_data/shelley1.tx"));
+        let mut mtx: Tx = minted_tx_from_cbor(&cbor_bytes);
+        let body = &mut mtx.transaction_body;
+        body.inputs = vec![TransactionInput {
+            transaction_id: [5; 32].into(),
+            index: 0,
+        }];
+        body.outputs = vec![TransactionOutput {
+            address: address.clone().into(),
+            amount: Value::Coin(output),
+            datum_hash: None,
+        }];
+        body.fee = fee;
+        body.withdrawals = Some(
+            [([&[0xe1][..], key_hash.as_ref()].concat().into(), withdrawal)]
+                .into_iter()
+                .collect(),
+        );
+        mtx.transaction_witness_set = minicbor::decode::<WitnessSet>(&[0xa0]).unwrap().into();
+        let unsigned = minicbor::to_vec(mtx).unwrap();
+        let mut mtx: Tx = minted_tx_from_cbor(&unsigned);
+        let hash = Hasher::<256>::hash(mtx.transaction_body.raw_cbor());
+        mtx.transaction_witness_set.vkeywitness = Some(vec![VKeyWitness {
+            vkey: key.public_key().as_ref().to_vec().into(),
+            signature: key.sign(hash).as_ref().to_vec().into(),
+        }]);
+        let signed = minicbor::to_vec(mtx).unwrap();
+        let mtx: Tx = minted_tx_from_cbor(&signed);
+        let utxos: UTxOs = mk_utxo_for_alonzo_compatible_tx(
+            &mtx.transaction_body,
+            &[(hex::encode(&address), Value::Coin(input), None)],
+        );
+        let metx: MultiEraTx = MultiEraTx::from_alonzo_compatible(&mtx, era);
+        let env: Environment = hardcoded_environment_values!();
+        let result = validate_txs(&[metx], &env, &utxos, &mut CertState::default());
+        format!("{result:?}")
+    }
+
+    #[test]
+    fn withdrawals_balance_through_dispatch() {
+        let (input, withdrawal, fee) = (10_000_000, 3_000_000, 200_000);
+        let balanced = input + withdrawal - fee;
+        let unbalanced = "Err(ShelleyMA(PreservationOfValue))";
+        for era in [Era::Shelley, Era::Allegra, Era::Mary] {
+            let actual: Vec<String> = [balanced - 1, balanced, balanced + 1]
+                .into_iter()
+                .map(|output| withdrawing_outcome(era, input, withdrawal, fee, output))
+                .collect();
+            assert_eq!(actual, [unbalanced, "Ok(())", unbalanced], "{era:?}");
         }
     }
 }

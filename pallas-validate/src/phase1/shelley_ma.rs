@@ -5,9 +5,10 @@ use crate::utils::{
     ShelleyMAError::*,
     ShelleyProtParams, UTxOs,
     ValidationError::{self, *},
-    ValidationResult, add_minted_value, add_values, aux_data_from_alonzo_tx, empty_value,
-    get_alonzo_comp_tx_size, get_lovelace_from_alonzo_val, get_payment_part, get_shelley_address,
-    get_val_size_in_words, mk_alonzo_vk_wits_check_list, values_are_equal, verify_signature,
+    ValidationResult, add_minted_value, add_values, aux_data_from_alonzo_tx, balance_coins,
+    empty_value, get_alonzo_comp_tx_size, get_lovelace_from_alonzo_val, get_payment_part,
+    get_shelley_address, get_val_size_in_words, mk_alonzo_vk_wits_check_list, values_are_equal,
+    verify_signature,
 };
 use pallas_addresses::{PaymentKeyHash, ScriptHash, ShelleyAddress, ShelleyPaymentPart};
 use pallas_codec::minicbor::encode;
@@ -164,8 +165,21 @@ fn check_preservation_of_value(
     era: &Era,
     prot_pps: &ShelleyProtParams,
 ) -> ValidationResult {
-    let consumed: Value = get_consumed(tx_body, utxos, stk_refund_count, era, prot_pps)?;
-    let produced: Value = get_produced(tx_body, stk_dep_count, pool_count, era, prot_pps)?;
+    let err = ShelleyMA(NegativeValue);
+    let deposits = prot_pps.pool_deposit * *pool_count + prot_pps.key_deposit * *stk_dep_count;
+    let refunds = prot_pps.key_deposit * *stk_refund_count;
+    let (consumed, produced) = balance_coins(
+        [(deposits, refunds)],
+        tx_body.withdrawals.as_ref(),
+        [tx_body.fee],
+        &err,
+    )?;
+    let consumed: Value = add_values(
+        &get_consumed(tx_body, utxos, era)?,
+        &Value::Coin(consumed),
+        &err,
+    )?;
+    let produced: Value = add_values(&get_produced(tx_body, era)?, &Value::Coin(produced), &err)?;
     if !values_are_equal(&consumed, &produced) {
         Err(ShelleyMA(PreservationOfValue))
     } else {
@@ -176,9 +190,7 @@ fn check_preservation_of_value(
 fn get_consumed(
     tx_body: &TransactionBody,
     utxos: &UTxOs,
-    stk_refund_count: &u64,
     era: &Era,
-    prot_pps: &ShelleyProtParams,
 ) -> Result<Value, ValidationError> {
     let neg_val_err: ValidationError = ShelleyMA(NegativeValue);
     let mut res: Value = empty_value();
@@ -200,26 +212,13 @@ fn get_consumed(
             },
         }
     }
-    // TODO: Set right error message below.
-    // Adding key refunds and minted assets
-    res = add_values(
-        &res,
-        &Value::Coin(prot_pps.key_deposit * *stk_refund_count),
-        &neg_val_err,
-    )?;
     if let Some(m) = &tx_body.mint {
         res = add_minted_value(&res, m, &neg_val_err)?;
     }
     Ok(res)
 }
 
-fn get_produced(
-    tx_body: &TransactionBody,
-    stk_dep_count: &u64,
-    pool_count: &u64,
-    era: &Era,
-    prot_pps: &ShelleyProtParams,
-) -> Result<Value, ValidationError> {
+fn get_produced(tx_body: &TransactionBody, era: &Era) -> Result<Value, ValidationError> {
     let neg_val_err: ValidationError = ShelleyMA(NegativeValue);
     let mut res: Value = empty_value();
     for TransactionOutput { amount, .. } in tx_body.outputs.iter() {
@@ -229,13 +228,6 @@ fn get_produced(
             _ => res = add_values(&res, amount, &neg_val_err)?,
         }
     }
-    // TODO: Set right error message below.
-    // Adding fees
-    res = add_values(&res, &Value::Coin(tx_body.fee), &neg_val_err)?;
-    // Pool reg deposits and staking key registrations
-    let total_deposits =
-        prot_pps.pool_deposit * *pool_count + prot_pps.key_deposit * *stk_dep_count;
-    res = add_values(&res, &Value::Coin(total_deposits), &neg_val_err)?;
     Ok(res)
 }
 
