@@ -2683,6 +2683,44 @@ impl HaskellDisplay for Network {
 }
 
 #[cfg(test)]
+mod cost_models_tests {
+    use super::*;
+
+    #[test]
+    fn a_model_under_an_unnamed_key_renders_as_unknown() {
+        let models = CostModels {
+            plutus_v1: Some(vec![1]),
+            plutus_v2: None,
+            plutus_v3: Some(vec![3]),
+            unknown: vec![(9u64, vec![9i64])].into(),
+        };
+
+        assert_eq!(
+            models.to_haskell_str(),
+            "CostModels {_costModelsValid = fromList [(PlutusV1,CostModel PlutusV1 [1]),\
+             (PlutusV3,CostModel PlutusV3 [3])], _costModelsUnknown = fromList [(9,[9])]}"
+        );
+    }
+
+    #[test]
+    fn the_plutus_v4_model_renders_as_valid() {
+        let models = CostModels {
+            plutus_v1: Some(vec![1]),
+            plutus_v2: None,
+            plutus_v3: Some(vec![3]),
+            unknown: vec![(3u64, vec![4i64]), (9u64, vec![9i64])].into(),
+        };
+
+        assert_eq!(
+            models.to_haskell_str(),
+            "CostModels {_costModelsValid = fromList [(PlutusV1,CostModel PlutusV1 [1]),\
+             (PlutusV3,CostModel PlutusV3 [3]),(PlutusV4,CostModel PlutusV4 [4])], \
+             _costModelsUnknown = fromList [(9,[9])]}"
+        );
+    }
+}
+
+#[cfg(test)]
 mod native_script_tests {
     use super::*;
 
