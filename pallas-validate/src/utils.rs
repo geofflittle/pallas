@@ -4,7 +4,9 @@ pub mod environment;
 pub mod validation;
 
 pub use environment::*;
-use pallas_addresses::{Address, ShelleyAddress, ShelleyPaymentPart};
+use pallas_addresses::{
+    Address, Network, ShelleyAddress, ShelleyPaymentPart, StakeAddress, StakePayload,
+};
 use pallas_codec::{
     minicbor::encode,
     utils::{Bytes, Nullable},
@@ -21,7 +23,8 @@ use pallas_primitives::{
 
 use pallas_traverse::{Era, MultiEraInput, MultiEraOutput, MultiEraUpdate, time::Slot};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Deref;
 pub use validation::*;
 
@@ -723,6 +726,83 @@ pub fn verify_signature(vk_wit: &VKeyWitness, data_to_verify: &[u8]) -> bool {
     signature_source.copy_from_slice(vk_wit.signature.as_slice());
     let sig: Signature = From::<[u8; Signature::SIZE]>::from(signature_source);
     public_key.verify(data_to_verify, &sig)
+}
+
+pub(crate) fn check_remaining_vk_wits(
+    wits: &[(bool, VKeyWitness)],
+    data_to_verify: &[u8],
+    err: ValidationError,
+) -> ValidationResult {
+    for (covered, vkey_wit) in wits {
+        if !covered && !verify_signature(vkey_wit, data_to_verify) {
+            return Err(err);
+        }
+    }
+    Ok(())
+}
+
+// Marks every supplied script with the needed hash as used.
+pub(crate) fn check_needed_script(
+    hash: &PolicyId,
+    reference_scripts: &[PolicyId],
+    supplied: &mut [&mut [(bool, PolicyId)]],
+    missing: ValidationError,
+) -> ValidationResult {
+    let mut covered = reference_scripts.contains(hash);
+    for scripts in supplied.iter_mut() {
+        for (used, script) in scripts.iter_mut() {
+            if script == hash {
+                *used = true;
+                covered = true;
+            }
+        }
+    }
+    if covered { Ok(()) } else { Err(missing) }
+}
+
+// Script hashes of the withdrawing reward accounts, each with its index in
+// reward account order.
+pub(crate) fn withdrawal_scripts(
+    withdrawals: Option<&BTreeMap<RewardAccount, Coin>>,
+    undecodable: ValidationError,
+) -> Result<Vec<(u32, PolicyId)>, ValidationError> {
+    let mut accounts: Vec<StakeAddress> = withdrawals
+        .into_iter()
+        .flatten()
+        .map(|(bytes, _)| match Address::from_bytes(bytes) {
+            Ok(Address::Stake(account)) => Ok(account),
+            _ => Err(undecodable.clone()),
+        })
+        .collect::<Result<_, _>>()?;
+    accounts.sort_by(sort_reward_accounts);
+    Ok(accounts
+        .iter()
+        .enumerate()
+        .filter(|(_, account)| account.is_script())
+        .map(|(index, account)| (index as u32, *account.payload().as_hash()))
+        .collect())
+}
+
+// Sorting function for reward accounts (withdrawals).
+fn sort_reward_accounts(a: &StakeAddress, b: &StakeAddress) -> Ordering {
+    fn network_tag(network: Network) -> u8 {
+        match network {
+            Network::Testnet => 0,
+            Network::Mainnet => 1,
+            Network::Other(tag) => tag,
+        }
+    }
+
+    if a.network() != b.network() {
+        return network_tag(a.network()).cmp(&network_tag(b.network()));
+    }
+
+    match (a.payload(), b.payload()) {
+        (StakePayload::Script(..), StakePayload::Stake(..)) => Ordering::Less,
+        (StakePayload::Stake(..), StakePayload::Script(..)) => Ordering::Greater,
+        (StakePayload::Script(hash_a), StakePayload::Script(hash_b)) => hash_a.cmp(hash_b),
+        (StakePayload::Stake(hash_a), StakePayload::Stake(hash_b)) => hash_a.cmp(hash_b),
+    }
 }
 
 pub fn get_payment_part(address: &Bytes) -> Option<ShelleyPaymentPart> {
