@@ -75,6 +75,8 @@ pub enum Error {
     MissingRequiredInlineDatumOrHash,
     #[error("redeemer points to an unsupported certificate type")]
     UnsupportedCertificateType,
+    #[error("certificate not supported in a PlutusV1 or PlutusV2 script context")]
+    CertificateNotSupported,
     #[error("failed script execution\n{:>13} {}", format!("{}[{}]", tag, index), err)]
     RedeemerError {
         tag: String,

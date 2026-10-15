@@ -1,4 +1,7 @@
-use super::{error::Error, to_plutus_data::MintValue};
+use super::{
+    error::Error,
+    to_plutus_data::{MintValue, v1_v2_certificate},
+};
 use itertools::Itertools;
 use pallas_addresses::{Address, Network, StakePayload};
 use pallas_codec::utils::{Bytes, KeyValuePairs, NonEmptySet, PositiveCoin};
@@ -183,7 +186,7 @@ impl TxInfoV1<'_> {
         }
 
         let inputs = get_tx_in_info_v1(&tx.transaction_body.inputs, utxos)?;
-        let certificates = get_certificates_info(&tx.transaction_body.certificates);
+        let certificates = get_v1_v2_certificates_info(&tx.transaction_body.certificates)?;
         let withdrawals =
             KeyValuePairs::from(get_withdrawals_info(&tx.transaction_body.withdrawals));
         let mint = get_mint_info(&tx.transaction_body.mint);
@@ -232,7 +235,7 @@ impl TxInfoV2<'_> {
         slot_config: &SlotConfig,
     ) -> Result<TxInfo<'a>, Error> {
         let inputs = get_tx_in_info_v2(&tx.transaction_body.inputs, utxos)?;
-        let certificates = get_certificates_info(&tx.transaction_body.certificates);
+        let certificates = get_v1_v2_certificates_info(&tx.transaction_body.certificates)?;
         let withdrawals =
             KeyValuePairs::from(get_withdrawals_info(&tx.transaction_body.withdrawals));
         let mint = get_mint_info(&tx.transaction_body.mint);
@@ -584,6 +587,20 @@ pub fn get_certificates_info(certificates: &Option<NonEmptySet<Certificate>>) ->
     certificates.clone().map(|s| s.to_vec()).unwrap_or_default()
 }
 
+fn get_v1_v2_certificates_info(
+    certificates: &Option<NonEmptySet<Certificate>>,
+) -> Result<Vec<Certificate>, Error> {
+    let certificates = get_certificates_info(certificates);
+    if certificates
+        .iter()
+        .all(|certificate| v1_v2_certificate(certificate).is_some())
+    {
+        Ok(certificates)
+    } else {
+        Err(Error::CertificateNotSupported)
+    }
+}
+
 pub fn get_proposal_procedures_info(
     proposal_procedures: &Option<NonEmptySet<ProposalProcedure>>,
 ) -> Vec<ProposalProcedure> {
@@ -864,6 +881,7 @@ pub fn find_script(
             .ok_or(Error::MissingScriptForRedeemer)
             .and_then(|cert| match cert {
                 Certificate::StakeDeregistration(stake_credential)
+                | Certificate::Reg(stake_credential, _)
                 | Certificate::UnReg(stake_credential, _)
                 | Certificate::VoteDeleg(stake_credential, _)
                 | Certificate::VoteRegDeleg(stake_credential, _, _)
@@ -881,7 +899,6 @@ pub fn find_script(
                 },
                 Certificate::StakeRegistration { .. }
                 | Certificate::PoolRetirement { .. }
-                | Certificate::Reg { .. }
                 | Certificate::PoolRegistration { .. } => Err(Error::UnsupportedCertificateType),
             })
             .and_then(lookup_script),
