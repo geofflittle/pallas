@@ -4,7 +4,7 @@ pub mod environment;
 pub mod validation;
 
 pub use environment::*;
-use pallas_addresses::{Address, ScriptHash, ShelleyAddress, ShelleyPaymentPart};
+use pallas_addresses::{Address, ScriptHash, ShelleyAddress, ShelleyPaymentPart, byron::AddressId};
 use pallas_codec::{
     minicbor::encode,
     utils::{Bytes, Nullable},
@@ -14,7 +14,7 @@ use pallas_primitives::{
     AddrKeyhash, AssetName, Coin, Epoch, GenesisDelegateHash, Genesishash, Hash, NetworkId,
     NonZeroInt, PlutusScript, PolicyId, PoolKeyhash, PoolMetadata, PositiveCoin, Relay,
     RewardAccount, StakeCredential, TransactionIndex, TransactionInput, UnitInterval, VrfKeyhash,
-    alonzo::{Multiasset, NativeScript, Tx as AlonzoTx, VKeyWitness, Value},
+    alonzo::{BootstrapWitness, Multiasset, NativeScript, Tx as AlonzoTx, VKeyWitness, Value},
     babbage::Tx as BabbageTx,
     conway::{DatumOption, Multiasset as ConwayMultiasset, Tx as ConwayTx, Value as ConwayValue},
 };
@@ -723,6 +723,61 @@ pub fn verify_signature(vk_wit: &VKeyWitness, data_to_verify: &[u8]) -> bool {
     signature_source.copy_from_slice(vk_wit.signature.as_slice());
     let sig: Signature = From::<[u8; Signature::SIZE]>::from(signature_source);
     public_key.verify(data_to_verify, &sig)
+}
+
+pub(crate) fn check_bootstrap_wit(
+    root: &AddressId,
+    wits: &mut [(bool, BootstrapWitness)],
+    data_to_verify: &[u8],
+    missing: &ValidationError,
+    wrong_signature: &ValidationError,
+) -> ValidationResult {
+    for (covered, wit) in wits.iter_mut() {
+        if bootstrap_wit_root(wit) == *root {
+            if !verify_bootstrap_signature(wit, data_to_verify) {
+                return Err(wrong_signature.clone());
+            }
+            *covered = true;
+            return Ok(());
+        }
+    }
+    Err(missing.clone())
+}
+
+pub(crate) fn check_remaining_bootstrap_wits(
+    wits: &[(bool, BootstrapWitness)],
+    data_to_verify: &[u8],
+    wrong_signature: &ValidationError,
+) -> ValidationResult {
+    for (covered, wit) in wits {
+        if !*covered && !verify_bootstrap_signature(wit, data_to_verify) {
+            return Err(wrong_signature.clone());
+        }
+    }
+    Ok(())
+}
+
+fn verify_bootstrap_signature(wit: &BootstrapWitness, data_to_verify: &[u8]) -> bool {
+    match (
+        PublicKey::try_from(wit.public_key.as_slice()),
+        Signature::try_from(wit.signature.as_slice()),
+    ) {
+        (Ok(key), Ok(signature)) => key.verify(data_to_verify, &signature),
+        _ => false,
+    }
+}
+
+fn bootstrap_wit_root(wit: &BootstrapWitness) -> AddressId {
+    // CBOR heads of `[0, [0, bytes(64)], attributes]`, the root preimage of a key address.
+    let prefix: &[u8] = &[0x83, 0x00, 0x82, 0x00, 0x58, 0x40];
+    let payload: Vec<u8> = [
+        prefix,
+        wit.public_key.as_slice(),
+        wit.chain_code.as_slice(),
+        wit.attributes.as_slice(),
+    ]
+    .concat();
+    pallas_crypto::hash::Hasher::<224>::hash(&cryptoxide::hashing::sha3_256(&payload))
 }
 
 pub fn get_payment_part(address: &Bytes) -> Option<ShelleyPaymentPart> {

@@ -4,11 +4,11 @@ use crate::utils::{
     AlonzoError::*,
     AlonzoProtParams, UTxOs,
     ValidationError::{self, *},
-    ValidationResult, add_minted_value, add_values, aux_data_from_alonzo_tx,
-    compute_native_script_hash, compute_plutus_v1_script_hash, empty_value,
-    get_alonzo_comp_tx_size, get_lovelace_from_alonzo_val, get_payment_part,
-    get_script_hash_from_input, get_shelley_address, get_val_size_in_words,
-    mk_alonzo_vk_wits_check_list, values_are_equal, verify_signature,
+    ValidationResult, add_minted_value, add_values, aux_data_from_alonzo_tx, check_bootstrap_wit,
+    check_remaining_bootstrap_wits, compute_native_script_hash, compute_plutus_v1_script_hash,
+    empty_value, get_alonzo_comp_tx_size, get_lovelace_from_alonzo_val, get_script_hash_from_input,
+    get_shelley_address, get_val_size_in_words, mk_alonzo_vk_wits_check_list, values_are_equal,
+    verify_signature,
 };
 use hex;
 use pallas_addresses::{Address, ScriptHash, ShelleyAddress, ShelleyPaymentPart};
@@ -19,11 +19,12 @@ use pallas_codec::{
 use pallas_crypto::hash::Hash;
 use pallas_primitives::{
     alonzo::{
-        AddrKeyhash, Mint, Multiasset, NativeScript, PlutusData, PlutusScript, PolicyId, Redeemer,
-        RedeemerPointer, RedeemerTag, RequiredSigners, TransactionBody, TransactionInput,
-        TransactionOutput, Tx, VKeyWitness, Value, WitnessSet,
+        AddrKeyhash, BootstrapWitness, Mint, Multiasset, NativeScript, PlutusData, PlutusScript,
+        PolicyId, Redeemer, RedeemerPointer, RedeemerTag, RequiredSigners, TransactionBody,
+        TransactionInput, TransactionOutput, Tx, VKeyWitness, Value, WitnessSet,
     },
     byron::TxOut,
+    conway::DatumOption,
 };
 use pallas_traverse::{MultiEraInput, MultiEraOutput, OriginalHash};
 use std::ops::Deref;
@@ -217,18 +218,12 @@ fn check_collaterals_assets(
             for collateral in collaterals {
                 match utxos.get(&MultiEraInput::from_alonzo_compatible(collateral)) {
                     Some(multi_era_output) => {
-                        if let Some(TransactionOutput { amount, .. }) =
-                            MultiEraOutput::as_alonzo(multi_era_output)
-                        {
-                            let (Value::Coin(n) | Value::Multiasset(n, _)) = amount;
-                            if *n * 100 < fee_percentage {
-                                return Err(Alonzo(CollateralMinLovelace));
-                            }
-                            if let Value::Multiasset(_, multi_assets) = amount
-                                && !multi_assets.is_empty()
-                            {
-                                return Err(Alonzo(NonLovelaceCollateral));
-                            }
+                        let value = multi_era_output.value();
+                        if value.coin() * 100 < fee_percentage {
+                            return Err(Alonzo(CollateralMinLovelace));
+                        }
+                        if !value.assets().is_empty() {
+                            return Err(Alonzo(NonLovelaceCollateral));
                         }
                     }
                     None => return Err(Alonzo(CollateralNotInUTxO)),
@@ -385,7 +380,11 @@ fn check_witness_set(mtx: &Tx, utxos: &UTxOs) -> ValidationResult {
     check_datums(tx_body, utxos, &tx_wits.plutus_data)?;
     check_redeemers(tx_body, tx_wits, utxos)?;
     check_required_signers(&tx_body.required_signers, vkey_wits, tx_hash)?;
-    check_vkey_input_wits(mtx, &tx_wits.vkeywitness, utxos)
+    check_vkey_input_wits(
+        mtx,
+        &Some(tx_wits.vkeywitness.clone().unwrap_or_default()),
+        utxos,
+    )
 }
 
 // The set of needed scripts (minting policies, native scripts and Plutus
@@ -439,16 +438,11 @@ fn check_input_datum_hash_in_witness_set(
     plutus_data: &mut [(bool, &KeepRaw<PlutusData>)],
 ) -> ValidationResult {
     for input in &tx_body.inputs {
-        match utxos
+        let output = utxos
             .get(&MultiEraInput::from_alonzo_compatible(input))
-            .and_then(MultiEraOutput::as_alonzo)
-        {
-            Some(output) => {
-                if let Some(datum_hash) = output.datum_hash {
-                    find_datum_hash(datum_hash, plutus_data)?
-                }
-            }
-            None => return Err(Alonzo(InputNotInUTxO)),
+            .ok_or(Alonzo(InputNotInUTxO))?;
+        if let Some(DatumOption::Hash(datum_hash)) = output.datum() {
+            find_datum_hash(datum_hash, plutus_data)?
         }
     }
     Ok(())
@@ -682,6 +676,13 @@ fn check_vkey_input_wits(
     let vk_wits: &mut Vec<(bool, VKeyWitness)> =
         &mut mk_alonzo_vk_wits_check_list(vkey_wits, Alonzo(VKWitnessMissing))?;
     let tx_hash: &Vec<u8> = &Vec::from(mtx.transaction_body.original_hash().as_ref());
+    let bootstrap_wits: &mut Vec<(bool, BootstrapWitness)> = &mut mtx
+        .transaction_witness_set
+        .bootstrap_witness
+        .iter()
+        .flatten()
+        .map(|wit| (false, wit.clone()))
+        .collect();
     let mut inputs_and_collaterals: Vec<TransactionInput> = Vec::new();
     inputs_and_collaterals.extend(tx_body.inputs.clone());
 
@@ -691,22 +692,27 @@ fn check_vkey_input_wits(
 
     for input in inputs_and_collaterals.iter() {
         match utxos.get(&MultiEraInput::from_alonzo_compatible(input)) {
-            Some(multi_era_output) => {
-                if let Some(alonzo_comp_output) = MultiEraOutput::as_alonzo(multi_era_output) {
-                    match get_payment_part(&alonzo_comp_output.address)
-                        .ok_or(Alonzo(InputDecoding))?
-                    {
-                        ShelleyPaymentPart::Key(payment_key_hash) => {
-                            check_vk_wit(&payment_key_hash, vk_wits, tx_hash)?
-                        }
-                        ShelleyPaymentPart::Script(_) => (),
+            Some(multi_era_output) => match multi_era_output.address() {
+                Ok(Address::Shelley(address)) => match address.payment() {
+                    ShelleyPaymentPart::Key(payment_key_hash) => {
+                        check_vk_wit(payment_key_hash, vk_wits, tx_hash)?
                     }
-                }
-            }
+                    ShelleyPaymentPart::Script(_) => {}
+                },
+                Ok(Address::Byron(address)) => check_bootstrap_wit(
+                    &address.decode().map_err(|_| Alonzo(InputDecoding))?.root,
+                    bootstrap_wits,
+                    tx_hash,
+                    &Alonzo(VKWitnessMissing),
+                    &Alonzo(VKWrongSignature),
+                )?,
+                _ => return Err(Alonzo(InputDecoding)),
+            },
             None => return Err(Alonzo(InputNotInUTxO)),
         }
     }
-    check_remaining_vk_wits(vk_wits, tx_hash) // required for native scripts
+    check_remaining_vk_wits(vk_wits, tx_hash)?; // required for native scripts
+    check_remaining_bootstrap_wits(bootstrap_wits, tx_hash, &Alonzo(VKWrongSignature))
 }
 
 fn check_vk_wit(
@@ -907,8 +913,10 @@ fn check_minting(tx_body: &TransactionBody, mtx: &Tx) -> ValidationResult {
 mod tests {
     use super::*;
     use crate::phase1::fixtures::{
-        byron_address, input, key_address, legacy_output, reward_address, script_address, utxos,
+        byron_address, input, key_address, legacy_output, reward_address, script_address,
+        tx_spending_input, undecodable_byron_address, utxos,
     };
+    use pallas_codec::minicbor;
     use pallas_traverse::Era;
 
     #[test]
@@ -945,5 +953,34 @@ mod tests {
 
             assert!(matches!(result, Err(Alonzo(InputDecoding))), "{result:?}");
         }
+    }
+
+    #[test]
+    fn an_input_at_a_reward_or_undecodable_byron_address_is_refused() {
+        let cbor = tx_spending_input();
+        let tx: Tx = minicbor::decode(&cbor).unwrap();
+        let outcomes: Vec<_> = [
+            key_address(),
+            byron_address(),
+            reward_address(),
+            undecodable_byron_address(),
+        ]
+        .map(|address| {
+            let raw = legacy_output(address);
+            format!(
+                "{:?}",
+                check_vkey_input_wits(&tx, &Some(vec![]), &utxos(Era::Alonzo, &raw))
+            )
+        })
+        .into();
+        assert_eq!(
+            outcomes,
+            [
+                "Err(Alonzo(VKWitnessMissing))",
+                "Err(Alonzo(VKWitnessMissing))",
+                "Err(Alonzo(InputDecoding))",
+                "Err(Alonzo(InputDecoding))",
+            ]
+        );
     }
 }

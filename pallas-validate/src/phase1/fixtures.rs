@@ -45,6 +45,10 @@ pub(super) fn byron_address() -> Vec<u8> {
     .to_vec()
 }
 
+pub(super) fn undecodable_byron_address() -> Vec<u8> {
+    pallas_addresses::ByronAddress::new(&[0x00], 0).to_vec()
+}
+
 pub(super) fn reward_address() -> Vec<u8> {
     [vec![0xe0], vec![3; 28]].concat()
 }
