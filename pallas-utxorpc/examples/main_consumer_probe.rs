@@ -7,7 +7,7 @@ use pallas_traverse as trv;
 use pallas_utxorpc::{LedgerContext, TxoRef, UtxoMap};
 use prost_types::FieldMask;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 struct Ledger;
 
 impl LedgerContext for Ledger {
