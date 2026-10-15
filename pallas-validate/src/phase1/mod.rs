@@ -96,7 +96,7 @@ pub fn validate_tx(
             MultiEraTx::Dijkstra(_) | MultiEraTx::DijkstraSub(..) => {
                 unimplemented!("validate_tx is not yet implemented for Dijkstra")
             }
-            _ => Err(TxAndProtParamsDiffer),
+            _ => Ok(()),
         },
         (_, None) => Err(EnvMissingAccountState),
     }
