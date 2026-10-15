@@ -355,7 +355,7 @@ impl CostModels {
     pub fn plutus_v4(&self) -> Option<&CostModel> {
         self.unknown
             .iter()
-            .find(|entry| entry.0 == 3)
+            .find(|entry| entry.0 == 4)
             .map(|entry| &entry.1)
     }
 }
