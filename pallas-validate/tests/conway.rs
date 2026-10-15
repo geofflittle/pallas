@@ -2017,7 +2017,23 @@ mod conway_tests {
 
         #[test]
         fn script_registration_with_its_redeemer_evaluates() {
-            let script = plutus_v3("(program 1.1.0 (lam context (con unit ())))");
+            fn field(value: &str, index: usize) -> String {
+                let mut list =
+                    format!("[(force (force (builtin sndPair))) [(builtin unConstrData) {value}]]");
+                for _ in 0..index {
+                    list = format!("[(force (builtin tailList)) {list}]");
+                }
+                format!("[(force (builtin headList)) {list}]")
+            }
+            // Field 2 of the context is the Certifying purpose, its field 1 the Reg
+            // certificate, whose field 1 is the deposit inside Just.
+            let deposit = field(&field(&field(&field("ctx", 2), 1), 1), 0);
+            let condition = format!(
+                "[[(builtin equalsInteger) [(builtin unIData) {deposit}]] (con integer 2000000)]"
+            );
+            let script = plutus_v3(&format!(
+                "(program 1.1.0 (lam ctx (force [[[(force (builtin ifThenElse)) {condition}] (delay (con unit ()))] (delay (error))])))"
+            ));
             let cbor = certifying_tx(
                 vec![registration(script.compute_hash())],
                 cert_redeemer(0),
@@ -2025,20 +2041,26 @@ mod conway_tests {
             );
             let mtx: Tx = conway_minted_tx_from_cbor(&cbor);
 
-            let mut params = mk_mainnet_params_epoch_380();
-            params.protocol_version = (10, 0);
-            let results = eval_tx(
-                &MultiEraTx::from_conway(&mtx),
-                &MultiEraProtocolParameters::Conway(params),
-                &UtxoMap::new(),
-                &SlotConfig::default(),
-            )
-            .unwrap();
-            let outcomes: Vec<_> = results
-                .iter()
-                .map(|r| (r.tag, r.index, r.success))
-                .collect();
-            assert_eq!(outcomes, [(RedeemerTag::Cert, 0, true)]);
+            for (protocol, deposit_present) in [(9, false), (10, true)] {
+                let mut params = mk_mainnet_params_epoch_380();
+                params.protocol_version = (protocol, 0);
+                let results = eval_tx(
+                    &MultiEraTx::from_conway(&mtx),
+                    &MultiEraProtocolParameters::Conway(params),
+                    &UtxoMap::new(),
+                    &SlotConfig::default(),
+                )
+                .unwrap();
+                let outcomes: Vec<_> = results
+                    .iter()
+                    .map(|r| (r.tag, r.index, r.success))
+                    .collect();
+                assert_eq!(
+                    outcomes,
+                    [(RedeemerTag::Cert, 0, deposit_present)],
+                    "protocol {protocol}"
+                );
+            }
         }
     }
 }
