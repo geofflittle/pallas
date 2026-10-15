@@ -1296,7 +1296,41 @@ mod tests {
                 (None, None),
                 "a {era:?} body without keys 25 and 26 reports neither"
             );
+            assert_eq!(
+                tx.starting_account_balance_intervals(),
+                None,
+                "a {era:?} body without key 27 reports no starting balance intervals"
+            );
         }
+    }
+
+    #[test]
+    fn only_the_top_level_body_reports_starting_balance_intervals() {
+        let sub = testing::sub_body_with_account_fields(&[0xe2; 29], 12);
+        let cbor = testing::dijkstra_block_tx(
+            &testing::body_with_starting_balance_interval(&[0xe1; 29], 27, &[&sub]),
+            &testing::empty_witness_set(),
+            None,
+            true,
+        );
+        let tx = MultiEraTx::decode_for_era(Era::Dijkstra, &cbor).unwrap();
+
+        assert_eq!(
+            tx.starting_account_balance_intervals().cloned(),
+            Some(dijkstra::StartingAccountBalanceIntervals::from([(
+                [0xe1; 29].to_vec().into(),
+                dijkstra::AccountBalanceInterval::Exact(27),
+            )])),
+            "the transaction reports key 27 of its own body"
+        );
+
+        let subs = tx.sub_transactions();
+        let sub = subs.first().expect("body key 23 holds one sub transaction");
+        assert_eq!(
+            sub.starting_account_balance_intervals(),
+            None,
+            "a sub transaction body has no key 27, so the sub transaction reports none"
+        );
     }
 
     #[test]
