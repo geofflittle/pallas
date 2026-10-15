@@ -149,8 +149,8 @@ fn dijkstra_pparams(x: &pallas_validate::utils::DijkstraProtParams) -> u5c::PPar
         max_pledge_leverage: x.max_pledge_leverage.clone().map(rational_number_to_u5c),
         min_pool_margin: Some(rational_number_to_u5c(x.min_pool_margin.clone())),
         leios_announcement_period_length: Some(x.leios_announcement_period_length.into()),
-        leios_vote_period_length: Some(x.leios_vote_period_length.into()),
-        leios_diffusion_period_length: Some(x.leios_diffusion_period_length.into()),
+        leios_vote_period_length: Some(x.leios_diffusion_period_length.into()),
+        leios_diffusion_period_length: Some(x.leios_vote_period_length.into()),
         leios_committee_size: Some(x.leios_committee_size.into()),
         leios_quorum_stake_threshold: Some(rational_number_to_u5c(
             x.leios_quorum_stake_threshold.clone(),
