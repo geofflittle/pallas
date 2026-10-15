@@ -2661,7 +2661,7 @@ impl HaskellDisplay for CostModels {
 
         let mut unknown_str = vec![];
 
-        for kv in self.unknown.iter().filter(|kv| kv.0 != 3) {
+        for kv in self.unknown.iter() {
             unknown_str.push(display_unknown(kv));
         }
 
