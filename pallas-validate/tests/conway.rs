@@ -490,6 +490,61 @@ mod conway_tests {
     }
 
     #[test]
+    fn registration_deposit_is_required_through_dispatch() {
+        // Adds an unfunded registration to conway3, so balance fails before the
+        // stale signatures are checked.
+        let raw = cbor_to_bytes(include_str!("../../test_data/conway3.tx"));
+        let mut tx: Tx = conway_minted_tx_from_cbor(&raw);
+        let mut body = (*tx.transaction_body).clone();
+        assert!(body.certificates.is_none());
+        body.certificates = Some(
+            vec![pallas_primitives::conway::Certificate::Reg(
+                pallas_primitives::StakeCredential::AddrKeyhash([1; 28].into()),
+                2_000_000,
+            )]
+            .try_into()
+            .unwrap(),
+        );
+        let changed_body = minicbor::to_vec(body).unwrap();
+        tx.transaction_body = minicbor::decode(&changed_body).unwrap();
+        let tx_outs_info: &[ConwayTxOutInfo] = &[(
+            String::from(
+                "015c5c318d01f729e205c95eb1b02d623dd10e78ea58f72d0c13f892b2e8904edc699e2f0ce7b72be7cec991df651a222e2ae9244eb5975cba",
+            ),
+            Value::Coin(20_000_000),
+            None,
+            None,
+        )];
+        let utxos = mk_utxo_for_conway_tx(&tx.transaction_body, tx_outs_info);
+        let mut params = mk_mainnet_params_epoch_365();
+        params.key_deposit = 2_000_000;
+        // The edited body changes size, so a zero minimum fee stops the fee
+        // check from failing first.
+        params.minfee_a = 0;
+        params.minfee_b = 0;
+        let env = Environment {
+            prot_params: MultiEraProtocolParameters::Conway(params),
+            prot_magic: 764824073,
+            block_slot: 137806612,
+            network_id: 1,
+            acnt: Some(AccountState::default()),
+        };
+        let result = validate_txs(
+            &[MultiEraTx::from_conway(&tx)],
+            &env,
+            &utxos,
+            &mut CertState::default(),
+        );
+        assert!(
+            matches!(
+                result,
+                Err(PostAlonzo(PostAlonzoError::PreservationOfValue))
+            ),
+            "expected deposit imbalance, got {result:?}"
+        );
+    }
+
+    #[test]
     // Same as successful_mainnet_tx, except that the minimum lovelace in an output
     // is unreached.
     fn min_lovelace_unreached() {
