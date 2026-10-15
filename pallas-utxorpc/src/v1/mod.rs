@@ -215,7 +215,7 @@ fn map_guards(x: &pallas_primitives::dijkstra::Guards) -> Vec<u5c::StakeCredenti
     match x {
         Guards::AddrKeyhashes(x) => x
             .iter()
-            .map(|h| map_credential(&StakeCredential::AddrKeyhash(*h)))
+            .map(|h| map_credential(&StakeCredential::ScriptHash(*h)))
             .collect(),
         Guards::Credentials(x) => x.iter().map(map_credential).collect(),
     }
