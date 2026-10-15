@@ -11,8 +11,9 @@ use crate::utils::{
     compute_plutus_v2_script_hash, compute_plutus_v3_script_hash, conway_add_minted_non_zero,
     conway_add_values, conway_get_val_size_in_words, conway_lovelace_diff_or_fail,
     conway_values_are_equal, get_conway_tx_size, get_lovelace_from_conway_val, get_payment_part,
-    get_shelley_address, is_byron_address, mk_alonzo_vk_wits_check_list, reference_scripts,
-    script_ref_hash, verify_signature, withdrawal_scripts,
+    get_script_hash_from_input, get_shelley_address, language_features,
+    mk_alonzo_vk_wits_check_list, reference_scripts, script_ref_hash, verify_signature,
+    withdrawal_scripts,
 };
 use pallas_addresses::{Address, ScriptHash, ShelleyAddress, ShelleyPaymentPart};
 use pallas_codec::utils::{Bytes, KeepRaw, NonEmptySet};
@@ -858,23 +859,6 @@ fn get_script_hashes_from_inputs(
     res
 }
 
-fn get_script_hash_from_input(input: &TransactionInput, utxos: &UTxOs) -> Option<ScriptHash> {
-    match utxos
-        .get(&MultiEraInput::from_alonzo_compatible(input))
-        .and_then(MultiEraOutput::as_conway)
-    {
-        Some(TransactionOutput::Legacy(output)) => match get_payment_part(&output.address) {
-            Some(ShelleyPaymentPart::Script(script_hash)) => Some(script_hash),
-            _ => None,
-        },
-        Some(TransactionOutput::PostAlonzo(output)) => match get_payment_part(&output.address) {
-            Some(ShelleyPaymentPart::Script(script_hash)) => Some(script_hash),
-            _ => None,
-        },
-        None => None,
-    }
-}
-
 fn check_minting_policies(
     tx_body: &TransactionBody,
     native_scripts: &mut [(bool, PolicyId)],
@@ -1045,25 +1029,12 @@ fn find_datum(hash: &Hash<32>, tx_body: &TransactionBody, utxos: &UTxOs) -> Vali
     // Look for hash in reference input
     if let Some(reference_inputs) = &tx_body.reference_inputs {
         for reference_input in reference_inputs.iter() {
-            match utxos
+            if let Some(DatumOption::Hash(datum_hash)) = utxos
                 .get(&MultiEraInput::from_alonzo_compatible(reference_input))
-                .and_then(MultiEraOutput::as_conway)
+                .and_then(MultiEraOutput::datum)
+                && *hash == datum_hash
             {
-                Some(TransactionOutput::Legacy(output)) => {
-                    if let Some(datum_hash) = &output.datum_hash
-                        && *hash == *datum_hash
-                    {
-                        return Ok(());
-                    }
-                }
-                Some(TransactionOutput::PostAlonzo(output)) => {
-                    if let Some(DatumOption::Hash(datum_hash)) = &output.datum_option.as_deref()
-                        && *hash == *datum_hash
-                    {
-                        return Ok(());
-                    }
-                }
-                _ => (),
+                return Ok(());
             }
         }
     }
@@ -1420,10 +1391,10 @@ fn available_langs(prot_pps: &ConwayProtParams) -> Vec<Language> {
 }
 
 fn allowed_tx_langs(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
-    let all_outputs: Vec<&TransactionOutput> = compute_all_outputs(mtx, utxos);
-    if any_byron_addresses(&all_outputs) {
+    let (byron, modern) = language_features(&MultiEraTx::from_conway(mtx), utxos);
+    if byron {
         vec![]
-    } else if any_datums_or_script_refs(&all_outputs)
+    } else if modern
         || any_reference_inputs(
             &mtx.transaction_body
                 .reference_inputs
@@ -1435,66 +1406,6 @@ fn allowed_tx_langs(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
     } else {
         vec![Language::PlutusV1, Language::PlutusV2, Language::PlutusV3]
     }
-}
-
-fn compute_all_outputs<'a>(mtx: &'a Tx, utxos: &'a UTxOs) -> Vec<&'a TransactionOutput<'a>> {
-    let mut res: Vec<&TransactionOutput> = Vec::new();
-    for input in mtx.transaction_body.inputs.iter() {
-        if let Some(output) = utxos
-            .get(&MultiEraInput::from_alonzo_compatible(input))
-            .and_then(MultiEraOutput::as_conway)
-        {
-            res.push(output)
-        }
-    }
-    if let Some(reference_inputs) = &mtx.transaction_body.reference_inputs {
-        for ref_input in reference_inputs.iter() {
-            if let Some(output) = utxos
-                .get(&MultiEraInput::from_alonzo_compatible(ref_input))
-                .and_then(MultiEraOutput::as_conway)
-            {
-                res.push(output)
-            }
-        }
-    }
-    for output in mtx.transaction_body.outputs.iter() {
-        res.push(output)
-    }
-    res
-}
-
-fn any_byron_addresses(all_outputs: &[&TransactionOutput]) -> bool {
-    for output in all_outputs.iter() {
-        match output {
-            TransactionOutput::Legacy(output) => {
-                if is_byron_address(&output.address) {
-                    return true;
-                }
-            }
-            TransactionOutput::PostAlonzo(output) => {
-                if is_byron_address(&output.address) {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-
-fn any_datums_or_script_refs(all_outputs: &[&TransactionOutput]) -> bool {
-    for output in all_outputs.iter() {
-        match output {
-            TransactionOutput::Legacy(_) => (),
-            TransactionOutput::PostAlonzo(output) => {
-                if output.script_ref.is_some() {
-                    return true;
-                } else if let Some(DatumOption::Data(_)) = &output.datum_option.as_deref() {
-                    return true;
-                }
-            }
-        }
-    }
-    false
 }
 
 fn any_reference_inputs(reference_inputs: &Option<Vec<TransactionInput>>) -> bool {
@@ -1525,17 +1436,14 @@ fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
     }
     if let Some(reference_inputs) = &mtx.transaction_body.reference_inputs {
         for ref_input in reference_inputs.iter() {
-            if let Some(TransactionOutput::PostAlonzo(output)) = utxos
+            match utxos
                 .get(&MultiEraInput::from_alonzo_compatible(ref_input))
-                .and_then(MultiEraOutput::as_conway)
-                && let Some(script_ref_cborwrap) = &output.script_ref
+                .and_then(MultiEraOutput::script_ref)
             {
-                match script_ref_cborwrap.clone().unwrap() {
-                    ScriptRef::PlutusV1Script(_) => v1_scripts = true,
-                    ScriptRef::PlutusV2Script(_) => v2_scripts = true,
-                    ScriptRef::PlutusV3Script(_) => v3_scripts = true,
-                    _ => (),
-                }
+                Some(ScriptRef::PlutusV1Script(_)) => v1_scripts = true,
+                Some(ScriptRef::PlutusV2Script(_)) => v2_scripts = true,
+                Some(ScriptRef::PlutusV3Script(_)) => v3_scripts = true,
+                _ => (),
             }
         }
     }
@@ -1624,7 +1532,8 @@ fn cost_model_for_tx(
 mod tests {
     use super::*;
     use crate::phase1::fixtures::{
-        byron_address, input, key_address, legacy_output, reward_address, script_address, utxos,
+        byron_address, byron_output, input, key_address, legacy_output, reward_address,
+        script_address, tx_referencing_input, tx_spending_input, utxos,
     };
     use pallas_codec::minicbor;
     use pallas_crypto::{hash::Hasher, key::ed25519::SecretKey};
@@ -2545,5 +2454,127 @@ mod tests {
                 "{result:?}"
             );
         }
+    }
+
+    const V2_SCRIPT: [u8; 4] = [1, 2, 3, 4];
+
+    fn output_with_reference_script() -> Vec<u8> {
+        let mut cbor = vec![0xa3, 0x00, 0x58, 0x1d]; // output, a 29 byte address
+        cbor.extend(key_address());
+        cbor.extend([0x01, 0x1a, 0x00, 0x4c, 0x4b, 0x40]); // five ada
+        cbor.extend([0x03, 0xd8, 0x18, 0x47, 0x82, 0x02, 0x44]); // a PlutusV2 reference script
+        cbor.extend(V2_SCRIPT);
+        cbor
+    }
+
+    #[test]
+    fn a_script_address_from_an_earlier_era_names_its_script() {
+        for (address, expected) in [
+            (script_address(), Some(Hash::from([2; 28]))),
+            (key_address(), None),
+        ] {
+            let raw = legacy_output(address);
+            for era in [Era::Alonzo, Era::Babbage, Era::Conway] {
+                let actual = get_script_hash_from_input(&input(), &utxos(era, &raw));
+
+                assert_eq!(actual, expected, "{era:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_reference_script_from_an_earlier_era_is_found() {
+        let cbor = tx_spending_input();
+        let tx = MultiEraTx::decode_for_era(Era::Conway, &cbor).unwrap();
+        let expected = Hasher::<224>::hash_tagged(&V2_SCRIPT, 2);
+
+        let with_script = output_with_reference_script();
+        let without_script = legacy_output(key_address());
+        for era in [Era::Babbage, Era::Conway] {
+            let with = utxos(era, &with_script);
+            let without = utxos(era, &without_script);
+            let hashes: Vec<_> = reference_scripts(&tx, &with)
+                .iter()
+                .map(script_ref_hash)
+                .collect();
+
+            assert_eq!(hashes, vec![expected], "{era:?}");
+            assert!(reference_scripts(&tx, &without).is_empty(), "{era:?}");
+        }
+    }
+
+    #[test]
+    fn a_datum_hash_on_an_earlier_era_reference_input_is_found() {
+        let cbor = tx_referencing_input();
+        let tx = MultiEraTx::decode_for_era(Era::Conway, &cbor).unwrap();
+        let body = &tx.as_conway().unwrap().transaction_body;
+        let hash = Hash::from([3; 32]);
+        let raw = minicbor::to_vec(pallas_primitives::alonzo::TransactionOutput {
+            address: key_address().into(),
+            amount: babbage::Value::Coin(5_000_000),
+            datum_hash: Some(hash),
+        })
+        .unwrap();
+
+        for era in [Era::Alonzo, Era::Babbage, Era::Conway] {
+            let utxos = utxos(era, &raw);
+
+            let found = find_datum(&hash, body, &utxos);
+            let other = find_datum(&Hash::from([4; 32]), body, &utxos);
+
+            assert!(found.is_ok(), "{era:?} {found:?}");
+            assert!(
+                matches!(other, Err(PostAlonzo(UnneededDatum))),
+                "{era:?} {other:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_reference_script_on_an_input_or_an_output_rules_out_plutus_v1() {
+        let cbor = tx_spending_input();
+        let with_script = output_with_reference_script();
+        let without_script = legacy_output(key_address());
+        let (mut outcomes, mut expected) = (vec![], vec![]);
+        for input_script in [false, true] {
+            for output_script in [false, true] {
+                let mut tx: Tx = minicbor::decode(&cbor).unwrap();
+                let mut body = (*tx.transaction_body).clone();
+                if output_script {
+                    body.outputs = vec![minicbor::decode(&with_script).unwrap()];
+                }
+                tx.transaction_body = body.into();
+                let spent = if input_script {
+                    utxos(Era::Babbage, &with_script)
+                } else {
+                    utxos(Era::Alonzo, &without_script)
+                };
+                let languages = allowed_tx_langs(&tx, &spent);
+                outcomes.push((input_script, output_script, languages));
+                let languages = if input_script || output_script {
+                    vec![Language::PlutusV2, Language::PlutusV3]
+                } else {
+                    vec![Language::PlutusV1, Language::PlutusV2, Language::PlutusV3]
+                };
+                expected.push((input_script, output_script, languages));
+            }
+        }
+        assert_eq!(outcomes, expected);
+    }
+
+    #[test]
+    fn a_byron_era_input_allows_no_plutus_language() {
+        let cbor = tx_spending_input();
+        let tx = MultiEraTx::decode_for_era(Era::Conway, &cbor).unwrap();
+        let tx = tx.as_conway().unwrap();
+
+        let byron = byron_output();
+        let key = legacy_output(key_address());
+
+        assert_eq!(allowed_tx_langs(tx, &utxos(Era::Byron, &byron)), vec![]);
+        assert_eq!(
+            allowed_tx_langs(tx, &utxos(Era::Alonzo, &key)),
+            vec![Language::PlutusV1, Language::PlutusV2, Language::PlutusV3]
+        );
     }
 }
