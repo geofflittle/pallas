@@ -41,6 +41,7 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo clippy -p pallas-validate --all-targets --features phase2 -- -D warnings
 
   docs:
     name: Docs
@@ -78,6 +79,8 @@ jobs:
         run: cargo test -p pallas-primitives -p pallas-traverse -p pallas-utxorpc --features unstable
       - name: Test unstable blueprint feature
         run: cargo test -p pallas-primitives --features unstable,blueprint
+      - name: Test phase2 feature
+        run: cargo test -p pallas-validate --features phase2
 
   features:
     name: Features (${{ matrix.flags }})
