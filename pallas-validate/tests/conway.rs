@@ -490,6 +490,108 @@ mod conway_tests {
     }
 
     #[test]
+    fn deposits_are_required_through_dispatch() {
+        use pallas_primitives::{
+            StakeCredential,
+            conway::{Anchor, Certificate, GovAction, ProposalProcedure},
+        };
+        // Adds one deposit to conway3 and funds its input with the deposit less
+        // one, the deposit and the deposit plus one. The edit makes the
+        // signatures stale and balance is checked first, so only the funded
+        // body fails on a signature.
+        let credential = StakeCredential::AddrKeyhash([1; 28].into());
+        let proposal = ProposalProcedure {
+            deposit: 4_000_000,
+            reward_account: [vec![0xe1], vec![3; 28]].concat().into(),
+            gov_action: GovAction::Information,
+            anchor: Anchor {
+                url: String::new(),
+                content_hash: [0; 32].into(),
+            },
+        };
+        let cases = [
+            (
+                "key",
+                2_000_000,
+                vec![Certificate::Reg(credential.clone(), 2_000_000)],
+                vec![],
+            ),
+            (
+                "drep",
+                3_000_000,
+                vec![Certificate::RegDRepCert(credential, 3_000_000, None)],
+                vec![],
+            ),
+            ("proposal", 4_000_000, vec![], vec![proposal]),
+        ];
+        let raw = cbor_to_bytes(include_str!("../../test_data/conway3.tx"));
+        let mut params = mk_mainnet_params_epoch_365();
+        params.key_deposit = 2_000_000;
+        params.drep_deposit = 3_000_000;
+        params.governance_action_deposit = 4_000_000;
+        // The edited body changes size, so a zero minimum fee stops the fee
+        // check from failing first.
+        params.minfee_a = 0;
+        params.minfee_b = 0;
+        let env = Environment {
+            prot_params: MultiEraProtocolParameters::Conway(params),
+            prot_magic: 764824073,
+            block_slot: 137806612,
+            network_id: 1,
+            acnt: Some(AccountState::default()),
+        };
+        let actual: Vec<_> = cases
+            .iter()
+            .map(|(name, deposit, certificates, proposals)| {
+                let mut tx: Tx = conway_minted_tx_from_cbor(&raw);
+                let mut body = (*tx.transaction_body).clone();
+                body.certificates = certificates.clone().try_into().ok();
+                body.proposal_procedures = proposals.clone().try_into().ok();
+                let changed_body = minicbor::to_vec(body).unwrap();
+                tx.transaction_body = minicbor::decode(&changed_body).unwrap();
+                let results: Vec<_> = [deposit - 1, *deposit, deposit + 1]
+                    .into_iter()
+                    .map(|funded| {
+                        let tx_outs_info: &[ConwayTxOutInfo] = &[(
+                            String::from(
+                                "015c5c318d01f729e205c95eb1b02d623dd10e78ea58f72d0c13f892b2e8904edc699e2f0ce7b72be7cec991df651a222e2ae9244eb5975cba",
+                            ),
+                            Value::Coin(20_000_000 + funded),
+                            None,
+                            None,
+                        )];
+                        let utxos = mk_utxo_for_conway_tx(&tx.transaction_body, tx_outs_info);
+                        let result = validate_txs(
+                            &[MultiEraTx::from_conway(&tx)],
+                            &env,
+                            &utxos,
+                            &mut CertState::default(),
+                        );
+                        format!("{result:?}")
+                    })
+                    .collect();
+                (*name, results)
+            })
+            .collect();
+        let unbalanced = "Err(PostAlonzo(PreservationOfValue))".to_string();
+        let stale_signature = "Err(PostAlonzo(VKWrongSignature))".to_string();
+        let expected: Vec<_> = cases
+            .iter()
+            .map(|(name, ..)| {
+                (
+                    *name,
+                    vec![
+                        unbalanced.clone(),
+                        stale_signature.clone(),
+                        unbalanced.clone(),
+                    ],
+                )
+            })
+            .collect();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     // Same as successful_mainnet_tx, except that the minimum lovelace in an output
     // is unreached.
     fn min_lovelace_unreached() {
