@@ -1478,3 +1478,6 @@ mod tests {
         assert_eq!(actual, expected);
     }
 }
+
+#[cfg(all(test, feature = "unstable"))]
+mod registration_scripts;
