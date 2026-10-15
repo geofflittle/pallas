@@ -725,6 +725,38 @@ pub fn verify_signature(vk_wit: &VKeyWitness, data_to_verify: &[u8]) -> bool {
     public_key.verify(data_to_verify, &sig)
 }
 
+pub(crate) fn check_remaining_vk_wits(
+    wits: &[(bool, VKeyWitness)],
+    data_to_verify: &[u8],
+    err: ValidationError,
+) -> ValidationResult {
+    for (covered, vkey_wit) in wits {
+        if !covered && !verify_signature(vkey_wit, data_to_verify) {
+            return Err(err);
+        }
+    }
+    Ok(())
+}
+
+// Marks every supplied script with the needed hash as used.
+pub(crate) fn check_needed_script(
+    hash: &PolicyId,
+    reference_scripts: &[PolicyId],
+    supplied: &mut [&mut [(bool, PolicyId)]],
+    missing: ValidationError,
+) -> ValidationResult {
+    let mut covered = reference_scripts.contains(hash);
+    for scripts in supplied.iter_mut() {
+        for (used, script) in scripts.iter_mut() {
+            if script == hash {
+                *used = true;
+                covered = true;
+            }
+        }
+    }
+    if covered { Ok(()) } else { Err(missing) }
+}
+
 pub fn get_payment_part(address: &Bytes) -> Option<ShelleyPaymentPart> {
     let addr: ShelleyAddress = get_shelley_address(Bytes::deref(address))?;
     Some(addr.payment().clone())
