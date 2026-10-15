@@ -6,6 +6,7 @@ pub mod validation;
 pub use environment::*;
 use pallas_addresses::{
     Address, Network, ScriptHash, ShelleyAddress, ShelleyPaymentPart, StakeAddress, StakePayload,
+    byron::AddressId,
 };
 use pallas_codec::{
     minicbor::encode,
@@ -16,7 +17,9 @@ use pallas_primitives::{
     AddrKeyhash, AssetName, Coin, Epoch, GenesisDelegateHash, Genesishash, Hash, NetworkId,
     NonZeroInt, PlutusScript, PolicyId, PoolKeyhash, PoolMetadata, PositiveCoin, Relay,
     RewardAccount, StakeCredential, TransactionIndex, TransactionInput, UnitInterval, VrfKeyhash,
-    alonzo::{Certificate, Multiasset, NativeScript, Tx as AlonzoTx, VKeyWitness, Value},
+    alonzo::{
+        BootstrapWitness, Certificate, Multiasset, NativeScript, Tx as AlonzoTx, VKeyWitness, Value,
+    },
     babbage::Tx as BabbageTx,
     conway::{
         Certificate as ConwayCertificate, DatumOption, GovAction, Multiasset as ConwayMultiasset,
@@ -763,13 +766,13 @@ pub fn mk_alonzo_vk_wits_check_list(
 }
 
 pub fn verify_signature(vk_wit: &VKeyWitness, data_to_verify: &[u8]) -> bool {
-    let mut public_key_source: [u8; PublicKey::SIZE] = [0; PublicKey::SIZE];
-    public_key_source.copy_from_slice(vk_wit.vkey.as_slice());
-    let public_key: PublicKey = From::<[u8; PublicKey::SIZE]>::from(public_key_source);
-    let mut signature_source: [u8; Signature::SIZE] = [0; Signature::SIZE];
-    signature_source.copy_from_slice(vk_wit.signature.as_slice());
-    let sig: Signature = From::<[u8; Signature::SIZE]>::from(signature_source);
-    public_key.verify(data_to_verify, &sig)
+    match (
+        PublicKey::try_from(vk_wit.vkey.as_slice()),
+        Signature::try_from(vk_wit.signature.as_slice()),
+    ) {
+        (Ok(key), Ok(signature)) => key.verify(data_to_verify, &signature),
+        _ => false,
+    }
 }
 
 pub(crate) fn check_remaining_vk_wits(
@@ -972,6 +975,61 @@ pub(crate) fn script_ref_hash(script: &ScriptRef) -> PolicyId {
         ScriptRef::PlutusV2Script(script) => script.compute_hash(),
         ScriptRef::PlutusV3Script(script) => script.compute_hash(),
     }
+}
+
+pub(crate) fn check_bootstrap_wit(
+    root: &AddressId,
+    wits: &mut [(bool, BootstrapWitness)],
+    data_to_verify: &[u8],
+    missing: &ValidationError,
+    wrong_signature: &ValidationError,
+) -> ValidationResult {
+    for (covered, wit) in wits.iter_mut() {
+        if bootstrap_wit_root(wit) == *root {
+            if !verify_bootstrap_signature(wit, data_to_verify) {
+                return Err(wrong_signature.clone());
+            }
+            *covered = true;
+            return Ok(());
+        }
+    }
+    Err(missing.clone())
+}
+
+pub(crate) fn check_remaining_bootstrap_wits(
+    wits: &[(bool, BootstrapWitness)],
+    data_to_verify: &[u8],
+    wrong_signature: &ValidationError,
+) -> ValidationResult {
+    for (covered, wit) in wits {
+        if !*covered && !verify_bootstrap_signature(wit, data_to_verify) {
+            return Err(wrong_signature.clone());
+        }
+    }
+    Ok(())
+}
+
+fn verify_bootstrap_signature(wit: &BootstrapWitness, data_to_verify: &[u8]) -> bool {
+    match (
+        PublicKey::try_from(wit.public_key.as_slice()),
+        Signature::try_from(wit.signature.as_slice()),
+    ) {
+        (Ok(key), Ok(signature)) => key.verify(data_to_verify, &signature),
+        _ => false,
+    }
+}
+
+fn bootstrap_wit_root(wit: &BootstrapWitness) -> AddressId {
+    // CBOR heads of `[0, [0, bytes(64)], attributes]`, the root preimage of a key address.
+    let prefix: &[u8] = &[0x83, 0x00, 0x82, 0x00, 0x58, 0x40];
+    let payload: Vec<u8> = [
+        prefix,
+        wit.public_key.as_slice(),
+        wit.chain_code.as_slice(),
+        wit.attributes.as_slice(),
+    ]
+    .concat();
+    pallas_crypto::hash::Hasher::<224>::hash(&cryptoxide::hashing::sha3_256(&payload))
 }
 
 pub fn get_payment_part(address: &Bytes) -> Option<ShelleyPaymentPart> {

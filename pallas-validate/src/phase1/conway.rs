@@ -6,14 +6,14 @@ use crate::utils::{
     PostAlonzoError::*,
     UTxOs,
     ValidationError::{self, *},
-    ValidationResult, aux_data_from_conway_tx, balance_coins, check_needed_script,
-    check_remaining_vk_wits, compute_native_script_hash, compute_plutus_v1_script_hash,
-    compute_plutus_v2_script_hash, compute_plutus_v3_script_hash, conway_add_minted_non_zero,
-    conway_add_values, conway_get_val_size_in_words, conway_lovelace_diff_or_fail,
-    conway_values_are_equal, get_conway_tx_size, get_lovelace_from_conway_val, get_payment_part,
-    get_script_hash_from_input, get_shelley_address, language_features,
-    mk_alonzo_vk_wits_check_list, needed_script_hashes, reference_scripts, script_ref_hash,
-    verify_signature, withdrawal_scripts,
+    ValidationResult, aux_data_from_conway_tx, balance_coins, check_bootstrap_wit,
+    check_needed_script, check_remaining_bootstrap_wits, check_remaining_vk_wits,
+    compute_native_script_hash, compute_plutus_v1_script_hash, compute_plutus_v2_script_hash,
+    compute_plutus_v3_script_hash, conway_add_minted_non_zero, conway_add_values,
+    conway_get_val_size_in_words, conway_lovelace_diff_or_fail, conway_values_are_equal,
+    get_conway_tx_size, get_lovelace_from_conway_val, get_script_hash_from_input,
+    get_shelley_address, language_features, mk_alonzo_vk_wits_check_list, needed_script_hashes,
+    reference_scripts, script_ref_hash, verify_signature, withdrawal_scripts,
 };
 use pallas_addresses::{Address, ScriptHash, ShelleyAddress, ShelleyPaymentPart};
 use pallas_codec::utils::{Bytes, KeepRaw, NonEmptySet};
@@ -21,9 +21,9 @@ use pallas_primitives::{
     AddrKeyhash, Hash, PlutusData, PolicyId, PositiveCoin, StakeCredential, TransactionInput,
     babbage,
     conway::{
-        Certificate, DatumOption, Language, LanguageViews, Mint, Redeemers, RedeemersKey,
-        RequiredSigners, ScriptRef, TransactionBody, TransactionOutput, Tx, VKeyWitness, Value,
-        WitnessSet,
+        BootstrapWitness, Certificate, DatumOption, Language, LanguageViews, Mint, Redeemers,
+        RedeemersKey, RequiredSigners, ScriptRef, TransactionBody, TransactionOutput, Tx,
+        VKeyWitness, Value, WitnessSet,
     },
 };
 use pallas_traverse::{MultiEraInput, MultiEraOutput, MultiEraTx, OriginalHash};
@@ -1259,6 +1259,13 @@ fn check_vkey_input_wits(
     let vk_wits: &mut Vec<(bool, VKeyWitness)> =
         &mut mk_alonzo_vk_wits_check_list(vkey_wits, PostAlonzo(VKWitnessMissing))?;
     let tx_hash: &Vec<u8> = &Vec::from(mtx.transaction_body.original_hash().as_ref());
+    let bootstrap_wits: &mut Vec<(bool, BootstrapWitness)> = &mut mtx
+        .transaction_witness_set
+        .bootstrap_witness
+        .iter()
+        .flatten()
+        .map(|wit| (false, wit.clone()))
+        .collect();
     let mut inputs_and_collaterals: Vec<TransactionInput> = Vec::new();
     inputs_and_collaterals.extend(tx_body.inputs.clone().to_vec());
     if let Some(collaterals) = &tx_body.collateral {
@@ -1266,42 +1273,25 @@ fn check_vkey_input_wits(
     }
     for input in inputs_and_collaterals.iter() {
         match utxos.get(&MultiEraInput::from_alonzo_compatible(input)) {
-            Some(multi_era_output) => {
-                // Try to get address from Conway output first
-                let address: Option<Bytes> = if let Some(conway_output) =
-                    MultiEraOutput::as_conway(multi_era_output)
-                {
-                    match conway_output {
-                        TransactionOutput::Legacy(output) => Some(output.address.clone()),
-                        TransactionOutput::PostAlonzo(output) => Some(output.address.clone()),
+            Some(multi_era_output) => match multi_era_output.address() {
+                Ok(Address::Shelley(address)) => match address.payment() {
+                    ShelleyPaymentPart::Key(payment_key_hash) => {
+                        check_vk_wit(payment_key_hash, vk_wits, tx_hash)?
                     }
-                } else if let Some(alonzo_output) = multi_era_output.as_alonzo() {
-                    // Alonzo, Mary, Allegra, Shelley
-                    Some(alonzo_output.address.clone())
-                } else if let Some(babbage_output) = multi_era_output.as_babbage() {
-                    // Babbage
-                    match babbage_output {
-                        babbage::TransactionOutput::Legacy(output) => Some(output.address.clone()),
-                        babbage::TransactionOutput::PostAlonzo(output) => {
-                            Some(output.address.clone())
-                        }
-                    }
-                } else {
-                    // Byron outputs are handled separately below
-                    None
-                };
-
-                if let Some(address) = address {
-                    match get_payment_part(&address).ok_or(PostAlonzo(InputDecoding))? {
-                        ShelleyPaymentPart::Key(payment_key_hash) => {
-                            check_vk_wit(&payment_key_hash, vk_wits, tx_hash)?
-                        }
-                        ShelleyPaymentPart::Script(_) => {}
-                    }
-                } else {
-                    return Err(PostAlonzo(InputDecoding));
-                }
-            }
+                    ShelleyPaymentPart::Script(_) => {}
+                },
+                Ok(Address::Byron(address)) => check_bootstrap_wit(
+                    &address
+                        .decode()
+                        .map_err(|_| PostAlonzo(InputDecoding))?
+                        .root,
+                    bootstrap_wits,
+                    tx_hash,
+                    &PostAlonzo(VKWitnessMissing),
+                    &PostAlonzo(VKWrongSignature),
+                )?,
+                _ => return Err(PostAlonzo(InputDecoding)),
+            },
             None => return Err(PostAlonzo(InputNotInUTxO)),
         }
     }
@@ -1324,7 +1314,8 @@ fn check_vkey_input_wits(
             _ => {}
         }
     }
-    check_remaining_vk_wits(vk_wits, tx_hash, PostAlonzo(VKWrongSignature))
+    check_remaining_vk_wits(vk_wits, tx_hash, PostAlonzo(VKWrongSignature))?;
+    check_remaining_bootstrap_wits(bootstrap_wits, tx_hash, &PostAlonzo(VKWrongSignature))
 }
 
 fn check_vk_wit(
@@ -1534,7 +1525,7 @@ mod tests {
     use crate::phase1::fixtures::{
         V2_SCRIPT, byron_address, byron_output, input, key_address, legacy_output,
         output_with_reference_script, reward_address, script_address, tx_referencing_input,
-        tx_spending_input, utxos,
+        tx_spending_input, undecodable_byron_address, utxos,
     };
     use pallas_codec::minicbor;
     use pallas_crypto::{hash::Hasher, key::ed25519::SecretKey};
@@ -2735,5 +2726,34 @@ mod tests {
             outcomes.push(languages.map_err(|error| matches!(error, PostAlonzo(InputDecoding))));
         }
         assert_eq!(outcomes, vec![Ok(vec![]), Err(true)]);
+    }
+
+    #[test]
+    fn an_input_at_a_reward_or_undecodable_byron_address_is_refused() {
+        let cbor = tx_spending_input();
+        let tx: Tx = minicbor::decode(&cbor).unwrap();
+        let outcomes: Vec<_> = [
+            key_address(),
+            byron_address(),
+            reward_address(),
+            undecodable_byron_address(),
+        ]
+        .map(|address| {
+            let raw = legacy_output(address);
+            format!(
+                "{:?}",
+                check_vkey_input_wits(&tx, &Some(vec![]), &utxos(Era::Alonzo, &raw))
+            )
+        })
+        .into();
+        assert_eq!(
+            outcomes,
+            [
+                "Err(PostAlonzo(VKWitnessMissing))",
+                "Err(PostAlonzo(VKWitnessMissing))",
+                "Err(PostAlonzo(InputDecoding))",
+                "Err(PostAlonzo(InputDecoding))",
+            ]
+        );
     }
 }

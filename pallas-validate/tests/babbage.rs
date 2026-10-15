@@ -65,6 +65,78 @@ mod babbage_tests {
     }
 
     #[test]
+    fn byron_inputs_are_witnessed_through_dispatch() {
+        use pallas_primitives::babbage::TransactionInput;
+        use pallas_traverse::{Era, OriginalHash};
+
+        // Spends a Byron era output and a collateral input locked by the same
+        // Byron key, the collateral from a Babbage era output.
+        let address = byron_key_address();
+        let collateral = TransactionInput {
+            transaction_id: [1; 32].into(),
+            index: 0,
+        };
+        let raw = cbor_to_bytes(include_str!("../../test_data/babbage3.tx"));
+        let input_only: Tx = babbage_minted_tx_from_cbor(&raw);
+        let mut tx = input_only.clone();
+        tx.transaction_body.collateral = Some(vec![collateral.clone()]);
+        let encoded = to_vec(&tx).unwrap();
+        let tx: Tx = decode(&encoded).unwrap();
+        let spent = tx.transaction_body.inputs[0].clone();
+        let spent_output = byron_era_output(&address, 103324335);
+        let collateral_output = to_vec(pallas_primitives::alonzo::TransactionOutput {
+            address: address.clone().into(),
+            amount: pallas_primitives::alonzo::Value::Coin(5_000_000),
+            datum_hash: None,
+        })
+        .unwrap();
+        let utxos = UTxOs::from([
+            (
+                MultiEraInput::from_alonzo_compatible(&spent),
+                MultiEraOutput::decode(Era::Byron, &spent_output).unwrap(),
+            ),
+            (
+                MultiEraInput::from_alonzo_compatible(&collateral),
+                MultiEraOutput::decode(Era::Babbage, &collateral_output).unwrap(),
+            ),
+        ]);
+        let mut params = mk_mainnet_params_epoch_365();
+        // The edited body changes size, so a zero minimum fee stops the fee
+        // check from failing first.
+        params.minfee_a = 0;
+        params.minfee_b = 0;
+        let env = Environment {
+            prot_params: MultiEraProtocolParameters::Babbage(params),
+            prot_magic: 764824073,
+            block_slot: 72316896,
+            network_id: 1,
+            acnt: Some(AccountState::default()),
+        };
+        let mut expected = vec![];
+        let mut actual = vec![];
+        for tx in [&tx, &input_only] {
+            let hash = tx.transaction_body.original_hash();
+            for (witnesses, outcome) in bootstrap_witness_cases(hash.as_ref()) {
+                let mut tx = tx.clone();
+                tx.transaction_witness_set.vkeywitness = None;
+                tx.transaction_witness_set.bootstrap_witness = Some(witnesses);
+                let result = validate_txs(
+                    &[MultiEraTx::from_babbage(&tx)],
+                    &env,
+                    &utxos,
+                    &mut CertState::default(),
+                );
+                expected.push(match outcome {
+                    Ok(()) => "Ok(())".to_string(),
+                    Err(variant) => format!("Err(PostAlonzo({variant}))"),
+                });
+                actual.push(format!("{result:?}"));
+            }
+        }
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     // Transaction hash:
     // f33d6f7eb877132af7307e385bb24a7d2c12298c8ac0b1460296748810925ccc
     fn successful_mainnet_tx_with_plutus_v1_script() {
