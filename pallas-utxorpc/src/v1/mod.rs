@@ -627,8 +627,9 @@ mod tests {
                 header.endorser_block_announcement,
                 body.leios_certificate,
                 body.peras_certificate.to_vec(),
+                mapped.endorser_block,
             ),
-            (false, None, None, vec![])
+            (false, None, None, vec![], None)
         );
     }
 
