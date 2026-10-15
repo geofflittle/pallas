@@ -214,8 +214,8 @@ fn map_key_hash(x: &pallas_primitives::AddrKeyhash) -> u5c::StakeCredential {
 
 /// The credentials at body key 14, the required signers of every era before Dijkstra.
 fn map_signers(x: &trv::MultiEraSigners) -> Vec<u5c::StakeCredential> {
-    if let Some(x) = x.as_alonzo() {
-        return x.iter().map(map_key_hash).collect();
+    if let Some(_x) = x.as_alonzo() {
+        return vec![];
     }
 
     #[cfg(feature = "unstable")]
