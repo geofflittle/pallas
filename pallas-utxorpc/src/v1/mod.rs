@@ -43,6 +43,184 @@ fn update_scalar<T>(value: Option<T>) -> Option<T> {
     value
 }
 
+/// The u5c purpose of a guarding redeemer.
+#[cfg(feature = "unstable")]
+fn guarding_purpose() -> u5c::RedeemerPurpose {
+    u5c::RedeemerPurpose::Guarding
+}
+
+/// The u5c member of a guard clause.
+#[cfg(feature = "unstable")]
+fn native_script_guard(
+    x: &pallas_primitives::StakeCredential,
+) -> Option<u5c::native_script::NativeScript> {
+    Some(u5c::native_script::NativeScript::ScriptRequireGuard(
+        map_credential(x),
+    ))
+}
+
+/// Adds the pool BLS key to a pool registration certificate.
+#[cfg(feature = "unstable")]
+fn with_pool_bls_key(
+    cert: Option<u5c::certificate::Certificate>,
+    key: Option<&pallas_primitives::dijkstra::BlsKey>,
+) -> Option<u5c::certificate::Certificate> {
+    match cert {
+        Some(u5c::certificate::Certificate::PoolRegistration(x)) => Some(
+            u5c::certificate::Certificate::PoolRegistration(u5c::PoolRegistrationCert {
+                bls_key: key.map(|k| u5c::PoolBlsKey {
+                    bls_pubkey: k.bls_pubkey.to_vec().into(),
+                    bls_possession_proof: k.bls_possession_proof.to_vec().into(),
+                }),
+                ..x
+            }),
+        ),
+        other => other,
+    }
+}
+
+/// The fields of the keys only a Dijkstra update carries, noting in `seen` each key it sets.
+#[cfg(feature = "unstable")]
+fn dijkstra_pparams_update(seen: &mut bool, x: &trv::MultiEraParamUpdate) -> ParamUpdate {
+    use pallas_primitives::Nullable;
+    use u5c::max_pledge_leverage_update::Update;
+
+    let max_pledge_leverage = match read_key(seen, x.max_pledge_leverage().proposed()) {
+        Some(Nullable::Some(x)) => Some(Update::Leverage(rational_number_to_u5c(x))),
+        Some(Nullable::Null) => Some(Update::NoLimit(true)),
+        _ => None,
+    }
+    .map(|update| u5c::MaxPledgeLeverageUpdate {
+        update: Some(update),
+    });
+
+    ParamUpdate {
+        max_ref_script_size_per_block: read_key(seen, x.max_ref_script_size_per_block().proposed()),
+        max_ref_script_size_per_tx: read_key(seen, x.max_ref_script_size_per_tx().proposed()),
+        ref_script_cost_stride: read_key(seen, x.ref_script_cost_stride().proposed()),
+        ref_script_cost_multiplier: read_key(seen, x.ref_script_cost_multiplier().proposed())
+            .map(rational_number_to_u5c),
+        max_pledge_leverage,
+        min_pool_margin: read_key(seen, x.min_pool_margin().proposed()).map(rational_number_to_u5c),
+        leios_announcement_period_length: read_key(
+            seen,
+            x.leios_announcement_period_length().proposed(),
+        ),
+        leios_vote_period_length: read_key(seen, x.leios_vote_period_length().proposed()),
+        leios_diffusion_period_length: read_key(seen, x.leios_diffusion_period_length().proposed()),
+        leios_committee_size: read_key(seen, x.leios_committee_size().proposed()).map(|x| x as u32),
+        leios_quorum_stake_threshold: read_key(seen, x.leios_quorum_stake_threshold().proposed())
+            .map(rational_number_to_u5c),
+        max_endorser_block_references_size: read_key(
+            seen,
+            x.max_endorser_block_references_size().proposed(),
+        ),
+        max_endorser_block_txs_size: read_key(seen, x.max_endorser_block_txs_size().proposed()),
+        max_endorser_block_execution_units: read_key(
+            seen,
+            x.max_endorser_block_execution_units().proposed(),
+        )
+        .map(execution_units_to_u5c),
+        max_ref_script_size_per_endorser_block: read_key(
+            seen,
+            x.max_ref_script_size_per_endorser_block().proposed(),
+        ),
+        ..Default::default()
+    }
+}
+
+/// The fields of the keys only a Dijkstra update carries, all unset when the
+/// Dijkstra accessors are not built.
+#[cfg(not(feature = "unstable"))]
+fn dijkstra_pparams_update(_: &mut bool, _: &trv::MultiEraParamUpdate) -> ParamUpdate {
+    ParamUpdate::default()
+}
+
+/// The fields of the Dijkstra parameters no other era carries.
+#[cfg(feature = "unstable")]
+fn dijkstra_pparams(x: &pallas_validate::utils::DijkstraProtParams) -> u5c::PParams {
+    let Some(plutus) = &x.plutus else {
+        return u5c::PParams::default();
+    };
+
+    u5c::PParams {
+        max_ref_script_size_per_tx: Some(plutus.max_ref_script_size_per_tx.into()),
+        ref_script_cost_stride: Some(plutus.ref_script_cost_stride.into()),
+        ref_script_cost_multiplier: Some(rational_number_to_u5c(
+            plutus.ref_script_cost_multiplier.clone(),
+        )),
+        ..Default::default()
+    }
+}
+
+/// The deposit of one coin into one reward account.
+#[cfg(feature = "unstable")]
+fn map_direct_deposit(
+    (account, coin): (&pallas_primitives::RewardAccount, &pallas_primitives::Coin),
+) -> u5c::DirectDeposit {
+    u5c::DirectDeposit {
+        reward_account: account.to_vec().into(),
+        coin: u64_to_bigint(*coin),
+    }
+}
+
+/// The interval one reward account balance must fall within.
+#[cfg(feature = "unstable")]
+fn map_account_balance_interval(
+    (account, interval): (
+        &pallas_primitives::RewardAccount,
+        &pallas_primitives::dijkstra::AccountBalanceInterval,
+    ),
+) -> u5c::AccountBalanceInterval {
+    use pallas_primitives::dijkstra::AccountBalanceInterval;
+    use u5c::account_balance_interval::Interval;
+
+    let range = |lower: Option<u64>, upper: Option<u64>| {
+        Some(Interval::Range(u5c::AccountBalanceRange {
+            inclusive_lower_bound: lower.and_then(u64_to_bigint),
+            exclusive_upper_bound: upper.and_then(u64_to_bigint),
+        }))
+    };
+
+    u5c::AccountBalanceInterval {
+        reward_account: account.to_vec().into(),
+        interval: match *interval {
+            AccountBalanceInterval::LowerBound(l) => range(Some(l), None),
+            AccountBalanceInterval::Bounded(l, u) => range(Some(l), Some(u)),
+            AccountBalanceInterval::UpperBound(u) => range(None, Some(u)),
+            AccountBalanceInterval::Exact(c) => u64_to_bigint(c).map(Interval::Exact),
+        },
+    }
+}
+
+/// The fields a transaction and a sub transaction share that only the Dijkstra
+/// era fills.
+#[cfg(feature = "unstable")]
+fn map_dijkstra_common_fields(tx: &trv::MultiEraTx) -> u5c::TxCommon {
+    u5c::TxCommon {
+        direct_deposits: tx
+            .direct_deposits()
+            .into_iter()
+            .flatten()
+            .map(map_direct_deposit)
+            .collect(),
+        account_balance_intervals: tx
+            .account_balance_intervals()
+            .into_iter()
+            .flatten()
+            .map(map_account_balance_interval)
+            .collect(),
+        ..Default::default()
+    }
+}
+
+/// The fields a transaction and a sub transaction share that only the Dijkstra
+/// era fills, all empty when the Dijkstra accessors are not built.
+#[cfg(not(feature = "unstable"))]
+fn map_dijkstra_common_fields(_: &trv::MultiEraTx) -> u5c::TxCommon {
+    u5c::TxCommon::default()
+}
+
 /// Sets the Leios and Peras fields of a mapped block from the block's header
 /// and body.
 fn with_leios_fields(mut mapped: u5c::Block, block: &trv::MultiEraBlock) -> u5c::Block {
@@ -90,18 +268,55 @@ fn common(tx: &u5c::Tx) -> &u5c::TxCommon {
 
 impl<C: LedgerContext> Mapper<C> {
     pub fn map_tx(&self, tx: &trv::MultiEraTx) -> u5c::Tx {
-        let resolved = self.ledger.as_ref().and_then(|ctx| {
-            let to_resolve = self.find_related_inputs(tx);
-            ctx.get_utxos(to_resolve.as_slice())
-        });
+        let resolved = self.resolve(tx);
 
         u5c::Tx {
             common: Some(self.map_tx_common(tx, &resolved)),
             collateral: self.map_collateral(tx, &resolved),
             fee: tx.fee().and_then(u64_to_bigint),
             successful: tx.is_valid(),
+            ..self.map_dijkstra_tx_fields(tx)
+        }
+    }
+
+    /// Look up the outputs a transaction's inputs, collateral and reference
+    /// inputs name.
+    fn resolve(&self, tx: &trv::MultiEraTx) -> Option<crate::UtxoMap> {
+        self.ledger.as_ref().and_then(|ctx| {
+            let to_resolve = self.find_related_inputs(tx);
+            ctx.get_utxos(to_resolve.as_slice())
+        })
+    }
+
+    /// The fields of a transaction that only the Dijkstra era fills.
+    #[cfg(feature = "unstable")]
+    fn map_dijkstra_tx_fields(&self, tx: &trv::MultiEraTx) -> u5c::Tx {
+        let starting = tx.as_dijkstra().and_then(|x| {
+            x.transaction_body
+                .starting_account_balance_intervals
+                .as_ref()
+        });
+
+        u5c::Tx {
+            sub_transactions: tx
+                .sub_transactions()
+                .iter()
+                .map(|x| self.map_tx_common(x, &self.resolve(x)))
+                .collect(),
+            starting_account_balance_intervals: starting
+                .into_iter()
+                .flatten()
+                .map(map_account_balance_interval)
+                .collect(),
             ..Default::default()
         }
+    }
+
+    /// The fields of a transaction that only the Dijkstra era fills, all empty
+    /// when the Dijkstra accessors are not built.
+    #[cfg(not(feature = "unstable"))]
+    fn map_dijkstra_tx_fields(&self, _: &trv::MultiEraTx) -> u5c::Tx {
+        u5c::Tx::default()
     }
 
     /// Map the fields a transaction shares with a sub transaction.
@@ -199,7 +414,7 @@ impl<C: LedgerContext> Mapper<C> {
             network_id: tx.network_id().map(|x| u8::from(x) as u32),
             treasury_value: tx.treasury_value().and_then(u64_to_bigint),
             treasury_donation: tx.donation().and_then(u64_to_bigint),
-            ..Default::default()
+            ..map_dijkstra_common_fields(tx)
         }
     }
 
@@ -425,6 +640,453 @@ mod tests {
         assert_eq!(
             mapped.body.unwrap().peras_certificate.to_vec(),
             vec![0x22; 16]
+        );
+    }
+
+    /// Reads the transaction id and output index of each input given.
+    #[cfg(feature = "unstable")]
+    fn input_refs(inputs: &[u5c::TxInput]) -> Vec<(String, u32)> {
+        inputs
+            .iter()
+            .map(|x| (hex::encode(&x.tx_hash), x.output_index))
+            .collect()
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_transaction_without_sub_transactions_maps_none() {
+        let conway =
+            Mapper::new(NoLedger).map_tx(&conway_tx(include_str!("../../../test_data/conway9.tx")));
+        let dijkstra = Mapper::new(NoLedger).map_tx(&dijkstra_tx(include_str!(
+            "../../../test_data/dijkstra-proposal.tx"
+        )));
+
+        assert_eq!(
+            (
+                conway.sub_transactions.len(),
+                dijkstra.sub_transactions.len(),
+                common(&dijkstra).direct_deposits.len(),
+                common(&dijkstra).account_balance_intervals.len(),
+                dijkstra.starting_account_balance_intervals.len(),
+            ),
+            (0, 0, 0, 0, 0),
+            "a Conway transaction and a Dijkstra one whose body has none of keys 23, 25, 26 or 27 map to empty lists"
+        );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_dijkstra_transaction_maps_its_own_body_and_its_sub_transaction() {
+        let tx = dijkstra_tx(include_str!("../../../test_data/dijkstra-subtx.tx"));
+        let mapped = Mapper::new(NoLedger).map_tx(&tx);
+        let outer = common(&mapped);
+
+        assert_eq!(
+            outer.hash.to_vec(),
+            tx.hash().to_vec(),
+            "the common fields carry the id of the transaction itself"
+        );
+        assert_eq!(
+            (
+                input_refs(&outer.inputs),
+                outer
+                    .outputs
+                    .iter()
+                    .map(|x| x.coin.clone())
+                    .collect::<Vec<_>>(),
+                input_refs(&outer.reference_inputs),
+            ),
+            (
+                vec![(
+                    "737549420add1f19d144809aa02e2ae68a89b1761368e3294fbb30ee1467e3e4".to_string(),
+                    12
+                )],
+                vec![u64_to_bigint(1_903_631)],
+                vec![
+                    (
+                        "2ed1285cced47acb5f08502843d980d7231665af9d90ef33fe6751e0f9e0b171"
+                            .to_string(),
+                        0
+                    ),
+                    (
+                        "c095234678d98a74cd1488bda1971fbd2e9c828acf57f7673c679ec601abf7a6"
+                            .to_string(),
+                        0
+                    ),
+                ],
+            ),
+            "the outer body's one input, one output and two reference inputs reach the common fields"
+        );
+
+        assert_eq!(
+            mapped.sub_transactions.len(),
+            1,
+            "the body carries one sub transaction"
+        );
+        let sub = &mapped.sub_transactions[0];
+
+        assert_eq!(
+            sub.hash.to_vec(),
+            tx.sub_transactions()[0].hash().to_vec(),
+            "the sub transaction's id is the hash of its own body"
+        );
+        assert_ne!(
+            sub.hash, outer.hash,
+            "and differs from the id of the transaction that carries it"
+        );
+        assert_eq!(
+            (
+                input_refs(&sub.inputs),
+                sub.outputs
+                    .iter()
+                    .map(|x| x.coin.clone())
+                    .collect::<Vec<_>>(),
+            ),
+            (
+                vec![(
+                    "2ed1285cced47acb5f08502843d980d7231665af9d90ef33fe6751e0f9e0b171".to_string(),
+                    0
+                )],
+                vec![u64_to_bigint(3_000_000)],
+            ),
+            "the sub body's one input and one output reach the sub transaction"
+        );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_sub_transaction_carries_none_of_the_fields_only_the_outer_body_holds() {
+        use prost::Message;
+
+        let tx = dijkstra_tx(include_str!("../../../test_data/dijkstra-subtx.tx"));
+        let mapped = Mapper::new(NoLedger).map_tx(&tx);
+        let collateral_tx =
+            hex::decode("7727ec1dfb0f84f2ffeb51935f35850cf84cfabfca1957e8c74cf8fde871dd34")
+                .unwrap();
+        let carries = |wire: &[u8], bytes: &[u8]| wire.windows(bytes.len()).any(|w| w == bytes);
+
+        assert_eq!(
+            (
+                input_refs(&mapped.collateral.as_ref().unwrap().collateral),
+                mapped.fee.is_some(),
+                carries(&mapped.encode_to_vec(), &collateral_tx),
+            ),
+            (vec![(hex::encode(&collateral_tx), 12)], true, true),
+            "the outer body's collateral input and fee reach the transaction"
+        );
+        assert!(
+            !carries(&mapped.sub_transactions[0].encode_to_vec(), &collateral_tx),
+            "the sub transaction holds no collateral, so the outer body's collateral input must not reach it"
+        );
+
+        let mapped = Mapper::new(NoLedger).map_tx(&dijkstra_tx_with_account_fields());
+        assert_eq!(
+            (
+                carries(&mapped.encode_to_vec(), &STARTING_ACCOUNT),
+                carries(
+                    &mapped.sub_transactions[0].encode_to_vec(),
+                    &STARTING_ACCOUNT
+                ),
+            ),
+            (true, false),
+            "the starting interval reaches the transaction and not the sub transaction it carries"
+        );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn deposits_and_intervals_map_with_their_accounts() {
+        use u5c::account_balance_interval::Interval;
+
+        let mapped = Mapper::new(NoLedger).map_tx(&dijkstra_tx_with_account_fields());
+
+        let range = |lower: Option<u64>, upper: Option<u64>| {
+            Some(Interval::Range(u5c::AccountBalanceRange {
+                inclusive_lower_bound: lower.and_then(u64_to_bigint),
+                exclusive_upper_bound: upper.and_then(u64_to_bigint),
+            }))
+        };
+        let interval =
+            |account: [u8; 29], interval: Option<Interval>| u5c::AccountBalanceInterval {
+                reward_account: account.to_vec().into(),
+                interval,
+            };
+
+        assert_eq!(
+            common(&mapped).direct_deposits,
+            vec![u5c::DirectDeposit {
+                reward_account: DEPOSIT_ACCOUNT.to_vec().into(),
+                coin: u64_to_bigint(DEPOSIT_COIN),
+            }],
+            "the body's one deposit reaches u5c with its account and its coin"
+        );
+
+        assert_eq!(
+            common(&mapped).account_balance_intervals,
+            vec![
+                interval(LOWER_BOUND_ACCOUNT, range(Some(5), None)),
+                interval(UPPER_BOUND_ACCOUNT, range(None, Some(6))),
+                interval(BOUNDED_ACCOUNT, range(Some(7), Some(8))),
+                interval(COIN_ACCOUNT, u64_to_bigint(9).map(Interval::Exact)),
+            ],
+            "each interval keeps the bounds it was written with, and a bare coin maps to an exact balance"
+        );
+
+        assert_eq!(
+            mapped.starting_account_balance_intervals,
+            vec![interval(STARTING_ACCOUNT, range(Some(10), None))],
+            "the starting intervals reach their own field"
+        );
+
+        assert_eq!(
+            mapped.sub_transactions.len(),
+            1,
+            "the body carries one sub transaction"
+        );
+        let sub = &mapped.sub_transactions[0];
+        assert_eq!(
+            (
+                sub.direct_deposits.clone(),
+                sub.account_balance_intervals.clone(),
+            ),
+            (
+                vec![u5c::DirectDeposit {
+                    reward_account: SUB_DEPOSIT_ACCOUNT.to_vec().into(),
+                    coin: u64_to_bigint(12),
+                }],
+                vec![interval(SUB_INTERVAL_ACCOUNT, range(None, Some(13)))],
+            ),
+            "the sub body's deposit and interval reach the sub transaction and not the one carrying it"
+        );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_guarding_redeemer_maps_to_the_guarding_purpose() {
+        assert_eq!(
+            Mapper::new(NoLedger).map_multi_era_purpose(&trv::MultiEraRedeemerTag::Guarding),
+            u5c::RedeemerPurpose::Guarding,
+            "a guarding redeemer reaches the purpose of the same name"
+        );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_guard_clause_maps_to_the_credential_it_names() {
+        use pallas_primitives::{StakeCredential, dijkstra};
+
+        let script = dijkstra::NativeScript::ScriptAll(vec![
+            dijkstra::NativeScript::ScriptRequireGuard(StakeCredential::ScriptHash(
+                [0x7a; 28].into(),
+            )),
+            dijkstra::NativeScript::ScriptPubkey([0x44; 28].into()),
+        ]);
+
+        let mapped = Mapper::<NoLedger>::map_multi_era_native_script(
+            &trv::MultiEraNativeScript::from_decoded_dijkstra(&script),
+        );
+
+        let Some(u5c::native_script::NativeScript::ScriptAll(list)) = mapped.native_script else {
+            panic!(
+                "the root clause is script_all, got {:?}",
+                mapped.native_script
+            );
+        };
+        assert_eq!(
+            list.items[0].native_script,
+            Some(u5c::native_script::NativeScript::ScriptRequireGuard(
+                u5c::StakeCredential {
+                    stake_credential: Some(u5c::stake_credential::StakeCredential::ScriptHash(
+                        [0x7a; 28].to_vec().into()
+                    )),
+                }
+            )),
+            "the guard reaches u5c as the credential it requires, of the kind it names"
+        );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_dijkstra_pool_registration_maps_the_bls_key_it_fills() {
+        let block = dijkstra_block(include_str!("../../../test_data/dijkstra6.block"));
+        let txs = block.txs();
+        let expected: Vec<u5c::PoolBlsKey> = txs
+            .iter()
+            .flat_map(|tx| tx.certs())
+            .filter_map(|cert| {
+                cert.bls_key().map(|k| u5c::PoolBlsKey {
+                    bls_pubkey: k.bls_pubkey.to_vec().into(),
+                    bls_possession_proof: k.bls_possession_proof.to_vec().into(),
+                })
+            })
+            .collect();
+        assert_eq!(
+            expected.len(),
+            2,
+            "this block's two pool registrations each fill the BLS key slot"
+        );
+
+        let mapped = Mapper::new(NoLedger).map_block(&block);
+        let found: Vec<u5c::PoolBlsKey> = mapped
+            .body
+            .iter()
+            .flat_map(|body| body.tx.iter())
+            .flat_map(|tx| common(tx).certificates.iter())
+            .filter_map(|cert| match &cert.certificate {
+                Some(u5c::certificate::Certificate::PoolRegistration(x)) => x.bls_key.clone(),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(
+            found, expected,
+            "each pool registration's key and proof reach its certificate"
+        );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_dijkstra_update_maps_every_key_the_era_adds() {
+        let update = dijkstra_update_of_every_era_key();
+        let mapped = Mapper::new(NoLedger).map_pparams_update(&trv::MultiEraParamUpdate::Dijkstra(
+            Box::new(std::borrow::Cow::Borrowed(&update)),
+        ));
+
+        assert_eq!(
+            mapped,
+            Some(u5c::PParamsUpdate {
+                max_ref_script_size_per_block: Some(34),
+                max_ref_script_size_per_tx: Some(35),
+                ref_script_cost_stride: Some(36),
+                ref_script_cost_multiplier: Some(rational_number_to_u5c(ratio(37, 1))),
+                max_pledge_leverage: Some(u5c::MaxPledgeLeverageUpdate {
+                    update: Some(u5c::max_pledge_leverage_update::Update::Leverage(
+                        rational_number_to_u5c(ratio(38, 1))
+                    )),
+                }),
+                min_pool_margin: Some(rational_number_to_u5c(ratio(1, 39))),
+                leios_announcement_period_length: Some(40),
+                leios_vote_period_length: Some(41),
+                leios_diffusion_period_length: Some(42),
+                leios_committee_size: Some(43),
+                leios_quorum_stake_threshold: Some(rational_number_to_u5c(ratio(1, 44))),
+                max_endorser_block_references_size: Some(45),
+                max_endorser_block_txs_size: Some(46),
+                max_endorser_block_execution_units: Some(u5c::ExUnits {
+                    memory: 47,
+                    steps: 470,
+                }),
+                max_ref_script_size_per_endorser_block: Some(48),
+                ..Default::default()
+            }),
+            "each key from 34 to 48 reaches the u5c field it means, carrying its own value"
+        );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_dijkstra_update_setting_any_one_era_key_to_zero_is_still_an_update() {
+        let cases = dijkstra_updates_of_one_zero_era_key();
+        assert_eq!(cases.len(), 15, "one case per key from 34 to 48");
+
+        for (key, update) in cases {
+            let mapped = Mapper::new(NoLedger).map_pparams_update(
+                &trv::MultiEraParamUpdate::Dijkstra(Box::new(std::borrow::Cow::Borrowed(&update))),
+            );
+
+            assert!(
+                mapped.is_some(),
+                "the key {key}, set alone to its zero, is a proposed change, so the update must map to parameters"
+            );
+        }
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_nil_pledge_leverage_maps_to_removing_the_cap() {
+        let mut update = dijkstra_update_of_no_key();
+        update.max_pledge_leverage = Some(pallas_primitives::Nullable::Null);
+
+        let mapped = Mapper::new(NoLedger).map_pparams_update(&trv::MultiEraParamUpdate::Dijkstra(
+            Box::new(std::borrow::Cow::Borrowed(&update)),
+        ));
+
+        assert_eq!(
+            mapped,
+            Some(u5c::PParamsUpdate {
+                max_pledge_leverage: Some(u5c::MaxPledgeLeverageUpdate {
+                    update: Some(u5c::max_pledge_leverage_update::Update::NoLimit(true)),
+                }),
+                ..Default::default()
+            }),
+            "a nil key 38 proposes removing the cap, which is the no limit member"
+        );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_dijkstra_parameter_change_of_key_48_maps_its_field() {
+        let proposal = dijkstra_proposal(include_str!(
+            "../../../test_data/proposal-param-change-key48.hex"
+        ));
+        let action = Mapper::new(NoLedger)
+            .map_gov_action(&trv::MultiEraGovAction::from_dijkstra(&proposal.gov_action));
+
+        let Some(u5c::governance_action::GovernanceAction::ParameterChangeAction(change)) =
+            action.governance_action
+        else {
+            panic!("the action is a parameter change, got {action:?}");
+        };
+        assert_eq!(
+            change.protocol_param_update,
+            Some(u5c::PParamsUpdate {
+                max_ref_script_size_per_endorser_block: Some(20_000),
+                ..Default::default()
+            }),
+            "key 48 reaches its field and no other"
+        );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_dijkstra_parameter_change_of_a_carried_key_and_an_era_key_maps_both() {
+        // Key 16 is min_pool_cost, key 48 is max_ref_script_size_per_endorser_block.
+        let update = dijkstra_update(&[0xa2, 0x10, 0x10, 0x18, 0x30, 0x19, 0x4e, 0x20]);
+
+        let mapped = Mapper::new(NoLedger).map_pparams_update(&trv::MultiEraParamUpdate::Dijkstra(
+            Box::new(std::borrow::Cow::Borrowed(&update)),
+        ));
+
+        assert_eq!(
+            mapped,
+            Some(u5c::PParamsUpdate {
+                min_pool_cost: u64_to_bigint(16),
+                max_ref_script_size_per_endorser_block: Some(20_000),
+                ..Default::default()
+            }),
+            "each key reaches its own field"
+        );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_dijkstra_parameter_set_maps_its_reference_script_fields() {
+        let mapped = Mapper::new(NoLedger).map_pparams(
+            pallas_validate::utils::MultiEraProtocolParameters::Dijkstra(dijkstra_params()),
+        );
+
+        assert_eq!(
+            (
+                mapped.max_ref_script_size_per_tx,
+                mapped.ref_script_cost_stride,
+                mapped.ref_script_cost_multiplier,
+            ),
+            (
+                Some(204_800),
+                Some(25_600),
+                Some(rational_number_to_u5c(ratio(6, 5)))
+            ),
+            "the reference script parameters the set holds reach the fields this schema names for them"
         );
     }
 }
