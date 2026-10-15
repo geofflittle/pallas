@@ -301,7 +301,16 @@ impl<C: LedgerContext> Mapper<C> {
             sub_transactions: tx
                 .sub_transactions()
                 .iter()
-                .map(|x| self.map_tx_common(x, &self.resolve(x)))
+                .map(|x| {
+                    let mut c = self.map_tx_common(x, &self.resolve(x));
+                    c.account_balance_intervals.extend(
+                        starting
+                            .into_iter()
+                            .flatten()
+                            .map(map_account_balance_interval),
+                    );
+                    c
+                })
                 .collect(),
             starting_account_balance_intervals: starting
                 .into_iter()
