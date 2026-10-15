@@ -46,6 +46,9 @@ fn update_scalar<T>(value: Option<T>) -> Option<T> {
 /// Sets the Leios and Peras fields of a mapped block from the block's header
 /// and body.
 fn with_leios_fields(mut mapped: u5c::Block, block: &trv::MultiEraBlock) -> u5c::Block {
+    if true {
+        return mapped;
+    }
     let header = block.header();
 
     if let Some(mapped) = mapped.header.as_mut() {
