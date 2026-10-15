@@ -200,16 +200,17 @@ fn check_collaterals_address(collaterals: &[TransactionInput], utxos: &UTxOs) ->
     for collateral in collaterals {
         match utxos.get(&MultiEraInput::from_alonzo_compatible(collateral)) {
             Some(multi_era_output) => {
-                if let Some(conway_output) = MultiEraOutput::as_conway(multi_era_output) {
-                    let address: &Bytes = match conway_output {
-                        TransactionOutput::Legacy(inner) => &inner.address,
-                        TransactionOutput::PostAlonzo(inner) => &inner.address,
-                    };
-                    if let ShelleyPaymentPart::Script(_) =
-                        get_payment_part(address).ok_or(PostAlonzo(InputDecoding))?
-                    {
+                match multi_era_output
+                    .address()
+                    .map_err(|_| PostAlonzo(InputDecoding))?
+                {
+                    Address::Shelley(address)
+                        if matches!(address.payment(), ShelleyPaymentPart::Key(_)) => {}
+                    Address::Byron(_) => {}
+                    Address::Shelley(_) => {
                         return Err(PostAlonzo(CollateralNotVKeyLocked));
                     }
+                    _ => return Err(PostAlonzo(InputDecoding)),
                 }
             }
             None => {
@@ -1796,6 +1797,7 @@ mod tests {
         alonzo::NativeScript,
         conway::{Certificate, DRep, ExUnits, PostAlonzoTransactionOutput, Redeemer, RedeemerTag},
     };
+    use pallas_traverse::Era;
 
     const KEY_DEPOSIT: u64 = 2_000_000;
     const DREP_DEPOSIT: u64 = 5_000_000;
@@ -2669,5 +2671,84 @@ mod tests {
                 },
             );
         }
+    }
+
+    fn input() -> TransactionInput {
+        TransactionInput {
+            transaction_id: Hash::new([0; 32]),
+            index: 0,
+        }
+    }
+
+    fn legacy_output(address: Vec<u8>) -> Vec<u8> {
+        minicbor::to_vec(pallas_primitives::alonzo::TransactionOutput {
+            address: address.into(),
+            amount: babbage::Value::Coin(5_000_000),
+            datum_hash: None,
+        })
+        .unwrap()
+    }
+
+    fn utxos(era: Era, output: &[u8]) -> UTxOs<'_> {
+        UTxOs::from([(
+            MultiEraInput::AlonzoCompatible(Box::new(std::borrow::Cow::Owned(input()))),
+            MultiEraOutput::decode(era, output).unwrap(),
+        )])
+    }
+
+    fn key_address() -> Vec<u8> {
+        [vec![0x61], vec![1; 28]].concat()
+    }
+
+    fn script_address() -> Vec<u8> {
+        [vec![0x71], vec![2; 28]].concat()
+    }
+
+    fn byron_address() -> Vec<u8> {
+        pallas_addresses::ByronAddress::from_base58(
+            "Ae2tdPwUPEZLs4HtbuNey7tK4hTKrwNwYtGqp7bDfCy2WdR3P6735W5Yfpe",
+        )
+        .unwrap()
+        .to_vec()
+    }
+
+    fn reward_address() -> Vec<u8> {
+        [vec![0xe0], vec![3; 28]].concat()
+    }
+
+    #[test]
+    fn script_collateral_from_an_earlier_era_is_not_key_locked() {
+        let raw = legacy_output(script_address());
+
+        let result = check_collaterals_address(&[input()], &utxos(Era::Babbage, &raw));
+
+        assert!(
+            matches!(result, Err(PostAlonzo(CollateralNotVKeyLocked))),
+            "{result:?}"
+        );
+    }
+
+    #[test]
+    fn key_and_byron_collateral_is_key_locked_from_alonzo_to_conway() {
+        for address in [key_address(), byron_address()] {
+            let raw = legacy_output(address);
+            for era in [Era::Alonzo, Era::Babbage, Era::Conway] {
+                let result = check_collaterals_address(&[input()], &utxos(era, &raw));
+
+                assert!(result.is_ok(), "{era:?} {result:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn collateral_at_a_reward_address_is_refused() {
+        let raw = legacy_output(reward_address());
+
+        let result = check_collaterals_address(&[input()], &utxos(Era::Babbage, &raw));
+
+        assert!(
+            matches!(result, Err(PostAlonzo(InputDecoding))),
+            "{result:?}"
+        );
     }
 }
