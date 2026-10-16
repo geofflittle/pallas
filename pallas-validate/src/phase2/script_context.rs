@@ -1,4 +1,7 @@
-use super::{error::Error, to_plutus_data::MintValue};
+use super::{
+    error::Error,
+    to_plutus_data::{MintValue, v1_v2_certificate},
+};
 use itertools::Itertools;
 use pallas_addresses::{Address, Network, StakePayload};
 use pallas_codec::utils::{Bytes, KeyValuePairs, NonEmptySet, PositiveCoin};
@@ -183,7 +186,7 @@ impl TxInfoV1<'_> {
         }
 
         let inputs = get_tx_in_info_v1(&tx.transaction_body.inputs, utxos)?;
-        let certificates = get_certificates_info(&tx.transaction_body.certificates);
+        let certificates = get_v1_v2_certificates_info(&tx.transaction_body.certificates)?;
         let withdrawals =
             KeyValuePairs::from(get_withdrawals_info(&tx.transaction_body.withdrawals));
         let mint = get_mint_info(&tx.transaction_body.mint);
@@ -232,7 +235,7 @@ impl TxInfoV2<'_> {
         slot_config: &SlotConfig,
     ) -> Result<TxInfo<'a>, Error> {
         let inputs = get_tx_in_info_v2(&tx.transaction_body.inputs, utxos)?;
-        let certificates = get_certificates_info(&tx.transaction_body.certificates);
+        let certificates = get_v1_v2_certificates_info(&tx.transaction_body.certificates)?;
         let withdrawals =
             KeyValuePairs::from(get_withdrawals_info(&tx.transaction_body.withdrawals));
         let mint = get_mint_info(&tx.transaction_body.mint);
@@ -584,6 +587,20 @@ pub fn get_certificates_info(certificates: &Option<NonEmptySet<Certificate>>) ->
     certificates.clone().map(|s| s.to_vec()).unwrap_or_default()
 }
 
+fn get_v1_v2_certificates_info(
+    certificates: &Option<NonEmptySet<Certificate>>,
+) -> Result<Vec<Certificate>, Error> {
+    let certificates = get_certificates_info(certificates);
+    if certificates
+        .iter()
+        .all(|certificate| v1_v2_certificate(certificate).is_some())
+    {
+        Ok(certificates)
+    } else {
+        Err(Error::CertificateNotSupported)
+    }
+}
+
 pub fn get_proposal_procedures_info(
     proposal_procedures: &Option<NonEmptySet<ProposalProcedure>>,
 ) -> Vec<ProposalProcedure> {
@@ -864,6 +881,7 @@ pub fn find_script(
             .ok_or(Error::MissingScriptForRedeemer)
             .and_then(|cert| match cert {
                 Certificate::StakeDeregistration(stake_credential)
+                | Certificate::Reg(stake_credential, _)
                 | Certificate::UnReg(stake_credential, _)
                 | Certificate::VoteDeleg(stake_credential, _)
                 | Certificate::VoteRegDeleg(stake_credential, _, _)
@@ -881,7 +899,6 @@ pub fn find_script(
                 },
                 Certificate::StakeRegistration { .. }
                 | Certificate::PoolRetirement { .. }
-                | Certificate::Reg { .. }
                 | Certificate::PoolRegistration { .. } => Err(Error::UnsupportedCertificateType),
             })
             .and_then(lookup_script),
@@ -1111,9 +1128,17 @@ pub fn sort_reward_accounts(a: &Bytes, b: &Bytes) -> Ordering {
 #[cfg(test)]
 mod tests {
     use super::{
-        DataLookupTable, Hash, ResolvedInput, ScriptRef, TransactionInput, TransactionOutput,
+        Certificate, DataLookupTable, Error, Hash, PlutusData, Redeemer, RedeemerTag,
+        ResolvedInput, ScriptRef, ScriptVersion, SlotConfig, StakeCredential, TransactionInput,
+        TransactionOutput, TxInfoV1, TxInfoV2, find_script,
     };
+    use crate::phase2::{data::Data, to_plutus_data::ToPlutusData};
+    use pallas_codec::minicbor;
     use pallas_crypto::hash::Hasher;
+    use pallas_primitives::{
+        RationalNumber,
+        conway::{Anchor, DRep, ExUnits},
+    };
     use pallas_traverse::{ComputeHash, Era, MultiEraTx};
 
     /// `ScriptAll` over one `ScriptPubkey`, with the child list written as an
@@ -1231,5 +1256,225 @@ mod tests {
             .collect();
 
         assert_eq!(keys, vec![committed]);
+    }
+
+    /// `ScriptPubkey` over a 28 byte key hash.
+    const WITNESS_SCRIPT: [u8; 32] = [
+        0x82, 0x00, 0x58, 0x1c, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
+        0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
+        0x1a, 0x1b,
+    ];
+
+    fn conway_tx_registering(credential_kind: u8, credential: &[u8]) -> Vec<u8> {
+        let mut cbor = vec![0x84]; // transaction
+        cbor.extend([0xa4, 0x00, 0x80, 0x01, 0x80, 0x02, 0x00]); // body, no inputs, outputs or fee
+        cbor.extend([0x04, 0x81]); // one certificate
+        cbor.extend([0x83, 0x07]); // registration with a deposit
+        cbor.extend([0x82, credential_kind, 0x58, 0x1c]); // a 28 byte credential
+        cbor.extend_from_slice(credential);
+        cbor.push(0x00); // zero deposit
+        cbor.extend_from_slice(&[0xa1, 0x01, 0x81]); // witness set, one native script
+        cbor.extend_from_slice(&WITNESS_SCRIPT);
+        cbor.extend_from_slice(&[0xf5, 0xf6]); // valid, no auxiliary data
+        cbor
+    }
+
+    fn certifying_redeemer() -> Redeemer {
+        Redeemer {
+            tag: RedeemerTag::Cert,
+            index: 0,
+            data: Data::list(vec![]),
+            ex_units: ExUnits { mem: 0, steps: 0 },
+        }
+    }
+
+    #[test]
+    fn a_registration_at_a_script_credential_finds_that_script() {
+        let hash = Hasher::<224>::hash_tagged(&WITNESS_SCRIPT, 0);
+        let cbor = conway_tx_registering(0x01, hash.as_ref());
+        let tx = MultiEraTx::decode_for_era(Era::Conway, &cbor).unwrap();
+        let table = DataLookupTable::from_transaction(&tx, &[]);
+
+        let found = find_script(&certifying_redeemer(), tx.as_conway().unwrap(), &[], &table);
+
+        assert!(
+            matches!(found, Ok((ScriptVersion::Native(_), None))),
+            "{found:?}"
+        );
+    }
+
+    #[test]
+    fn a_registration_at_a_key_credential_finds_no_script() {
+        let hash = Hasher::<224>::hash_tagged(&WITNESS_SCRIPT, 0);
+        let cbor = conway_tx_registering(0x00, hash.as_ref());
+        let tx = MultiEraTx::decode_for_era(Era::Conway, &cbor).unwrap();
+        let table = DataLookupTable::from_transaction(&tx, &[]);
+
+        let found = find_script(&certifying_redeemer(), tx.as_conway().unwrap(), &[], &table);
+
+        assert!(
+            matches!(found, Err(Error::NonScriptStakeCredential)),
+            "{found:?}"
+        );
+    }
+
+    #[test]
+    fn a_registration_reaches_a_v1_context_as_a_key_registration() {
+        let hash = Hasher::<224>::hash_tagged(&WITNESS_SCRIPT, 0);
+        let cbor = conway_tx_registering(0x01, hash.as_ref());
+        let tx = MultiEraTx::decode_for_era(Era::Conway, &cbor).unwrap();
+
+        let info = TxInfoV1::from_transaction(tx.as_conway().unwrap(), &[], &SlotConfig::default())
+            .unwrap()
+            .to_plutus_data();
+
+        let PlutusData::Constr(info) = info else {
+            panic!("a constructor")
+        };
+        let staking_hash = Data::constr(0, vec![Data::constr(1, vec![hash.to_plutus_data()])]);
+        assert_eq!(
+            info.fields[4],
+            Data::list(vec![Data::constr(0, vec![staking_hash])])
+        );
+    }
+
+    fn conway_tx_certifying(certificate: &Certificate) -> Vec<u8> {
+        let mut cbor = vec![0x84]; // transaction
+        cbor.extend([0xa4, 0x00, 0x80, 0x01, 0x80, 0x02, 0x00]); // body, no inputs, outputs or fee
+        cbor.extend([0x04, 0x81]); // one certificate
+        cbor.extend(minicbor::to_vec(certificate).unwrap());
+        cbor.extend([0xa0, 0xf5, 0xf6]); // no witnesses, valid, no auxiliary data
+        cbor
+    }
+
+    fn v1_and_v2_dcerts(certificate: &Certificate) -> [Result<PlutusData, String>; 2] {
+        let cbor = conway_tx_certifying(certificate);
+        let tx = MultiEraTx::decode_for_era(Era::Conway, &cbor).unwrap();
+        let tx = tx.as_conway().unwrap();
+        let slots = SlotConfig::default();
+        [
+            (TxInfoV1::from_transaction(tx, &[], &slots), 4),
+            (TxInfoV2::from_transaction(tx, &[], &slots), 5),
+        ]
+        .map(|(info, field)| {
+            let PlutusData::Constr(info) = info.map_err(|err| format!("{err:?}"))?.to_plutus_data()
+            else {
+                panic!("a constructor")
+            };
+            let PlutusData::Array(dcerts) = &info.fields[field] else {
+                panic!("a list")
+            };
+            Ok(dcerts[0].clone())
+        })
+    }
+
+    #[test]
+    fn v1_and_v2_contexts_hold_only_certificates_with_a_dcert() {
+        let credential = StakeCredential::ScriptHash([1; 28].into());
+        let pool: Hash<28> = [2; 28].into();
+        let vrf: Hash<32> = [3; 32].into();
+        let staking_hash = Data::constr(0, vec![credential.to_plutus_data()]);
+        let anchor = Anchor {
+            url: String::new(),
+            content_hash: [4; 32].into(),
+        };
+        let cases = [
+            (
+                Certificate::StakeRegistration(credential.clone()),
+                Some(Data::constr(0, vec![staking_hash.clone()])),
+            ),
+            (
+                Certificate::Reg(credential.clone(), 5),
+                Some(Data::constr(0, vec![staking_hash.clone()])),
+            ),
+            (
+                Certificate::StakeDeregistration(credential.clone()),
+                Some(Data::constr(1, vec![staking_hash.clone()])),
+            ),
+            (
+                Certificate::UnReg(credential.clone(), 5),
+                Some(Data::constr(1, vec![staking_hash.clone()])),
+            ),
+            (
+                Certificate::StakeDelegation(credential.clone(), pool),
+                Some(Data::constr(
+                    2,
+                    vec![staking_hash.clone(), pool.to_plutus_data()],
+                )),
+            ),
+            (
+                Certificate::PoolRegistration {
+                    operator: pool,
+                    vrf_keyhash: vrf,
+                    pledge: 1,
+                    cost: 2,
+                    margin: RationalNumber {
+                        numerator: 1,
+                        denominator: 2,
+                    },
+                    reward_account: vec![0xe0; 29].into(),
+                    pool_owners: vec![].into(),
+                    relays: vec![],
+                    pool_metadata: None,
+                },
+                Some(Data::constr(
+                    3,
+                    vec![pool.to_plutus_data(), vrf.to_plutus_data()],
+                )),
+            ),
+            (
+                Certificate::PoolRetirement(pool, 6),
+                Some(Data::constr(
+                    4,
+                    vec![pool.to_plutus_data(), 6u64.to_plutus_data()],
+                )),
+            ),
+            (
+                Certificate::VoteDeleg(credential.clone(), DRep::Abstain),
+                None,
+            ),
+            (
+                Certificate::StakeVoteDeleg(credential.clone(), pool, DRep::Abstain),
+                None,
+            ),
+            (
+                Certificate::StakeRegDeleg(credential.clone(), pool, 5),
+                None,
+            ),
+            (
+                Certificate::VoteRegDeleg(credential.clone(), DRep::Abstain, 5),
+                None,
+            ),
+            (
+                Certificate::StakeVoteRegDeleg(credential.clone(), pool, DRep::Abstain, 5),
+                None,
+            ),
+            (
+                Certificate::AuthCommitteeHot(credential.clone(), credential.clone()),
+                None,
+            ),
+            (
+                Certificate::ResignCommitteeCold(credential.clone(), None),
+                None,
+            ),
+            (
+                Certificate::RegDRepCert(credential.clone(), 5, Some(anchor.clone())),
+                None,
+            ),
+            (Certificate::UnRegDRepCert(credential.clone(), 5), None),
+            (Certificate::UpdateDRepCert(credential, Some(anchor)), None),
+        ];
+        let actual: Vec<_> = cases
+            .iter()
+            .map(|(certificate, _)| v1_and_v2_dcerts(certificate))
+            .collect();
+        let expected: Vec<_> = cases
+            .into_iter()
+            .map(|(_, dcert)| {
+                let outcome = dcert.ok_or_else(|| "CertificateNotSupported".to_string());
+                [outcome.clone(), outcome]
+            })
+            .collect();
+        assert_eq!(actual, expected);
     }
 }
