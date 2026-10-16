@@ -1,4 +1,4 @@
-use pallas_codec::minicbor;
+use pallas_codec::{minicbor, utils::decode_bytes_def_or_indef};
 use std::{fmt, ops::Deref, str::FromStr};
 
 /// data that is a cryptographic [`struct@Hash`] of `BYTES` long.
@@ -89,12 +89,12 @@ impl<'a, C, const BYTES: usize> minicbor::Decode<'a, C> for Hash<BYTES> {
     #[cfg(not(feature = "relaxed"))]
     fn decode(
         d: &mut minicbor::Decoder<'a>,
-        _ctx: &mut C,
+        ctx: &mut C,
     ) -> Result<Self, minicbor::decode::Error> {
-        let bytes = d.bytes()?;
+        let bytes = decode_bytes_def_or_indef(d, ctx)?;
         if bytes.len() == BYTES {
             let mut hash = [0; BYTES];
-            hash.copy_from_slice(bytes);
+            hash.copy_from_slice(&bytes);
             Ok(Self::new(hash))
         } else {
             // TODO: minicbor does not allow for expecting a specific size byte array
@@ -106,12 +106,12 @@ impl<'a, C, const BYTES: usize> minicbor::Decode<'a, C> for Hash<BYTES> {
     #[cfg(feature = "relaxed")]
     fn decode(
         d: &mut minicbor::Decoder<'a>,
-        _ctx: &mut C,
+        ctx: &mut C,
     ) -> Result<Self, minicbor::decode::Error> {
-        let bytes = d.bytes()?;
+        let bytes = decode_bytes_def_or_indef(d, ctx)?;
 
         if bytes.len() != BYTES {
-            dbg!(hex::encode(bytes));
+            dbg!(hex::encode(&bytes));
         }
 
         let mut hash = [0; BYTES];

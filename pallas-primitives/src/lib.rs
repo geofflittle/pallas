@@ -89,6 +89,7 @@ pub use pallas_codec::utils::{
 pub use pallas_crypto::hash::Hash;
 
 use pallas_codec::minicbor::{self, Decode, Encode, data::Tag};
+use pallas_codec::utils::decode_text_def_or_indef;
 use serde::{Deserialize, Serialize};
 
 use std::collections::BTreeMap;
@@ -259,6 +260,7 @@ pub type PoolKeyhash = Hash<28>;
 pub struct PoolMetadata {
     /// URL serving the pool metadata JSON.
     #[n(0)]
+    #[cbor(decode_with = "pallas_codec::utils::decode_text_def_or_indef")]
     pub url: String,
 
     /// Hash of the JSON document served at `url`.
@@ -337,9 +339,9 @@ impl<'b, C> minicbor::decode::Decode<'b, C> for Relay {
             )),
             1 => Ok(Relay::SingleHostName(
                 d.decode_with(ctx)?,
-                d.decode_with(ctx)?,
+                decode_text_def_or_indef(d, ctx)?,
             )),
-            2 => Ok(Relay::MultiHostName(d.decode_with(ctx)?)),
+            2 => Ok(Relay::MultiHostName(decode_text_def_or_indef(d, ctx)?)),
             _ => Err(minicbor::decode::Error::message(
                 "invalid variant id for Relay",
             )),

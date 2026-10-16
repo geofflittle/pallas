@@ -469,6 +469,7 @@ pub enum Voter {
 #[derive(Encode, Decode, Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Ord, Clone)]
 pub struct Anchor {
     #[n(0)]
+    #[cbor(decode_with = "pallas_codec::utils::decode_text_def_or_indef")]
     pub url: String,
     #[n(1)]
     pub content_hash: Hash<32>,

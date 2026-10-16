@@ -4,7 +4,7 @@ use pallas_codec::minicbor::{self, data::Type};
 use pallas_codec::tree::{
     Arity, IndexedNode, TreeDecode, Visit, cmp_tree, decode_tree, fold_tree, walk_tree,
 };
-use pallas_codec::utils::KeyValuePairs;
+use pallas_codec::utils::{KeyValuePairs, decode_text_def_or_indef};
 
 use crate::Metadatum;
 
@@ -168,8 +168,10 @@ impl<'b, C> TreeDecode<'b, C> for Node {
             | Type::I32
             | Type::I64
             | Type::Int => leaf(Metadatum::Int(d.decode_with(ctx)?)),
-            Type::Bytes => leaf(Metadatum::Bytes(d.decode_with(ctx)?)),
-            Type::String | Type::StringIndef => leaf(Metadatum::Text(d.decode_with(ctx)?)),
+            Type::Bytes | Type::BytesIndef => leaf(Metadatum::Bytes(d.decode_with(ctx)?)),
+            Type::String | Type::StringIndef => {
+                leaf(Metadatum::Text(decode_text_def_or_indef(d, ctx)?))
+            }
             Type::Array | Type::ArrayIndef => {
                 let len = d.array()?;
                 Ok((Builder::new(Partial::Array(Vec::new())), len.into()))
