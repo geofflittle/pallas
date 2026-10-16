@@ -47,7 +47,6 @@ pub(crate) fn certificate_deposits_and_refunds(
             let (deposit, refund) = match cert.as_conway() {
                 Some(
                     ConwayCertificate::StakeRegistration(..)
-                    | ConwayCertificate::Reg(..)
                     | ConwayCertificate::StakeRegDeleg(..)
                     | ConwayCertificate::VoteRegDeleg(..)
                     | ConwayCertificate::StakeVoteRegDeleg(..),
