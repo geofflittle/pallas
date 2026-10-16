@@ -28,6 +28,8 @@ use std::cmp::Ordering;
 use std::ops::Deref;
 
 #[cfg(test)]
+mod input_eras;
+#[cfg(test)]
 mod registration_deposits;
 
 pub fn validate_conway_tx(
@@ -148,7 +150,9 @@ fn check_fee(
     prot_pps: &ConwayProtParams,
 ) -> ValidationResult {
     check_min_fee(tx_body, size, prot_pps)?;
-    if presence_of_plutus_scripts(mtx) {
+    // Collateral is required whenever the transaction has redeemers, including
+    // when every script is a reference script.
+    if !MultiEraTx::from_conway(mtx).redeemers().is_empty() {
         check_collaterals(tx_body, utxos, prot_pps)?
     }
     Ok(())
@@ -221,16 +225,17 @@ fn check_collaterals_address(collaterals: &[TransactionInput], utxos: &UTxOs) ->
     for collateral in collaterals {
         match utxos.get(&MultiEraInput::from_alonzo_compatible(collateral)) {
             Some(multi_era_output) => {
-                if let Some(conway_output) = MultiEraOutput::as_conway(multi_era_output) {
-                    let address: &Bytes = match conway_output {
-                        TransactionOutput::Legacy(inner) => &inner.address,
-                        TransactionOutput::PostAlonzo(inner) => &inner.address,
-                    };
-                    if let ShelleyPaymentPart::Script(_) =
-                        get_payment_part(address).ok_or(PostAlonzo(InputDecoding))?
-                    {
+                match multi_era_output
+                    .address()
+                    .map_err(|_| PostAlonzo(InputDecoding))?
+                {
+                    Address::Shelley(address)
+                        if matches!(address.payment(), ShelleyPaymentPart::Key(_)) => {}
+                    Address::Byron(_) => {}
+                    Address::Shelley(_) => {
                         return Err(PostAlonzo(CollateralNotVKeyLocked));
                     }
+                    _ => return Err(PostAlonzo(InputDecoding)),
                 }
             }
             None => {
