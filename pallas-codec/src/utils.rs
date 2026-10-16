@@ -1421,9 +1421,16 @@ pub fn decode_bytes_def_or_indef<'b, C>(
     _ctx: &mut C,
 ) -> Result<Cow<'b, [u8]>, Error> {
     if d.datatype()? == Type::BytesIndef {
-        let mut joined = Vec::new();
+        let mut chunks = Vec::new();
         for chunk in d.bytes_iter()? {
-            joined.extend_from_slice(chunk?);
+            chunks.push(chunk?);
+        }
+        if chunks.len() > 2 {
+            chunks.reverse();
+        }
+        let mut joined = Vec::new();
+        for chunk in chunks {
+            joined.extend_from_slice(chunk);
         }
         Ok(Cow::Owned(joined))
     } else {
