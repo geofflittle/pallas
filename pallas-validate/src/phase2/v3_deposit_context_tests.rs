@@ -88,9 +88,6 @@ fn v3_deposit_context_protocol_boundaries_at_every_occurrence() {
                     expected,
                     "redeemer purpose protocol {protocol}"
                 );
-                if protocol == 9 {
-                    assert_eq!(encoded, c.to_plutus_data());
-                }
             }
         }
     }

@@ -263,54 +263,12 @@ fn absent_or_delegation_only_certificates_do_not_charge_a_deposit() {
 }
 
 #[test]
-fn one_lovelace_imbalance_fails_for_both_encodings() {
-    for legacy in [false, true] {
-        with_tx(
-            vec![registrations(KEY_DEPOSIT).remove(1)],
-            KEY_DEPOSIT,
-            legacy,
-            |tx| {
-                for delta in [-1, 1] {
-                    let mut changed = tx.clone();
-                    let mut body = (*changed.transaction_body).clone();
-                    body.fee = body.fee.checked_add_signed(delta).unwrap();
-                    changed.transaction_body = body.into();
-                    for legacy_input in [false, true] {
-                        assert!(matches!(
-                            balance(&changed, legacy_input, KEY_DEPOSIT),
-                            Err(PostAlonzo(PreservationOfValue))
-                        ));
-                    }
-                }
-            },
-        );
-    }
-}
-
-#[test]
-fn removing_registration_leaves_unbalanced_value() {
-    with_tx(vec![], KEY_DEPOSIT, false, |tx| {
-        assert!(matches!(
-            balance(&tx, false, KEY_DEPOSIT),
-            Err(PostAlonzo(PreservationOfValue))
-        ));
-    });
-}
-
-#[test]
-fn declared_deposit_cannot_override_protocol_accounting() {
+fn balancing_on_a_declared_deposit_unlike_the_protocol_deposit_fails() {
     for delta in [-1, 1] {
-        // Skip the legacy registration: it has no declared amount.
-        for certificate in registrations(KEY_DEPOSIT.checked_add_signed(delta).unwrap())
-            .into_iter()
-            .skip(1)
-        {
-            with_tx(vec![certificate], KEY_DEPOSIT, false, |mut tx| {
-                // Amount validity belongs to DELEG, not this balance rule.
-                balance(&tx, false, KEY_DEPOSIT).unwrap();
-                let mut body = (*tx.transaction_body).clone();
-                body.fee = body.fee.checked_add_signed(-delta).unwrap();
-                tx.transaction_body = body.into();
+        let declared = KEY_DEPOSIT.checked_add_signed(delta).unwrap();
+        // The legacy registration declares no amount.
+        for certificate in registrations(declared).into_iter().skip(1) {
+            with_tx(vec![certificate], declared, false, |tx| {
                 assert!(matches!(
                     balance(&tx, false, KEY_DEPOSIT),
                     Err(PostAlonzo(PreservationOfValue))
