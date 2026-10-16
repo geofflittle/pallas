@@ -238,17 +238,35 @@ mod conway_tests {
             network_id: 1,
             acnt: Some(AccountState::default()),
         };
-        let witness = |signed: &[u8]| BootstrapWitness {
+        let other_key = SecretKey::from([8; 32]);
+        let sign = |key: &SecretKey, attributes: &[u8], signed: &[u8]| BootstrapWitness {
             public_key: key.public_key().as_ref().to_vec().into(),
             signature: key.sign(signed).as_ref().to_vec().into(),
             chain_code: chain_code.to_vec().into(),
-            attributes: vec![0xa0].into(),
+            attributes: attributes.to_vec().into(),
         };
-        for (witnesses, expected) in [
-            (vec![witness(hash.as_ref())], "Ok(())"),
+        let witness = |signed: &[u8]| sign(&key, &[0xa0], signed);
+        let other = |signed: &[u8]| sign(&other_key, &[0xa0], signed);
+        let signed = hash.as_ref();
+        let cases = [
+            (vec![witness(signed)], "Ok(())"),
             (vec![], "Err(PostAlonzo(VKWitnessMissing))"),
             (vec![witness(&[0; 32])], "Err(PostAlonzo(VKWrongSignature))"),
-        ] {
+            (vec![other(signed)], "Err(PostAlonzo(VKWitnessMissing))"),
+            (vec![witness(signed), other(signed)], "Ok(())"),
+            (
+                vec![witness(signed), other(&[0; 32])],
+                "Err(PostAlonzo(VKWrongSignature))",
+            ),
+            // An empty attribute map written with indefinite length.
+            (
+                vec![sign(&key, &[0xbf, 0xff], signed)],
+                "Err(PostAlonzo(VKWitnessMissing))",
+            ),
+        ];
+        let mut expected = vec![];
+        let mut actual = vec![];
+        for (witnesses, outcome) in cases {
             let mut tx = tx.clone();
             tx.transaction_witness_set.vkeywitness = None;
             tx.transaction_witness_set.bootstrap_witness = witnesses.try_into().ok();
@@ -258,8 +276,10 @@ mod conway_tests {
                 &utxos,
                 &mut CertState::default(),
             );
-            assert_eq!(format!("{result:?}"), expected);
+            expected.push(outcome.to_string());
+            actual.push(format!("{result:?}"));
         }
+        assert_eq!(actual, expected);
     }
 
     #[test]
