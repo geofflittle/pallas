@@ -669,24 +669,7 @@ impl<'b> MultiEraTx<'b> {
     /// collateral, followed by the inputs and reference inputs of each
     /// Dijkstra sub transaction.
     pub fn requires(&self) -> Vec<MultiEraInput<'_>> {
-        let required = [self.inputs(), self.reference_inputs(), self.collateral()].concat();
-
-        #[cfg(feature = "unstable")]
-        if let Self::Dijkstra(tx) = self {
-            let mut required = required;
-            for sub in tx.transaction_body.sub_transactions.iter().flatten() {
-                let body = &sub.sub_transaction_body;
-                required.extend(
-                    body.inputs
-                        .iter()
-                        .chain(body.reference_inputs.iter().flatten())
-                        .map(MultiEraInput::from_alonzo_compatible),
-                );
-            }
-            return required;
-        }
-
-        required
+        [self.inputs(), self.reference_inputs(), self.collateral()].concat()
     }
 
     pub fn withdrawals(&self) -> MultiEraWithdrawals<'_> {
