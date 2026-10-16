@@ -77,7 +77,7 @@ fn balance(tx: &Tx, legacy_input: bool, key_deposit: u64) -> ValidationResult {
         MultiEraInput::from_alonzo_compatible(&tx.transaction_body.inputs[0]),
         MultiEraOutput::from_conway(&input),
     )]);
-    check_preservation_of_value(tx, &utxos, key_deposit, DREP_DEPOSIT, PROPOSAL_DEPOSIT)
+    check_preservation_of_value(tx, &utxos, key_deposit)
 }
 
 const DREP_DEPOSIT: u64 = 5_000_000;
@@ -85,11 +85,7 @@ const PROPOSAL_DEPOSIT: u64 = 7_000_000;
 
 // Balance results for a body whose deposits less refunds come to `net`, with
 // the output short by `net - 1`, `net` and `net + 1`.
-fn balance_around(
-    certificates: Vec<Certificate>,
-    prepare: impl Fn(&mut TransactionBody),
-    net: i64,
-) -> Vec<String> {
+fn balance_around(certificates: Vec<Certificate>, prepare: impl Fn(&mut TransactionBody), net: i64) -> Vec<String> {
     [net - 1, net, net + 1]
         .into_iter()
         .map(|reserved| {
@@ -148,19 +144,11 @@ fn deposits_refunds_withdrawals_and_donations_balance() {
         ),
         (
             "deregistration refunds its declared deposit",
-            balance_around(
-                vec![Certificate::UnReg(credential(2), 3_000_000)],
-                none,
-                -3_000_000,
-            ),
+            balance_around(vec![Certificate::UnReg(credential(2), 3_000_000)], none, -3_000_000),
         ),
         (
             "legacy deregistration refunds the key deposit",
-            balance_around(
-                vec![Certificate::StakeDeregistration(credential(2))],
-                none,
-                -key,
-            ),
+            balance_around(vec![Certificate::StakeDeregistration(credential(2))], none, -key),
         ),
         (
             "drep registration charges the drep deposit",
@@ -183,11 +171,8 @@ fn deposits_refunds_withdrawals_and_donations_balance() {
             balance_around(
                 vec![],
                 |body| {
-                    body.withdrawals = Some(
-                        [(reward_account.clone().into(), 1_500_000)]
-                            .into_iter()
-                            .collect(),
-                    )
+                    body.withdrawals =
+                        Some([(reward_account.clone().into(), 1_500_000)].into_iter().collect())
                 },
                 -1_500_000,
             ),
@@ -215,12 +200,7 @@ fn deposits_refunds_withdrawals_and_donations_balance() {
     let unbalanced = "Err(PostAlonzo(PreservationOfValue))".to_string();
     let expected: Vec<(&str, Vec<String>)> = cases
         .iter()
-        .map(|(name, _)| {
-            (
-                *name,
-                vec![unbalanced.clone(), "Ok(())".to_string(), unbalanced.clone()],
-            )
-        })
+        .map(|(name, _)| (*name, vec![unbalanced.clone(), "Ok(())".to_string(), unbalanced.clone()]))
         .collect();
     assert_eq!(cases, expected);
 }
