@@ -1826,4 +1826,201 @@ mod conway_tests {
             },
         }
     }
+
+    #[cfg(feature = "phase2")]
+    mod phase2_certificates {
+        use amaru_uplc::{arena::Arena, flat, syn::parse_program};
+        use pallas_codec::utils::MaybeIndefArray;
+        use pallas_primitives::{
+            BigInt, Constr, Hash, PlutusData, StakeCredential,
+            conway::{Certificate, ExUnits, Redeemer, RedeemerTag, Redeemers, WitnessSet},
+        };
+        use pallas_traverse::ComputeHash;
+        use pallas_validate::{
+            phase2::{
+                script_context::{SlotConfig, TxInfoV1, TxInfoV2},
+                to_plutus_data::ToPlutusData,
+                tx::eval_tx,
+            },
+            utils::UtxoMap,
+        };
+
+        use super::*;
+
+        const V1_V2_ALWAYS: &str = "(program 1.0.0 (lam redeemer (lam context (con unit ()))))";
+        const V3_ALWAYS: &str = "(program 1.1.0 (lam context (con unit ())))";
+
+        fn always_succeeds<const VERSION: usize>(source: &str) -> PlutusScript<VERSION> {
+            let arena = Arena::new();
+            let program = parse_program(&arena, source).into_result().unwrap();
+            let flat = flat::encode(program).unwrap();
+            PlutusScript(
+                minicbor::to_vec(PlutusScript::<VERSION>(flat.into()))
+                    .unwrap()
+                    .into(),
+            )
+        }
+
+        fn registration(script_hash: Hash<28>) -> Certificate {
+            Certificate::Reg(StakeCredential::ScriptHash(script_hash), 2_000_000)
+        }
+
+        fn cert_redeemer(index: u32) -> Redeemer {
+            Redeemer {
+                tag: RedeemerTag::Cert,
+                index,
+                data: PlutusData::BigInt(BigInt::Int(0.into())),
+                ex_units: ExUnits {
+                    mem: 1_000_000,
+                    steps: 1_000_000_000,
+                },
+            }
+        }
+
+        fn certifying_tx(
+            certificates: Vec<Certificate>,
+            redeemer: Redeemer,
+            add_script: impl FnOnce(&mut WitnessSet<'_>),
+        ) -> Vec<u8> {
+            let cbor_bytes: Vec<u8> = cbor_to_bytes(include_str!("../../test_data/conway3.tx"));
+            let mut mtx: Tx = conway_minted_tx_from_cbor(&cbor_bytes);
+            let body = &mut mtx.transaction_body;
+            body.inputs = Set::from(Vec::new());
+            body.outputs = Vec::new();
+            body.ttl = None;
+            body.validity_interval_start = None;
+            body.collateral = None;
+            body.reference_inputs = None;
+            body.certificates = certificates.try_into().ok();
+            let mut witnesses: WitnessSet = minicbor::decode(&[0xa0]).unwrap();
+            add_script(&mut witnesses);
+            witnesses.redeemer = Some(Redeemers::List(vec![redeemer]).into());
+            mtx.transaction_witness_set = witnesses.into();
+            minicbor::to_vec(mtx).unwrap()
+        }
+
+        fn constr(index: u64, fields: Vec<PlutusData>) -> PlutusData {
+            PlutusData::Constr(Constr {
+                tag: 121 + index,
+                any_constructor: None,
+                fields: MaybeIndefArray::Indef(fields),
+            })
+        }
+
+        fn bytes(value: &[u8]) -> PlutusData {
+            PlutusData::BoundedBytes(value.to_vec().into())
+        }
+
+        fn fields(data: &PlutusData) -> &[PlutusData] {
+            match data {
+                PlutusData::Constr(constr) => &constr.fields,
+                PlutusData::Array(items) => items,
+                other => panic!("not a constructor or a list: {other:?}"),
+            }
+        }
+
+        #[test]
+        fn v1_v2_context_encodes_stake_certificates_as_the_ledger_does() {
+            let script = always_succeeds::<2>(V1_V2_ALWAYS);
+            let script_hash = script.compute_hash();
+            let credential = StakeCredential::ScriptHash(script_hash);
+            let pool: Hash<28> = [9; 28].into();
+            let redeemer = cert_redeemer(1);
+            let cbor = certifying_tx(
+                vec![
+                    Certificate::StakeRegistration(credential.clone()),
+                    registration(script_hash),
+                    Certificate::StakeDeregistration(credential.clone()),
+                    Certificate::UnReg(credential.clone(), 2_000_000),
+                    Certificate::StakeDelegation(credential, pool),
+                ],
+                redeemer.clone(),
+                |witnesses| witnesses.plutus_v2_script = Some(vec![script].try_into().unwrap()),
+            );
+            let mtx: Tx = conway_minted_tx_from_cbor(&cbor);
+
+            let staking_hash = constr(0, vec![constr(1, vec![bytes(script_hash.as_ref())])]);
+            let dcerts = vec![
+                constr(0, vec![staking_hash.clone()]),
+                constr(0, vec![staking_hash.clone()]),
+                constr(1, vec![staking_hash.clone()]),
+                constr(1, vec![staking_hash.clone()]),
+                constr(2, vec![staking_hash, bytes(pool.as_ref())]),
+            ];
+
+            let slot_config = SlotConfig::default();
+            for (tx_info, dcerts_field) in [
+                (
+                    TxInfoV1::from_transaction(&mtx, &[], &slot_config).unwrap(),
+                    4,
+                ),
+                (
+                    TxInfoV2::from_transaction(&mtx, &[], &slot_config).unwrap(),
+                    5,
+                ),
+            ] {
+                let context = tx_info
+                    .into_script_context(&redeemer, None)
+                    .unwrap()
+                    .to_plutus_data();
+                let [tx_info, purpose] = fields(&context) else {
+                    panic!("not a V1 or V2 script context: {context:?}")
+                };
+                assert_eq!(fields(&fields(tx_info)[dcerts_field]), dcerts.as_slice());
+                assert_eq!(*purpose, constr(3, vec![dcerts[1].clone()]));
+            }
+        }
+
+        #[test]
+        fn script_registration_with_its_redeemer_evaluates() {
+            let v1 = always_succeeds::<1>(V1_V2_ALWAYS);
+            let v2 = always_succeeds::<2>(V1_V2_ALWAYS);
+            let v3 = always_succeeds::<3>(V3_ALWAYS);
+            let txs = [
+                (
+                    "V1",
+                    certifying_tx(
+                        vec![registration(v1.compute_hash())],
+                        cert_redeemer(0),
+                        |w| w.plutus_v1_script = Some(vec![v1].try_into().unwrap()),
+                    ),
+                ),
+                (
+                    "V2",
+                    certifying_tx(
+                        vec![registration(v2.compute_hash())],
+                        cert_redeemer(0),
+                        |w| w.plutus_v2_script = Some(vec![v2].try_into().unwrap()),
+                    ),
+                ),
+                (
+                    "V3",
+                    certifying_tx(
+                        vec![registration(v3.compute_hash())],
+                        cert_redeemer(0),
+                        |w| w.plutus_v3_script = Some(vec![v3].try_into().unwrap()),
+                    ),
+                ),
+            ];
+
+            let mut params = mk_mainnet_params_epoch_380();
+            params.protocol_version = (10, 0);
+            let params = MultiEraProtocolParameters::Conway(params);
+            for (language, cbor) in txs {
+                let mtx: Tx = conway_minted_tx_from_cbor(&cbor);
+                let results = eval_tx(
+                    &MultiEraTx::from_conway(&mtx),
+                    &params,
+                    &UtxoMap::new(),
+                    &SlotConfig::default(),
+                )
+                .unwrap_or_else(|err| panic!("{language}: {err:?}"));
+                let outcomes: Vec<_> = results
+                    .iter()
+                    .map(|r| (r.tag, r.index, r.success))
+                    .collect();
+                assert_eq!(outcomes, [(RedeemerTag::Cert, 0, true)], "{language}");
+            }
+        }
+    }
 }
