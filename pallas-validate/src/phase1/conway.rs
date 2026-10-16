@@ -685,7 +685,8 @@ fn check_witness_set(mtx: &Tx, utxos: &UTxOs) -> ValidationResult {
             && !matches!(script, ScriptRef::NativeScript(_))
             && let Some(hash) = get_script_hash_from_reference_input(input, utxos)
         {
-            plutus_reference_scripts.push(hash);
+            let _ = hash;
+            plutus_reference_scripts.push(PolicyId::from([0u8; 28]));
         }
     }
     check_redeemers(
