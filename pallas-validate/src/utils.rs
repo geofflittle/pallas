@@ -30,35 +30,37 @@ pub use validation::*;
 #[cfg(test)]
 mod registration_deposits;
 
-// The stake-registration component of produced value, shared by Conway and
-// Dijkstra. Each registration (including registration with delegation) costs
-// the protocol key deposit. DELEG checks the declared amount and credential
-// state separately. Other deposits and refunds are outside this calculation.
-pub(crate) fn add_fee_and_stake_deposits(
-    outputs: &ConwayValue,
-    fee: Coin,
+// The deposits a certificate list charges and the refunds it returns, as
+// (deposits, refunds).
+pub(crate) fn certificate_deposits_and_refunds(
     certificates: &[MultiEraCert<'_>],
     key_deposit: Coin,
-) -> Result<ConwayValue, ValidationError> {
+    drep_deposit: Coin,
+) -> Result<(Coin, Coin), ValidationError> {
     let err = ValidationError::PostAlonzo(PostAlonzoError::NegativeValue);
-    let produced = conway_add_values(outputs, &ConwayValue::Coin(fee), &err)?;
-    let deposits = certificates.iter().try_fold(0u64, |total, cert| {
-        if matches!(
-            cert.kind(),
-            Some(
-                MultiEraCertKind::StakeRegistration(..)
+    certificates
+        .iter()
+        .try_fold((0u64, 0u64), |(deposits, refunds), cert| {
+            let (deposit, refund) = match cert.kind() {
+                Some(
+                    MultiEraCertKind::StakeRegistration(..)
                     | MultiEraCertKind::Reg(..)
                     | MultiEraCertKind::StakeRegDeleg(..)
                     | MultiEraCertKind::VoteRegDeleg(..)
-                    | MultiEraCertKind::StakeVoteRegDeleg(..)
-            )
-        ) {
-            total.checked_add(key_deposit).ok_or_else(|| err.clone())
-        } else {
-            Ok(total)
-        }
-    })?;
-    conway_add_values(&produced, &ConwayValue::Coin(deposits), &err)
+                    | MultiEraCertKind::StakeVoteRegDeleg(..),
+                ) => (key_deposit, 0),
+                Some(MultiEraCertKind::RegDRep(..)) => (drep_deposit, 0),
+                Some(MultiEraCertKind::StakeDeregistration(..)) => (0, key_deposit),
+                Some(
+                    MultiEraCertKind::UnReg(_, refund) | MultiEraCertKind::UnRegDRep(_, refund),
+                ) => (0, refund),
+                _ => (0, 0),
+            };
+            Ok((
+                deposits.checked_add(deposit).ok_or_else(|| err.clone())?,
+                refunds.checked_add(refund).ok_or_else(|| err.clone())?,
+            ))
+        })
 }
 
 pub type TxHash = Hash<32>;

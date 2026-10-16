@@ -77,7 +77,152 @@ fn balance(tx: &Tx, legacy_input: bool, key_deposit: u64) -> ValidationResult {
         MultiEraInput::from_alonzo_compatible(&tx.transaction_body.inputs[0]),
         MultiEraOutput::from_conway(&input),
     )]);
-    check_preservation_of_value(tx, &utxos, key_deposit)
+    check_preservation_of_value(tx, &utxos, key_deposit, DREP_DEPOSIT, PROPOSAL_DEPOSIT)
+}
+
+const DREP_DEPOSIT: u64 = 5_000_000;
+const PROPOSAL_DEPOSIT: u64 = 7_000_000;
+
+// Balance results for a body whose deposits less refunds come to `net`, with
+// the output short by `net - 1`, `net` and `net + 1`.
+fn balance_around(
+    certificates: Vec<Certificate>,
+    prepare: impl Fn(&mut TransactionBody),
+    net: i64,
+) -> Vec<String> {
+    [net - 1, net, net + 1]
+        .into_iter()
+        .map(|reserved| {
+            let mut outcome = String::new();
+            with_tx(certificates.clone(), 0, false, |mut tx| {
+                let mut body = (*tx.transaction_body).clone();
+                let coin = (INPUT - body.fee) as i64 - reserved;
+                body.outputs = vec![output(coin as u64, false)];
+                prepare(&mut body);
+                tx.transaction_body = body.into();
+                outcome = format!("{:?}", balance(&tx, false, KEY_DEPOSIT));
+            });
+            outcome
+        })
+        .collect()
+}
+
+#[test]
+fn deposits_refunds_withdrawals_and_donations_balance() {
+    let credential = |id| StakeCredential::AddrKeyhash([id; 28].into());
+    let none = |_: &mut TransactionBody| {};
+    let reward_account = [vec![0xe0], vec![3; 28]].concat();
+    let proposal = pallas_primitives::conway::ProposalProcedure {
+        deposit: PROPOSAL_DEPOSIT,
+        reward_account: reward_account.clone().into(),
+        gov_action: pallas_primitives::conway::GovAction::Information,
+        anchor: pallas_primitives::conway::Anchor {
+            url: String::new(),
+            content_hash: [0; 32].into(),
+        },
+    };
+    let key = KEY_DEPOSIT as i64;
+    let cases: Vec<(&str, Vec<String>)> = vec![
+        ("nothing", balance_around(vec![], none, 0)),
+        (
+            "registration and unrelated deregistration",
+            balance_around(
+                vec![
+                    Certificate::Reg(credential(1), KEY_DEPOSIT),
+                    Certificate::UnReg(credential(2), KEY_DEPOSIT),
+                ],
+                none,
+                0,
+            ),
+        ),
+        (
+            "legacy registration and unrelated deregistration",
+            balance_around(
+                vec![
+                    Certificate::StakeRegistration(credential(1)),
+                    Certificate::StakeDeregistration(credential(2)),
+                ],
+                none,
+                0,
+            ),
+        ),
+        (
+            "deregistration refunds its declared deposit",
+            balance_around(
+                vec![Certificate::UnReg(credential(2), 3_000_000)],
+                none,
+                -3_000_000,
+            ),
+        ),
+        (
+            "legacy deregistration refunds the key deposit",
+            balance_around(
+                vec![Certificate::StakeDeregistration(credential(2))],
+                none,
+                -key,
+            ),
+        ),
+        (
+            "drep registration charges the drep deposit",
+            balance_around(
+                vec![Certificate::RegDRepCert(credential(1), DREP_DEPOSIT, None)],
+                none,
+                DREP_DEPOSIT as i64,
+            ),
+        ),
+        (
+            "drep deregistration refunds its declared deposit",
+            balance_around(
+                vec![Certificate::UnRegDRepCert(credential(1), 4_000_000)],
+                none,
+                -4_000_000,
+            ),
+        ),
+        (
+            "withdrawal",
+            balance_around(
+                vec![],
+                |body| {
+                    body.withdrawals = Some(
+                        [(reward_account.clone().into(), 1_500_000)]
+                            .into_iter()
+                            .collect(),
+                    )
+                },
+                -1_500_000,
+            ),
+        ),
+        (
+            "donation",
+            balance_around(
+                vec![],
+                |body| body.donation = Some(600_000.try_into().unwrap()),
+                600_000,
+            ),
+        ),
+        (
+            "two proposals",
+            balance_around(
+                vec![],
+                |body| {
+                    body.proposal_procedures =
+                        Some(vec![proposal.clone(), proposal.clone()].try_into().unwrap())
+                },
+                2 * PROPOSAL_DEPOSIT as i64,
+            ),
+        ),
+    ];
+    let unbalanced = "Err(PostAlonzo(PreservationOfValue))".to_string();
+    let expected: Vec<(&str, Vec<String>)> = cases
+        .iter()
+        .map(|(name, _)| {
+            (
+                *name,
+                vec![unbalanced.clone(), "Ok(())".to_string(), unbalanced.clone()],
+            )
+        })
+        .collect();
+    assert_eq!(cases, expected);
 }
 
 #[test]
