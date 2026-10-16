@@ -651,57 +651,58 @@ impl ToPlutusData for WithPartialCertificates<'_, Vec<Certificate>> {
 
 impl ToPlutusData for WithPartialCertificates<'_, Certificate> {
     fn to_plutus_data(&self) -> PlutusData {
-        match self.0 {
-            Certificate::StakeRegistration(stake_credential) => {
-                wrap_with_constr(0, stake_credential.to_plutus_data())
-            }
-
-            // Conway translates explicit registration to DCertDelegRegKey,
-            // whose credential is wrapped in the V1/V2 StakingHash constructor.
-            Certificate::Reg(stake_credential, _) => wrap_with_constr(
-                0,
-                WithWrappedStakeCredential(stake_credential).to_plutus_data(),
-            ),
-
-            Certificate::StakeDeregistration(stake_credential) => {
-                wrap_with_constr(1, stake_credential.to_plutus_data())
-            }
-
-            Certificate::StakeDelegation(stake_credential, pool_keyhash) => {
-                wrap_multiple_with_constr(
-                    2,
-                    vec![
-                        stake_credential.to_plutus_data(),
-                        pool_keyhash.to_plutus_data(),
-                    ],
-                )
-            }
-
-            Certificate::PoolRegistration {
-                operator,
-                vrf_keyhash,
-                pledge: _,
-                cost: _,
-                margin: _,
-                reward_account: _,
-                pool_owners: _,
-                relays: _,
-                pool_metadata: _,
-            } => wrap_multiple_with_constr(
-                3,
-                vec![operator.to_plutus_data(), vrf_keyhash.to_plutus_data()],
-            ),
-
-            Certificate::PoolRetirement(pool_keyhash, epoch) => wrap_multiple_with_constr(
-                4,
-                vec![pool_keyhash.to_plutus_data(), epoch.to_plutus_data()],
-            ),
-
-            certificate => {
-                unreachable!("unexpected certificate type in V1/V2 script context: {certificate:?}")
-            }
-        }
+        v1_v2_certificate(self.0).unwrap_or_else(|| {
+            unreachable!(
+                "unexpected certificate type in V1/V2 script context: {:?}",
+                self.0
+            )
+        })
     }
+}
+
+pub(crate) fn v1_v2_certificate(certificate: &Certificate) -> Option<PlutusData> {
+    let staking_hash = |credential| WithWrappedStakeCredential(credential).to_plutus_data();
+    Some(match certificate {
+        Certificate::StakeRegistration(stake_credential)
+        | Certificate::Reg(stake_credential, _) => {
+            wrap_with_constr(0, staking_hash(stake_credential))
+        }
+
+        Certificate::StakeDeregistration(stake_credential)
+        | Certificate::UnReg(stake_credential, _) => {
+            wrap_with_constr(1, staking_hash(stake_credential))
+        }
+
+        Certificate::StakeDelegation(stake_credential, pool_keyhash) => wrap_multiple_with_constr(
+            2,
+            vec![
+                staking_hash(stake_credential),
+                pool_keyhash.to_plutus_data(),
+            ],
+        ),
+
+        Certificate::PoolRegistration {
+            operator,
+            vrf_keyhash,
+            pledge: _,
+            cost: _,
+            margin: _,
+            reward_account: _,
+            pool_owners: _,
+            relays: _,
+            pool_metadata: _,
+        } => wrap_multiple_with_constr(
+            3,
+            vec![operator.to_plutus_data(), vrf_keyhash.to_plutus_data()],
+        ),
+
+        Certificate::PoolRetirement(pool_keyhash, epoch) => wrap_multiple_with_constr(
+            4,
+            vec![pool_keyhash.to_plutus_data(), epoch.to_plutus_data()],
+        ),
+
+        _ => return None,
+    })
 }
 
 impl ToPlutusData for WithRegistrationDeposit<'_, Certificate> {
