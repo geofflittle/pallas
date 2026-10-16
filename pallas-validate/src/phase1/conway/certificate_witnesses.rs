@@ -1,5 +1,3 @@
-//! Certificate authorization only; native Dijkstra captures use an explicit
-//! Conway view of their compatible body/witness/output CBOR, never era dispatch.
 use super::*;
 use pallas_codec::minicbor;
 use pallas_primitives::conway::{Certificate, RedeemerTag};
@@ -35,8 +33,8 @@ fn credential_certificates(cred: StakeCredential) -> Vec<Certificate> {
     ]
 }
 
-// Build, encode, then decode a synthetic Conway transaction before signing its
-// real body hash. Authorization tests isolate witnesses, not certificate state.
+// Round trips the edited transaction through CBOR so that the signed body hash
+// covers the edits.
 fn synthetic(
     certificates: Vec<Certificate>,
     prepare: impl FnOnce(&mut Tx<'_>),
@@ -299,7 +297,8 @@ fn native_certificate_checks_authorization_without_redeemers() {
             );
         }
     }
-    // A valid unrelated witness must not hide a later invalid script signer.
+    // A bad signature from the script key fails even after a good signature
+    // from another key.
     synthetic(
         vec![Certificate::Reg(
             StakeCredential::ScriptHash(compute_native_script_hash(&script)),

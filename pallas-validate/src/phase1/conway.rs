@@ -155,8 +155,8 @@ fn check_fee(
     prot_pps: &ConwayProtParams,
 ) -> ValidationResult {
     check_min_fee(tx_body, size, prot_pps)?;
-    // Redeemers trigger collateral even when every Plutus script is supplied
-    // by an input reference rather than by the witness set.
+    // Collateral is required whenever the transaction has redeemers, including
+    // when every script is a reference script.
     if !MultiEraTx::from_conway(mtx).redeemers().is_empty() {
         check_collaterals(tx_body, utxos, prot_pps)?
     }
@@ -852,9 +852,8 @@ fn get_reference_script_hashes(tx_body: &TransactionBody, utxos: &UTxOs) -> Vec<
     res
 }
 
-// Conway's legacy registration has no author. Every other credential-bearing
-// certificate is authorized by its stake, cold committee, or DRep credential.
-// Pool operator/owner witnesses are handled separately below.
+// The credential that must witness a certificate. Legacy stake registration
+// needs no witness, and pool certificates are witnessed by pool keys.
 fn certificate_credential(cert: &Certificate) -> Option<&StakeCredential> {
     match cert {
         Certificate::StakeRegistration(_)

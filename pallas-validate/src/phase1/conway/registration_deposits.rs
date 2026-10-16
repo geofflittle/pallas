@@ -1,4 +1,3 @@
-//! Synthetic Conway cases isolate balance accounting from signatures and DELEG.
 use super::*;
 use pallas_codec::minicbor;
 use pallas_primitives::{
@@ -47,7 +46,6 @@ fn output(coin: u64, legacy: bool) -> TransactionOutput<'static> {
 }
 
 fn with_tx(certificates: Vec<Certificate>, reserved: u64, legacy: bool, test: impl FnOnce(Tx<'_>)) {
-    // Reuse a native Conway body's structure, with synthetic amounts/certificates.
     let raw = hex::decode(
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),

@@ -72,8 +72,8 @@ mod conway_tests {
 
     #[test]
     fn registration_deposit_is_required_through_dispatch() {
-        // Synthetic mutation of the existing Conway control. The deposit has
-        // not been reserved; balance must fail before the invalid signatures.
+        // Adds an unfunded registration to conway3, so balance fails before the
+        // stale signatures are checked.
         let raw = cbor_to_bytes(include_str!("../../test_data/conway3.tx"));
         let mut tx: Tx = conway_minted_tx_from_cbor(&raw);
         let mut body = (*tx.transaction_body).clone();
@@ -99,7 +99,8 @@ mod conway_tests {
         let utxos = mk_utxo_for_conway_tx(&tx.transaction_body, tx_outs_info);
         let mut params = mk_mainnet_params_epoch_365();
         params.key_deposit = 2_000_000;
-        // Isolate balance from the size-dependent fee of the derived body.
+        // The edited body changes size, so a zero minimum fee stops the fee
+        // check from failing first.
         params.minfee_a = 0;
         params.minfee_b = 0;
         let env = Environment {
@@ -126,8 +127,8 @@ mod conway_tests {
 
     #[test]
     fn certificate_script_is_required_through_dispatch() {
-        // Synthetic Conway mutation with its deposit funded. A missing script
-        // must fail before the deliberately stale payment signature.
+        // Adds a funded registration at a script credential with no script,
+        // which fails before the stale payment signature is checked.
         let raw = cbor_to_bytes(include_str!("../../test_data/conway3.tx"));
         let mut tx: Tx = conway_minted_tx_from_cbor(&raw);
         let mut body = (*tx.transaction_body).clone();
@@ -153,7 +154,8 @@ mod conway_tests {
         let utxos = mk_utxo_for_conway_tx(&tx.transaction_body, tx_outs_info);
         let mut params = mk_mainnet_params_epoch_365();
         params.key_deposit = 2_000_000;
-        // Isolate balance from the size-dependent fee of the derived body.
+        // The edited body changes size, so a zero minimum fee stops the fee
+        // check from failing first.
         params.minfee_a = 0;
         params.minfee_b = 0;
         let env = Environment {
@@ -185,9 +187,8 @@ mod conway_tests {
         use pallas_primitives::conway::{BootstrapWitness, TransactionInput};
         use pallas_traverse::OriginalHash;
 
-        // Synthetic mutation of the Conway control. The spent input and an
-        // added collateral input are locked by one Byron key, the collateral
-        // by an output of the Byron era.
+        // Spends an input and a collateral input locked by one Byron key, the
+        // collateral from a Byron era output.
         let key = SecretKey::from([7; 32]);
         let chain_code = [9; 32];
         let xpub = [key.public_key().as_ref(), &chain_code[..]].concat();
@@ -228,7 +229,8 @@ mod conway_tests {
             ),
         ]);
         let mut params = mk_mainnet_params_epoch_365();
-        // Isolate witnessing from the size-dependent fee of the derived body.
+        // The edited body changes size, so a zero minimum fee stops the fee
+        // check from failing first.
         params.minfee_a = 0;
         params.minfee_b = 0;
         let env = Environment {

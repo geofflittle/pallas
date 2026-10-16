@@ -1,4 +1,3 @@
-//! Conway input checks over outputs of every era and address type.
 use super::*;
 use pallas_codec::minicbor;
 use pallas_traverse::Era;
@@ -55,7 +54,7 @@ fn script_collateral_from_an_earlier_era_is_not_key_locked() {
 }
 
 #[test]
-fn key_and_byron_collateral_is_key_locked_in_every_era() {
+fn key_and_byron_collateral_is_key_locked_from_alonzo_to_conway() {
     for address in [key_address(), byron_address()] {
         let raw = legacy_output(address);
         for era in [Era::Alonzo, Era::Babbage, Era::Conway] {

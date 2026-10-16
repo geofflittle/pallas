@@ -1446,7 +1446,8 @@ impl ToPlutusData for TxInfo<'_> {
 }
 
 impl TxInfo<'_> {
-    /// V3 Conway bootstrap encoding is retained only through protocol 9.
+    /// Encodes the transaction info for a protocol major version, with V3
+    /// registration deposits present above version 9.
     pub fn to_plutus_data_with_protocol(&self, protocol_major: u32) -> PlutusData {
         match self {
             TxInfo::V1(tx_info) => wrap_multiple_with_constr(
@@ -1519,7 +1520,7 @@ impl ToPlutusData for ScriptContext<'_> {
 }
 
 impl ScriptContext<'_> {
-    /// Encode all V3 certificate occurrences with the same protocol rule.
+    /// Encodes the script context for a protocol major version.
     pub fn to_plutus_data_with_protocol(&self, protocol_major: u32) -> PlutusData {
         match self {
             ScriptContext::V1V2 { tx_info, purpose } => wrap_multiple_with_constr(

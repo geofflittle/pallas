@@ -1,4 +1,3 @@
-//! Synthetic encoding boundaries, independent of captured script success.
 use super::{data::Data, script_context::*, to_plutus_data::*};
 use pallas_primitives::conway::{
     Certificate, ExUnits, PlutusData, Redeemer, RedeemerTag, StakeCredential,
@@ -121,7 +120,8 @@ fn v3_deposit_context_protocol_reaches_script_execution() {
         }
         format!("[(force (builtin headList)) {list}]")
     }
-    // Certifying[1] -> Reg/UnReg[1] -> Just[0] -> explicit amount.
+    // The deposit inside Just, field 1 of the Reg certificate, which is field 1
+    // of the Certifying purpose.
     let amount = field(&field(&field(&field("ctx", 2), 1), 1), 0);
     let condition =
         format!("[[(builtin equalsInteger) [(builtin unIData) {amount}]] (con integer 2000000)]");
