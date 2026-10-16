@@ -1,5 +1,6 @@
 //! Utilities required for Conway-era transaction validation.
 
+use crate::utils::certificate_deposits_and_refunds;
 use crate::utils::{
     ConwayProtParams,
     PostAlonzoError::*,
@@ -23,7 +24,7 @@ use pallas_primitives::{
         ScriptRef, TransactionBody, TransactionOutput, Tx, VKeyWitness, Value, WitnessSet,
     },
 };
-use pallas_traverse::{MultiEraInput, MultiEraOutput, OriginalHash};
+use pallas_traverse::{MultiEraInput, MultiEraOutput, MultiEraTx, OriginalHash};
 use std::cmp::Ordering;
 use std::ops::Deref;
 
@@ -40,7 +41,13 @@ pub fn validate_conway_tx(
     check_all_ins_in_utxos(tx_body, utxos)?;
     check_tx_validity_interval(tx_body, block_slot)?;
     check_fee(tx_body, &size, mtx, utxos, prot_pps)?;
-    check_preservation_of_value(tx_body, utxos)?;
+    check_preservation_of_value(
+        mtx,
+        utxos,
+        prot_pps.key_deposit,
+        prot_pps.drep_deposit,
+        prot_pps.governance_action_deposit,
+    )?;
     check_min_lovelace(tx_body, prot_pps)?;
     check_output_val_size(tx_body, prot_pps)?;
     check_network_id(tx_body, network_id)?;
@@ -316,14 +323,37 @@ fn val_from_multi_era_output(multi_era_output: &MultiEraOutput) -> Value {
 }
 
 // The preservation of value property holds.
-fn check_preservation_of_value(tx_body: &TransactionBody, utxos: &UTxOs) -> ValidationResult {
-    let mut input: Value = get_consumed(tx_body, utxos)?;
-    let produced: Value = get_produced(tx_body)?;
-    let output: Value = conway_add_values(
-        &produced,
-        &Value::Coin(tx_body.fee),
-        &PostAlonzo(NegativeValue),
+fn check_preservation_of_value(
+    tx: &Tx,
+    utxos: &UTxOs,
+    key_deposit: u64,
+    drep_deposit: u64,
+    proposal_deposit: u64,
+) -> ValidationResult {
+    let tx_body = &tx.transaction_body;
+    let err = PostAlonzo(NegativeValue);
+    let (deposits, refunds) = certificate_deposits_and_refunds(
+        &MultiEraTx::from_conway(tx).certs(),
+        key_deposit,
+        drep_deposit,
     )?;
+    let withdrawals = tx_body
+        .withdrawals
+        .iter()
+        .flatten()
+        .try_fold(refunds, |total, (_, coin)| {
+            total.checked_add(*coin).ok_or_else(|| err.clone())
+        })?;
+    let proposals = (tx_body.proposal_procedures.iter().flatten().count() as u64)
+        .checked_mul(proposal_deposit)
+        .ok_or_else(|| err.clone())?;
+    let donation = tx_body.donation.map_or(0, u64::from);
+    let mut input: Value = get_consumed(tx_body, utxos)?;
+    input = conway_add_values(&input, &Value::Coin(withdrawals), &err)?;
+    let mut output: Value = get_produced(tx_body)?;
+    for coin in [tx_body.fee, deposits, proposals, donation] {
+        output = conway_add_values(&output, &Value::Coin(coin), &err)?;
+    }
     if let Some(m) = &tx_body.mint {
         input = conway_add_minted_non_zero(&input, m, &PostAlonzo(NegativeValue))?;
     }
@@ -1665,3 +1695,6 @@ fn cost_model_for_tx(
     }
     Some(LanguageViews(map))
 }
+
+#[cfg(test)]
+mod registration_deposits;

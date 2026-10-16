@@ -16,14 +16,56 @@ use pallas_primitives::{
     RewardAccount, StakeCredential, TransactionIndex, UnitInterval, VrfKeyhash,
     alonzo::{Multiasset, NativeScript, Tx as AlonzoTx, VKeyWitness, Value},
     babbage::Tx as BabbageTx,
-    conway::{Multiasset as ConwayMultiasset, Tx as ConwayTx, Value as ConwayValue},
+    conway::{
+        Certificate as ConwayCertificate, Multiasset as ConwayMultiasset, Tx as ConwayTx,
+        Value as ConwayValue,
+    },
 };
 
-use pallas_traverse::{Era, MultiEraInput, MultiEraOutput, MultiEraUpdate, time::Slot};
+use pallas_traverse::{
+    Era, MultiEraCert, MultiEraInput, MultiEraOutput, MultiEraUpdate, time::Slot,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 pub use validation::*;
+
+#[cfg(test)]
+mod registration_deposits;
+
+// The deposits a certificate list charges and the refunds it returns, as
+// (deposits, refunds).
+pub(crate) fn certificate_deposits_and_refunds(
+    certificates: &[MultiEraCert<'_>],
+    key_deposit: Coin,
+    drep_deposit: Coin,
+) -> Result<(Coin, Coin), ValidationError> {
+    let err = ValidationError::PostAlonzo(PostAlonzoError::NegativeValue);
+    certificates
+        .iter()
+        .try_fold((0u64, 0u64), |(deposits, refunds), cert| {
+            let (deposit, refund) = match cert.as_conway() {
+                Some(
+                    ConwayCertificate::StakeRegistration(..)
+                    | ConwayCertificate::Reg(..)
+                    | ConwayCertificate::StakeRegDeleg(..)
+                    | ConwayCertificate::VoteRegDeleg(..)
+                    | ConwayCertificate::StakeVoteRegDeleg(..),
+                ) => (key_deposit, 0),
+                Some(ConwayCertificate::RegDRepCert(..)) => (drep_deposit, 0),
+                Some(ConwayCertificate::StakeDeregistration(..)) => (0, key_deposit),
+                Some(
+                    ConwayCertificate::UnReg(_, refund)
+                    | ConwayCertificate::UnRegDRepCert(_, refund),
+                ) => (0, *refund),
+                _ => (0, 0),
+            };
+            Ok((
+                deposits.checked_add(deposit).ok_or_else(|| err.clone())?,
+                refunds.checked_add(refund).ok_or_else(|| err.clone())?,
+            ))
+        })
+}
 
 pub type TxHash = Hash<32>;
 pub type TxoIdx = u32;
