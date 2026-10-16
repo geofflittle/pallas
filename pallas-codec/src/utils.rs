@@ -1574,4 +1574,26 @@ mod tests {
         assert_eq!(subject.inner, vec![1, 2, 3]);
         assert_eq!(encoded, hex::decode("83010203").unwrap());
     }
+
+    #[test]
+    fn bytes_refuse_text_and_other_types() {
+        for hex in ["63616263", "7f6161626263ff", "03", "80"] {
+            let raw = hex::decode(hex).unwrap();
+            assert!(minicbor::decode::<Bytes>(&raw).is_err(), "{hex}");
+        }
+    }
+
+    #[test]
+    fn bytes_decode_from_either_length_form() {
+        for (hex, expected) in [
+            ("43010203", vec![1, 2, 3]),
+            ("5f4201024103ff", vec![1, 2, 3]),
+            ("5f43010203ff", vec![1, 2, 3]),
+            ("5fff", vec![]),
+        ] {
+            let raw = hex::decode(hex).unwrap();
+            let decoded: Bytes = minicbor::decode(&raw).unwrap();
+            assert_eq!(decoded, Bytes::from(expected), "{hex}");
+        }
+    }
 }

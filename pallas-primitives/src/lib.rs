@@ -455,3 +455,44 @@ pub struct VrfCert(
 
 /// Hash of a VRF verification key (Blake2b-256).
 pub type VrfKeyhash = Hash<32>;
+
+#[cfg(test)]
+mod tests {
+    use super::{PoolMetadata, Relay};
+    use pallas_codec::minicbor;
+
+    const ABC: [&str; 2] = ["63616263", "7f6161626263ff"];
+
+    #[test]
+    fn pool_metadata_url_decodes_in_either_length_form() {
+        for url in ABC {
+            let raw = hex::decode(format!("82{url}43010203")).unwrap();
+            let metadata: PoolMetadata = minicbor::decode(&raw).unwrap();
+            assert_eq!(metadata.url, "abc", "{url}");
+            assert_eq!(*metadata.hash, vec![1, 2, 3], "{url}");
+        }
+    }
+
+    #[test]
+    fn relay_strings_decode_in_either_length_form() {
+        for name in ABC {
+            let raw = hex::decode(format!("8301f6{name}")).unwrap();
+            let relay: Relay = minicbor::decode(&raw).unwrap();
+            assert_eq!(relay, Relay::SingleHostName(None, "abc".into()), "{name}");
+
+            let raw = hex::decode(format!("8202{name}")).unwrap();
+            let relay: Relay = minicbor::decode(&raw).unwrap();
+            assert_eq!(relay, Relay::MultiHostName("abc".into()), "{name}");
+        }
+
+        for ipv4 in ["4401020304", "5f420102420304ff"] {
+            let raw = hex::decode(format!("8400f6{ipv4}f6")).unwrap();
+            let relay: Relay = minicbor::decode(&raw).unwrap();
+            assert_eq!(
+                relay,
+                Relay::SingleHostAddr(None, Some(vec![1, 2, 3, 4].into()), None),
+                "{ipv4}"
+            );
+        }
+    }
+}

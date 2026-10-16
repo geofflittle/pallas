@@ -559,6 +559,27 @@ mod tests {
     }
 
     #[test]
+    fn decodes_strings_in_either_length_form() {
+        for (definite, indefinite, expected) in [
+            (
+                "43010203",
+                "5f4201024103ff",
+                Metadatum::Bytes(vec![1, 2, 3].into()),
+            ),
+            (
+                "63616263",
+                "7f6161626263ff",
+                Metadatum::Text("abc".to_string()),
+            ),
+        ] {
+            for hex in [definite, indefinite] {
+                let datum: Metadatum = minicbor::decode(&hex::decode(hex).unwrap()).unwrap();
+                assert_eq!(datum, expected, "{hex}");
+            }
+        }
+    }
+
+    #[test]
     fn rejects_dangling_keys_and_foreign_types() {
         for hex in ["bf00ff", "a100", "f6", "f5", "c249010000000000000000"] {
             let bytes = hex::decode(hex).unwrap();

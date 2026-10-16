@@ -146,4 +146,55 @@ mod tests {
     fn from_str_fail_2() {
         let _digest: Hash<32> = "0d8d00cdd465".parse().unwrap();
     }
+
+    fn two_chunks(bytes: &[u8], at: usize) -> Vec<u8> {
+        let mut e = minicbor::Encoder::new(Vec::new());
+        e.begin_bytes().unwrap();
+        e.bytes(&bytes[..at]).unwrap();
+        e.bytes(&bytes[at..]).unwrap();
+        e.end().unwrap();
+        e.into_writer()
+    }
+
+    #[test]
+    fn text_is_not_a_hash() {
+        for hex in ["63616263", "7f6161626263ff", "00"] {
+            let bytes = hex::decode(hex).unwrap();
+            assert!(minicbor::decode::<Hash<28>>(&bytes).is_err(), "{hex}");
+        }
+    }
+
+    #[test]
+    fn decodes_from_either_length_form() {
+        let short: Hash<28> = "276fd18711931e2c0e21430192dbeac0e458093cd9d1fcd7210f64b3"
+            .parse()
+            .unwrap();
+        let long: Hash<32> = "0d8d00cdd4657ac84d82f0a56067634a7adfdf43da41cb534bcaa45060973d21"
+            .parse()
+            .unwrap();
+
+        let definite: Hash<28> = minicbor::decode(&minicbor::to_vec(short).unwrap()).unwrap();
+        assert_eq!(definite, short);
+        let definite: Hash<32> = minicbor::decode(&minicbor::to_vec(long).unwrap()).unwrap();
+        assert_eq!(definite, long);
+
+        let indefinite: Hash<28> = minicbor::decode(&two_chunks(&short[..], 17)).unwrap();
+        assert_eq!(indefinite, short);
+        let indefinite: Hash<32> = minicbor::decode(&two_chunks(&long[..], 17)).unwrap();
+        assert_eq!(indefinite, long);
+    }
+
+    #[cfg(not(feature = "relaxed"))]
+    #[test]
+    fn checks_the_size_of_the_joined_chunks() {
+        let long: Hash<32> = "0d8d00cdd4657ac84d82f0a56067634a7adfdf43da41cb534bcaa45060973d21"
+            .parse()
+            .unwrap();
+
+        let err = minicbor::decode::<Hash<28>>(&two_chunks(&long[..], 17)).unwrap_err();
+        assert!(err.to_string().contains("Invalid hash size"), "{err}");
+
+        let err = minicbor::decode::<Hash<32>>(&two_chunks(&long[..31], 17)).unwrap_err();
+        assert!(err.to_string().contains("Invalid hash size"), "{err}");
+    }
 }
