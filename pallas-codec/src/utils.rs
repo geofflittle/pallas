@@ -1420,6 +1420,9 @@ pub fn decode_bytes_def_or_indef<'b, C>(
     d: &mut minicbor::Decoder<'b>,
     _ctx: &mut C,
 ) -> Result<Cow<'b, [u8]>, Error> {
+    if d.datatype()? == Type::String {
+        return Ok(Cow::Borrowed(d.str()?.as_bytes()));
+    }
     if d.datatype()? == Type::BytesIndef {
         let mut joined = Vec::new();
         for chunk in d.bytes_iter()? {
@@ -1436,6 +1439,9 @@ pub fn decode_text_def_or_indef<'b, C>(
     d: &mut minicbor::Decoder<'b>,
     _ctx: &mut C,
 ) -> Result<String, Error> {
+    if d.datatype()? == Type::Bytes {
+        return Ok(String::from_utf8_lossy(d.bytes()?).into_owned());
+    }
     if d.datatype()? == Type::StringIndef {
         let mut joined = String::new();
         for chunk in d.str_iter()? {
