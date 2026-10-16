@@ -135,7 +135,7 @@ mod native {
         assert!(
             certificates
                 .iter()
-                .all(|cert| matches!(cert.kind(), Some(pallas_traverse::MultiEraCertKind::Reg(..))))
+                .all(|cert| matches!(cert.kind(), Some(MultiEraCertKind::Reg(..))))
         );
         let outputs = output_value(tx);
         let (deposits, refunds) =

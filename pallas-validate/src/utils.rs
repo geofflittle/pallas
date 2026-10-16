@@ -18,14 +18,11 @@ use pallas_primitives::{
     RewardAccount, StakeCredential, TransactionIndex, UnitInterval, VrfKeyhash,
     alonzo::{Multiasset, NativeScript, Tx as AlonzoTx, VKeyWitness, Value},
     babbage::Tx as BabbageTx,
-    conway::{
-        Certificate as ConwayCertificate, Multiasset as ConwayMultiasset, Tx as ConwayTx,
-        Value as ConwayValue,
-    },
+    conway::{Multiasset as ConwayMultiasset, Tx as ConwayTx, Value as ConwayValue},
 };
 
 use pallas_traverse::{
-    Era, MultiEraCert, MultiEraInput, MultiEraOutput, MultiEraUpdate, time::Slot,
+    Era, MultiEraCert, MultiEraCertKind, MultiEraInput, MultiEraOutput, MultiEraUpdate, time::Slot,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -46,20 +43,19 @@ pub(crate) fn certificate_deposits_and_refunds(
     certificates
         .iter()
         .try_fold((0u64, 0u64), |(deposits, refunds), cert| {
-            let (deposit, refund) = match cert.as_conway() {
+            let (deposit, refund) = match cert.kind() {
                 Some(
-                    ConwayCertificate::StakeRegistration(..)
-                    | ConwayCertificate::Reg(..)
-                    | ConwayCertificate::StakeRegDeleg(..)
-                    | ConwayCertificate::VoteRegDeleg(..)
-                    | ConwayCertificate::StakeVoteRegDeleg(..),
+                    MultiEraCertKind::StakeRegistration(..)
+                    | MultiEraCertKind::Reg(..)
+                    | MultiEraCertKind::StakeRegDeleg(..)
+                    | MultiEraCertKind::VoteRegDeleg(..)
+                    | MultiEraCertKind::StakeVoteRegDeleg(..),
                 ) => (key_deposit, 0),
-                Some(ConwayCertificate::RegDRepCert(..)) => (drep_deposit, 0),
-                Some(ConwayCertificate::StakeDeregistration(..)) => (0, key_deposit),
+                Some(MultiEraCertKind::RegDRep(..)) => (drep_deposit, 0),
+                Some(MultiEraCertKind::StakeDeregistration(..)) => (0, key_deposit),
                 Some(
-                    ConwayCertificate::UnReg(_, refund)
-                    | ConwayCertificate::UnRegDRepCert(_, refund),
-                ) => (0, *refund),
+                    MultiEraCertKind::UnReg(_, refund) | MultiEraCertKind::UnRegDRep(_, refund),
+                ) => (0, refund),
                 _ => (0, 0),
             };
             Ok((
