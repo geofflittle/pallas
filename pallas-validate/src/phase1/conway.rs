@@ -766,7 +766,7 @@ fn check_needed_scripts(
     )?;
     for cert in tx_body.certificates.iter().flatten() {
         if let Some(StakeCredential::ScriptHash(hash)) = certificate_credential(cert) {
-            let mut covered = reference_scripts.contains(hash);
+            let mut covered = true;
             for scripts in [
                 &mut filtered_native_scripts,
                 &mut filtered_plutus_v1_scripts,
