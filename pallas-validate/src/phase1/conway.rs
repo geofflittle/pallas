@@ -156,9 +156,7 @@ fn check_fee(
     prot_pps: &ConwayProtParams,
 ) -> ValidationResult {
     check_min_fee(tx_body, size, prot_pps)?;
-    // Redeemers trigger collateral even when every Plutus script is supplied
-    // by an input reference rather than by the witness set.
-    if !MultiEraTx::from_conway(mtx).redeemers().is_empty() {
+    if presence_of_plutus_scripts(mtx) {
         check_collaterals(tx_body, utxos, prot_pps)?
     }
     Ok(())
