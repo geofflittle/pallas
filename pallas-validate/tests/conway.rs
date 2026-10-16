@@ -134,9 +134,9 @@ mod conway_tests {
         let mut body = (*tx.transaction_body).clone();
         assert!(body.certificates.is_none());
         body.certificates = Some(
-            vec![pallas_primitives::conway::Certificate::StakeDelegation(
+            vec![pallas_primitives::conway::Certificate::Reg(
                 pallas_primitives::StakeCredential::ScriptHash([1; 28].into()),
-                [2; 28].into(),
+                2_000_000,
             )]
             .try_into()
             .unwrap(),
@@ -153,6 +153,7 @@ mod conway_tests {
         )];
         let utxos = mk_utxo_for_conway_tx(&tx.transaction_body, tx_outs_info);
         let mut params = mk_mainnet_params_epoch_365();
+        params.key_deposit = 2_000_000;
         // The edited body changes size, so a zero minimum fee stops the fee
         // check from failing first.
         params.minfee_a = 0;
