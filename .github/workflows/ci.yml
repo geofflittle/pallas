@@ -42,6 +42,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo clippy -p pallas-validate --all-targets --features phase2 -- -D warnings
+      - run: cargo clippy -p pallas-validate --all-targets --features unstable -- -D warnings
 
   docs:
     name: Docs
@@ -76,7 +77,7 @@ jobs:
       - name: Test blueprint feature
         run: cargo test -p pallas-network -p pallas-network2 --features blueprint
       - name: Test unstable feature
-        run: cargo test -p pallas-primitives -p pallas-traverse -p pallas-utxorpc --features unstable
+        run: cargo test -p pallas-primitives -p pallas-traverse -p pallas-utxorpc -p pallas-validate --features unstable
       - name: Test unstable blueprint feature
         run: cargo test -p pallas-primitives --features unstable,blueprint
       - name: Test phase2 feature
