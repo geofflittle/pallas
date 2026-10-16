@@ -1634,13 +1634,17 @@ mod tests {
     }
 
     #[test]
-    fn length_form_readers_refuse_the_other_string_type() {
+    fn byte_string_reader_refuses_text_and_other_types() {
         for hex in ["63616263", "7f6161626263ff", "03"] {
             let raw = hex::decode(hex).unwrap();
             let mut d = minicbor::Decoder::new(&raw);
             assert!(decode_bytes_def_or_indef(&mut d, &mut ()).is_err(), "{hex}");
         }
-        for hex in ["43010203", "5f4201024103ff", "03"] {
+    }
+
+    #[test]
+    fn text_string_reader_refuses_bytes_and_other_types() {
+        for hex in ["43616263", "5f4201024103ff", "03"] {
             let raw = hex::decode(hex).unwrap();
             let mut d = minicbor::Decoder::new(&raw);
             assert!(decode_text_def_or_indef(&mut d, &mut ()).is_err(), "{hex}");

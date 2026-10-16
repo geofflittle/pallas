@@ -158,8 +158,13 @@ mod tests {
 
     #[test]
     fn text_is_not_a_hash() {
-        for hex in ["63616263", "7f6161626263ff", "00"] {
-            let bytes = hex::decode(hex).unwrap();
+        let a = |n: usize| "61".repeat(n);
+        for hex in [
+            format!("781c{}", a(28)),
+            format!("7f71{}6b{}ff", a(17), a(11)),
+            "00".to_string(),
+        ] {
+            let bytes = hex::decode(&hex).unwrap();
             assert!(minicbor::decode::<Hash<28>>(&bytes).is_err(), "{hex}");
         }
     }
