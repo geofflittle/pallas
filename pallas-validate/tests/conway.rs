@@ -126,6 +126,164 @@ mod conway_tests {
     }
 
     #[test]
+    fn certificate_script_is_required_through_dispatch() {
+        // Adds a delegation from a script credential with no script, which
+        // fails before the stale payment signature is checked.
+        let raw = cbor_to_bytes(include_str!("../../test_data/conway3.tx"));
+        let mut tx: Tx = conway_minted_tx_from_cbor(&raw);
+        let mut body = (*tx.transaction_body).clone();
+        assert!(body.certificates.is_none());
+        body.certificates = Some(
+            vec![pallas_primitives::conway::Certificate::StakeDelegation(
+                pallas_primitives::StakeCredential::ScriptHash([1; 28].into()),
+                [2; 28].into(),
+            )]
+            .try_into()
+            .unwrap(),
+        );
+        let changed_body = minicbor::to_vec(body).unwrap();
+        tx.transaction_body = minicbor::decode(&changed_body).unwrap();
+        let tx_outs_info: &[ConwayTxOutInfo] = &[(
+            String::from(
+                "015c5c318d01f729e205c95eb1b02d623dd10e78ea58f72d0c13f892b2e8904edc699e2f0ce7b72be7cec991df651a222e2ae9244eb5975cba",
+            ),
+            Value::Coin(20_000_000),
+            None,
+            None,
+        )];
+        let utxos = mk_utxo_for_conway_tx(&tx.transaction_body, tx_outs_info);
+        let mut params = mk_mainnet_params_epoch_365();
+        // The edited body changes size, so a zero minimum fee stops the fee
+        // check from failing first.
+        params.minfee_a = 0;
+        params.minfee_b = 0;
+        let env = Environment {
+            prot_params: MultiEraProtocolParameters::Conway(params),
+            prot_magic: 764824073,
+            block_slot: 137806612,
+            network_id: 1,
+            acnt: Some(AccountState::default()),
+        };
+        let result = validate_txs(
+            &[MultiEraTx::from_conway(&tx)],
+            &env,
+            &utxos,
+            &mut CertState::default(),
+        );
+        assert!(
+            matches!(
+                result,
+                Err(PostAlonzo(PostAlonzoError::ScriptWitnessMissing))
+            ),
+            "expected missing certificate script, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn byron_inputs_are_witnessed_through_dispatch() {
+        use pallas_addresses::byron::{AddrType, AddressPayload, ByronAddress, SpendingData};
+        use pallas_crypto::key::ed25519::SecretKey;
+        use pallas_primitives::conway::{BootstrapWitness, TransactionInput};
+        use pallas_traverse::OriginalHash;
+
+        // Spends an input and a collateral input locked by one Byron key, the
+        // collateral from a Byron era output.
+        let key = SecretKey::from([7; 32]);
+        let chain_code = [9; 32];
+        let xpub = [key.public_key().as_ref(), &chain_code[..]].concat();
+        let address = ByronAddress::from(AddressPayload::new(
+            AddrType::PubKey,
+            SpendingData::PubKey(xpub.into()),
+            vec![].into(),
+        ))
+        .to_vec();
+        let collateral = TransactionInput {
+            transaction_id: [1; 32].into(),
+            index: 0,
+        };
+        let raw = cbor_to_bytes(include_str!("../../test_data/conway3.tx"));
+        let mut tx: Tx = conway_minted_tx_from_cbor(&raw);
+        tx.transaction_body.collateral = Some(vec![collateral.clone()].try_into().unwrap());
+        let encoded = minicbor::to_vec(&tx).unwrap();
+        let tx: Tx = minicbor::decode(&encoded).unwrap();
+        let hash = tx.transaction_body.original_hash();
+        let spent = tx.transaction_body.inputs.iter().next().unwrap().clone();
+        let spent_output = minicbor::to_vec(pallas_primitives::alonzo::TransactionOutput {
+            address: address.clone().into(),
+            amount: pallas_primitives::alonzo::Value::Coin(20_000_000),
+            datum_hash: None,
+        })
+        .unwrap();
+        let mut collateral_output = vec![0x82];
+        collateral_output.extend(&address);
+        collateral_output.extend([0x1a, 0x00, 0x4c, 0x4b, 0x40]);
+        let utxos = UTxOs::from([
+            (
+                MultiEraInput::from_alonzo_compatible(&spent),
+                MultiEraOutput::decode(pallas_traverse::Era::Conway, &spent_output).unwrap(),
+            ),
+            (
+                MultiEraInput::from_alonzo_compatible(&collateral),
+                MultiEraOutput::decode(pallas_traverse::Era::Byron, &collateral_output).unwrap(),
+            ),
+        ]);
+        let mut params = mk_mainnet_params_epoch_365();
+        // The edited body changes size, so a zero minimum fee stops the fee
+        // check from failing first.
+        params.minfee_a = 0;
+        params.minfee_b = 0;
+        let env = Environment {
+            prot_params: MultiEraProtocolParameters::Conway(params),
+            prot_magic: 764824073,
+            block_slot: 137806612,
+            network_id: 1,
+            acnt: Some(AccountState::default()),
+        };
+        let other_key = SecretKey::from([8; 32]);
+        let sign = |key: &SecretKey, attributes: &[u8], signed: &[u8]| BootstrapWitness {
+            public_key: key.public_key().as_ref().to_vec().into(),
+            signature: key.sign(signed).as_ref().to_vec().into(),
+            chain_code: chain_code.to_vec().into(),
+            attributes: attributes.to_vec().into(),
+        };
+        let witness = |signed: &[u8]| sign(&key, &[0xa0], signed);
+        let other = |signed: &[u8]| sign(&other_key, &[0xa0], signed);
+        let signed = hash.as_ref();
+        let cases = [
+            (vec![witness(signed)], "Ok(())"),
+            (vec![], "Err(PostAlonzo(VKWitnessMissing))"),
+            (vec![witness(&[0; 32])], "Err(PostAlonzo(VKWrongSignature))"),
+            (vec![other(signed)], "Err(PostAlonzo(VKWitnessMissing))"),
+            (vec![witness(signed), other(signed)], "Ok(())"),
+            (
+                vec![witness(signed), other(&[0; 32])],
+                "Err(PostAlonzo(VKWrongSignature))",
+            ),
+            // An empty attribute map written with indefinite length.
+            (
+                vec![sign(&key, &[0xbf, 0xff], signed)],
+                "Err(PostAlonzo(VKWitnessMissing))",
+            ),
+        ];
+        let mut expected = vec![];
+        let mut actual = vec![];
+        for (witnesses, outcome) in cases {
+            let mut tx = tx.clone();
+            tx.transaction_witness_set.vkeywitness = None;
+            tx.transaction_witness_set.bootstrap_witness = witnesses.try_into().ok();
+            let result = validate_txs(
+                &[MultiEraTx::from_conway(&tx)],
+                &env,
+                &utxos,
+                &mut CertState::default(),
+            );
+            expected.push(outcome.to_string());
+            actual.push(format!("{result:?}"));
+        }
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     //Transaction hash:
     // b41ebebf5234b645f9b0767ac541e1d9ea680b763d9b105554ef3b41acdbd36f
     fn successful_preview_tx_with_plutus_v3_script() {
