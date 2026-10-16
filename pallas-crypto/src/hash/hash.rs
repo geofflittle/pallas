@@ -92,7 +92,12 @@ impl<'a, C, const BYTES: usize> minicbor::Decode<'a, C> for Hash<BYTES> {
         ctx: &mut C,
     ) -> Result<Self, minicbor::decode::Error> {
         let bytes = decode_bytes_def_or_indef(d, ctx)?;
-        if bytes.len() == BYTES {
+        if matches!(bytes, std::borrow::Cow::Owned(_)) {
+            let mut hash = [0; BYTES];
+            let n = bytes.len().min(BYTES);
+            hash[..n].copy_from_slice(&bytes[..n]);
+            Ok(Self::new(hash))
+        } else if bytes.len() == BYTES {
             let mut hash = [0; BYTES];
             hash.copy_from_slice(&bytes);
             Ok(Self::new(hash))

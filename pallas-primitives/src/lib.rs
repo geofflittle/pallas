@@ -341,7 +341,7 @@ impl<'b, C> minicbor::decode::Decode<'b, C> for Relay {
                 d.decode_with(ctx)?,
                 decode_text_def_or_indef(d, ctx)?,
             )),
-            2 => Ok(Relay::MultiHostName(decode_text_def_or_indef(d, ctx)?)),
+            2 => Ok(Relay::MultiHostName(d.decode_with(ctx)?)),
             _ => Err(minicbor::decode::Error::message(
                 "invalid variant id for Relay",
             )),

@@ -170,7 +170,7 @@ impl<'b, C> TreeDecode<'b, C> for Node {
             | Type::Int => leaf(Metadatum::Int(d.decode_with(ctx)?)),
             Type::Bytes | Type::BytesIndef => leaf(Metadatum::Bytes(d.decode_with(ctx)?)),
             Type::String | Type::StringIndef => {
-                leaf(Metadatum::Text(decode_text_def_or_indef(d, ctx)?))
+                leaf(Metadatum::Text(d.decode_with(ctx)?))
             }
             Type::Array | Type::ArrayIndef => {
                 let len = d.array()?;
