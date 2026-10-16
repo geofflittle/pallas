@@ -1420,15 +1420,7 @@ pub fn decode_bytes_def_or_indef<'b, C>(
     d: &mut minicbor::Decoder<'b>,
     _ctx: &mut C,
 ) -> Result<Cow<'b, [u8]>, Error> {
-    if d.datatype()? == Type::BytesIndef {
-        let mut joined = Vec::new();
-        for chunk in d.bytes_iter()? {
-            joined.extend_from_slice(chunk?);
-        }
-        Ok(Cow::Owned(joined))
-    } else {
-        d.bytes().map(Cow::Borrowed)
-    }
+    d.bytes().map(Cow::Borrowed)
 }
 
 /// Decode a CBOR text string written in either the definite or the indefinite length form.
@@ -1436,15 +1428,7 @@ pub fn decode_text_def_or_indef<'b, C>(
     d: &mut minicbor::Decoder<'b>,
     _ctx: &mut C,
 ) -> Result<String, Error> {
-    if d.datatype()? == Type::StringIndef {
-        let mut joined = String::new();
-        for chunk in d.str_iter()? {
-            joined.push_str(chunk?);
-        }
-        Ok(joined)
-    } else {
-        d.str().map(String::from)
-    }
+    d.str().map(String::from)
 }
 
 #[derive(Serialize, Deserialize, Clone, Encode, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
