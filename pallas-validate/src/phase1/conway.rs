@@ -23,7 +23,7 @@ use pallas_primitives::{
         ScriptRef, TransactionBody, TransactionOutput, Tx, VKeyWitness, Value, WitnessSet,
     },
 };
-use pallas_traverse::{MultiEraInput, MultiEraOutput, OriginalHash};
+use pallas_traverse::{MultiEraInput, MultiEraOutput, MultiEraTx, OriginalHash};
 use std::cmp::Ordering;
 use std::ops::Deref;
 
@@ -139,7 +139,9 @@ fn check_fee(
     prot_pps: &ConwayProtParams,
 ) -> ValidationResult {
     check_min_fee(tx_body, size, prot_pps)?;
-    if presence_of_plutus_scripts(mtx) {
+    // Collateral is required whenever the transaction has redeemers, including
+    // when every script is a reference script.
+    if !MultiEraTx::from_conway(mtx).redeemers().is_empty() {
         check_collaterals(tx_body, utxos, prot_pps)?
     }
     Ok(())
