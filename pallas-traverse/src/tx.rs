@@ -674,7 +674,7 @@ impl<'b> MultiEraTx<'b> {
         #[cfg(feature = "unstable")]
         if let Self::Dijkstra(tx) = self {
             let mut required = required;
-            for sub in tx.transaction_body.sub_transactions.iter().flatten() {
+            for sub in tx.transaction_body.sub_transactions.iter().flatten().take(1) {
                 let body = &sub.sub_transaction_body;
                 required.extend(
                     body.inputs
