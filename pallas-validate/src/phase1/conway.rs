@@ -1666,7 +1666,7 @@ fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
             continue;
         };
         if !get_script_hash_from_reference_input(input, utxos)
-            .is_some_and(|hash| needed.contains(&hash))
+            .is_some_and(|hash| needed.contains(&hash) || !needed.is_empty())
         {
             continue;
         }
