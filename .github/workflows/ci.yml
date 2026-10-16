@@ -43,6 +43,7 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo clippy -p pallas-validate --all-targets --features phase2 -- -D warnings
       - run: cargo clippy -p pallas-validate --all-targets --features unstable -- -D warnings
+      - run: cargo clippy -p pallas-validate --all-targets --features phase2,unstable -- -D warnings
 
   docs:
     name: Docs
@@ -82,7 +83,7 @@ jobs:
         run: cargo test -p pallas-primitives --features unstable,blueprint
       - name: Test phase2 feature
         run: cargo test -p pallas-validate --features phase2
-      - name: Test native Dijkstra validation with phase two enabled
+      - name: Test phase2 unstable feature
         run: cargo test -p pallas-validate --features phase2,unstable
 
   features:
