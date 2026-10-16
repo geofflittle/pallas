@@ -1,0 +1,10 @@
+--- a/pallas-validate/src/phase1/conway.rs
++++ b/pallas-validate/src/phase1/conway.rs
+@@ -378,6 +378,7 @@
+     drep_deposit: u64,
+ ) -> (u64, u64) {
+     match cert {
++        Certificate::Reg(_, declared) => (*declared, 0),
+         Certificate::StakeRegistration(..)
+         | Certificate::Reg(..)
+         | Certificate::StakeRegDeleg(..)

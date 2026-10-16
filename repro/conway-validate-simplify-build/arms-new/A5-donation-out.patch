@@ -1,0 +1,10 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:12
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:12
+@@ -357,7 +357,6 @@
+         .into_iter()
+         .chain(deposits)
+         .chain(proposals)
+-        .chain(donation)
+     {
+         output = conway_add_values(&output, &Value::Coin(coin), &err)?;
+     }

@@ -1,0 +1,13 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:13
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:13
+@@ -937,8 +937,8 @@
+             && !super::shelley_ma::eval_native_script(
+                 &vkeys,
+                 script,
+-                &body.validity_interval_start,
+-                &body.ttl,
++                &None,
++                &None,
+             )
+         {
+             return Err(PostAlonzo(NativeScriptDenial));

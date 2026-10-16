@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:12
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:12
+@@ -809,7 +809,7 @@
+         &mut filtered_plutus_v3_scripts,
+         reference_scripts,
+     )?;
+-    for cert in tx_body.certificates.iter().flatten() {
++    for cert in tx_body.certificates.iter().flatten().take(0) {
+         if let Some(StakeCredential::ScriptHash(hash)) = certificate_credential(cert) {
+             let mut covered = reference_scripts.contains(hash);
+             for scripts in [

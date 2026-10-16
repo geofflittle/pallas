@@ -1,0 +1,13 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:13
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:13
+@@ -825,9 +825,7 @@
+                     }
+                 }
+             }
+-            if !covered {
+-                return Err(PostAlonzo(ScriptWitnessMissing));
+-            }
++            let _ = covered;
+         }
+     }
+     for (covered, _) in filtered_native_scripts.iter() {

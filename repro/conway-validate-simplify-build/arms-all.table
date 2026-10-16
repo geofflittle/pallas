@@ -1,0 +1,46 @@
+baseline exit=0 |  | passed=144 failed=0
+A1-deposits-out exit=101 | deposits_refunds_withdrawals_and_donations_balance registration_deposit_is_required_through_dispatch  | passed=142 failed=2
+A10-legacy-dereg-refund exit=101 | each_certificate_charges_or_refunds_its_deposit  | passed=143 failed=1
+A11-declared-refund exit=101 | deposits_refunds_withdrawals_and_donations_balance each_certificate_charges_or_refunds_its_deposit  | passed=142 failed=2
+A11m-refund-is-key-deposit exit=101 | deposits_refunds_withdrawals_and_donations_balance each_certificate_charges_or_refunds_its_deposit  | passed=142 failed=2
+A13m-reg-uses-declared exit=101 | each_certificate_charges_or_refunds_its_deposit  | passed=143 failed=1
+A14m-delegation-charges exit=101 | each_certificate_charges_or_refunds_its_deposit  | passed=143 failed=1
+A15m-key-deposit-zero exit=101 | registration_deposit_is_required_through_dispatch  | passed=143 failed=1
+A16m-drep-deposit-zero exit=0 |  | passed=144 failed=0
+A17m-gov-deposit-zero exit=0 |  | passed=144 failed=0
+A2-refunds-in exit=101 | deposits_refunds_withdrawals_and_donations_balance  | passed=143 failed=1
+A3-withdrawals-in exit=101 | deposits_refunds_withdrawals_and_donations_balance  | passed=143 failed=1
+A4-proposals-out exit=101 | deposits_refunds_withdrawals_and_donations_balance  | passed=143 failed=1
+A5-donation-out exit=101 | deposits_refunds_withdrawals_and_donations_balance  | passed=143 failed=1
+A7-legacy-reg-deposit exit=101 | each_certificate_charges_or_refunds_its_deposit  | passed=143 failed=1
+A8-voteregdeleg-deposit exit=101 | each_certificate_charges_or_refunds_its_deposit  | passed=143 failed=1
+A9-drep-deposit exit=101 | deposits_refunds_withdrawals_and_donations_balance each_certificate_charges_or_refunds_its_deposit  | passed=142 failed=2
+B1-needed-cert-scripts exit=101 | all_plutus_versions_can_supply_certificate_scripts certificate_pointers_use_full_positions_and_distinct_purposes every_credential_certificate_requires_script_and_plutus_redeemer native_certificate_checks_authorization_without_redeemers native_certificate_timelocks_and_thresholds_are_evaluated  | passed=139 failed=5
+B10-ref-hashes-ref-inputs-only exit=101 | native_reference_certificate_needs_no_redeemer plutus_reference_scripts_need_a_redeemer_for_every_purpose  | passed=142 failed=2
+B11m-legacy-reg-needs-witness exit=101 | certificate_pointers_use_full_positions_and_distinct_purposes  | passed=143 failed=1
+B12m-reg-needs-no-witness exit=101 | all_plutus_versions_can_supply_certificate_scripts certificate_pointers_use_full_positions_and_distinct_purposes every_credential_certificate_requires_its_key_and_valid_signature every_credential_certificate_requires_script_and_plutus_redeemer native_certificate_checks_authorization_without_redeemers native_certificate_timelocks_and_thresholds_are_evaluated native_reference_authorization_uses_original_script_hash native_reference_certificate_needs_no_redeemer plutus_reference_scripts_need_a_redeemer_for_every_purpose  | passed=135 failed=9
+B13-ref-inputs-only-everywhere exit=101 | native_reference_certificate_needs_no_redeemer plutus_reference_scripts_need_a_redeemer_for_every_purpose  | passed=142 failed=2
+B14m-cert-cover-no-v1v2 exit=101 | all_plutus_versions_can_supply_certificate_scripts  | passed=143 failed=1
+B15m-cert-pointer-any-script exit=101 | native_certificate_checks_authorization_without_redeemers native_certificate_timelocks_and_thresholds_are_evaluated native_reference_authorization_uses_original_script_hash native_reference_certificate_needs_no_redeemer  | passed=140 failed=4
+B16m-plutus-ref-list-ref-inputs-only exit=101 | plutus_reference_scripts_need_a_redeemer_for_every_purpose  | passed=143 failed=1
+B1m-cert-missing-return-off exit=101 | every_credential_certificate_requires_script_and_plutus_redeemer  | passed=143 failed=1
+B2-native-ref-filter exit=101 | native_reference_authorization_uses_original_script_hash native_reference_certificate_needs_no_redeemer  | passed=142 failed=2
+B3-cert-native-eval-call exit=101 | native_certificate_checks_authorization_without_redeemers native_certificate_timelocks_and_thresholds_are_evaluated native_reference_authorization_uses_original_script_hash native_reference_certificate_needs_no_redeemer  | passed=140 failed=4
+B3m-cert-eval-no-bounds exit=101 | native_certificate_timelocks_and_thresholds_are_evaluated  | passed=143 failed=1
+B4-cert-native-eval-refs exit=101 | native_reference_authorization_uses_original_script_hash native_reference_certificate_needs_no_redeemer  | passed=142 failed=2
+B5-ref-native-original-hash exit=101 | native_reference_authorization_uses_original_script_hash  | passed=143 failed=1
+B6-cert-redeemer-pointers exit=101 | all_plutus_versions_can_supply_certificate_scripts certificate_pointers_use_full_positions_and_distinct_purposes every_credential_certificate_requires_script_and_plutus_redeemer plutus_reference_scripts_need_a_redeemer_for_every_purpose  | passed=140 failed=4
+B6m-script-cert-index exit=101 | certificate_pointers_use_full_positions_and_distinct_purposes  | passed=143 failed=1
+B7-cert-key-witness exit=101 | every_credential_certificate_requires_its_key_and_valid_signature  | passed=143 failed=1
+B8-pool-key-witnesses exit=101 | pool_certificates_require_operator_and_registration_owners  | passed=143 failed=1
+B8b-pool-owner-witnesses exit=101 | pool_certificates_require_operator_and_registration_owners  | passed=143 failed=1
+B9-remaining-vk-wits exit=101 | native_certificate_checks_authorization_without_redeemers  | passed=143 failed=1
+C1-collateral-trigger exit=101 | reference_script_tx_with_collateral_one_lovelace_short  | passed=143 failed=1
+F4n-native-ref-hash-reencoded exit=101 | native_reference_authorization_uses_original_script_hash  | passed=143 failed=1
+F4v1-v1-ref-hash-tag exit=0 |  | passed=144 failed=0
+F4v2-v2-ref-hash-tag exit=0 |  | passed=144 failed=0
+F4v3-v3-ref-hash-tag exit=101 | plutus_reference_scripts_need_a_redeemer_for_every_purpose successful_mainnet_tx_with_plutus_v3_script successful_preview_tx_with_plutus_v3_script  | passed=141 failed=3
+F5r-check-minting-ref-inputs-only exit=101 | plutus_reference_scripts_need_a_redeemer_for_every_purpose  | passed=143 failed=1
+M1-check-minting-never-refuses exit=101 | minted_policy_needs_a_script  | passed=143 failed=1
+TF1-conway4-fixture-old exit=101 | successful_preview_tx_with_plutus_v3_script  | passed=143 failed=1
+TF2-conway5-fixture-old exit=101 | successful_mainnet_tx_with_plutus_v3_script  | passed=143 failed=1

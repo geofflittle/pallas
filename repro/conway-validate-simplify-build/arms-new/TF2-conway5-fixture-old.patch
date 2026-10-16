@@ -1,0 +1,11 @@
+--- a/pallas-validate/tests/conway.rs	2026-10-16 13:13:46
++++ b/pallas-validate/tests/conway.rs	2026-10-16 13:13:46
+@@ -197,7 +197,7 @@
+             String::from(
+                 "015c5c318d01f729e205c95eb1b02d623dd10e78ea58f72d0c13f892b2e8904edc699e2f0ce7b72be7cec991df651a222e2ae9244eb5975cba",
+             ),
+-            Value::Coin(50000000),
++            Value::Coin(49731771),
+             None,
+             None,
+             Vec::new(),

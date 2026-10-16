@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:13:45
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:13:45
+@@ -1034,7 +1034,7 @@
+         ScriptRef::NativeScript(script) => script.original_hash(),
+         ScriptRef::PlutusV1Script(script) => script.compute_hash(),
+         ScriptRef::PlutusV2Script(script) => script.compute_hash(),
+-        ScriptRef::PlutusV3Script(script) => script.compute_hash(),
++        ScriptRef::PlutusV3Script(script) => pallas_crypto::hash::Hasher::<224>::hash_tagged(&script.0, 2),
+     }
+ }
+ 

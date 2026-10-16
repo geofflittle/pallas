@@ -1,0 +1,138 @@
+arm baseline base=tip exit=0 compiled=6
+
+totals passed=144 failed=0
+arm A1-deposits-out base=tip exit=101 compiled=6
+deposits_refunds_withdrawals_and_donations_balance registration_deposit_is_required_through_dispatch 
+totals passed=142 failed=2
+arm A10-legacy-dereg-refund base=tip exit=101 compiled=6
+each_certificate_charges_or_refunds_its_deposit 
+totals passed=143 failed=1
+arm A11-declared-refund base=tip exit=101 compiled=6
+deposits_refunds_withdrawals_and_donations_balance each_certificate_charges_or_refunds_its_deposit 
+totals passed=142 failed=2
+arm A11m-refund-is-key-deposit base=tip exit=101 compiled=6
+deposits_refunds_withdrawals_and_donations_balance each_certificate_charges_or_refunds_its_deposit 
+totals passed=142 failed=2
+arm A13m-reg-uses-declared base=tip exit=101 compiled=6
+each_certificate_charges_or_refunds_its_deposit 
+totals passed=143 failed=1
+arm A14m-delegation-charges base=tip exit=101 compiled=6
+each_certificate_charges_or_refunds_its_deposit 
+totals passed=143 failed=1
+arm A15m-key-deposit-zero base=tip exit=101 compiled=6
+registration_deposit_is_required_through_dispatch 
+totals passed=143 failed=1
+arm A16m-drep-deposit-zero base=tip exit=0 compiled=6
+
+totals passed=144 failed=0
+arm A17m-gov-deposit-zero base=tip exit=0 compiled=6
+
+totals passed=144 failed=0
+arm A2-refunds-in base=tip exit=101 compiled=6
+deposits_refunds_withdrawals_and_donations_balance 
+totals passed=143 failed=1
+arm A3-withdrawals-in base=tip exit=101 compiled=6
+deposits_refunds_withdrawals_and_donations_balance 
+totals passed=143 failed=1
+arm A4-proposals-out base=tip exit=101 compiled=6
+deposits_refunds_withdrawals_and_donations_balance 
+totals passed=143 failed=1
+arm A5-donation-out base=tip exit=101 compiled=6
+deposits_refunds_withdrawals_and_donations_balance 
+totals passed=143 failed=1
+arm A7-legacy-reg-deposit base=tip exit=101 compiled=6
+each_certificate_charges_or_refunds_its_deposit 
+totals passed=143 failed=1
+arm A8-voteregdeleg-deposit base=tip exit=101 compiled=6
+each_certificate_charges_or_refunds_its_deposit 
+totals passed=143 failed=1
+arm A9-drep-deposit base=tip exit=101 compiled=6
+deposits_refunds_withdrawals_and_donations_balance each_certificate_charges_or_refunds_its_deposit 
+totals passed=142 failed=2
+arm B1-needed-cert-scripts base=tip exit=101 compiled=6
+all_plutus_versions_can_supply_certificate_scripts certificate_pointers_use_full_positions_and_distinct_purposes every_credential_certificate_requires_script_and_plutus_redeemer native_certificate_checks_authorization_without_redeemers native_certificate_timelocks_and_thresholds_are_evaluated 
+totals passed=139 failed=5
+arm B10-ref-hashes-ref-inputs-only base=tip exit=101 compiled=6
+native_reference_certificate_needs_no_redeemer plutus_reference_scripts_need_a_redeemer_for_every_purpose 
+totals passed=142 failed=2
+arm B11m-legacy-reg-needs-witness base=tip exit=101 compiled=6
+certificate_pointers_use_full_positions_and_distinct_purposes 
+totals passed=143 failed=1
+arm B12m-reg-needs-no-witness base=tip exit=101 compiled=6
+all_plutus_versions_can_supply_certificate_scripts certificate_pointers_use_full_positions_and_distinct_purposes every_credential_certificate_requires_its_key_and_valid_signature every_credential_certificate_requires_script_and_plutus_redeemer native_certificate_checks_authorization_without_redeemers native_certificate_timelocks_and_thresholds_are_evaluated native_reference_authorization_uses_original_script_hash native_reference_certificate_needs_no_redeemer plutus_reference_scripts_need_a_redeemer_for_every_purpose 
+totals passed=135 failed=9
+arm B13-ref-inputs-only-everywhere base=tip exit=101 compiled=6
+native_reference_certificate_needs_no_redeemer plutus_reference_scripts_need_a_redeemer_for_every_purpose 
+totals passed=142 failed=2
+arm B14m-cert-cover-no-v1v2 base=tip exit=101 compiled=6
+all_plutus_versions_can_supply_certificate_scripts 
+totals passed=143 failed=1
+arm B15m-cert-pointer-any-script base=tip exit=101 compiled=6
+native_certificate_checks_authorization_without_redeemers native_certificate_timelocks_and_thresholds_are_evaluated native_reference_authorization_uses_original_script_hash native_reference_certificate_needs_no_redeemer 
+totals passed=140 failed=4
+arm B16m-plutus-ref-list-ref-inputs-only base=tip exit=101 compiled=6
+plutus_reference_scripts_need_a_redeemer_for_every_purpose 
+totals passed=143 failed=1
+arm B1m-cert-missing-return-off base=tip exit=101 compiled=6
+every_credential_certificate_requires_script_and_plutus_redeemer 
+totals passed=143 failed=1
+arm B2-native-ref-filter base=tip exit=101 compiled=6
+native_reference_authorization_uses_original_script_hash native_reference_certificate_needs_no_redeemer 
+totals passed=142 failed=2
+arm B3-cert-native-eval-call base=tip exit=101 compiled=6
+native_certificate_checks_authorization_without_redeemers native_certificate_timelocks_and_thresholds_are_evaluated native_reference_authorization_uses_original_script_hash native_reference_certificate_needs_no_redeemer 
+totals passed=140 failed=4
+arm B3m-cert-eval-no-bounds base=tip exit=101 compiled=6
+native_certificate_timelocks_and_thresholds_are_evaluated 
+totals passed=143 failed=1
+arm B4-cert-native-eval-refs base=tip exit=101 compiled=6
+native_reference_authorization_uses_original_script_hash native_reference_certificate_needs_no_redeemer 
+totals passed=142 failed=2
+arm B5-ref-native-original-hash base=tip exit=101 compiled=6
+native_reference_authorization_uses_original_script_hash 
+totals passed=143 failed=1
+arm B6-cert-redeemer-pointers base=tip exit=101 compiled=6
+all_plutus_versions_can_supply_certificate_scripts certificate_pointers_use_full_positions_and_distinct_purposes every_credential_certificate_requires_script_and_plutus_redeemer plutus_reference_scripts_need_a_redeemer_for_every_purpose 
+totals passed=140 failed=4
+arm B6m-script-cert-index base=tip exit=101 compiled=6
+certificate_pointers_use_full_positions_and_distinct_purposes 
+totals passed=143 failed=1
+arm B7-cert-key-witness base=tip exit=101 compiled=6
+every_credential_certificate_requires_its_key_and_valid_signature 
+totals passed=143 failed=1
+arm B8-pool-key-witnesses base=tip exit=101 compiled=6
+pool_certificates_require_operator_and_registration_owners 
+totals passed=143 failed=1
+arm B8b-pool-owner-witnesses base=tip exit=101 compiled=6
+pool_certificates_require_operator_and_registration_owners 
+totals passed=143 failed=1
+arm B9-remaining-vk-wits base=tip exit=101 compiled=6
+native_certificate_checks_authorization_without_redeemers 
+totals passed=143 failed=1
+arm C1-collateral-trigger base=tip exit=101 compiled=6
+reference_script_tx_with_collateral_one_lovelace_short 
+totals passed=143 failed=1
+arm F4n-native-ref-hash-reencoded base=tip exit=101 compiled=6
+native_reference_authorization_uses_original_script_hash 
+totals passed=143 failed=1
+arm F4v1-v1-ref-hash-tag base=tip exit=0 compiled=6
+
+totals passed=144 failed=0
+arm F4v2-v2-ref-hash-tag base=tip exit=0 compiled=6
+
+totals passed=144 failed=0
+arm F4v3-v3-ref-hash-tag base=tip exit=101 compiled=6
+plutus_reference_scripts_need_a_redeemer_for_every_purpose successful_mainnet_tx_with_plutus_v3_script successful_preview_tx_with_plutus_v3_script 
+totals passed=141 failed=3
+arm F5r-check-minting-ref-inputs-only base=tip exit=101 compiled=6
+plutus_reference_scripts_need_a_redeemer_for_every_purpose 
+totals passed=143 failed=1
+arm M1-check-minting-never-refuses base=tip exit=101 compiled=6
+minted_policy_needs_a_script 
+totals passed=143 failed=1
+arm TF1-conway4-fixture-old base=tip exit=101 compiled=6
+successful_preview_tx_with_plutus_v3_script 
+totals passed=143 failed=1
+arm TF2-conway5-fixture-old base=tip exit=101 compiled=6
+successful_mainnet_tx_with_plutus_v3_script 
+totals passed=143 failed=1

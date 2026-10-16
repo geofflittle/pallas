@@ -1,0 +1,15 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:12
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:12
+@@ -869,10 +869,10 @@
+     match cert {
+         Certificate::StakeRegistration(_)
+         | Certificate::PoolRegistration { .. }
+-        | Certificate::PoolRetirement(..) => None,
++        | Certificate::PoolRetirement(..)
++        | Certificate::Reg(..) => None,
+         Certificate::StakeDeregistration(cred)
+         | Certificate::StakeDelegation(cred, _)
+-        | Certificate::Reg(cred, _)
+         | Certificate::UnReg(cred, _)
+         | Certificate::VoteDeleg(cred, _)
+         | Certificate::StakeVoteDeleg(cred, _, _)

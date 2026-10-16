@@ -1,0 +1,17 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:13
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:13
+@@ -1540,12 +1540,9 @@
+                 pool_owners,
+                 ..
+             } => {
+-                check_vk_wit(operator, vk_wits, tx_hash)?;
+-                for owner in pool_owners.iter() {
+-                    check_vk_wit(owner, vk_wits, tx_hash)?;
+-                }
++                let _ = (operator, pool_owners);
+             }
+-            Certificate::PoolRetirement(operator, _) => check_vk_wit(operator, vk_wits, tx_hash)?,
++            Certificate::PoolRetirement(..) => {}
+             _ => {}
+         }
+     }

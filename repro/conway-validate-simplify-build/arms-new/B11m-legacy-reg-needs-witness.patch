@@ -1,0 +1,15 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:12
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:12
+@@ -867,10 +867,10 @@
+ // needs no witness, and pool certificates are witnessed by pool keys.
+ fn certificate_credential(cert: &Certificate) -> Option<&StakeCredential> {
+     match cert {
+-        Certificate::StakeRegistration(_)
+-        | Certificate::PoolRegistration { .. }
++        Certificate::PoolRegistration { .. }
+         | Certificate::PoolRetirement(..) => None,
+         Certificate::StakeDeregistration(cred)
++        | Certificate::StakeRegistration(cred)
+         | Certificate::StakeDelegation(cred, _)
+         | Certificate::Reg(cred, _)
+         | Certificate::UnReg(cred, _)

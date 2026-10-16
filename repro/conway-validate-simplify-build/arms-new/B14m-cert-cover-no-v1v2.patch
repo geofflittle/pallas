@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:13
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:13
+@@ -814,8 +814,6 @@
+             let mut covered = reference_scripts.contains(hash);
+             for scripts in [
+                 &mut filtered_native_scripts,
+-                &mut filtered_plutus_v1_scripts,
+-                &mut filtered_plutus_v2_scripts,
+                 &mut filtered_plutus_v3_scripts,
+             ] {
+                 for (used, supplied) in scripts.iter_mut() {

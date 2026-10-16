@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:12
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:12
+@@ -855,7 +855,7 @@
+ 
+ fn get_reference_script_hashes(tx_body: &TransactionBody, utxos: &UTxOs) -> Vec<PolicyId> {
+     let mut res: Vec<PolicyId> = Vec::new();
+-    for input in reference_script_inputs(tx_body) {
++    for input in tx_body.reference_inputs.iter().flatten() {
+         if let Some(script_hash) = get_script_hash_from_reference_input(input, utxos) {
+             res.push(script_hash);
+         }

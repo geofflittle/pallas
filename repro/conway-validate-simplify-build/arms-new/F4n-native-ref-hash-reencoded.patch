@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:13:45
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:13:45
+@@ -1031,7 +1031,7 @@
+ 
+ fn script_ref_hash(script: &ScriptRef) -> PolicyId {
+     match script {
+-        ScriptRef::NativeScript(script) => script.original_hash(),
++        ScriptRef::NativeScript(script) => compute_native_script_hash(script),
+         ScriptRef::PlutusV1Script(script) => script.compute_hash(),
+         ScriptRef::PlutusV2Script(script) => script.compute_hash(),
+         ScriptRef::PlutusV3Script(script) => script.compute_hash(),

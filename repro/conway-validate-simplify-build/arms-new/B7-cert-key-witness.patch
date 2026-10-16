@@ -1,0 +1,12 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:13
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:13
+@@ -1531,9 +1531,6 @@
+         }
+     }
+     for cert in tx_body.certificates.iter().flatten() {
+-        if let Some(StakeCredential::AddrKeyhash(hash)) = certificate_credential(cert) {
+-            check_vk_wit(hash, vk_wits, tx_hash)?;
+-        }
+         match cert {
+             Certificate::PoolRegistration {
+                 operator,

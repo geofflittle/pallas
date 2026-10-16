@@ -1,0 +1,10 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:11
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:11
+@@ -355,7 +355,6 @@
+     let donation = tx_body.donation.map(u64::from);
+     for coin in [tx_body.fee]
+         .into_iter()
+-        .chain(deposits)
+         .chain(proposals)
+         .chain(donation)
+     {

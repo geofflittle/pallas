@@ -1,0 +1,14 @@
+--- a/pallas-validate/src/phase1/conway.rs
++++ b/pallas-validate/src/phase1/conway.rs
+@@ -727,7 +727,10 @@
+     let plutus_data = tx_wits.plutus_data.clone();
+     check_datums(tx_body, utxos, &plutus_data)?;
+     // Native reference scripts satisfy script presence, but never need redeemers.
+-    let plutus_reference_scripts: Vec<PolicyId> = reference_script_inputs(tx_body)
++    let plutus_reference_scripts: Vec<PolicyId> = tx_body
++        .reference_inputs
++        .iter()
++        .flatten()
+         .filter_map(|input| reference_script(input, utxos))
+         .filter(|script| !matches!(script, ScriptRef::NativeScript(_)))
+         .map(script_ref_hash)

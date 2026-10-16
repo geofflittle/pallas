@@ -1,0 +1,10 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:13
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:13
+@@ -741,7 +741,6 @@
+         tx_wits,
+         utxos,
+     )?;
+-    check_certificate_native_scripts(mtx, utxos)?;
+     check_required_signers(&tx_body.required_signers, vkey_wits, tx_hash)?;
+     check_vkey_input_wits(
+         mtx,

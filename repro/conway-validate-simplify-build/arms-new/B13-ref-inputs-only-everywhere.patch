@@ -1,0 +1,10 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:12
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:13
+@@ -892,6 +892,7 @@
+ ) -> impl Iterator<Item = &'a TransactionInput> {
+     body.inputs
+         .iter()
++        .take(0)
+         .chain(body.reference_inputs.iter().flatten())
+ }
+ 

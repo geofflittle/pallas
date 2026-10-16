@@ -1,0 +1,19 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:13
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:13
+@@ -1347,15 +1347,7 @@
+         }
+     }
+     for (index, cert) in tx_body.certificates.iter().flatten().enumerate() {
+-        if let Some(StakeCredential::ScriptHash(hash)) = certificate_credential(cert)
+-            && is_phase_2_script(
+-                hash,
+-                plutus_v1_scripts,
+-                plutus_v2_scripts,
+-                plutus_v3_scripts,
+-                reference_scripts,
+-            )
+-        {
++        if let Some(StakeCredential::ScriptHash(_hash)) = certificate_credential(cert) {
+             res.push(RedeemersKey {
+                 tag: pallas_primitives::conway::RedeemerTag::Cert,
+                 index: index as u32,

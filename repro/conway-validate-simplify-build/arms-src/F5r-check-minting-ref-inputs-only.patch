@@ -1,0 +1,14 @@
+--- a/pallas-validate/src/phase1/conway.rs
++++ b/pallas-validate/src/phase1/conway.rs
+@@ -646,7 +646,10 @@
+                 .flatten()
+                 .map(compute_plutus_v3_script_hash);
+
+-            let ref_scripts = reference_script_inputs(tx_body)
++            let ref_scripts = tx_body
++                .reference_inputs
++                .iter()
++                .flatten()
+                 .filter_map(|x| get_script_hash_from_reference_input(x, utxos));
+
+             let all_scripts_wits: Vec<_> = native_script_wits

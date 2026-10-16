@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase1/conway.rs
++++ b/pallas-validate/src/phase1/conway.rs
+@@ -658,7 +658,7 @@
+
+             for policy in minted_value.keys() {
+                 if !all_scripts_wits.contains(policy) {
+-                    return Err(PostAlonzo(MintingLacksPolicy(*policy)));
++                    let _ = policy;
+                 }
+             }
+             Ok(())

@@ -1,0 +1,10 @@
+--- a/pallas-validate/src/phase1/conway.rs
++++ b/pallas-validate/src/phase1/conway.rs
+@@ -386,6 +386,6 @@
+         Certificate::RegDRepCert(..) => (drep_deposit, 0),
+         Certificate::StakeDeregistration(..) => (0, key_deposit),
+-        Certificate::UnReg(_, refund) | Certificate::UnRegDRepCert(_, refund) => (0, *refund),
++        Certificate::UnReg(..) | Certificate::UnRegDRepCert(..) => (0, 0),
+         _ => (0, 0),
+     }
+ }

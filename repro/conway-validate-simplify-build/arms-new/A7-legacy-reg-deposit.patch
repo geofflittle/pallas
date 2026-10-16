@@ -1,0 +1,12 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:12
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:12
+@@ -378,8 +378,7 @@
+     drep_deposit: u64,
+ ) -> (u64, u64) {
+     match cert {
+-        Certificate::StakeRegistration(..)
+-        | Certificate::Reg(..)
++        Certificate::Reg(..)
+         | Certificate::StakeRegDeleg(..)
+         | Certificate::VoteRegDeleg(..)
+         | Certificate::StakeVoteRegDeleg(..) => (key_deposit, 0),

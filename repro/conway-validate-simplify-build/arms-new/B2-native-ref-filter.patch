@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:13
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:13
+@@ -736,7 +736,7 @@
+         &plutus_v1_scripts,
+         &plutus_v2_scripts,
+         &plutus_v3_scripts,
+-        &plutus_reference_scripts,
++        &reference_scripts,
+         tx_body,
+         tx_wits,
+         utxos,

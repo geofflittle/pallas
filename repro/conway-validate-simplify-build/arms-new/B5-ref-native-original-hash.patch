@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:13
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:13
+@@ -924,7 +924,7 @@
+         .chain(reference_script_inputs(body).filter_map(|input| {
+             match reference_script(input, utxos) {
+                 Some(ScriptRef::NativeScript(script)) => {
+-                    Some((script.original_hash(), script.deref()))
++                    Some((compute_native_script_hash(script), script.deref()))
+                 }
+                 _ => None,
+             }

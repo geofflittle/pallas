@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:12
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 13:12:12
+@@ -383,7 +383,7 @@
+         | Certificate::StakeRegDeleg(..)
+         | Certificate::VoteRegDeleg(..)
+         | Certificate::StakeVoteRegDeleg(..) => (key_deposit, 0),
+-        Certificate::RegDRepCert(..) => (drep_deposit, 0),
++        Certificate::RegDRepCert(..) => (key_deposit, 0),
+         Certificate::StakeDeregistration(..) => (0, key_deposit),
+         Certificate::UnReg(_, refund) | Certificate::UnRegDRepCert(_, refund) => (0, *refund),
+         _ => (0, 0),
