@@ -195,6 +195,53 @@ fn transaction_payloads_reencode_to_their_wire_bytes() {
     );
 }
 
+/// Provenance for these fixtures is in `test_data/dijkstra-fixtures.md`.
+const INDEFINITE_BYTES_TXS: &[(&str, &str, &str, usize)] = &[
+    (
+        "dijkstra-indef-bytes1",
+        include_str!("../../../test_data/dijkstra-indef-bytes1.tx"),
+        "943a88c97f86522b2cda39d1d6bd076ea51a696e5ad41c41e4c6d38ce8f7dd50",
+        11,
+    ),
+    (
+        "dijkstra-indef-bytes2",
+        include_str!("../../../test_data/dijkstra-indef-bytes2.tx"),
+        "b026c42a9cf28aff7ce8624487f4d2b8f45df93454ac0ea2842408c1673cce5c",
+        7,
+    ),
+];
+
+#[test]
+fn transactions_with_indefinite_length_byte_strings_decode_and_keep_their_ids() {
+    for (name, tx_hex, id, indefinite) in INDEFINITE_BYTES_TXS {
+        let bytes = hex::decode(tx_hex).unwrap();
+
+        let tx: MempoolTransaction = minicbor::decode(&bytes)
+            .unwrap_or_else(|e| panic!("{name} should decode as a mempool transaction: {e:?}"));
+
+        let body = tx.transaction_body.raw_cbor();
+        let begins = minicbor::decode::Tokenizer::new(body)
+            .filter(|token| matches!(token, Ok(minicbor::data::Token::BeginBytes)))
+            .count();
+        assert_eq!(
+            begins, *indefinite,
+            "{name}: the body should hold {indefinite} indefinite length byte strings"
+        );
+
+        assert_eq!(
+            hex::encode(pallas_crypto::hash::Hasher::<256>::hash(body)),
+            *id,
+            "{name}: the id is the hash of the body bytes as read"
+        );
+
+        assert_eq!(
+            hex::encode(minicbor::to_vec(&tx).unwrap()),
+            *tx_hex,
+            "{name}: the transaction should re-encode to the bytes it was read from"
+        );
+    }
+}
+
 /// Run over an empty tail and a populated one, because an empty tail is two
 /// bytes and a length check could match that by accident.
 #[test]

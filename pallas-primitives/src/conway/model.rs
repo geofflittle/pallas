@@ -730,10 +730,21 @@ pub type MintedTx<'b> = Tx<'b>;
 
 #[cfg(test)]
 mod tests {
-    use super::Block;
+    use super::{Anchor, Block};
     use pallas_codec::minicbor;
 
     type BlockWrapper<'b> = (u16, Block<'b>);
+
+    #[test]
+    fn anchor_url_decodes_in_either_length_form() {
+        let hash = "5820".to_string() + &"11".repeat(32);
+        for url in ["63616263", "7f6161626263ff"] {
+            let raw = hex::decode(format!("82{url}{hash}")).unwrap();
+            let anchor: Anchor = minicbor::decode(&raw).unwrap();
+            assert_eq!(anchor.url, "abc", "{url}");
+            assert_eq!(anchor.content_hash, crate::Hash::new([0x11; 32]), "{url}");
+        }
+    }
 
     #[cfg(test)]
     mod tests_voter {

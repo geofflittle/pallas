@@ -56,3 +56,14 @@ models is exercised by no fixture and is modelled from the CDDL alone.
 | dijkstra13.block | 0, 1, 2, 4 | 0 | array | 7, 9 | tagged | 0 | nil | nil |
 | dijkstra14.block | 0, 1, 2, 3, 4 | 0 | map | 3 | bare | 0 | nil | nil |
 | dijkstra15.block | none | none | none | none | none | 0 | present | present |
+
+## Transactions with indefinite length byte strings
+
+Two transactions from the same chain, as lowercase hex of the three element
+mempool form an endorser block holds, no trailing newline. Each id is
+blake2b-256 of the body bytes as stored.
+
+| file | id | bytes | indefinite byte strings in the body | where | held by |
+| --- | --- | --- | --- | --- | --- |
+| dijkstra-indef-bytes1.tx | `943a88c97f86522b2cda39d1d6bd076ea51a696e5ad41c41e4c6d38ce8f7dd50` | 751 | 11 | input id, output address, guard key hash, reference input id, two account keys, and in the sub transaction an input id, an output address, a guard key hash and two account keys | endorser block `6740c8d5` at offset 0, ranking block at slot 3438997 as transaction 137 |
+| dijkstra-indef-bytes2.tx | `b026c42a9cf28aff7ce8624487f4d2b8f45df93454ac0ea2842408c1673cce5c` | 646 | 7 | input id, two output addresses, reference input id, and in the sub transaction an input id and two output addresses | endorser blocks `8295d3be` and `4e4706aa` |
