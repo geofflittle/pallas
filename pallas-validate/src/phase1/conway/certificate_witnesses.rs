@@ -537,6 +537,139 @@ fn native_reference_certificate_needs_no_redeemer() {
     }
 }
 
+// Witness set results for a script by reference that spends, mints, withdraws
+// and certifies, with the reference script on a reference input or a spent input.
+fn reference_script_outcomes(
+    script: ScriptRef<'static>,
+    hash: PolicyId,
+) -> Vec<(RedeemerTag, bool, String)> {
+    use pallas_codec::utils::{CborWrap, NonZeroInt};
+    use pallas_primitives::conway::PostAlonzoTransactionOutput;
+    let holder = TransactionInput {
+        transaction_id: [7; 32].into(),
+        index: 0,
+    };
+    let locked = TransactionInput {
+        transaction_id: [8; 32].into(),
+        index: 0,
+    };
+    let output = |header: u8, hash: &[u8], script_ref: Option<ScriptRef<'static>>| {
+        let mut address = vec![header];
+        address.extend(hash);
+        let output = TransactionOutput::PostAlonzo(
+            PostAlonzoTransactionOutput {
+                address: address.into(),
+                value: Value::Coin(2_000_000),
+                datum_option: None,
+                script_ref: script_ref.map(CborWrap),
+            }
+            .into(),
+        );
+        minicbor::to_vec(output).unwrap()
+    };
+    let held = output(0x61, key_hash(1).as_ref(), Some(script));
+    let held: TransactionOutput = minicbor::decode(&held).unwrap();
+    let locked_output = output(0x71, hash.as_ref(), None);
+    let locked_output: TransactionOutput = minicbor::decode(&locked_output).unwrap();
+    let utxos = UTxOs::from([
+        (
+            MultiEraInput::from_alonzo_compatible(&holder),
+            MultiEraOutput::from_conway(&held),
+        ),
+        (
+            MultiEraInput::from_alonzo_compatible(&locked),
+            MultiEraOutput::from_conway(&locked_output),
+        ),
+    ]);
+    let mut reward_account = vec![0xf0];
+    reward_account.extend(hash.as_ref());
+    let mut outcomes = Vec::new();
+    for purpose in [
+        RedeemerTag::Spend,
+        RedeemerTag::Mint,
+        RedeemerTag::Reward,
+        RedeemerTag::Cert,
+    ] {
+        for holder_spent in [false, true] {
+            let certificates = match purpose {
+                RedeemerTag::Cert => vec![Certificate::Reg(
+                    StakeCredential::ScriptHash(hash),
+                    2_000_000,
+                )],
+                _ => vec![],
+            };
+            synthetic(
+                certificates,
+                |tx| {
+                    let body = &mut tx.transaction_body;
+                    let mut inputs = Vec::new();
+                    if holder_spent {
+                        inputs.push(holder.clone());
+                    } else {
+                        body.reference_inputs = Some(vec![holder.clone()].try_into().unwrap());
+                    }
+                    match purpose {
+                        RedeemerTag::Spend => inputs.push(locked.clone()),
+                        RedeemerTag::Mint => {
+                            let assets =
+                                vec![(Bytes::from(vec![1]), NonZeroInt::try_from(1).unwrap())];
+                            body.mint =
+                                Some([(hash, assets.into_iter().collect())].into_iter().collect());
+                        }
+                        RedeemerTag::Reward => {
+                            body.withdrawals =
+                                Some([(reward_account.clone().into(), 0)].into_iter().collect());
+                        }
+                        _ => {}
+                    }
+                    body.inputs = inputs.into();
+                },
+                &[1],
+                |tx| {
+                    let outcome = format!("{:?}", check_witness_set(&tx, &utxos));
+                    outcomes.push((purpose, holder_spent, outcome));
+                },
+            );
+        }
+    }
+    outcomes
+}
+
+fn every_purpose(expected: &str) -> Vec<(RedeemerTag, bool, String)> {
+    [
+        RedeemerTag::Spend,
+        RedeemerTag::Mint,
+        RedeemerTag::Reward,
+        RedeemerTag::Cert,
+    ]
+    .into_iter()
+    .flat_map(|purpose| [false, true].map(|spent| (purpose, spent, expected.to_string())))
+    .collect()
+}
+
+#[test]
+fn native_reference_scripts_need_no_redeemer_for_any_purpose() {
+    let script = NativeScript::ScriptPubkey(key_hash(1));
+    assert_eq!(
+        reference_script_outcomes(
+            ScriptRef::NativeScript(script.clone().into()),
+            compute_native_script_hash(&script),
+        ),
+        every_purpose("Ok(())"),
+    );
+}
+
+#[test]
+fn plutus_reference_scripts_need_a_redeemer_for_every_purpose() {
+    assert_eq!(
+        reference_script_outcomes(
+            ScriptRef::PlutusV3Script(plutus()),
+            compute_plutus_v3_script_hash(&plutus()),
+        ),
+        every_purpose("Err(PostAlonzo(RedeemerMissing))"),
+    );
+}
+
 #[test]
 fn native_reference_authorization_uses_original_script_hash() {
     // Valid noncanonical CBOR for [0, key_hash]: integer 0 uses two bytes.
