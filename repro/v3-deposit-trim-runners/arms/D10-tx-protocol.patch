@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase2/tx.rs	2026-10-16 14:19:36
++++ b/pallas-validate/src/phase2/tx.rs	2026-10-16 14:19:36
+@@ -81,7 +81,7 @@
+         .into_script_context(redeemer, datum.as_ref())
+         .ok_or_else(|| Error::ScriptContextBuildError)?;
+ 
+-    let script_context_data = script_context.to_plutus_data_with_protocol(protocol_version_major);
++    let script_context_data = script_context.to_plutus_data_with_protocol(9);
+     let redeemer_data = redeemer.to_plutus_data();
+ 
+     let result = evaluator::eval_script(

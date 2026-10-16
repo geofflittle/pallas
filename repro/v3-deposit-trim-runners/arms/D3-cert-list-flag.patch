@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:35
++++ b/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:35
+@@ -1488,7 +1488,7 @@
+                     tx_info.outputs.to_plutus_data(),
+                     tx_info.fee.to_plutus_data(),
+                     tx_info.mint.to_plutus_data(),
+-                    WithRegistrationDeposit(&tx_info.certificates, protocol_major > 9)
++                    WithRegistrationDeposit(&tx_info.certificates, false)
+                         .to_plutus_data(),
+                     tx_info.withdrawals.to_plutus_data(),
+                     tx_info.valid_range.to_plutus_data(),

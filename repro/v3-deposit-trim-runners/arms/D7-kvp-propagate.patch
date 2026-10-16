@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:36
++++ b/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:36
+@@ -256,7 +256,7 @@
+         let mut data_vec: Vec<(PlutusData, PlutusData)> = vec![];
+         for (key, value) in self.0.iter() {
+             data_vec.push((
+-                WithRegistrationDeposit(key, self.1).to_plutus_data(),
++                WithRegistrationDeposit(key, false).to_plutus_data(),
+                 value.to_plutus_data(),
+             ))
+         }

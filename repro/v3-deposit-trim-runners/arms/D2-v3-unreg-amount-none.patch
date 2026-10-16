@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:35
++++ b/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:35
+@@ -732,7 +732,7 @@
+                 1,
+                 vec![
+                     stake_credential.to_plutus_data(),
+-                    self.1.then_some(*amount).to_plutus_data(),
++                    None::<PlutusData>.to_plutus_data(),
+                 ],
+             ),
+ 

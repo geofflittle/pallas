@@ -1,0 +1,66 @@
+arm baseline base=tip exit=0 compiled=6
+failing: 
+totals passed=155 failed=0
+arm D1-v3-reg-amount-none base=tip exit=101 compiled=6
+failing: v3_deposit_context_protocol_boundaries_at_every_occurrence v3_deposit_context_protocol_reaches_script_execution 
+totals passed=153 failed=2
+arm D10-tx-protocol base=tip exit=101 compiled=6
+failing: v3_deposit_context_protocol_reaches_script_execution 
+totals passed=154 failed=1
+arm D11-v3-txinfo-protocol base=tip exit=101 compiled=6
+failing: v3_deposit_context_protocol_boundaries_at_every_occurrence 
+totals passed=154 failed=1
+arm D12-v1v2-txinfo-protocol base=tip exit=0 compiled=6
+failing: 
+totals passed=155 failed=0
+arm D2-v3-unreg-amount-none base=tip exit=101 compiled=6
+failing: v3_deposit_context_protocol_boundaries_at_every_occurrence v3_deposit_context_protocol_reaches_script_execution 
+totals passed=153 failed=2
+arm D3-cert-list-flag base=tip exit=101 compiled=6
+failing: v3_deposit_context_protocol_boundaries_at_every_occurrence 
+totals passed=154 failed=1
+arm D4-redeemer-map-flag base=tip exit=101 compiled=6
+failing: v3_deposit_context_protocol_boundaries_at_every_occurrence 
+totals passed=154 failed=1
+arm D5-purpose-flag base=tip exit=101 compiled=6
+failing: v3_deposit_context_protocol_boundaries_at_every_occurrence v3_deposit_context_protocol_reaches_script_execution 
+totals passed=153 failed=2
+arm D6-vec-propagate base=tip exit=101 compiled=6
+failing: v3_deposit_context_protocol_boundaries_at_every_occurrence 
+totals passed=154 failed=1
+arm D7-kvp-propagate base=tip exit=101 compiled=6
+failing: v3_deposit_context_protocol_boundaries_at_every_occurrence 
+totals passed=154 failed=1
+arm D8-purpose-propagate base=tip exit=101 compiled=6
+failing: v3_deposit_context_protocol_boundaries_at_every_occurrence 
+totals passed=154 failed=1
+arm D9-scriptinfo-propagate base=tip exit=101 compiled=6
+failing: v3_deposit_context_protocol_boundaries_at_every_occurrence v3_deposit_context_protocol_reaches_script_execution 
+totals passed=153 failed=2
+arm DF-default-protocol-10 base=tip exit=0 compiled=6
+failing: 
+totals passed=155 failed=0
+arm K10-cutoff-gt-10 base=tip exit=101 compiled=6
+failing: v3_deposit_context_protocol_boundaries_at_every_occurrence v3_deposit_context_protocol_reaches_script_execution 
+totals passed=153 failed=2
+arm K9-cutoff-ge-9 base=tip exit=101 compiled=6
+failing: v3_deposit_context_protocol_boundaries_at_every_occurrence v3_deposit_context_protocol_reaches_script_execution 
+totals passed=153 failed=2
+arm R1-reg-lookup base=tip exit=101 compiled=6
+failing: script_registration_with_its_redeemer_evaluates 
+totals passed=154 failed=1
+arm R2-v1v2-reg-arm base=tip exit=101 compiled=6
+failing: script_registration_with_its_redeemer_evaluates v1_v2_context_encodes_stake_certificates_as_the_ledger_does 
+totals passed=153 failed=2
+arm R3-v1v2-unreg-arm base=tip exit=101 compiled=6
+failing: v1_v2_context_encodes_stake_certificates_as_the_ledger_does 
+totals passed=154 failed=1
+arm W1-v1v2-wrap-reg base=tip exit=101 compiled=6
+failing: v1_v2_context_encodes_stake_certificates_as_the_ledger_does 
+totals passed=154 failed=1
+arm W2-v1v2-wrap-dereg base=tip exit=101 compiled=6
+failing: v1_v2_context_encodes_stake_certificates_as_the_ledger_does 
+totals passed=154 failed=1
+arm W3-v1v2-wrap-deleg base=tip exit=101 compiled=6
+failing: v1_v2_context_encodes_stake_certificates_as_the_ledger_does 
+totals passed=154 failed=1

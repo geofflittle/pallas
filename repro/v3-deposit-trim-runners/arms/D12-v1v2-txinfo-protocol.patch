@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:36
++++ b/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:36
+@@ -1519,7 +1519,7 @@
+             ScriptContext::V1V2 { tx_info, purpose } => wrap_multiple_with_constr(
+                 0,
+                 vec![
+-                    tx_info.to_plutus_data_with_protocol(protocol_major),
++                    tx_info.to_plutus_data_with_protocol(9),
+                     WithWrappedTransactionId(purpose.as_ref()).to_plutus_data(),
+                 ],
+             ),

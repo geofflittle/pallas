@@ -1,0 +1,26 @@
+--- a/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:36
++++ b/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:36
+@@ -1488,12 +1488,12 @@
+                     tx_info.outputs.to_plutus_data(),
+                     tx_info.fee.to_plutus_data(),
+                     tx_info.mint.to_plutus_data(),
+-                    WithRegistrationDeposit(&tx_info.certificates, protocol_major > 9)
++                    WithRegistrationDeposit(&tx_info.certificates, protocol_major > 10)
+                         .to_plutus_data(),
+                     tx_info.withdrawals.to_plutus_data(),
+                     tx_info.valid_range.to_plutus_data(),
+                     tx_info.signatories.to_plutus_data(),
+-                    WithRegistrationDeposit(&tx_info.redeemers, protocol_major > 9)
++                    WithRegistrationDeposit(&tx_info.redeemers, protocol_major > 10)
+                         .to_plutus_data(),
+                     tx_info.data.to_plutus_data(),
+                     tx_info.id.to_plutus_data(),
+@@ -1532,7 +1532,7 @@
+                 vec![
+                     tx_info.to_plutus_data_with_protocol(protocol_major),
+                     redeemer.to_plutus_data(),
+-                    WithRegistrationDeposit(purpose.as_ref(), protocol_major > 9).to_plutus_data(),
++                    WithRegistrationDeposit(purpose.as_ref(), protocol_major > 10).to_plutus_data(),
+                 ],
+             ),
+         }

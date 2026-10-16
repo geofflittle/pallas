@@ -1,0 +1,19 @@
+--- a/pallas-validate/src/phase2/script_context.rs	2026-10-16 14:19:35
++++ b/pallas-validate/src/phase2/script_context.rs	2026-10-16 14:19:35
+@@ -862,7 +862,6 @@
+             .ok_or(Error::MissingScriptForRedeemer)
+             .and_then(|cert| match cert {
+                 Certificate::StakeDeregistration(stake_credential)
+-                | Certificate::Reg(stake_credential, _)
+                 | Certificate::UnReg(stake_credential, _)
+                 | Certificate::VoteDeleg(stake_credential, _)
+                 | Certificate::VoteRegDeleg(stake_credential, _, _)
+@@ -879,7 +878,7 @@
+                     _ => Err(Error::NonScriptStakeCredential),
+                 },
+                 Certificate::StakeRegistration { .. }
+-                | Certificate::PoolRetirement { .. }
++                | Certificate::PoolRetirement { .. } | Certificate::Reg { .. }
+                 | Certificate::PoolRegistration { .. } => Err(Error::UnsupportedCertificateType),
+             })
+             .and_then(lookup_script),

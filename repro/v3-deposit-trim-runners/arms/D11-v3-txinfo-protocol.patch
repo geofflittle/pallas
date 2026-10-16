@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:36
++++ b/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:36
+@@ -1530,7 +1530,7 @@
+             } => wrap_multiple_with_constr(
+                 0,
+                 vec![
+-                    tx_info.to_plutus_data_with_protocol(protocol_major),
++                    tx_info.to_plutus_data_with_protocol(9),
+                     redeemer.to_plutus_data(),
+                     WithRegistrationDeposit(purpose.as_ref(), protocol_major > 9).to_plutus_data(),
+                 ],

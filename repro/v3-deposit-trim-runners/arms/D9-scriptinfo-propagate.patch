@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:36
++++ b/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:36
+@@ -1424,7 +1424,7 @@
+                 3,
+                 vec![
+                     ix.to_plutus_data(),
+-                    WithRegistrationDeposit(dcert, self.1).to_plutus_data(),
++                    WithRegistrationDeposit(dcert, false).to_plutus_data(),
+                 ],
+             ),
+             ScriptInfo::Voting(voter) => wrap_multiple_with_constr(4, vec![voter.to_plutus_data()]),

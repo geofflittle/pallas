@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:35
++++ b/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:35
+@@ -668,7 +668,7 @@
+                 wrap_multiple_with_constr(
+                     2,
+                     vec![
+-                        WithWrappedStakeCredential(stake_credential).to_plutus_data(),
++                        stake_credential.to_plutus_data(),
+                         pool_keyhash.to_plutus_data(),
+                     ],
+                 )

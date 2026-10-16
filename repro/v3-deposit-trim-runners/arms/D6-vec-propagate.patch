@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:36
++++ b/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:36
+@@ -245,7 +245,7 @@
+     fn to_plutus_data(&self) -> PlutusData {
+         self.0
+             .iter()
+-            .map(|cert| WithRegistrationDeposit(cert, self.1))
++            .map(|cert| WithRegistrationDeposit(cert, false))
+             .collect::<Vec<_>>()
+             .to_plutus_data()
+     }

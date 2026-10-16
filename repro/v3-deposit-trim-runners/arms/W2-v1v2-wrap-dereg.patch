@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:35
++++ b/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 14:19:35
+@@ -661,7 +661,7 @@
+             Certificate::StakeDeregistration(stake_credential)
+             | Certificate::UnReg(stake_credential, _) => wrap_with_constr(
+                 1,
+-                WithWrappedStakeCredential(stake_credential).to_plutus_data(),
++                stake_credential.to_plutus_data(),
+             ),
+ 
+             Certificate::StakeDelegation(stake_credential, pool_keyhash) => {
