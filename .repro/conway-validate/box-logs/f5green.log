@@ -1,0 +1,14 @@
+   Compiling pallas-validate v1.4.0 (/w/pallas-validate)
+    Finished `test` profile [unoptimized] target(s) in 2.27s
+     Running unittests src/lib.rs (/target/debug/deps/pallas_validate-8fcd73a38203f480)
+
+running 6 tests
+test phase2::script_context::tests::a_native_script_is_keyed_by_the_hash_of_the_bytes_it_arrived_in ... ok
+test phase2::script_context::tests::a_reference_native_script_is_keyed_by_the_hash_of_the_bytes_it_arrived_in ... ok
+test phase2::script_context::tests::a_registration_at_a_script_credential_finds_that_script ... ok
+test phase2::script_context::tests::a_registration_at_a_key_credential_finds_no_script ... ok
+test phase2::script_context::tests::a_registration_reaches_a_v1_context_as_a_key_registration ... ok
+test phase2::script_context::tests::v1_and_v2_contexts_hold_only_certificates_with_a_dcert ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 43 filtered out; finished in 0.00s
+

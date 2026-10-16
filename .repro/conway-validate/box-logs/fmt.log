@@ -1,0 +1,134 @@
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Diff in /w/pallas-validate/src/phase1/conway/certificate_witnesses.rs:611:
+                     match purpose {
+                         RedeemerTag::Spend => inputs.push(locked.clone()),
+                         RedeemerTag::Mint => {
+-                            let assets = vec![(
+-                                Bytes::from(vec![1]),
+-                                NonZeroInt::try_from(1).unwrap(),
+-                            )];
++                            let assets =
++                                vec![(Bytes::from(vec![1]), NonZeroInt::try_from(1).unwrap())];
+                             body.mint =
+                                 Some([(hash, assets.into_iter().collect())].into_iter().collect());
+                         }
+Diff in /w/pallas-validate/src/phase1/conway/certificate_witnesses.rs:621:
+                         RedeemerTag::Reward => {
+-                            body.withdrawals = Some(
+-                                [(reward_account.clone().into(), 0)].into_iter().collect(),
+-                            );
++                            body.withdrawals =
++                                Some([(reward_account.clone().into(), 0)].into_iter().collect());
+                         }
+                         _ => {}
+                     }
+Diff in /w/pallas-validate/src/phase1/conway/input_eras.rs:214:
+                     let languages = tx_languages(&tx, &utxos(era, output));
+                     outcomes.push((spent, mints, has_script, era, languages));
+                     let needed = mints && has_script;
+-                    let languages = if needed { vec![Language::PlutusV2] } else { vec![] };
++                    let languages = if needed {
++                        vec![Language::PlutusV2]
++                    } else {
++                        vec![]
++                    };
+                     expected.push((spent, mints, has_script, era, languages));
+                 }
+             }
+Diff in /w/pallas-validate/src/phase1/conway/input_eras.rs:257:
+                 "spend" => body.inputs = vec![locked.clone()].into(),
+                 "mint" => {
+                     let asset = (Bytes::from(vec![1]), NonZeroInt::try_from(1).unwrap());
+-                    body.mint = Some([(hash, [asset].into_iter().collect())].into_iter().collect())
++                    body.mint = Some(
++                        [(hash, [asset].into_iter().collect())]
++                            .into_iter()
++                            .collect(),
++                    )
+                 }
+                 "cert" => {
+                     body.certificates = Some(
+Diff in /w/pallas-validate/src/phase1/conway/input_eras.rs:308:
+     let expected: Vec<_> = outcomes
+         .iter()
+         .map(|(purpose, needed, _)| {
+-            let languages = if *needed { vec![Language::PlutusV2] } else { vec![] };
++            let languages = if *needed {
++                vec![Language::PlutusV2]
++            } else {
++                vec![]
++            };
+             (*purpose, *needed, languages)
+         })
+         .collect();
+Diff in /w/pallas-validate/src/phase1/conway.rs:1681:
+         .iter()
+         .filter_map(|input| get_script_hash_from_input(input, utxos));
+     let policies = tx_body.mint.iter().flat_map(|mint| mint.keys().copied());
+-    let certificates = tx_body
+-        .certificates
+-        .iter()
+-        .flatten()
+-        .filter_map(|cert| match certificate_credential(cert) {
++    let certificates = tx_body.certificates.iter().flatten().filter_map(|cert| {
++        match certificate_credential(cert) {
+             Some(StakeCredential::ScriptHash(hash)) => Some(*hash),
+             _ => None,
+-        });
++        }
++    });
+     let withdrawals = tx_body
+         .withdrawals
+         .iter()
+Diff in /w/pallas-validate/src/phase1/conway.rs:1712:
+         .iter()
+         .flatten()
+         .filter_map(|proposal| match &proposal.gov_action {
+-            GovAction::ParameterChange(_, _, policy) | GovAction::TreasuryWithdrawals(_, policy) => {
+-                *policy
+-            }
++            GovAction::ParameterChange(_, _, policy)
++            | GovAction::TreasuryWithdrawals(_, policy) => *policy,
+             _ => None,
+         });
+     inputs
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.
+Warning: can't set `wrap_comments = true`, unstable features are only available in nightly channel.

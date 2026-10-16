@@ -1,0 +1,156 @@
+arm A1 features=phase2 exit=101 active=71 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: test failed, to rerun pass `-p pallas-validate --test conway`
+error: 2 targets failed:
+test result: FAILED. 45 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+test result: FAILED. 22 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+arm A2 features=phase2 exit=101 active=54 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: test failed, to rerun pass `-p pallas-validate --test conway`
+error: 2 targets failed:
+test result: FAILED. 45 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+test result: FAILED. 22 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+arm B1 features=phase2 exit=101 active=2 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: test failed, to rerun pass `-p pallas-validate --test conway`
+error: 2 targets failed:
+test result: FAILED. 48 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+test result: FAILED. 23 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+arm B2 features=phase2 exit=101 active=122 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 45 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+arm B3 features=phase2 exit=101 active=127 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 45 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+arm B4 features=phase2 exit=101 active=4 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 48 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+arm B4b features=phase2 exit=101 active=78 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 48 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+arm B5 features=phase2 exit=101 active=84 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 48 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+arm B6 features=phase2 exit=101 active=230 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 45 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+arm C1 features=phase2 exit=101 active=2 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 47 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+arm C2 features=phase2 exit=101 active=2 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 47 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+arm C2b features=phase2 exit=101 active=6 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 47 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+arm D1 features=phase2 exit=101 active=7 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 48 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+arm D1r features=phase2 exit=101 active=7 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 48 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+arm D1p features=phase2 exit=101 active=4 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 47 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+arm D2 features=phase2 exit=101 active=4 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 48 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+arm E1 features=phase2 exit=101 active=24 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --test conway`
+error: 1 target failed:
+test result: FAILED. 23 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+arm F1 features=phase2 exit=101 active=15 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 46 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+test phase1::conway::input_eras::script_collateral_from_an_earlier_era_is_not_key_locked ... FAILED
+
+arm G1 features=phase2 exit=101 active=157 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 47 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+arm G2 features=phase2 exit=101 active=74 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 47 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+arm G3 features=phase2 exit=101 active=2 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 48 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+arm G4 features=phase2 exit=101 active=6 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 48 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+arm H1 features=phase2 exit=101 active=2 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 48 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+arm H2 features=phase2 exit=101 active=38 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 48 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+arm I1 features=phase2 exit=101 active=9 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: test failed, to rerun pass `-p pallas-validate --test conway`
+error: 2 targets failed:
+test result: FAILED. 48 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+test result: FAILED. 23 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+arm I2 features=phase2 exit=0 active=8 compiled=0 results=9
+
+arm I3 features=phase2 exit=101 active=4 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --test conway`
+error: 1 target failed:
+test result: FAILED. 23 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+arm F2 features=phase2 exit=101 active=10 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 47 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+arm F4 features=phase2 exit=101 active=91 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+test result: FAILED. 46 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+arm F6 features=phase2 exit=101 active=83 compiled=0 results=9
+error: test failed, to rerun pass `-p pallas-validate --test conway`
+error: 1 target failed:
+test result: FAILED. 23 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+

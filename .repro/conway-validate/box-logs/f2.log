@@ -1,0 +1,17 @@
+   Compiling pallas-validate v1.4.0 (/w/pallas-validate)
+    Finished `test` profile [unoptimized] target(s) in 1.35s
+     Running unittests src/lib.rs (/target/debug/deps/pallas_validate-3559ad3880eb8212)
+
+running 9 tests
+test phase1::conway::input_eras::a_datum_hash_on_an_earlier_era_reference_input_is_found ... ok
+test phase1::conway::input_eras::a_byron_era_input_allows_no_plutus_language ... ok
+test phase1::conway::input_eras::a_script_address_from_an_earlier_era_names_its_script ... ok
+test phase1::conway::input_eras::a_reference_script_from_an_earlier_era_is_found ... ok
+test phase1::conway::input_eras::a_reference_script_on_a_spent_input_supplies_a_minting_policy ... ok
+test phase1::conway::input_eras::each_needed_purpose_sets_the_reference_script_language ... ok
+test phase1::conway::input_eras::key_and_byron_collateral_is_key_locked_in_every_era ... ok
+test phase1::conway::input_eras::script_collateral_from_an_earlier_era_is_not_key_locked ... ok
+test phase1::conway::input_eras::only_a_needed_reference_script_sets_the_language ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s
+

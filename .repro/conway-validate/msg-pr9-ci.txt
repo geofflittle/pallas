@@ -1,0 +1,4 @@
+ci: test and lint validate with unstable
+
+- ci.yml: run the pallas-validate tests in the unstable step
+- ci.yml: run clippy on pallas-validate with unstable

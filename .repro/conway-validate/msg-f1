@@ -1,0 +1,5 @@
+test(validate): restore Conway V3 success tests
+
+- tests/conway.rs: chain collateral and inputs, Ok asserted again
+- tests/conway.rs: collateral one lovelace short is refused
+- tests/conway.rs: derived conway6 tests supply its real collateral

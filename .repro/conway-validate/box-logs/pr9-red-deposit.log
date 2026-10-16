@@ -1,0 +1,166 @@
+   Compiling pallas-validate v1.4.0 (/w/pallas-validate)
+    Finished `test` profile [unoptimized] target(s) in 3.09s
+     Running unittests src/lib.rs (/target/debug/deps/pallas_validate-969933c6046486ed)
+
+running 41 tests
+test phase1::dijkstra_batch_tests::dijkstra_batch_aggregate_balance_and_native_size ... ok
+test phase1::dijkstra_batch_tests::dijkstra_batch_cannot_spend_output_created_in_same_batch ... ok
+test phase1::dijkstra_batch_tests::dijkstra_batch_original_inputs_and_no_double_spending ... ok
+test phase1::dijkstra_batch_tests::dijkstra_batch_sub_signatures_and_required_top_guards ... ok
+test phase1::dijkstra_native_tests::dijkstra_native_captured_mint_admission ... ok
+test phase1::dijkstra_batch_tests::dijkstra_batch_validity_boundaries_and_unsupported_real_scripted_batch ... ok
+test phase1::dijkstra_native_tests::dijkstra_native_guards_reject_even_in_unused_branches ... ok
+test phase1::dijkstra_native_tests::dijkstra_native_mint_registration_and_partial_withdrawal ... FAILED
+test phase1::dijkstra_native_tests::dijkstra_native_earlier_era_reference_and_new_output ... ok
+test phase1::dijkstra_native_tests::dijkstra_native_deep_scripts_do_not_use_recursive_evaluation ... ok
+test phase1::dijkstra_native_tests::dijkstra_native_reference_fee_size_and_scope ... ok
+test phase1::dijkstra_registration_tests::dijkstra_registration_captured_native_dispatch ... FAILED
+test phase1::dijkstra_native_tests::dijkstra_native_signatures_and_witness_coverage ... ok
+test phase1::dijkstra_registration_tests::dijkstra_registration_fee_rounding_and_reference_accounting ... FAILED
+test phase1::dijkstra_native_tests::dijkstra_native_reference_sources_and_original_hash ... ok
+test phase1::dijkstra_registration_tests::dijkstra_registration_collateral_budgets_and_fees ... ok
+test phase1::dijkstra_registration_tests::dijkstra_registration_key_author_and_deposit_balance ... FAILED
+test phase1::dijkstra_registration_tests::dijkstra_registration_other_certificates_and_script_forms_reject ... ok
+test phase1::dijkstra_registration_tests::dijkstra_registration_requires_distinct_certificate_author ... FAILED
+test phase1::dijkstra_tests::dijkstra_balance_network_and_input_checks ... ok
+test phase1::dijkstra_registration_tests::dijkstra_registration_state_deposit_and_parameters ... ok
+test phase1::dijkstra_tests::dijkstra_captured_control_passes_native_dispatch ... ok
+test phase1::dijkstra_tests::dijkstra_captured_signatures_are_required_and_all_verified ... ok
+test phase1::dijkstra_registration_tests::dijkstra_registration_scripts_redeemers_integrity_and_signatures ... FAILED
+test phase1::dijkstra_tests::dijkstra_earlier_era_inputs_keep_their_eras ... ok
+test phase1::dijkstra_tests::dijkstra_registration_rejects_unavailable_certificate_state ... ok
+test phase1::dijkstra_native_tests::dijkstra_native_combinators_and_slot_bounds ... ok
+test phase1::dijkstra_tests::dijkstra_output_subset_and_checked_arithmetic ... ok
+test phase1::dijkstra_tests::dijkstra_size_fee_and_output_boundaries ... ok
+test phase1::dijkstra_tests::dijkstra_typed_features_reject_explicitly ... ok
+test phase1::dijkstra_tests::dijkstra_unsupported_fields_do_not_disappear_in_decode ... ok
+test phase1::dijkstra_tests::dijkstra_validity_is_half_open ... ok
+test phase1::dijkstra_transaction_tests::dijkstra_multiasset_conservation_and_script_output ... ok
+test phase1::dijkstra_transaction_tests::dijkstra_observed_metadata_reaches_input_validation ... ok
+test phase1::dijkstra_transaction_tests::dijkstra_invalid_multiasset_encodings ... ok
+test phase1::dijkstra_transaction_tests::dijkstra_observed_order_valid_context ... ok
+test utils::registration_deposits::native::protocol_native_dijkstra_registration_balance ... ok
+test utils::registration_deposits::native::settings_native_dijkstra_registration_balance ... ok
+test phase1::dijkstra_transaction_tests::dijkstra_metadata_commitment_and_limits ... ok
+test phase1::dijkstra_transaction_tests::dijkstra_preserves_original_auxiliary_bytes ... ok
+test phase1::dijkstra_tests::dijkstra_capture_integrity_and_certified_original_input ... ok
+
+failures:
+
+---- phase1::dijkstra_native_tests::dijkstra_native_mint_registration_and_partial_withdrawal stdout ----
+
+thread 'phase1::dijkstra_native_tests::dijkstra_native_mint_registration_and_partial_withdrawal' (55) panicked at pallas-validate/src/phase1/dijkstra_native_tests.rs:229:9:
+Err(PostAlonzo(PreservationOfValue))
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: pallas_validate::phase1::dijkstra_native_tests::dijkstra_native_mint_registration_and_partial_withdrawal::{closure#0}
+   3: pallas_validate::phase1::dijkstra_native_tests::spend::<pallas_validate::phase1::dijkstra_native_tests::dijkstra_native_mint_registration_and_partial_withdrawal::{closure#0}>::{closure#0}
+   4: pallas_validate::phase1::dijkstra_tests::synthetic::<pallas_validate::phase1::dijkstra_native_tests::spend<pallas_validate::phase1::dijkstra_native_tests::dijkstra_native_mint_registration_and_partial_withdrawal::{closure#0}>::{closure#0}>::{closure#0}
+   5: pallas_validate::phase1::dijkstra_tests::captured::<pallas_validate::phase1::dijkstra_tests::synthetic<pallas_validate::phase1::dijkstra_native_tests::spend<pallas_validate::phase1::dijkstra_native_tests::dijkstra_native_mint_registration_and_partial_withdrawal::{closure#0}>::{closure#0}>::{closure#0}>
+   6: pallas_validate::phase1::dijkstra_tests::synthetic::<pallas_validate::phase1::dijkstra_native_tests::spend<pallas_validate::phase1::dijkstra_native_tests::dijkstra_native_mint_registration_and_partial_withdrawal::{closure#0}>::{closure#0}>
+   7: pallas_validate::phase1::dijkstra_native_tests::spend::<pallas_validate::phase1::dijkstra_native_tests::dijkstra_native_mint_registration_and_partial_withdrawal::{closure#0}>
+   8: pallas_validate::phase1::dijkstra_native_tests::dijkstra_native_mint_registration_and_partial_withdrawal
+   9: pallas_validate::phase1::dijkstra_native_tests::dijkstra_native_mint_registration_and_partial_withdrawal::{closure#0}
+  10: <pallas_validate::phase1::dijkstra_native_tests::dijkstra_native_mint_registration_and_partial_withdrawal::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- phase1::dijkstra_registration_tests::dijkstra_registration_captured_native_dispatch stdout ----
+
+thread 'phase1::dijkstra_registration_tests::dijkstra_registration_captured_native_dispatch' (59) panicked at pallas-validate/src/phase1/dijkstra_registration_tests.rs:155:9:
+Err(PostAlonzo(PreservationOfValue))
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_captured_native_dispatch::{closure#0}
+   3: pallas_validate::phase1::dijkstra_registration_tests::fixture::<pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_captured_native_dispatch::{closure#0}>
+   4: pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_captured_native_dispatch
+   5: pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_captured_native_dispatch::{closure#0}
+   6: <pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_captured_native_dispatch::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- phase1::dijkstra_registration_tests::dijkstra_registration_fee_rounding_and_reference_accounting stdout ----
+
+thread 'phase1::dijkstra_registration_tests::dijkstra_registration_fee_rounding_and_reference_accounting' (61) panicked at pallas-validate/src/phase1/dijkstra_registration_tests.rs:408:9:
+assertion failed: run(&tx, &utxos, &e, &mut state.clone()).is_ok()
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::panicking::panic
+   3: pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_fee_rounding_and_reference_accounting::{closure#0}
+   4: pallas_validate::phase1::dijkstra_registration_tests::fixture::<pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_fee_rounding_and_reference_accounting::{closure#0}>
+   5: pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_fee_rounding_and_reference_accounting
+   6: pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_fee_rounding_and_reference_accounting::{closure#0}
+   7: <pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_fee_rounding_and_reference_accounting::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- phase1::dijkstra_registration_tests::dijkstra_registration_key_author_and_deposit_balance stdout ----
+
+thread 'phase1::dijkstra_registration_tests::dijkstra_registration_key_author_and_deposit_balance' (62) panicked at pallas-validate/src/phase1/dijkstra_registration_tests.rs:379:9:
+Err(PostAlonzo(PreservationOfValue))
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_key_author_and_deposit_balance::{closure#0}
+   3: pallas_validate::phase1::dijkstra_tests::synthetic::<pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_key_author_and_deposit_balance::{closure#0}>::{closure#0}
+   4: pallas_validate::phase1::dijkstra_tests::captured::<pallas_validate::phase1::dijkstra_tests::synthetic<pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_key_author_and_deposit_balance::{closure#0}>::{closure#0}>
+   5: pallas_validate::phase1::dijkstra_tests::synthetic::<pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_key_author_and_deposit_balance::{closure#0}>
+   6: pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_key_author_and_deposit_balance
+   7: pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_key_author_and_deposit_balance::{closure#0}
+   8: <pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_key_author_and_deposit_balance::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- phase1::dijkstra_registration_tests::dijkstra_registration_requires_distinct_certificate_author stdout ----
+
+thread 'phase1::dijkstra_registration_tests::dijkstra_registration_requires_distinct_certificate_author' (64) panicked at pallas-validate/src/phase1/dijkstra_tests.rs:157:5:
+assertion `left == right` failed
+  left: "PostAlonzo(PreservationOfValue)"
+ right: "PostAlonzo(VKWitnessMissing)"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed::<alloc::string::String, &str>
+   4: pallas_validate::phase1::dijkstra_tests::error
+   5: pallas_validate::phase1::dijkstra_registration_tests::fail
+   6: pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_requires_distinct_certificate_author::{closure#0}
+   7: pallas_validate::phase1::dijkstra_tests::synthetic::<pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_requires_distinct_certificate_author::{closure#0}>::{closure#0}
+   8: pallas_validate::phase1::dijkstra_tests::captured::<pallas_validate::phase1::dijkstra_tests::synthetic<pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_requires_distinct_certificate_author::{closure#0}>::{closure#0}>
+   9: pallas_validate::phase1::dijkstra_tests::synthetic::<pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_requires_distinct_certificate_author::{closure#0}>
+  10: pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_requires_distinct_certificate_author
+  11: pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_requires_distinct_certificate_author::{closure#0}
+  12: <pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_requires_distinct_certificate_author::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- phase1::dijkstra_registration_tests::dijkstra_registration_scripts_redeemers_integrity_and_signatures stdout ----
+
+thread 'phase1::dijkstra_registration_tests::dijkstra_registration_scripts_redeemers_integrity_and_signatures' (65) panicked at pallas-validate/src/phase1/dijkstra_tests.rs:157:5:
+assertion `left == right` failed
+  left: "PostAlonzo(PreservationOfValue)"
+ right: "PostAlonzo(VKWrongSignature)"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed::<alloc::string::String, &str>
+   4: pallas_validate::phase1::dijkstra_tests::error
+   5: pallas_validate::phase1::dijkstra_registration_tests::fail
+   6: pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_scripts_redeemers_integrity_and_signatures::{closure#0}
+   7: pallas_validate::phase1::dijkstra_registration_tests::fixture::<pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_scripts_redeemers_integrity_and_signatures::{closure#0}>
+   8: pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_scripts_redeemers_integrity_and_signatures
+   9: pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_scripts_redeemers_integrity_and_signatures::{closure#0}
+  10: <pallas_validate::phase1::dijkstra_registration_tests::dijkstra_registration_scripts_redeemers_integrity_and_signatures::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    phase1::dijkstra_native_tests::dijkstra_native_mint_registration_and_partial_withdrawal
+    phase1::dijkstra_registration_tests::dijkstra_registration_captured_native_dispatch
+    phase1::dijkstra_registration_tests::dijkstra_registration_fee_rounding_and_reference_accounting
+    phase1::dijkstra_registration_tests::dijkstra_registration_key_author_and_deposit_balance
+    phase1::dijkstra_registration_tests::dijkstra_registration_requires_distinct_certificate_author
+    phase1::dijkstra_registration_tests::dijkstra_registration_scripts_redeemers_integrity_and_signatures
+
+test result: FAILED. 35 passed; 6 failed; 0 ignored; 0 measured; 56 filtered out; finished in 0.20s
+
+error: test failed, to rerun pass `-p pallas-validate --lib`

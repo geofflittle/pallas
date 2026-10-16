@@ -1,0 +1,13 @@
+   Compiling pallas-validate v1.4.0 (/w/pallas-validate)
+    Finished `test` profile [unoptimized] target(s) in 1.23s
+     Running unittests src/lib.rs (/target/debug/deps/pallas_validate-3559ad3880eb8212)
+
+running 5 tests
+test phase1::conway::input_eras::a_reference_script_on_a_spent_input_sets_the_language ... ok
+test phase1::conway::input_eras::a_reference_script_from_an_earlier_era_is_found ... ok
+test phase1::conway::input_eras::a_reference_script_on_a_spent_input_supplies_a_minting_policy ... ok
+test phase1::conway::certificate_witnesses::plutus_reference_scripts_need_a_redeemer_for_every_purpose ... ok
+test phase1::conway::certificate_witnesses::native_reference_scripts_need_no_redeemer_for_any_purpose ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.02s
+

@@ -1,0 +1,7 @@
+pallas-validate/src/phase1/conway.rs
+pallas-validate/src/phase1/conway/certificate_witnesses.rs
+pallas-validate/src/phase1/conway/input_eras.rs
+pallas-validate/src/phase1/conway/registration_deposits.rs
+pallas-validate/src/phase2/to_plutus_data.rs
+pallas-validate/src/phase2/v3_deposit_context_tests.rs
+pallas-validate/tests/conway.rs

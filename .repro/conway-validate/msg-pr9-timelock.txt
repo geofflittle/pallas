@@ -1,0 +1,4 @@
+test(validate): native Dijkstra reference timelocks
+
+- native_inputs: a non canonical timelock keeps its original hash
+- native_inputs: a native reference script needs no redeemer

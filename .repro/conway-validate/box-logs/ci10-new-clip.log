@@ -1,0 +1,14 @@
+    Checking pallas-validate v1.4.0 (/w/pallas-validate)
+error: using `clone` on type `i64` which implements the `Copy` trait
+   --> pallas-validate/src/phase2/native_evaluator.rs:159:14
+    |
+159 |         mem: budget.mem.clone().max(0) as u64,
+    |              ^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `budget.mem`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#clone_on_copy
+    = note: `-D clippy::clone-on-copy` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::clone_on_copy)]`
+
+error: could not compile `pallas-validate` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `pallas-validate` (lib test) due to 1 previous error

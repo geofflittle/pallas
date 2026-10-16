@@ -1,0 +1,32 @@
+   Compiling pallas-validate v1.4.0 (/w/pallas-validate)
+    Finished `test` profile [unoptimized] target(s) in 1.66s
+     Running tests/conway.rs (/target/debug/deps/conway-a7fe8f95cfc070d2)
+
+running 1 test
+test conway_tests::byron_inputs_are_witnessed_through_dispatch ... FAILED
+
+failures:
+
+---- conway_tests::byron_inputs_are_witnessed_through_dispatch stdout ----
+
+thread 'conway_tests::byron_inputs_are_witnessed_through_dispatch' (57) panicked at pallas-validate/tests/conway.rs:282:9:
+assertion `left == right` failed
+  left: ["Ok(())", "Err(PostAlonzo(VKWitnessMissing))", "Err(PostAlonzo(VKWrongSignature))", "Ok(())", "Ok(())", "Err(PostAlonzo(VKWrongSignature))", "Ok(())"]
+ right: ["Ok(())", "Err(PostAlonzo(VKWitnessMissing))", "Err(PostAlonzo(VKWrongSignature))", "Err(PostAlonzo(VKWitnessMissing))", "Ok(())", "Err(PostAlonzo(VKWrongSignature))", "Err(PostAlonzo(VKWitnessMissing))"]
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed::<alloc::vec::Vec<alloc::string::String>, alloc::vec::Vec<alloc::string::String>>
+   4: conway::conway_tests::byron_inputs_are_witnessed_through_dispatch
+   5: conway::conway_tests::byron_inputs_are_witnessed_through_dispatch::{closure#0}
+   6: <conway::conway_tests::byron_inputs_are_witnessed_through_dispatch::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    conway_tests::byron_inputs_are_witnessed_through_dispatch
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `-p pallas-validate --test conway`

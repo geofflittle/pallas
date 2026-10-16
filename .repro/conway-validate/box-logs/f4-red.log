@@ -1,0 +1,41 @@
+   Compiling pallas-validate v1.4.0 (/w/pallas-validate)
+    Finished `test` profile [unoptimized] target(s) in 1.38s
+     Running unittests src/lib.rs (/target/debug/deps/pallas_validate-3559ad3880eb8212)
+
+running 10 tests
+test phase1::conway::registration_deposits::absent_or_delegation_only_certificates_do_not_charge_a_deposit ... ok
+test phase1::conway::registration_deposits::declared_deposit_cannot_override_protocol_accounting ... ok
+test phase1::conway::registration_deposits::one_lovelace_imbalance_fails_for_both_encodings ... ok
+test phase1::conway::registration_deposits::removing_registration_leaves_unbalanced_value ... ok
+test utils::registration_deposits::adding_fees_and_deposits_cannot_overflow_produced_value ... ok
+test utils::registration_deposits::deposits_preserve_native_assets ... ok
+test utils::registration_deposits::stake_deposit_sum_overflow_is_rejected ... ok
+test utils::registration_deposits::unrelated_certificate_deposits_are_not_stake_deposits ... ok
+test phase1::conway::registration_deposits::all_stake_registration_forms_charge_the_protocol_deposit ... ok
+test phase1::conway::registration_deposits::deposits_refunds_withdrawals_and_donations_balance ... FAILED
+
+failures:
+
+---- phase1::conway::registration_deposits::deposits_refunds_withdrawals_and_donations_balance stdout ----
+
+thread 'phase1::conway::registration_deposits::deposits_refunds_withdrawals_and_donations_balance' (48) panicked at pallas-validate/src/phase1/conway/registration_deposits.rs:205:5:
+assertion `left == right` failed
+  left: [("nothing", ["Err(PostAlonzo(PreservationOfValue))", "Ok(())", "Err(PostAlonzo(PreservationOfValue))"]), ("registration and unrelated deregistration", ["Err(PostAlonzo(PreservationOfValue))", "Err(PostAlonzo(PreservationOfValue))", "Err(PostAlonzo(PreservationOfValue))"]), ("legacy registration and unrelated deregistration", ["Err(PostAlonzo(PreservationOfValue))", "Err(PostAlonzo(PreservationOfValue))", "Err(PostAlonzo(PreservationOfValue))"]), ("deregistration refunds its declared deposit", ["Err(PostAlonzo(PreservationOfValue))", "Err(PostAlonzo(PreservationOfValue))", "Err(PostAlonzo(PreservationOfValue))"]), ("legacy deregistration refunds the key deposit", ["Err(PostAlonzo(PreservationOfValue))", "Err(PostAlonzo(PreservationOfValue))", "Err(PostAlonzo(PreservationOfValue))"]), ("drep registration charges the drep deposit", ["Err(PostAlonzo(PreservationOfValue))", "Err(PostAlonzo(PreservationOfValue))", "Err(PostAlonzo(PreservationOfValue))"]), ("drep deregistration refunds its declared deposit", ["Err(PostAlonzo(PreservationOfValue))", "Err(PostAlonzo(PreservationOfValue))", "Err(PostAlonzo(PreservationOfValue))"]), ("withdrawal", ["Err(PostAlonzo(PreservationOfValue))", "Err(PostAlonzo(PreservationOfValue))", "Err(PostAlonzo(PreservationOfValue))"]), ("donation", ["Err(PostAlonzo(PreservationOfValue))", "Err(PostAlonzo(PreservationOfValue))", "Err(PostAlonzo(PreservationOfValue))"]), ("two proposals", ["Err(PostAlonzo(PreservationOfValue))", "Err(PostAlonzo(PreservationOfValue))", "Err(PostAlonzo(PreservationOfValue))"])]
+ right: [("nothing", ["Err(PostAlonzo(PreservationOfValue))", "Ok(())", "Err(PostAlonzo(PreservationOfValue))"]), ("registration and unrelated deregistration", ["Err(PostAlonzo(PreservationOfValue))", "Ok(())", "Err(PostAlonzo(PreservationOfValue))"]), ("legacy registration and unrelated deregistration", ["Err(PostAlonzo(PreservationOfValue))", "Ok(())", "Err(PostAlonzo(PreservationOfValue))"]), ("deregistration refunds its declared deposit", ["Err(PostAlonzo(PreservationOfValue))", "Ok(())", "Err(PostAlonzo(PreservationOfValue))"]), ("legacy deregistration refunds the key deposit", ["Err(PostAlonzo(PreservationOfValue))", "Ok(())", "Err(PostAlonzo(PreservationOfValue))"]), ("drep registration charges the drep deposit", ["Err(PostAlonzo(PreservationOfValue))", "Ok(())", "Err(PostAlonzo(PreservationOfValue))"]), ("drep deregistration refunds its declared deposit", ["Err(PostAlonzo(PreservationOfValue))", "Ok(())", "Err(PostAlonzo(PreservationOfValue))"]), ("withdrawal", ["Err(PostAlonzo(PreservationOfValue))", "Ok(())", "Err(PostAlonzo(PreservationOfValue))"]), ("donation", ["Err(PostAlonzo(PreservationOfValue))", "Ok(())", "Err(PostAlonzo(PreservationOfValue))"]), ("two proposals", ["Err(PostAlonzo(PreservationOfValue))", "Ok(())", "Err(PostAlonzo(PreservationOfValue))"])]
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed::<alloc::vec::Vec<(&str, alloc::vec::Vec<alloc::string::String>)>, alloc::vec::Vec<(&str, alloc::vec::Vec<alloc::string::String>)>>
+   4: pallas_validate::phase1::conway::registration_deposits::deposits_refunds_withdrawals_and_donations_balance
+   5: pallas_validate::phase1::conway::registration_deposits::deposits_refunds_withdrawals_and_donations_balance::{closure#0}
+   6: <pallas_validate::phase1::conway::registration_deposits::deposits_refunds_withdrawals_and_donations_balance::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    phase1::conway::registration_deposits::deposits_refunds_withdrawals_and_donations_balance
+
+test result: FAILED. 9 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p pallas-validate --lib`

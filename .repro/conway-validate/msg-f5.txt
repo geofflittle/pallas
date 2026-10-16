@@ -1,0 +1,7 @@
+fix(validate): V1/V2 certificates per ledger
+
+- to_plutus_data.rs: v1_v2_certificate wraps every credential in
+  StakingHash and maps UnReg to a key deregistration
+- script_context.rs: V1 and V2 contexts refuse a certificate that
+  has no DCert, as CertificateNotSupported
+- test the DCert of all 17 Conway certificates in V1 and V2

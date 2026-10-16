@@ -1,0 +1,52 @@
+
+    // Opponent arms. The ledger encodes RegTxCert, RegDepositTxCert and
+    // UnRegDepositTxCert in V1 and V2 with the StakingHash wrapper.
+    fn conway_tx_with_cert(cert: &[u8]) -> Vec<u8> {
+        let mut cbor = vec![0x84];
+        cbor.extend([0xa4, 0x00, 0x80, 0x01, 0x80, 0x02, 0x00]);
+        cbor.extend([0x04, 0x81]);
+        cbor.extend_from_slice(cert);
+        cbor.extend_from_slice(&[0xa1, 0x01, 0x81]);
+        cbor.extend_from_slice(&WITNESS_SCRIPT);
+        cbor.extend_from_slice(&[0xf5, 0xf6]);
+        cbor
+    }
+
+    fn v1_certs(cert: &[u8]) -> String {
+        let cbor = conway_tx_with_cert(cert);
+        let tx = MultiEraTx::decode_for_era(Era::Conway, &cbor).unwrap();
+        let conway = tx.as_conway().unwrap().clone();
+        let r = std::panic::catch_unwind(move || {
+            let info = TxInfoV1::from_transaction(&conway, &[], &SlotConfig::default())
+                .unwrap()
+                .to_plutus_data();
+            let PlutusData::Constr(info) = info else {
+                panic!("a constructor")
+            };
+            format!("{:?}", info.fields[4])
+        });
+        match r {
+            Ok(s) => s,
+            Err(_) => "PANIC".to_string(),
+        }
+    }
+
+    #[test]
+    fn arm_p_v1_certificate_siblings() {
+        let hash = Hasher::<224>::hash_tagged(&WITNESS_SCRIPT, 0);
+        let mut legacy = vec![0x82, 0x00, 0x82, 0x01, 0x58, 0x1c];
+        legacy.extend_from_slice(hash.as_ref());
+        let mut reg = vec![0x83, 0x07, 0x82, 0x01, 0x58, 0x1c];
+        reg.extend_from_slice(hash.as_ref());
+        reg.push(0x00);
+        let mut unreg = vec![0x83, 0x08, 0x82, 0x01, 0x58, 0x1c];
+        unreg.extend_from_slice(hash.as_ref());
+        unreg.push(0x00);
+        let a = v1_certs(&legacy);
+        let b = v1_certs(&reg);
+        let c = v1_certs(&unreg);
+        println!("ARM P_legacy_reg_v1 {a}");
+        println!("ARM P_reg_v1 {b}");
+        println!("ARM P_unreg_v1 {c}");
+        println!("ARM P_legacy_equals_reg {}", a == b);
+    }

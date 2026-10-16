@@ -1,0 +1,3 @@
+test(validate): F6 red control
+
+- the Byron witness cases against the validator before F6

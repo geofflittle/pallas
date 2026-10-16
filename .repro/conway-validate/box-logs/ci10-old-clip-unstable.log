@@ -1,0 +1,15 @@
+    Checking num-rational v0.4.2
+    Checking num-iter v0.1.46
+    Checking num-complex v0.4.6
+    Checking pallas-codec v1.4.0 (/w/pallas-codec)
+    Checking num v0.4.3
+    Checking amaru-deps v0.0.0 (https://github.com/rodrigomd94/amaru.git?rev=e122ffb2018196ba9c57f42b70b94ada603d3fbc#e122ffb2)
+    Checking amaru-minicbor-extra v0.1.2 (https://github.com/rodrigomd94/amaru.git?rev=e122ffb2018196ba9c57f42b70b94ada603d3fbc#e122ffb2)
+    Checking pallas-crypto v1.4.0 (/w/pallas-crypto)
+    Checking amaru-kernel v0.1.2 (https://github.com/rodrigomd94/amaru.git?rev=e122ffb2018196ba9c57f42b70b94ada603d3fbc#e122ffb2)
+    Checking pallas-addresses v1.4.0 (/w/pallas-addresses)
+    Checking pallas-primitives v1.4.0 (/w/pallas-primitives)
+    Checking amaru-uplc v0.4.0 (https://github.com/rodrigomd94/amaru.git?rev=e122ffb2018196ba9c57f42b70b94ada603d3fbc#e122ffb2)
+    Checking pallas-traverse v1.4.0 (/w/pallas-traverse)
+    Checking pallas-validate v1.4.0 (/w/pallas-validate)
+    Finished `dev` profile [unoptimized] target(s) in 8.62s

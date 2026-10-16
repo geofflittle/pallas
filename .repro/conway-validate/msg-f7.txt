@@ -1,0 +1,6 @@
+test(validate): drop deposit tests that never fail
+
+- registration_deposits: drop two imbalance tests that pass unfixed
+- registration_deposits: balance on a declared deposit unlike the
+  protocol deposit and require PreservationOfValue
+- v3_deposit_context_tests: drop the protocol 9 self comparison

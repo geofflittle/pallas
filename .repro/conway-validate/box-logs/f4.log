@@ -1,0 +1,16 @@
+   Compiling pallas-validate v1.4.0 (/w/pallas-validate)
+    Finished `test` profile [unoptimized] target(s) in 1.91s
+     Running unittests src/lib.rs (/target/debug/deps/pallas_validate-3559ad3880eb8212)
+
+running 8 tests
+test phase1::conway::registration_deposits::absent_or_delegation_only_certificates_do_not_charge_a_deposit ... ok
+test phase1::conway::registration_deposits::declared_deposit_cannot_override_protocol_accounting ... ok
+test phase1::conway::registration_deposits::removing_registration_leaves_unbalanced_value ... ok
+test utils::registration_deposits::deposit_and_refund_sum_overflow_is_rejected ... ok
+test utils::registration_deposits::each_certificate_charges_or_refunds_its_deposit ... ok
+test phase1::conway::registration_deposits::one_lovelace_imbalance_fails_for_both_encodings ... ok
+test phase1::conway::registration_deposits::all_stake_registration_forms_charge_the_protocol_deposit ... ok
+test phase1::conway::registration_deposits::deposits_refunds_withdrawals_and_donations_balance ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s
+

@@ -1,0 +1,3 @@
+red control: native ref scripts need redeemers
+
+- expected: native_reference tests fail, RedeemerMissing

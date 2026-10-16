@@ -1,0 +1,69 @@
+   Compiling pallas-validate v1.4.0 (/w/pallas-validate)
+    Finished `test` profile [unoptimized] target(s) in 2.38s
+     Running unittests src/lib.rs (/target/debug/deps/pallas_validate-c5e4b09702f903ef)
+
+running 6 tests
+test phase1::conway::registration_deposits::absent_or_delegation_only_certificates_do_not_charge_a_deposit ... ok
+test phase1::conway::registration_deposits::all_stake_registration_forms_charge_the_protocol_deposit ... ok
+test phase1::conway::registration_deposits::balancing_on_a_declared_deposit_unlike_the_protocol_deposit_fails ... FAILED
+test phase1::conway::registration_deposits::deposits_refunds_withdrawals_and_donations_balance ... ok
+test utils::registration_deposits::each_certificate_charges_or_refunds_its_deposit ... FAILED
+test utils::registration_deposits::deposit_and_refund_sum_overflow_is_rejected ... FAILED
+
+failures:
+
+---- phase1::conway::registration_deposits::balancing_on_a_declared_deposit_unlike_the_protocol_deposit_fails stdout ----
+
+thread 'phase1::conway::registration_deposits::balancing_on_a_declared_deposit_unlike_the_protocol_deposit_fails' (47) panicked at pallas-validate/src/phase1/conway/registration_deposits.rs:272:17:
+assertion failed: matches!(balance(&tx, false, KEY_DEPOSIT),
+    Err(PostAlonzo(PreservationOfValue)))
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::panicking::panic
+   3: pallas_validate::phase1::conway::registration_deposits::balancing_on_a_declared_deposit_unlike_the_protocol_deposit_fails::{closure#0}
+   4: pallas_validate::phase1::conway::registration_deposits::with_tx::<pallas_validate::phase1::conway::registration_deposits::balancing_on_a_declared_deposit_unlike_the_protocol_deposit_fails::{closure#0}>
+   5: pallas_validate::phase1::conway::registration_deposits::balancing_on_a_declared_deposit_unlike_the_protocol_deposit_fails
+   6: pallas_validate::phase1::conway::registration_deposits::balancing_on_a_declared_deposit_unlike_the_protocol_deposit_fails::{closure#0}
+   7: <pallas_validate::phase1::conway::registration_deposits::balancing_on_a_declared_deposit_unlike_the_protocol_deposit_fails::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- utils::registration_deposits::each_certificate_charges_or_refunds_its_deposit stdout ----
+
+thread 'utils::registration_deposits::each_certificate_charges_or_refunds_its_deposit' (50) panicked at pallas-validate/src/utils/registration_deposits.rs:65:5:
+assertion `left == right` failed
+  left: [(2, 0), (9, 0), (9, 0), (9, 0), (9, 0), (5, 0), (0, 2), (0, 7), (0, 8), (0, 0), (0, 0)]
+ right: [(2, 0), (2, 0), (2, 0), (2, 0), (2, 0), (5, 0), (0, 2), (0, 7), (0, 8), (0, 0), (0, 0)]
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed::<alloc::vec::Vec<(u64, u64)>, alloc::vec::Vec<(u64, u64)>>
+   4: pallas_validate::utils::registration_deposits::each_certificate_charges_or_refunds_its_deposit
+   5: pallas_validate::utils::registration_deposits::each_certificate_charges_or_refunds_its_deposit::{closure#0}
+   6: <pallas_validate::utils::registration_deposits::each_certificate_charges_or_refunds_its_deposit::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- utils::registration_deposits::deposit_and_refund_sum_overflow_is_rejected stdout ----
+
+thread 'utils::registration_deposits::deposit_and_refund_sum_overflow_is_rejected' (49) panicked at pallas-validate/src/utils/registration_deposits.rs:18:9:
+assertion failed: matches!(certificate_deposits_and_refunds(&certificates(&raw), u64::MAX, 0),
+    Err(ValidationError::PostAlonzo(PostAlonzoError::NegativeValue)))
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::panicking::panic
+   3: pallas_validate::utils::registration_deposits::deposit_and_refund_sum_overflow_is_rejected
+   4: pallas_validate::utils::registration_deposits::deposit_and_refund_sum_overflow_is_rejected::{closure#0}
+   5: <pallas_validate::utils::registration_deposits::deposit_and_refund_sum_overflow_is_rejected::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    phase1::conway::registration_deposits::balancing_on_a_declared_deposit_unlike_the_protocol_deposit_fails
+    utils::registration_deposits::deposit_and_refund_sum_overflow_is_rejected
+    utils::registration_deposits::each_certificate_charges_or_refunds_its_deposit
+
+test result: FAILED. 3 passed; 3 failed; 0 ignored; 0 measured; 43 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p pallas-validate --lib`

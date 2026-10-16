@@ -1,0 +1,5 @@
+test(validate): reach the input decoding refusals
+
+- input_eras: collateral at a reward address is InputDecoding
+- input_eras: an input at a reward or undecodable Byron address is
+  InputDecoding, key and Byron inputs are not

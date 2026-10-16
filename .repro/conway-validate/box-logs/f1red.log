@@ -1,0 +1,51 @@
+   Compiling pallas-validate v1.4.0 (/w/pallas-validate)
+    Finished `test` profile [unoptimized] target(s) in 2.83s
+     Running tests/conway.rs (/target/debug/deps/conway-b73c2c0525ec0203)
+
+running 24 tests
+test conway_tests::collateral_annotation ... ok
+test conway_tests::collateral_is_not_verification_key_locked ... ok
+test conway_tests::collateral_with_other_assets ... ok
+test conway_tests::certificate_script_is_required_through_dispatch ... ok
+test conway_tests::collateral_min_lovelace ... ok
+test conway_tests::max_val_exceeded ... ok
+test conway_tests::empty_ins ... ok
+test conway_tests::max_tx_size_exceeded ... ok
+test conway_tests::min_fee_unreached ... ok
+test conway_tests::min_lovelace_unreached ... ok
+test conway_tests::preservation_of_value_allows_empty_multiasset_to_equal_coin ... ok
+test conway_tests::preservation_of_value ... ok
+test conway_tests::no_collateral_inputs ... ok
+test conway_tests::registration_deposit_is_required_through_dispatch ... ok
+test conway_tests::successful_mainnet_tx ... ok
+test conway_tests::byron_inputs_are_witnessed_through_dispatch ... ok
+test conway_tests::too_many_collateral_inputs ... ok
+test conway_tests::tx_network_id ... ok
+test conway_tests::unfound_utxo_input ... ok
+test conway_tests::validity_interval_lower_bound_unreached ... ok
+test conway_tests::reference_script_tx_with_collateral_one_lovelace_short ... FAILED
+test conway_tests::validity_interval_upper_bound_surpassed ... ok
+test conway_tests::successful_preview_tx_with_plutus_v3_script ... ok
+test conway_tests::successful_mainnet_tx_with_plutus_v3_script ... ok
+
+failures:
+
+---- conway_tests::reference_script_tx_with_collateral_one_lovelace_short stdout ----
+
+thread 'conway_tests::reference_script_tx_with_collateral_one_lovelace_short' (71) panicked at pallas-validate/tests/conway.rs:497:9:
+Ok(())
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: conway::conway_tests::reference_script_tx_with_collateral_one_lovelace_short
+   3: conway::conway_tests::reference_script_tx_with_collateral_one_lovelace_short::{closure#0}
+   4: <conway::conway_tests::reference_script_tx_with_collateral_one_lovelace_short::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    conway_tests::reference_script_tx_with_collateral_one_lovelace_short
+
+test result: FAILED. 23 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p pallas-validate --test conway`

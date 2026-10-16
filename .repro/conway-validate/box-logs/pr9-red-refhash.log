@@ -1,0 +1,44 @@
+   Compiling pallas-validate v1.4.0 (/w/pallas-validate)
+    Finished `test` profile [unoptimized] target(s) in 2.97s
+     Running unittests src/lib.rs (/target/debug/deps/pallas_validate-969933c6046486ed)
+
+running 10 tests
+test phase1::conway::native_inputs::native_reference_languages_reach_integrity_hash_check ... ok
+test phase1::conway::certificate_witnesses::native_reference_authorization_uses_original_script_hash ... ok
+test phase1::conway::native_inputs::native_reference_scripts_reject_v4_and_nested_guards_explicitly ... ok
+test phase1::conway::certificate_witnesses::native_reference_certificate_needs_no_redeemer ... ok
+test phase1::conway::native_inputs::native_reference_script_requires_correct_hash_and_input_role ... ok
+test phase1::conway::native_inputs::native_reference_v1_v2_v3_scripts_supply_mint_from_spending_or_reference_inputs ... ok
+test phase1::conway::native_inputs::native_reference_timelocks_keep_original_hash_and_need_no_redeemer ... FAILED
+test phase1::conway::certificate_witnesses::native_reference_scripts_need_no_redeemer_for_any_purpose ... ok
+test phase1::dijkstra_native_tests::dijkstra_native_reference_fee_size_and_scope ... ok
+test phase1::dijkstra_native_tests::dijkstra_native_reference_sources_and_original_hash ... ok
+
+failures:
+
+---- phase1::conway::native_inputs::native_reference_timelocks_keep_original_hash_and_need_no_redeemer stdout ----
+
+thread 'phase1::conway::native_inputs::native_reference_timelocks_keep_original_hash_and_need_no_redeemer' (51) panicked at pallas-validate/src/phase1/conway/native_inputs.rs:167:5:
+assertion `left == right` failed
+  left: "Err(PostAlonzo(ScriptWitnessMissing))"
+ right: "Ok(())"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed::<alloc::string::String, &str>
+   4: pallas_validate::phase1::conway::native_inputs::expect
+   5: pallas_validate::phase1::conway::native_inputs::native_reference_timelocks_keep_original_hash_and_need_no_redeemer::{closure#0}
+   6: pallas_validate::phase1::conway::native_inputs::captured_settings::<pallas_validate::phase1::conway::native_inputs::native_reference_timelocks_keep_original_hash_and_need_no_redeemer::{closure#0}>
+   7: pallas_validate::phase1::conway::native_inputs::native_reference_timelocks_keep_original_hash_and_need_no_redeemer
+   8: pallas_validate::phase1::conway::native_inputs::native_reference_timelocks_keep_original_hash_and_need_no_redeemer::{closure#0}
+   9: <pallas_validate::phase1::conway::native_inputs::native_reference_timelocks_keep_original_hash_and_need_no_redeemer::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    phase1::conway::native_inputs::native_reference_timelocks_keep_original_hash_and_need_no_redeemer
+
+test result: FAILED. 9 passed; 1 failed; 0 ignored; 0 measured; 88 filtered out; finished in 0.03s
+
+error: test failed, to rerun pass `-p pallas-validate --lib`

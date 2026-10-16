@@ -1,0 +1,5 @@
+fix(validate): balance every Conway deposit
+
+- utils.rs: certificate_deposits_and_refunds replaces the stake helper
+- conway.rs: count refunds, withdrawals, proposals and donation
+- tests: each balance term at its net and one lovelace either side

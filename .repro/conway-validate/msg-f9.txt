@@ -1,0 +1,4 @@
+ci: lint the validate phase2 feature
+
+- ci.yml: run clippy on pallas-validate with phase2
+- ci.yml: name the phase2 test step as its neighbours are named

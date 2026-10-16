@@ -1,0 +1,5 @@
+fix(validate): state what the new comments mean
+
+- drop the test module docs and comments that restate the code
+- reword comments that named unbuilt checks or used images
+- input_eras: name the collateral test for the eras it loops

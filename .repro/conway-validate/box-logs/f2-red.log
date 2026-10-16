@@ -1,0 +1,57 @@
+   Compiling pallas-validate v1.4.0 (/w/pallas-validate)
+    Finished `test` profile [unoptimized] target(s) in 1.61s
+     Running unittests src/lib.rs (/target/debug/deps/pallas_validate-3559ad3880eb8212)
+
+running 9 tests
+test phase1::conway::input_eras::a_byron_era_input_allows_no_plutus_language ... ok
+test phase1::conway::input_eras::a_datum_hash_on_an_earlier_era_reference_input_is_found ... ok
+test phase1::conway::input_eras::a_reference_script_from_an_earlier_era_is_found ... ok
+test phase1::conway::input_eras::a_reference_script_on_a_spent_input_supplies_a_minting_policy ... ok
+test phase1::conway::input_eras::a_script_address_from_an_earlier_era_names_its_script ... ok
+test phase1::conway::input_eras::key_and_byron_collateral_is_key_locked_in_every_era ... ok
+test phase1::conway::input_eras::script_collateral_from_an_earlier_era_is_not_key_locked ... ok
+test phase1::conway::input_eras::only_a_needed_reference_script_sets_the_language ... FAILED
+test phase1::conway::input_eras::each_needed_purpose_sets_the_reference_script_language ... FAILED
+
+failures:
+
+---- phase1::conway::input_eras::only_a_needed_reference_script_sets_the_language stdout ----
+
+thread 'phase1::conway::input_eras::only_a_needed_reference_script_sets_the_language' (52) panicked at pallas-validate/src/phase1/conway/input_eras.rs:223:5:
+assertion `left == right` failed
+  left: [(true, false, true, Babbage, [PlutusV2]), (true, false, true, Conway, [PlutusV2]), (true, false, false, Babbage, []), (true, false, false, Conway, []), (true, true, true, Babbage, [PlutusV2]), (true, true, true, Conway, [PlutusV2]), (true, true, false, Babbage, []), (true, true, false, Conway, []), (false, false, true, Babbage, [PlutusV2]), (false, false, true, Conway, [PlutusV2]), (false, false, false, Babbage, []), (false, false, false, Conway, []), (false, true, true, Babbage, [PlutusV2]), (false, true, true, Conway, [PlutusV2]), (false, true, false, Babbage, []), (false, true, false, Conway, [])]
+ right: [(true, false, true, Babbage, []), (true, false, true, Conway, []), (true, false, false, Babbage, []), (true, false, false, Conway, []), (true, true, true, Babbage, [PlutusV2]), (true, true, true, Conway, [PlutusV2]), (true, true, false, Babbage, []), (true, true, false, Conway, []), (false, false, true, Babbage, []), (false, false, true, Conway, []), (false, false, false, Babbage, []), (false, false, false, Conway, []), (false, true, true, Babbage, [PlutusV2]), (false, true, true, Conway, [PlutusV2]), (false, true, false, Babbage, []), (false, true, false, Conway, [])]
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed::<alloc::vec::Vec<(bool, bool, bool, pallas_traverse::Era, alloc::vec::Vec<pallas_primitives::conway::model::Language>)>, alloc::vec::Vec<(bool, bool, bool, pallas_traverse::Era, alloc::vec::Vec<pallas_primitives::conway::model::Language>)>>
+   4: pallas_validate::phase1::conway::input_eras::only_a_needed_reference_script_sets_the_language
+   5: pallas_validate::phase1::conway::input_eras::only_a_needed_reference_script_sets_the_language::{closure#0}
+   6: <pallas_validate::phase1::conway::input_eras::only_a_needed_reference_script_sets_the_language::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- phase1::conway::input_eras::each_needed_purpose_sets_the_reference_script_language stdout ----
+
+thread 'phase1::conway::input_eras::each_needed_purpose_sets_the_reference_script_language' (50) panicked at pallas-validate/src/phase1/conway/input_eras.rs:316:5:
+assertion `left == right` failed
+  left: [("spend", true, [PlutusV2]), ("spend", false, [PlutusV2]), ("mint", true, [PlutusV2]), ("mint", false, [PlutusV2]), ("cert", true, [PlutusV2]), ("cert", false, [PlutusV2]), ("reward", true, [PlutusV2]), ("reward", false, [PlutusV2]), ("vote", true, [PlutusV2]), ("vote", false, [PlutusV2]), ("propose", true, [PlutusV2]), ("propose", false, [PlutusV2])]
+ right: [("spend", true, [PlutusV2]), ("spend", false, []), ("mint", true, [PlutusV2]), ("mint", false, []), ("cert", true, [PlutusV2]), ("cert", false, []), ("reward", true, [PlutusV2]), ("reward", false, []), ("vote", true, [PlutusV2]), ("vote", false, []), ("propose", true, [PlutusV2]), ("propose", false, [])]
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed::<alloc::vec::Vec<(&str, bool, alloc::vec::Vec<pallas_primitives::conway::model::Language>)>, alloc::vec::Vec<(&str, bool, alloc::vec::Vec<pallas_primitives::conway::model::Language>)>>
+   4: pallas_validate::phase1::conway::input_eras::each_needed_purpose_sets_the_reference_script_language
+   5: pallas_validate::phase1::conway::input_eras::each_needed_purpose_sets_the_reference_script_language::{closure#0}
+   6: <pallas_validate::phase1::conway::input_eras::each_needed_purpose_sets_the_reference_script_language::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    phase1::conway::input_eras::each_needed_purpose_sets_the_reference_script_language
+    phase1::conway::input_eras::only_a_needed_reference_script_sets_the_language
+
+test result: FAILED. 7 passed; 2 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p pallas-validate --lib`

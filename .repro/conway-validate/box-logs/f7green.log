@@ -1,0 +1,17 @@
+   Compiling pallas-validate v1.4.0 (/w/pallas-validate)
+    Finished `test` profile [unoptimized] target(s) in 2.51s
+     Running unittests src/lib.rs (/target/debug/deps/pallas_validate-c5e4b09702f903ef)
+
+running 9 tests
+test phase1::conway::registration_deposits::absent_or_delegation_only_certificates_do_not_charge_a_deposit ... ok
+test phase1::conway::registration_deposits::balancing_on_a_declared_deposit_unlike_the_protocol_deposit_fails ... ok
+test phase2::v3_deposit_context_tests::v3_deposit_context_legacy_certificates_have_no_explicit_amount ... ok
+test phase1::conway::registration_deposits::all_stake_registration_forms_charge_the_protocol_deposit ... ok
+test utils::registration_deposits::deposit_and_refund_sum_overflow_is_rejected ... ok
+test utils::registration_deposits::each_certificate_charges_or_refunds_its_deposit ... ok
+test phase1::conway::registration_deposits::deposits_refunds_withdrawals_and_donations_balance ... ok
+test phase2::v3_deposit_context_tests::v3_deposit_context_protocol_boundaries_at_every_occurrence ... ok
+test phase2::v3_deposit_context_tests::v3_deposit_context_protocol_reaches_script_execution ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.01s
+

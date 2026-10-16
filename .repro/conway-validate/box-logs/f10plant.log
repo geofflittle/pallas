@@ -1,0 +1,55 @@
+   Compiling pallas-validate v1.4.0 (/w/pallas-validate)
+    Finished `test` profile [unoptimized] target(s) in 1.44s
+     Running unittests src/lib.rs (/target/debug/deps/pallas_validate-d0f69c1298a150db)
+
+running 11 tests
+test phase1::conway::input_eras::a_byron_era_input_allows_no_plutus_language ... ok
+test phase1::conway::input_eras::a_datum_hash_on_an_earlier_era_reference_input_is_found ... ok
+test phase1::conway::input_eras::a_reference_script_from_an_earlier_era_is_found ... ok
+test phase1::conway::input_eras::a_reference_script_on_a_spent_input_supplies_a_minting_policy ... ok
+test phase1::conway::input_eras::a_script_address_from_an_earlier_era_names_its_script ... ok
+test phase1::conway::input_eras::key_and_byron_collateral_is_key_locked_in_every_era ... ok
+test phase1::conway::input_eras::only_a_needed_reference_script_sets_the_language ... ok
+test phase1::conway::input_eras::each_needed_purpose_sets_the_reference_script_language ... ok
+test phase1::conway::input_eras::collateral_at_a_reward_address_is_refused ... FAILED
+test phase1::conway::input_eras::script_collateral_from_an_earlier_era_is_not_key_locked ... ok
+test phase1::conway::input_eras::an_input_at_a_reward_or_undecodable_byron_address_is_refused ... FAILED
+
+failures:
+
+---- phase1::conway::input_eras::collateral_at_a_reward_address_is_refused stdout ----
+
+thread 'phase1::conway::input_eras::collateral_at_a_reward_address_is_refused' (51) panicked at pallas-validate/src/phase1/conway/input_eras.rs:83:5:
+Ok(())
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: pallas_validate::phase1::conway::input_eras::collateral_at_a_reward_address_is_refused
+   3: pallas_validate::phase1::conway::input_eras::collateral_at_a_reward_address_is_refused::{closure#0}
+   4: <pallas_validate::phase1::conway::input_eras::collateral_at_a_reward_address_is_refused::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- phase1::conway::input_eras::an_input_at_a_reward_or_undecodable_byron_address_is_refused stdout ----
+
+thread 'phase1::conway::input_eras::an_input_at_a_reward_or_undecodable_byron_address_is_refused' (50) panicked at pallas-validate/src/phase1/conway/input_eras.rs:107:5:
+assertion `left == right` failed
+  left: ["Err(PostAlonzo(VKWitnessMissing))", "Err(PostAlonzo(VKWitnessMissing))", "Ok(())", "Err(PostAlonzo(VKWitnessMissing))"]
+ right: ["Err(PostAlonzo(VKWitnessMissing))", "Err(PostAlonzo(VKWitnessMissing))", "Err(PostAlonzo(InputDecoding))", "Err(PostAlonzo(InputDecoding))"]
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed::<alloc::vec::Vec<alloc::string::String>, [&str; 4]>
+   4: pallas_validate::phase1::conway::input_eras::an_input_at_a_reward_or_undecodable_byron_address_is_refused
+   5: pallas_validate::phase1::conway::input_eras::an_input_at_a_reward_or_undecodable_byron_address_is_refused::{closure#0}
+   6: <pallas_validate::phase1::conway::input_eras::an_input_at_a_reward_or_undecodable_byron_address_is_refused::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    phase1::conway::input_eras::an_input_at_a_reward_or_undecodable_byron_address_is_refused
+    phase1::conway::input_eras::collateral_at_a_reward_address_is_refused
+
+test result: FAILED. 9 passed; 2 failed; 0 ignored; 0 measured; 25 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p pallas-validate --lib`

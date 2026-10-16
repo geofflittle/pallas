@@ -1,0 +1,70 @@
++    // Collateral is required whenever the transaction has redeemers, including
++    // when every script is a reference script.
++    // Native reference scripts satisfy script presence, but never need redeemers.
++// The credential that must witness a certificate. Legacy stake registration
++// needs no witness, and pool certificates are witnessed by pool keys.
++    check_remaining_vk_wits(vk_wits, tx_hash)?; // required for native scripts
++    // CBOR heads of `[0, [0, bytes(64)], attributes]`, the root preimage of a key address.
++// The scripts the body needs: spent script inputs, minting policies, the script
++// credentials of certificates, withdrawals and voters, and proposal policies.
++// Round trips the edited transaction through CBOR so that the signed body hash
++// covers the edits.
++    // A bad signature from the script key fails even after a good signature
++    // from another key.
++                    // Script payment address, so spending it needs no key witness.
++// Witness set results for a script by reference that spends, mints, withdraws
++// and certifies, with the reference script on a reference input or a spent input.
++    // Valid noncanonical CBOR for [0, key_hash]: integer 0 uses two bytes.
++    // A reference script is hashed from its original bytes.
++    let mut cbor = vec![0xa3, 0x00, 0x58, 0x1d]; // output, a 29 byte address
++    cbor.extend([0x01, 0x1a, 0x00, 0x4c, 0x4b, 0x40]); // five ada
++    cbor.extend([0x03, 0xd8, 0x18, 0x47, 0x82, 0x02, 0x44]); // a PlutusV2 reference script
++    let mut cbor = vec![0x84, 0xa3, 0x00, 0x81]; // transaction, body, one input
++    cbor.extend([0x01, 0x80, 0x02, 0x00]); // no outputs, no fee
++    cbor.extend([0xa0, 0xf5, 0xf6]); // no witnesses, valid, no auxiliary data
++    let mut cbor = vec![0x84, 0xa4]; // transaction, body
++    cbor.extend([0x00, 0x80, 0x01, 0x80, 0x02, 0x00]); // no inputs, no outputs, no fee
++    cbor.extend([0x12, 0x81]); // one reference input
++    cbor.extend([0xa0, 0xf5, 0xf6]); // no witnesses, valid, no auxiliary data
++    let mut cbor = vec![0x84, 0xa4, 0x00, 0x81]; // transaction, body, one input
++    cbor.extend([0x01, 0x80, 0x02, 0x00]); // no outputs, no fee
++    cbor.extend([0x09, 0xa1, 0x58, 0x1c]); // mint under one policy
++    cbor.extend([0xa1, 0x41, 0x01, 0x01]); // one unit of asset 01
++    cbor.extend([0xa0, 0xf5, 0xf6]); // no witnesses, valid, no auxiliary data
++// Balance results for a body whose deposits less refunds come to `net`, with
++// the output short by `net - 1`, `net` and `net + 1`.
++        // The legacy registration declares no amount.
++    /// `ScriptPubkey` over a 28 byte key hash.
++        let mut cbor = vec![0x84]; // transaction
++        cbor.extend([0xa4, 0x00, 0x80, 0x01, 0x80, 0x02, 0x00]); // body, no inputs, outputs or fee
++        cbor.extend([0x04, 0x81]); // one certificate
++        cbor.extend([0x83, 0x07]); // registration with a deposit
++        cbor.extend([0x82, credential_kind, 0x58, 0x1c]); // a 28 byte credential
++        cbor.push(0x00); // zero deposit
++        cbor.extend_from_slice(&[0xa1, 0x01, 0x81]); // witness set, one native script
++        cbor.extend_from_slice(&[0xf5, 0xf6]); // valid, no auxiliary data
++        let mut cbor = vec![0x84]; // transaction
++        cbor.extend([0xa4, 0x00, 0x80, 0x01, 0x80, 0x02, 0x00]); // body, no inputs, outputs or fee
++        cbor.extend([0x04, 0x81]); // one certificate
++        cbor.extend([0xa0, 0xf5, 0xf6]); // no witnesses, valid, no auxiliary data
++    /// Encodes the transaction info for a protocol major version, with V3 registration deposits present above version 9.
++    /// Encodes the script context for a protocol major version.
++    // The deposit inside Just, field 1 of the Reg certificate, which is field 1
++    // of the Certifying purpose.
++// The deposits a certificate list charges and the refunds it returns, as
++// (deposits, refunds).
++        // Adds an unfunded registration to conway3, so balance fails before the
++        // stale signatures are checked.
++        // The edited body changes size, so a zero minimum fee stops the fee
++        // check from failing first.
++        // Adds a funded registration at a script credential with no script,
++        // which fails before the stale payment signature is checked.
++        // The edited body changes size, so a zero minimum fee stops the fee
++        // check from failing first.
++        // Spends an input and a collateral input locked by one Byron key, the
++        // collateral from a Byron era output.
++        // The edited body changes size, so a zero minimum fee stops the fee
++        // check from failing first.
++            // An empty attribute map written with indefinite length.
++    // Same as successful_mainnet_tx_with_plutus_v3_script, except that the
++    // collateral input holds one lovelace less, below 150% of the fee.

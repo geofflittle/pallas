@@ -1,0 +1,4 @@
+ci: lint validate with phase2 and unstable
+
+- ci.yml: run clippy on pallas-validate with phase2 and unstable
+- ci.yml: name the phase2 unstable test step as its neighbours are named

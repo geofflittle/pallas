@@ -1,0 +1,36 @@
+   Compiling pallas-validate v1.4.0 (/w/pallas-validate)
+    Finished `test` profile [unoptimized] target(s) in 1.25s
+     Running unittests src/lib.rs (/target/debug/deps/pallas_validate-3559ad3880eb8212)
+
+running 5 tests
+test phase1::conway::input_eras::a_reference_script_on_a_spent_input_sets_the_language ... ok
+test phase1::conway::input_eras::a_reference_script_from_an_earlier_era_is_found ... ok
+test phase1::conway::input_eras::a_reference_script_on_a_spent_input_supplies_a_minting_policy ... ok
+test phase1::conway::certificate_witnesses::plutus_reference_scripts_need_a_redeemer_for_every_purpose ... ok
+test phase1::conway::certificate_witnesses::native_reference_scripts_need_no_redeemer_for_any_purpose ... FAILED
+
+failures:
+
+---- phase1::conway::certificate_witnesses::native_reference_scripts_need_no_redeemer_for_any_purpose stdout ----
+
+thread 'phase1::conway::certificate_witnesses::native_reference_scripts_need_no_redeemer_for_any_purpose' (45) panicked at pallas-validate/src/phase1/conway/certificate_witnesses.rs:656:5:
+assertion `left == right` failed
+  left: [(Spend, false, "Err(PostAlonzo(RedeemerMissing))"), (Spend, true, "Err(PostAlonzo(RedeemerMissing))"), (Mint, false, "Err(PostAlonzo(RedeemerMissing))"), (Mint, true, "Err(PostAlonzo(RedeemerMissing))"), (Reward, false, "Err(PostAlonzo(RedeemerMissing))"), (Reward, true, "Err(PostAlonzo(RedeemerMissing))"), (Cert, false, "Err(PostAlonzo(RedeemerMissing))"), (Cert, true, "Err(PostAlonzo(RedeemerMissing))")]
+ right: [(Spend, false, "Ok(())"), (Spend, true, "Ok(())"), (Mint, false, "Ok(())"), (Mint, true, "Ok(())"), (Reward, false, "Ok(())"), (Reward, true, "Ok(())"), (Cert, false, "Ok(())"), (Cert, true, "Ok(())")]
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::panicking::assert_failed_inner
+   3: core::panicking::assert_failed::<alloc::vec::Vec<(pallas_primitives::conway::model::RedeemerTag, bool, alloc::string::String)>, alloc::vec::Vec<(pallas_primitives::conway::model::RedeemerTag, bool, alloc::string::String)>>
+   4: pallas_validate::phase1::conway::certificate_witnesses::native_reference_scripts_need_no_redeemer_for_any_purpose
+   5: pallas_validate::phase1::conway::certificate_witnesses::native_reference_scripts_need_no_redeemer_for_any_purpose::{closure#0}
+   6: <pallas_validate::phase1::conway::certificate_witnesses::native_reference_scripts_need_no_redeemer_for_any_purpose::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    phase1::conway::certificate_witnesses::native_reference_scripts_need_no_redeemer_for_any_purpose
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p pallas-validate --lib`

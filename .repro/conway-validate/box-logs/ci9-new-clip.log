@@ -1,0 +1,18 @@
+   Compiling num-traits v0.2.19
+    Checking pallas-primitives v1.4.0 (/w/pallas-primitives)
+    Checking chrono v0.4.45
+    Checking pallas-traverse v1.4.0 (/w/pallas-traverse)
+    Checking pallas-validate v1.4.0 (/w/pallas-validate)
+error: using `clone` on type `u64` which implements the `Copy` trait
+   --> pallas-validate/src/phase1/dijkstra.rs:271:5
+    |
+271 |     a.clone().checked_add(b).ok_or(PostAlonzo(NegativeValue))
+    |     ^^^^^^^^^ help: try removing the `clone` call: `a`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#clone_on_copy
+    = note: `-D clippy::clone-on-copy` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::clone_on_copy)]`
+
+error: could not compile `pallas-validate` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `pallas-validate` (lib test) due to 1 previous error

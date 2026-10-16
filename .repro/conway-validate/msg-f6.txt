@@ -1,0 +1,6 @@
+fix(validate): verify every bootstrap witness
+
+- conway.rs: hash a bootstrap witness root from its raw attributes
+- conway.rs: verify the signature of every bootstrap witness
+- test a second Byron key, an extra bad witness, and attributes
+  that do not round trip
