@@ -858,6 +858,7 @@ fn reference_script<'a>(
 ) -> Option<ScriptRef<'a>> {
     utxos
         .get(&MultiEraInput::from_alonzo_compatible(input))
+        .filter(|output| matches!(output, MultiEraOutput::Conway(_)))
         .and_then(MultiEraOutput::script_ref)
 }
 
