@@ -109,6 +109,20 @@ element `block_transaction` form, written as lowercase hex with no trailing
 newline. Blake2b-256 over the body alone gives the transaction hash in the
 table, and `pallas-traverse` asserts that.
 
+## Transactions with indefinite length byte strings
+
+Two transactions from the chain above that write byte strings in the
+indefinite length form, each as the three element mempool form an endorser
+block holds it, written as lowercase hex with no trailing newline. They were
+read out of the node's endorser block database. Blake2b-256 over the body
+alone gives the transaction hash in the table, and `pallas-primitives` asserts
+that.
+
+| file | transaction | bytes | indefinite byte strings in the body | where | held by |
+| --- | --- | --- | --- | --- | --- |
+| `dijkstra-indef-bytes1.tx` | `943a88c97f86522b2cda39d1d6bd076ea51a696e5ad41c41e4c6d38ce8f7dd50` | 751 | 11 | an input id, an output address, a guard key hash, a reference input id, two account keys, and in the sub transaction an input id, an output address, a guard key hash and two account keys | endorser block `6740c8d5` at offset 0, and the ranking block at slot 3438997 as transaction 137 |
+| `dijkstra-indef-bytes2.tx` | `b026c42a9cf28aff7ce8624487f4d2b8f45df93454ac0ea2842408c1673cce5c` | 646 | 7 | an input id, two output addresses, a reference input id, and in the sub transaction an input id and two output addresses | endorser blocks `8295d3be` and `4e4706aa` |
+
 ## Fixtures built rather than cut
 
 Four files here are hand built CBOR, for shapes no block on this chain
