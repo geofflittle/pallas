@@ -9,23 +9,31 @@ use crate::utils::{
     compute_plutus_v1_script_hash, compute_plutus_v2_script_hash, compute_plutus_v3_script_hash,
     conway_add_minted_non_zero, conway_add_values, conway_get_val_size_in_words,
     conway_lovelace_diff_or_fail, conway_values_are_equal, get_conway_tx_size,
-    get_lovelace_from_conway_val, get_payment_part, get_shelley_address, is_byron_address,
-    mk_alonzo_vk_wits_check_list, verify_signature,
+    get_lovelace_from_conway_val, get_shelley_address, mk_alonzo_vk_wits_check_list,
+    verify_signature,
 };
 use pallas_addresses::{
-    Address, Network, ScriptHash, ShelleyAddress, ShelleyPaymentPart, StakeAddress, StakePayload,
+    Address, ByronAddress, Network, ScriptHash, ShelleyAddress, ShelleyPaymentPart, StakeAddress,
+    StakePayload, byron::AddressId,
 };
 use pallas_codec::utils::{Bytes, KeepRaw, NonEmptySet};
 use pallas_primitives::{
-    AddrKeyhash, Hash, PlutusData, PlutusScript, PolicyId, PositiveCoin, TransactionInput, babbage,
+    AddrKeyhash, Hash, PlutusData, PlutusScript, PolicyId, PositiveCoin, StakeCredential,
+    TransactionInput, babbage,
     conway::{
-        DatumOption, Language, LanguageViews, Mint, Redeemers, RedeemersKey, RequiredSigners,
-        ScriptRef, TransactionBody, TransactionOutput, Tx, VKeyWitness, Value, WitnessSet,
+        BootstrapWitness, Certificate, DatumOption, GovAction, Language, LanguageViews, Mint,
+        Redeemers, RedeemersKey, RequiredSigners, ScriptRef, TransactionBody, TransactionOutput,
+        Tx, VKeyWitness, Value, Voter, WitnessSet,
     },
 };
 use pallas_traverse::{MultiEraInput, MultiEraOutput, MultiEraTx, OriginalHash};
 use std::cmp::Ordering;
 use std::ops::Deref;
+
+#[cfg(test)]
+mod certificate_witnesses;
+#[cfg(test)]
+mod input_eras;
 
 pub fn validate_conway_tx(
     mtx: &Tx,
@@ -214,16 +222,17 @@ fn check_collaterals_address(collaterals: &[TransactionInput], utxos: &UTxOs) ->
     for collateral in collaterals {
         match utxos.get(&MultiEraInput::from_alonzo_compatible(collateral)) {
             Some(multi_era_output) => {
-                if let Some(conway_output) = MultiEraOutput::as_conway(multi_era_output) {
-                    let address: &Bytes = match conway_output {
-                        TransactionOutput::Legacy(inner) => &inner.address,
-                        TransactionOutput::PostAlonzo(inner) => &inner.address,
-                    };
-                    if let ShelleyPaymentPart::Script(_) =
-                        get_payment_part(address).ok_or(PostAlonzo(InputDecoding))?
-                    {
+                match multi_era_output
+                    .address()
+                    .map_err(|_| PostAlonzo(InputDecoding))?
+                {
+                    Address::Shelley(address)
+                        if matches!(address.payment(), ShelleyPaymentPart::Key(_)) => {}
+                    Address::Byron(_) => {}
+                    Address::Shelley(_) => {
                         return Err(PostAlonzo(CollateralNotVKeyLocked));
                     }
+                    _ => return Err(PostAlonzo(InputDecoding)),
                 }
             }
             None => {
@@ -592,10 +601,7 @@ fn check_minting(tx_body: &TransactionBody, mtx: &Tx, utxos: &UTxOs) -> Validati
                 .flatten()
                 .map(compute_plutus_v3_script_hash);
 
-            let ref_scripts = tx_body
-                .reference_inputs
-                .iter()
-                .flatten()
+            let ref_scripts = reference_script_inputs(tx_body)
                 .filter_map(|x| get_script_hash_from_reference_input(x, utxos));
 
             let all_scripts_wits: Vec<_> = native_script_wits
@@ -675,15 +681,26 @@ fn check_witness_set(mtx: &Tx, utxos: &UTxOs) -> ValidationResult {
     )?;
     let plutus_data = tx_wits.plutus_data.clone();
     check_datums(tx_body, utxos, &plutus_data)?;
+    // Native reference scripts satisfy script presence, but never need redeemers.
+    let mut plutus_reference_scripts = Vec::new();
+    for input in reference_script_inputs(tx_body) {
+        if let Some(script) = reference_script(input, utxos)
+            && !matches!(script, ScriptRef::NativeScript(_))
+            && let Some(hash) = get_script_hash_from_reference_input(input, utxos)
+        {
+            plutus_reference_scripts.push(hash);
+        }
+    }
     check_redeemers(
         &plutus_v1_scripts,
         &plutus_v2_scripts,
         &plutus_v3_scripts,
-        &reference_scripts,
+        &plutus_reference_scripts,
         tx_body,
         tx_wits,
         utxos,
     )?;
+    check_certificate_native_scripts(mtx, utxos)?;
     check_required_signers(&tx_body.required_signers, vkey_wits, tx_hash)?;
     check_vkey_input_wits(
         mtx,
@@ -751,6 +768,27 @@ fn check_needed_scripts(
         &mut filtered_plutus_v3_scripts,
         reference_scripts,
     )?;
+    for cert in tx_body.certificates.iter().flatten() {
+        if let Some(StakeCredential::ScriptHash(hash)) = certificate_credential(cert) {
+            let mut covered = reference_scripts.contains(hash);
+            for scripts in [
+                &mut filtered_native_scripts,
+                &mut filtered_plutus_v1_scripts,
+                &mut filtered_plutus_v2_scripts,
+                &mut filtered_plutus_v3_scripts,
+            ] {
+                for (used, supplied) in scripts.iter_mut() {
+                    if supplied == hash {
+                        *used = true;
+                        covered = true;
+                    }
+                }
+            }
+            if !covered {
+                return Err(PostAlonzo(ScriptWitnessMissing));
+            }
+        }
+    }
     for (covered, _) in filtered_native_scripts.iter() {
         if !covered {
             return Err(PostAlonzo(UnneededNativeScript));
@@ -776,14 +814,91 @@ fn check_needed_scripts(
 
 fn get_reference_script_hashes(tx_body: &TransactionBody, utxos: &UTxOs) -> Vec<PolicyId> {
     let mut res: Vec<PolicyId> = Vec::new();
-    if let Some(reference_inputs) = &tx_body.reference_inputs {
-        for input in reference_inputs.iter() {
-            if let Some(script_hash) = get_script_hash_from_reference_input(input, utxos) {
-                res.push(script_hash)
-            }
+    for input in reference_script_inputs(tx_body) {
+        if let Some(script_hash) = get_script_hash_from_reference_input(input, utxos) {
+            res.push(script_hash);
         }
     }
     res
+}
+
+// The credential that must witness a certificate. Legacy stake registration
+// needs no witness, and pool certificates are witnessed by pool keys.
+fn certificate_credential(cert: &Certificate) -> Option<&StakeCredential> {
+    match cert {
+        Certificate::StakeRegistration(_)
+        | Certificate::PoolRegistration { .. }
+        | Certificate::PoolRetirement(..) => None,
+        Certificate::StakeDeregistration(cred)
+        | Certificate::StakeDelegation(cred, _)
+        | Certificate::Reg(cred, _)
+        | Certificate::UnReg(cred, _)
+        | Certificate::VoteDeleg(cred, _)
+        | Certificate::StakeVoteDeleg(cred, _, _)
+        | Certificate::StakeRegDeleg(cred, _, _)
+        | Certificate::VoteRegDeleg(cred, _, _)
+        | Certificate::StakeVoteRegDeleg(cred, _, _, _)
+        | Certificate::AuthCommitteeHot(cred, _)
+        | Certificate::ResignCommitteeCold(cred, _)
+        | Certificate::RegDRepCert(cred, _, _)
+        | Certificate::UnRegDRepCert(cred, _)
+        | Certificate::UpdateDRepCert(cred, _) => Some(cred),
+    }
+}
+
+fn reference_script_inputs<'a>(
+    body: &'a TransactionBody<'_>,
+) -> impl Iterator<Item = &'a TransactionInput> {
+    body.inputs
+        .iter()
+        .chain(body.reference_inputs.iter().flatten())
+}
+
+fn reference_script<'a>(
+    input: &'a TransactionInput,
+    utxos: &'a UTxOs<'_>,
+) -> Option<ScriptRef<'a>> {
+    utxos
+        .get(&MultiEraInput::from_alonzo_compatible(input))
+        .and_then(MultiEraOutput::script_ref)
+}
+
+fn check_certificate_native_scripts(mtx: &Tx, utxos: &UTxOs) -> ValidationResult {
+    let body = &mtx.transaction_body;
+    let witnesses = &mtx.transaction_witness_set;
+    let vkeys = witnesses
+        .vkeywitness
+        .as_ref()
+        .map(|x| x.clone().to_vec())
+        .unwrap_or_default();
+    let references: Vec<_> = reference_script_inputs(body)
+        .map(|input| reference_script(input, utxos))
+        .collect();
+    let scripts = witnesses
+        .native_script
+        .iter()
+        .flatten()
+        .map(|script| (compute_native_script_hash(script), script.deref()))
+        .chain(references.iter().filter_map(|script| match script {
+            Some(ScriptRef::NativeScript(script)) => Some((script.original_hash(), script.deref())),
+            _ => None,
+        }));
+    for (hash, script) in scripts {
+        let needed = body.certificates.iter().flatten().any(|cert| {
+            matches!(certificate_credential(cert), Some(StakeCredential::ScriptHash(cred)) if *cred == hash)
+        });
+        if needed
+            && !super::shelley_ma::eval_native_script(
+                &vkeys,
+                script,
+                &body.validity_interval_start,
+                &body.ttl,
+            )
+        {
+            return Err(PostAlonzo(NativeScriptDenial));
+        }
+    }
+    Ok(())
 }
 
 fn check_input_scripts(
@@ -846,18 +961,15 @@ fn get_script_hashes_from_inputs(
 
 fn get_script_hash_from_input(input: &TransactionInput, utxos: &UTxOs) -> Option<ScriptHash> {
     match utxos
-        .get(&MultiEraInput::from_alonzo_compatible(input))
-        .and_then(MultiEraOutput::as_conway)
+        .get(&MultiEraInput::from_alonzo_compatible(input))?
+        .address()
+        .ok()?
     {
-        Some(TransactionOutput::Legacy(output)) => match get_payment_part(&output.address) {
-            Some(ShelleyPaymentPart::Script(script_hash)) => Some(script_hash),
+        Address::Shelley(address) => match address.payment() {
+            ShelleyPaymentPart::Script(hash) => Some(*hash),
             _ => None,
         },
-        Some(TransactionOutput::PostAlonzo(output)) => match get_payment_part(&output.address) {
-            Some(ShelleyPaymentPart::Script(script_hash)) => Some(script_hash),
-            _ => None,
-        },
-        None => None,
+        _ => None,
     }
 }
 
@@ -865,48 +977,12 @@ fn get_script_hash_from_reference_input(
     ref_input: &TransactionInput,
     utxos: &UTxOs,
 ) -> Option<PolicyId> {
-    match utxos
-        .get(&MultiEraInput::from_alonzo_compatible(ref_input))
-        .and_then(MultiEraOutput::as_conway)
-    {
-        Some(TransactionOutput::Legacy(_)) => None,
-        Some(TransactionOutput::PostAlonzo(output)) => {
-            if let Some(script_ref_cborwrap) = &output.script_ref {
-                match script_ref_cborwrap.clone().unwrap() {
-                    ScriptRef::NativeScript(native_script) => {
-                        // First, the NativeScript header.
-                        let mut val_to_hash: Vec<u8> = vec![0];
-                        // Then, the CBOR content.
-                        val_to_hash.extend_from_slice(native_script.raw_cbor());
-                        return Some(pallas_crypto::hash::Hasher::<224>::hash(&val_to_hash));
-                    }
-                    ScriptRef::PlutusV1Script(plutus_v1_script) => {
-                        // First, the PlutusV1Script header.
-                        let mut val_to_hash: Vec<u8> = vec![1];
-                        // Then, the CBOR content.
-                        val_to_hash.extend_from_slice(plutus_v1_script.as_ref());
-                        return Some(pallas_crypto::hash::Hasher::<224>::hash(&val_to_hash));
-                    }
-                    ScriptRef::PlutusV2Script(plutus_v2_script) => {
-                        // First, the PlutusV2Script header.
-                        let mut val_to_hash: Vec<u8> = vec![2];
-                        // Then, the CBOR content.
-                        val_to_hash.extend_from_slice(plutus_v2_script.as_ref());
-                        return Some(pallas_crypto::hash::Hasher::<224>::hash(&val_to_hash));
-                    }
-                    ScriptRef::PlutusV3Script(plutus_v3_script) => {
-                        // First, the PlutusV2Script header.
-                        let mut val_to_hash: Vec<u8> = vec![3];
-                        // Then, the CBOR content.
-                        val_to_hash.extend_from_slice(plutus_v3_script.as_ref());
-                        return Some(pallas_crypto::hash::Hasher::<224>::hash(&val_to_hash));
-                    }
-                }
-            }
-            None
-        }
-        _ => None,
-    }
+    reference_script(ref_input, utxos).map(|script| match script {
+        ScriptRef::NativeScript(script) => script.original_hash(),
+        ScriptRef::PlutusV1Script(script) => compute_plutus_v1_script_hash(&script),
+        ScriptRef::PlutusV2Script(script) => compute_plutus_v2_script_hash(&script),
+        ScriptRef::PlutusV3Script(script) => compute_plutus_v3_script_hash(&script),
+    })
 }
 
 fn check_minting_policies(
@@ -1079,25 +1155,12 @@ fn find_datum(hash: &Hash<32>, tx_body: &TransactionBody, utxos: &UTxOs) -> Vali
     // Look for hash in reference input
     if let Some(reference_inputs) = &tx_body.reference_inputs {
         for reference_input in reference_inputs.iter() {
-            match utxos
+            if let Some(DatumOption::Hash(datum_hash)) = utxos
                 .get(&MultiEraInput::from_alonzo_compatible(reference_input))
-                .and_then(MultiEraOutput::as_conway)
+                .and_then(MultiEraOutput::datum)
+                && *hash == datum_hash
             {
-                Some(TransactionOutput::Legacy(output)) => {
-                    if let Some(datum_hash) = &output.datum_hash
-                        && *hash == *datum_hash
-                    {
-                        return Ok(());
-                    }
-                }
-                Some(TransactionOutput::PostAlonzo(output)) => {
-                    if let Some(DatumOption::Hash(datum_hash)) = &output.datum_option.as_deref()
-                        && *hash == *datum_hash
-                    {
-                        return Ok(());
-                    }
-                }
-                _ => (),
+                return Ok(());
             }
         }
     }
@@ -1215,6 +1278,22 @@ fn mk_plutus_script_redeemer_pointers(
                     index: index as u32,
                 })
             }
+        }
+    }
+    for (index, cert) in tx_body.certificates.iter().flatten().enumerate() {
+        if let Some(StakeCredential::ScriptHash(hash)) = certificate_credential(cert)
+            && is_phase_2_script(
+                hash,
+                plutus_v1_scripts,
+                plutus_v2_scripts,
+                plutus_v3_scripts,
+                reference_scripts,
+            )
+        {
+            res.push(RedeemersKey {
+                tag: pallas_primitives::conway::RedeemerTag::Cert,
+                index: index as u32,
+            });
         }
     }
     if let Some(withdrawals) = &tx_body.withdrawals {
@@ -1339,6 +1418,13 @@ fn check_vkey_input_wits(
     let vk_wits: &mut Vec<(bool, VKeyWitness)> =
         &mut mk_alonzo_vk_wits_check_list(vkey_wits, PostAlonzo(VKWitnessMissing))?;
     let tx_hash: &Vec<u8> = &Vec::from(mtx.transaction_body.original_hash().as_ref());
+    let bootstrap_wits: &mut Vec<(bool, BootstrapWitness)> = &mut mtx
+        .transaction_witness_set
+        .bootstrap_witness
+        .iter()
+        .flatten()
+        .map(|wit| (false, wit.clone()))
+        .collect();
     let mut inputs_and_collaterals: Vec<TransactionInput> = Vec::new();
     inputs_and_collaterals.extend(tx_body.inputs.clone().to_vec());
     if let Some(collaterals) = &tx_body.collateral {
@@ -1346,46 +1432,42 @@ fn check_vkey_input_wits(
     }
     for input in inputs_and_collaterals.iter() {
         match utxos.get(&MultiEraInput::from_alonzo_compatible(input)) {
-            Some(multi_era_output) => {
-                // Try to get address from Conway output first
-                let address: Option<Bytes> = if let Some(conway_output) =
-                    MultiEraOutput::as_conway(multi_era_output)
-                {
-                    match conway_output {
-                        TransactionOutput::Legacy(output) => Some(output.address.clone()),
-                        TransactionOutput::PostAlonzo(output) => Some(output.address.clone()),
+            Some(multi_era_output) => match multi_era_output.address() {
+                Ok(Address::Shelley(address)) => match address.payment() {
+                    ShelleyPaymentPart::Key(payment_key_hash) => {
+                        check_vk_wit(payment_key_hash, vk_wits, tx_hash)?
                     }
-                } else if let Some(alonzo_output) = multi_era_output.as_alonzo() {
-                    // Alonzo, Mary, Allegra, Shelley
-                    Some(alonzo_output.address.clone())
-                } else if let Some(babbage_output) = multi_era_output.as_babbage() {
-                    // Babbage
-                    match babbage_output {
-                        babbage::TransactionOutput::Legacy(output) => Some(output.address.clone()),
-                        babbage::TransactionOutput::PostAlonzo(output) => {
-                            Some(output.address.clone())
-                        }
-                    }
-                } else {
-                    // Byron outputs are handled separately below
-                    None
-                };
-
-                if let Some(address) = address {
-                    match get_payment_part(&address).ok_or(PostAlonzo(InputDecoding))? {
-                        ShelleyPaymentPart::Key(payment_key_hash) => {
-                            check_vk_wit(&payment_key_hash, vk_wits, tx_hash)?
-                        }
-                        ShelleyPaymentPart::Script(_) => {}
-                    }
-                } else {
-                    return Err(PostAlonzo(InputDecoding));
+                    ShelleyPaymentPart::Script(_) => {}
+                },
+                Ok(Address::Byron(address)) => {
+                    check_bootstrap_wit(&address, bootstrap_wits, tx_hash)?
                 }
-            }
+                _ => return Err(PostAlonzo(InputDecoding)),
+            },
             None => return Err(PostAlonzo(InputNotInUTxO)),
         }
     }
-    check_remaining_vk_wits(vk_wits, tx_hash) // required for native scripts
+    for cert in tx_body.certificates.iter().flatten() {
+        if let Some(StakeCredential::AddrKeyhash(hash)) = certificate_credential(cert) {
+            check_vk_wit(hash, vk_wits, tx_hash)?;
+        }
+        match cert {
+            Certificate::PoolRegistration {
+                operator,
+                pool_owners,
+                ..
+            } => {
+                check_vk_wit(operator, vk_wits, tx_hash)?;
+                for owner in pool_owners.iter() {
+                    check_vk_wit(owner, vk_wits, tx_hash)?;
+                }
+            }
+            Certificate::PoolRetirement(operator, _) => check_vk_wit(operator, vk_wits, tx_hash)?,
+            _ => {}
+        }
+    }
+    check_remaining_vk_wits(vk_wits, tx_hash)?; // required for native scripts
+    check_remaining_bootstrap_wits(bootstrap_wits, tx_hash)
 }
 
 fn check_vk_wit(
@@ -1407,17 +1489,67 @@ fn check_vk_wit(
     Err(PostAlonzo(VKWitnessMissing))
 }
 
+fn check_bootstrap_wit(
+    address: &ByronAddress,
+    wits: &mut [(bool, BootstrapWitness)],
+    data_to_verify: &[u8],
+) -> ValidationResult {
+    let root: AddressId = address
+        .decode()
+        .map_err(|_| PostAlonzo(InputDecoding))?
+        .root;
+    for (wit_covered, wit) in wits.iter_mut() {
+        if bootstrap_wit_root(wit) == root {
+            if !verify_bootstrap_signature(wit, data_to_verify) {
+                return Err(PostAlonzo(VKWrongSignature));
+            }
+            *wit_covered = true;
+            return Ok(());
+        }
+    }
+    Err(PostAlonzo(VKWitnessMissing))
+}
+
+fn check_remaining_bootstrap_wits(
+    wits: &mut [(bool, BootstrapWitness)],
+    data_to_verify: &[u8],
+) -> ValidationResult {
+    for (covered, wit) in wits {
+        if !*covered && !verify_bootstrap_signature(wit, data_to_verify) {
+            return Err(PostAlonzo(VKWrongSignature));
+        }
+    }
+    Ok(())
+}
+
+fn verify_bootstrap_signature(wit: &BootstrapWitness, data_to_verify: &[u8]) -> bool {
+    let vkey_wit = VKeyWitness {
+        vkey: wit.public_key.clone(),
+        signature: wit.signature.clone(),
+    };
+    verify_signature(&vkey_wit, data_to_verify)
+}
+
+fn bootstrap_wit_root(wit: &BootstrapWitness) -> AddressId {
+    // CBOR heads of `[0, [0, bytes(64)], attributes]`, the root preimage of a key address.
+    let prefix: &[u8] = &[0x83, 0x00, 0x82, 0x00, 0x58, 0x40];
+    let payload: Vec<u8> = [
+        prefix,
+        wit.public_key.as_slice(),
+        wit.chain_code.as_slice(),
+        wit.attributes.as_slice(),
+    ]
+    .concat();
+    pallas_crypto::hash::Hasher::<224>::hash(&cryptoxide::hashing::sha3_256(&payload))
+}
+
 fn check_remaining_vk_wits(
     wits: &mut [(bool, VKeyWitness)],
     data_to_verify: &[u8],
 ) -> ValidationResult {
     for (covered, vkey_wit) in wits {
-        if !*covered {
-            if verify_signature(vkey_wit, data_to_verify) {
-                return Ok(());
-            } else {
-                return Err(PostAlonzo(VKWrongSignature));
-            }
+        if !*covered && !verify_signature(vkey_wit, data_to_verify) {
+            return Err(PostAlonzo(VKWrongSignature));
         }
     }
     Ok(())
@@ -1468,10 +1600,22 @@ fn available_langs(prot_pps: &ConwayProtParams) -> Vec<Language> {
 }
 
 fn allowed_tx_langs(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
-    let all_outputs: Vec<&TransactionOutput> = compute_all_outputs(mtx, utxos);
-    if any_byron_addresses(&all_outputs) {
+    let input_features = reference_script_inputs(&mtx.transaction_body)
+        .filter_map(|input| utxos.get(&MultiEraInput::from_alonzo_compatible(input)))
+        .map(output_language_features);
+    let output_features = mtx
+        .transaction_body
+        .outputs
+        .iter()
+        .map(|output| output_language_features(&MultiEraOutput::from_conway(output)));
+    let (byron, modern) = input_features
+        .chain(output_features)
+        .fold((false, false), |(byron, modern), (b, m)| {
+            (byron || b, modern || m)
+        });
+    if byron {
         vec![]
-    } else if any_datums_or_script_refs(&all_outputs)
+    } else if modern
         || any_reference_inputs(
             &mtx.transaction_body
                 .reference_inputs
@@ -1485,64 +1629,11 @@ fn allowed_tx_langs(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
     }
 }
 
-fn compute_all_outputs<'a>(mtx: &'a Tx, utxos: &'a UTxOs) -> Vec<&'a TransactionOutput<'a>> {
-    let mut res: Vec<&TransactionOutput> = Vec::new();
-    for input in mtx.transaction_body.inputs.iter() {
-        if let Some(output) = utxos
-            .get(&MultiEraInput::from_alonzo_compatible(input))
-            .and_then(MultiEraOutput::as_conway)
-        {
-            res.push(output)
-        }
-    }
-    if let Some(reference_inputs) = &mtx.transaction_body.reference_inputs {
-        for ref_input in reference_inputs.iter() {
-            if let Some(output) = utxos
-                .get(&MultiEraInput::from_alonzo_compatible(ref_input))
-                .and_then(MultiEraOutput::as_conway)
-            {
-                res.push(output)
-            }
-        }
-    }
-    for output in mtx.transaction_body.outputs.iter() {
-        res.push(output)
-    }
-    res
-}
-
-fn any_byron_addresses(all_outputs: &[&TransactionOutput]) -> bool {
-    for output in all_outputs.iter() {
-        match output {
-            TransactionOutput::Legacy(output) => {
-                if is_byron_address(&output.address) {
-                    return true;
-                }
-            }
-            TransactionOutput::PostAlonzo(output) => {
-                if is_byron_address(&output.address) {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-
-fn any_datums_or_script_refs(all_outputs: &[&TransactionOutput]) -> bool {
-    for output in all_outputs.iter() {
-        match output {
-            TransactionOutput::Legacy(_) => (),
-            TransactionOutput::PostAlonzo(output) => {
-                if output.script_ref.is_some() {
-                    return true;
-                } else if let Some(DatumOption::Data(_)) = &output.datum_option.as_deref() {
-                    return true;
-                }
-            }
-        }
-    }
-    false
+fn output_language_features(output: &MultiEraOutput<'_>) -> (bool, bool) {
+    (
+        matches!(output.address(), Ok(Address::Byron(_))),
+        output.script_ref().is_some() || matches!(output.datum(), Some(DatumOption::Data(_))),
+    )
 }
 
 fn any_reference_inputs(reference_inputs: &Option<Vec<TransactionInput>>) -> bool {
@@ -1571,20 +1662,21 @@ fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
     {
         v3_scripts = true;
     }
-    if let Some(reference_inputs) = &mtx.transaction_body.reference_inputs {
-        for ref_input in reference_inputs.iter() {
-            if let Some(TransactionOutput::PostAlonzo(output)) = utxos
-                .get(&MultiEraInput::from_alonzo_compatible(ref_input))
-                .and_then(MultiEraOutput::as_conway)
-                && let Some(script_ref_cborwrap) = &output.script_ref
-            {
-                match script_ref_cborwrap.clone().unwrap() {
-                    ScriptRef::PlutusV1Script(_) => v1_scripts = true,
-                    ScriptRef::PlutusV2Script(_) => v2_scripts = true,
-                    ScriptRef::PlutusV3Script(_) => v3_scripts = true,
-                    _ => (),
-                }
-            }
+    let needed = needed_script_hashes(&mtx.transaction_body, utxos);
+    for input in reference_script_inputs(&mtx.transaction_body) {
+        let Some(script) = reference_script(input, utxos) else {
+            continue;
+        };
+        if !get_script_hash_from_reference_input(input, utxos)
+            .is_some_and(|hash| needed.contains(&hash))
+        {
+            continue;
+        }
+        match script {
+            ScriptRef::PlutusV1Script(_) => v1_scripts = true,
+            ScriptRef::PlutusV2Script(_) => v2_scripts = true,
+            ScriptRef::PlutusV3Script(_) => v3_scripts = true,
+            ScriptRef::NativeScript(_) => (),
         }
     }
     let mut langs = vec![];
@@ -1598,6 +1690,56 @@ fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
         langs.push(Language::PlutusV3);
     }
     langs
+}
+
+// The scripts the body needs: spent script inputs, minting policies, the script
+// credentials of certificates, withdrawals and voters, and proposal policies.
+fn needed_script_hashes(tx_body: &TransactionBody, utxos: &UTxOs) -> Vec<ScriptHash> {
+    let inputs = tx_body
+        .inputs
+        .iter()
+        .filter_map(|input| get_script_hash_from_input(input, utxos));
+    let policies = tx_body.mint.iter().flat_map(|mint| mint.keys().copied());
+    let certificates = tx_body.certificates.iter().flatten().filter_map(|cert| {
+        match certificate_credential(cert) {
+            Some(StakeCredential::ScriptHash(hash)) => Some(*hash),
+            _ => None,
+        }
+    });
+    let withdrawals = tx_body
+        .withdrawals
+        .iter()
+        .flat_map(|withdrawals| withdrawals.keys())
+        .filter_map(|account| match Address::from_bytes(account) {
+            Ok(Address::Stake(address)) if address.is_script() => {
+                Some(*address.payload().as_hash())
+            }
+            _ => None,
+        });
+    let voters = tx_body
+        .voting_procedures
+        .iter()
+        .flat_map(|votes| votes.keys())
+        .filter_map(|voter| match voter {
+            Voter::ConstitutionalCommitteeScript(hash) | Voter::DRepScript(hash) => Some(*hash),
+            _ => None,
+        });
+    let proposals = tx_body
+        .proposal_procedures
+        .iter()
+        .flatten()
+        .filter_map(|proposal| match &proposal.gov_action {
+            GovAction::ParameterChange(_, _, policy)
+            | GovAction::TreasuryWithdrawals(_, policy) => *policy,
+            _ => None,
+        });
+    inputs
+        .chain(policies)
+        .chain(certificates)
+        .chain(withdrawals)
+        .chain(voters)
+        .chain(proposals)
+        .collect()
 }
 
 // The metadata of the transaction is valid.
