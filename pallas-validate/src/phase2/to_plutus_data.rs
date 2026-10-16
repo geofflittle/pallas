@@ -652,19 +652,23 @@ impl ToPlutusData for WithPartialCertificates<'_, Vec<Certificate>> {
 impl ToPlutusData for WithPartialCertificates<'_, Certificate> {
     fn to_plutus_data(&self) -> PlutusData {
         match self.0 {
-            Certificate::StakeRegistration(stake_credential) => {
-                wrap_with_constr(0, stake_credential.to_plutus_data())
-            }
+            Certificate::StakeRegistration(stake_credential)
+            | Certificate::Reg(stake_credential, _) => wrap_with_constr(
+                0,
+                WithWrappedStakeCredential(stake_credential).to_plutus_data(),
+            ),
 
-            Certificate::StakeDeregistration(stake_credential) => {
-                wrap_with_constr(1, stake_credential.to_plutus_data())
-            }
+            Certificate::StakeDeregistration(stake_credential)
+            | Certificate::UnReg(stake_credential, _) => wrap_with_constr(
+                1,
+                WithWrappedStakeCredential(stake_credential).to_plutus_data(),
+            ),
 
             Certificate::StakeDelegation(stake_credential, pool_keyhash) => {
                 wrap_multiple_with_constr(
                     2,
                     vec![
-                        stake_credential.to_plutus_data(),
+                        WithWrappedStakeCredential(stake_credential).to_plutus_data(),
                         pool_keyhash.to_plutus_data(),
                     ],
                 )
