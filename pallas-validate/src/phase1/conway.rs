@@ -2894,6 +2894,38 @@ mod tests {
     }
 
     #[test]
+    fn a_reference_script_on_an_input_or_an_output_rules_out_plutus_v1() {
+        let cbor = conway_tx_spending_input();
+        let with_script = output_with_reference_script();
+        let without_script = legacy_output(key_address());
+        let (mut outcomes, mut expected) = (vec![], vec![]);
+        for input_script in [false, true] {
+            for output_script in [false, true] {
+                let mut tx: Tx = minicbor::decode(&cbor).unwrap();
+                let mut body = (*tx.transaction_body).clone();
+                if output_script {
+                    body.outputs = vec![minicbor::decode(&with_script).unwrap()];
+                }
+                tx.transaction_body = body.into();
+                let spent = if input_script {
+                    utxos(Era::Babbage, &with_script)
+                } else {
+                    utxos(Era::Alonzo, &without_script)
+                };
+                let languages = allowed_tx_langs(&tx, &spent);
+                outcomes.push((input_script, output_script, languages));
+                let languages = if input_script || output_script {
+                    vec![Language::PlutusV2, Language::PlutusV3]
+                } else {
+                    vec![Language::PlutusV1, Language::PlutusV2, Language::PlutusV3]
+                };
+                expected.push((input_script, output_script, languages));
+            }
+        }
+        assert_eq!(outcomes, expected);
+    }
+
+    #[test]
     fn a_byron_era_input_allows_no_plutus_language() {
         let cbor = conway_tx_spending_input();
         let tx = MultiEraTx::decode_for_era(Era::Conway, &cbor).unwrap();
