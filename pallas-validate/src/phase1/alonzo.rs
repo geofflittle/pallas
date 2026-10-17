@@ -454,11 +454,16 @@ fn check_input_datum_hash_in_witness_set(
     plutus_data: &mut [(bool, &KeepRaw<PlutusData>)],
 ) -> ValidationResult {
     for input in &tx_body.inputs {
-        let output = utxos
+        match utxos
             .get(&MultiEraInput::from_alonzo_compatible(input))
-            .ok_or(Alonzo(InputNotInUTxO))?;
-        if let Some(DatumOption::Hash(datum_hash)) = output.datum() {
-            find_datum_hash(datum_hash, plutus_data)?
+            .and_then(MultiEraOutput::as_alonzo)
+        {
+            Some(output) => {
+                if let Some(datum_hash) = output.datum_hash {
+                    find_datum_hash(datum_hash, plutus_data)?
+                }
+            }
+            None => return Err(Alonzo(InputNotInUTxO)),
         }
     }
     Ok(())
