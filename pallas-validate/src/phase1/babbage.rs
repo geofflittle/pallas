@@ -1938,9 +1938,9 @@ mod tests {
         }
     }
 
-    // Witness set and minting results for a script by reference that mints or
-    // certifies, with the reference script on a reference input or on a spent
-    // input locked by key 1.
+    // Witness set and minting results for a script by reference that spends,
+    // mints, withdraws or certifies, with the reference script on a reference
+    // input or on a spent input locked by key 1.
     fn reference_script_outcomes(
         script: ScriptRef<'static>,
         hash: PolicyId,
@@ -1949,25 +1949,47 @@ mod tests {
             transaction_id: [7; 32].into(),
             index: 0,
         };
-        let mut address = vec![0x61];
-        address.extend(key_hash(1).as_ref());
-        let held = TransactionOutput::PostAlonzo(
-            PostAlonzoTransactionOutput {
-                address: address.into(),
-                value: Value::Coin(2_000_000),
-                datum_option: None,
-                script_ref: Some(CborWrap(script)),
-            }
-            .into(),
-        );
-        let held = minicbor::to_vec(held).unwrap();
+        let locked = TransactionInput {
+            transaction_id: [8; 32].into(),
+            index: 0,
+        };
+        let output = |header: u8, hash: &[u8], script_ref: Option<ScriptRef<'static>>| {
+            let mut address = vec![header];
+            address.extend(hash);
+            let output = TransactionOutput::PostAlonzo(
+                PostAlonzoTransactionOutput {
+                    address: address.into(),
+                    value: Value::Coin(2_000_000),
+                    datum_option: None,
+                    script_ref: script_ref.map(CborWrap),
+                }
+                .into(),
+            );
+            minicbor::to_vec(output).unwrap()
+        };
+        let held = output(0x61, key_hash(1).as_ref(), Some(script));
         let held: TransactionOutput = minicbor::decode(&held).unwrap();
-        let utxos = UTxOs::from([(
-            MultiEraInput::from_alonzo_compatible(&holder),
-            MultiEraOutput::from_babbage(&held),
-        )]);
+        let locked_output = output(0x71, hash.as_ref(), None);
+        let locked_output: TransactionOutput = minicbor::decode(&locked_output).unwrap();
+        let utxos = UTxOs::from([
+            (
+                MultiEraInput::from_alonzo_compatible(&holder),
+                MultiEraOutput::from_babbage(&held),
+            ),
+            (
+                MultiEraInput::from_alonzo_compatible(&locked),
+                MultiEraOutput::from_babbage(&locked_output),
+            ),
+        ]);
+        let mut reward_account = vec![0xf0];
+        reward_account.extend(hash.as_ref());
         let mut outcomes = Vec::new();
-        for purpose in [RedeemerTag::Mint, RedeemerTag::Cert] {
+        for purpose in [
+            RedeemerTag::Spend,
+            RedeemerTag::Mint,
+            RedeemerTag::Reward,
+            RedeemerTag::Cert,
+        ] {
             for holder_spent in [false, true] {
                 let certificates = match purpose {
                     RedeemerTag::Cert => vec![Certificate::StakeDeregistration(
@@ -1979,15 +2001,26 @@ mod tests {
                     certificates,
                     |tx| {
                         let body = &mut tx.transaction_body;
+                        let mut inputs = Vec::new();
                         if holder_spent {
-                            body.inputs = vec![holder.clone()];
+                            inputs.push(holder.clone());
                         } else {
                             body.reference_inputs = Some(vec![holder.clone()]);
                         }
-                        if purpose == RedeemerTag::Mint {
-                            let assets = [(Bytes::from(vec![1]), 1)].into_iter().collect();
-                            body.mint = Some([(hash, assets)].into_iter().collect());
+                        match purpose {
+                            RedeemerTag::Spend => inputs.push(locked.clone()),
+                            RedeemerTag::Mint => {
+                                let assets = [(Bytes::from(vec![1]), 1)].into_iter().collect();
+                                body.mint = Some([(hash, assets)].into_iter().collect());
+                            }
+                            RedeemerTag::Reward => {
+                                body.withdrawals = Some(
+                                    [(reward_account.clone().into(), 0)].into_iter().collect(),
+                                );
+                            }
+                            _ => {}
                         }
+                        body.inputs = inputs;
                     },
                     &[1],
                     |tx| {
@@ -2005,8 +2038,13 @@ mod tests {
     }
 
     fn every_purpose(expected: &str) -> Vec<(RedeemerTag, bool, String)> {
-        [RedeemerTag::Mint, RedeemerTag::Cert]
-            .into_iter()
+        [
+            RedeemerTag::Spend,
+            RedeemerTag::Mint,
+            RedeemerTag::Reward,
+            RedeemerTag::Cert,
+        ]
+        .into_iter()
             .flat_map(|purpose| [false, true].map(|spent| (purpose, spent, expected.to_string())))
             .collect()
     }

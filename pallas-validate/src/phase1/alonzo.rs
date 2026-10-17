@@ -1071,17 +1071,21 @@ mod tests {
         PlutusScript(vec![1, 2, 3].into())
     }
 
+    fn redeemer(index: u32, tag: RedeemerTag) -> Redeemer {
+        Redeemer {
+            tag,
+            index,
+            data: PlutusData::BigInt(pallas_primitives::BigInt::Int(0.into())),
+            ex_units: ExUnits { mem: 1, steps: 1 },
+        }
+    }
+
     fn add_plutus(tx: &mut Tx<'_>, cert_indexes: &[u32]) {
         tx.transaction_witness_set.plutus_script = Some(vec![plutus()]);
         tx.transaction_witness_set.redeemer = Some(
             cert_indexes
                 .iter()
-                .map(|index| Redeemer {
-                    tag: RedeemerTag::Cert,
-                    index: *index,
-                    data: PlutusData::BigInt(pallas_primitives::BigInt::Int(0.into())),
-                    ex_units: ExUnits { mem: 1, steps: 1 },
-                })
+                .map(|index| redeemer(*index, RedeemerTag::Cert))
                 .collect(),
         );
     }
@@ -1243,6 +1247,50 @@ mod tests {
                 &[],
                 |tx| result(check_witness_set(&tx, &UTxOs::new()), expected),
             );
+        }
+    }
+
+    #[test]
+    fn withdrawal_scripts_need_reward_redeemers_in_account_order() {
+        let account = |header: u8, hash: &[u8]| {
+            let mut account = vec![header];
+            account.extend(hash);
+            Bytes::from(account)
+        };
+        let script = account(0xf1, compute_plutus_v1_script_hash(&plutus()).as_ref());
+        for (key_header, script_index) in [(0xe1, 0), (0xe0, 1)] {
+            let key = account(key_header, key_hash(1).as_ref());
+            for (indexes, expected) in [
+                (vec![script_index], "Ok(())"),
+                (vec![], "Err(Alonzo(RedeemerMissing))"),
+                (vec![1 - script_index], "Err(Alonzo(UnneededRedeemer))"),
+            ] {
+                synthetic(
+                    vec![],
+                    |tx| {
+                        tx.transaction_body.withdrawals =
+                            Some([(key.clone(), 0), (script.clone(), 0)].into());
+                        tx.transaction_witness_set.plutus_script = Some(vec![plutus()]);
+                        tx.transaction_witness_set.redeemer = Some(
+                            indexes
+                                .iter()
+                                .map(|index| redeemer(*index, RedeemerTag::Reward))
+                                .collect(),
+                        );
+                    },
+                    &[],
+                    |tx| {
+                        result(
+                            check_redeemers(
+                                &tx.transaction_body,
+                                &tx.transaction_witness_set,
+                                &UTxOs::new(),
+                            ),
+                            expected,
+                        )
+                    },
+                );
+            }
         }
     }
 

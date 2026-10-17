@@ -747,8 +747,13 @@ pub(super) fn eval_native_script(
 
 #[cfg(test)]
 mod tests {
-    use super::eval_native_script;
-    use pallas_primitives::alonzo::NativeScript;
+    use super::{
+        Certificate, NativeScript, OriginalHash, StakeCredential, Tx, UTxOs, VKeyWitness,
+        WitnessSet, check_witnesses, compute_script_hash, eval_native_script,
+    };
+    use pallas_codec::minicbor;
+    use pallas_crypto::{hash::Hasher, key::ed25519::SecretKey};
+    use pallas_primitives::alonzo::AddrKeyhash;
 
     // Evaluates `native_script` with no vkey witnesses and the given validity
     // interval bounds (`low_bnd` is `validity_interval_start`, `upp_bnd` is `ttl`).
@@ -816,42 +821,163 @@ mod tests {
         assert!(!eval(&any, Some(80), Some(220)), "satisfies neither arm");
     }
 
+    // Re-encodes and decodes the edited transaction, so the body hash the keys
+    // sign is the hash of the edited body.
+    fn witnesses_outcome(
+        certificates: Vec<Certificate>,
+        native_scripts: Vec<NativeScript>,
+        keys: &[u8],
+        corrupted: Option<usize>,
+    ) -> String {
+        let raw = hex::decode(include_str!("../../../test_data/shelley1.tx").trim()).unwrap();
+        let mut tx: Tx = minicbor::decode(&raw).unwrap();
+        tx.transaction_body.inputs = Vec::new();
+        tx.transaction_body.certificates = Some(certificates);
+        tx.transaction_witness_set = minicbor::decode::<WitnessSet>(&[0xa0]).unwrap().into();
+        tx.transaction_witness_set.native_script =
+            Some(native_scripts.into_iter().map(Into::into).collect());
+        let encoded = minicbor::to_vec(tx).unwrap();
+        let mut tx: Tx = minicbor::decode(&encoded).unwrap();
+        let hash = tx.transaction_body.original_hash();
+        let mut witnesses: Vec<VKeyWitness> = keys
+            .iter()
+            .map(|id| {
+                let key = SecretKey::from([*id; 32]);
+                VKeyWitness {
+                    vkey: key.public_key().as_ref().to_vec().into(),
+                    signature: key.sign(hash).as_ref().to_vec().into(),
+                }
+            })
+            .collect();
+        if let Some(position) = corrupted {
+            witnesses[position].signature = vec![0; 64].into();
+        }
+        tx.transaction_witness_set.vkeywitness = Some(witnesses);
+        let actual = check_witnesses(
+            &tx.transaction_body,
+            &tx.transaction_witness_set,
+            &UTxOs::new(),
+        );
+        format!("{actual:?}")
+    }
+
+    fn key_hash(id: u8) -> AddrKeyhash {
+        Hasher::<224>::hash(SecretKey::from([id; 32]).public_key().as_ref())
+    }
+
+    fn credential_certificates(cred: StakeCredential) -> Vec<Certificate> {
+        vec![
+            Certificate::StakeDeregistration(cred.clone()),
+            Certificate::StakeDelegation(cred, [9; 28].into()),
+        ]
+    }
+
     #[test]
     fn every_vkey_witness_must_verify() {
-        use super::{OriginalHash, Tx, UTxOs, VKeyWitness, WitnessSet, check_witnesses};
-        use pallas_codec::minicbor;
-        use pallas_crypto::key::ed25519::SecretKey;
         for (corrupted, expected) in [
             (None, "Ok(())"),
             (Some(0), "Err(ShelleyMA(WrongSignature))"),
             (Some(1), "Err(ShelleyMA(WrongSignature))"),
         ] {
-            let raw = hex::decode(include_str!("../../../test_data/shelley1.tx").trim()).unwrap();
-            let mut tx: Tx = minicbor::decode(&raw).unwrap();
-            tx.transaction_body.inputs = Vec::new();
-            tx.transaction_witness_set = minicbor::decode::<WitnessSet>(&[0xa0]).unwrap().into();
-            let encoded = minicbor::to_vec(tx).unwrap();
-            let mut tx: Tx = minicbor::decode(&encoded).unwrap();
-            let hash = tx.transaction_body.original_hash();
-            let mut witnesses: Vec<VKeyWitness> = [1, 2]
-                .map(|id| {
-                    let key = SecretKey::from([id; 32]);
-                    VKeyWitness {
-                        vkey: key.public_key().as_ref().to_vec().into(),
-                        signature: key.sign(hash).as_ref().to_vec().into(),
-                    }
-                })
-                .to_vec();
-            if let Some(position) = corrupted {
-                witnesses[position].signature = vec![0; 64].into();
-            }
-            tx.transaction_witness_set.vkeywitness = Some(witnesses);
-            let actual = check_witnesses(
-                &tx.transaction_body,
-                &tx.transaction_witness_set,
-                &UTxOs::new(),
+            assert_eq!(
+                witnesses_outcome(vec![], vec![], &[1, 2], corrupted),
+                expected
             );
-            assert_eq!(format!("{actual:?}"), expected);
+        }
+    }
+
+    #[test]
+    fn key_certificates_require_their_key_and_valid_signature() {
+        let cred = StakeCredential::AddrKeyhash(key_hash(1));
+        assert_eq!(
+            witnesses_outcome(
+                vec![Certificate::StakeRegistration(cred.clone())],
+                vec![],
+                &[],
+                None
+            ),
+            "Ok(())"
+        );
+        for cert in credential_certificates(cred) {
+            for (keys, corrupted, expected) in [
+                (&[1][..], None, "Ok(())"),
+                (&[][..], None, "Err(ShelleyMA(MissingVKWitness))"),
+                (&[2][..], None, "Err(ShelleyMA(MissingVKWitness))"),
+                (&[1][..], Some(0), "Err(ShelleyMA(WrongSignature))"),
+            ] {
+                assert_eq!(
+                    witnesses_outcome(vec![cert.clone()], vec![], keys, corrupted),
+                    expected
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn pool_certificates_require_operator_and_registration_owners() {
+        let registration = Certificate::PoolRegistration {
+            operator: key_hash(1),
+            vrf_keyhash: [0; 32].into(),
+            pledge: 0,
+            cost: 0,
+            margin: pallas_primitives::UnitInterval {
+                numerator: 0,
+                denominator: 1,
+            },
+            reward_account: vec![0xe1; 29].into(),
+            pool_owners: vec![key_hash(2)],
+            relays: vec![],
+            pool_metadata: None,
+        };
+        for (cert, keys) in [
+            (registration, vec![1, 2]),
+            (Certificate::PoolRetirement(key_hash(1), 1), vec![1]),
+        ] {
+            assert_eq!(
+                witnesses_outcome(vec![cert.clone()], vec![], &keys, None),
+                "Ok(())"
+            );
+            for missing in 0..keys.len() {
+                let mut incomplete = keys.clone();
+                incomplete.remove(missing);
+                assert_eq!(
+                    witnesses_outcome(vec![cert.clone()], vec![], &incomplete, None),
+                    "Err(ShelleyMA(MissingVKWitness))"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn script_certificates_require_their_script() {
+        let script = NativeScript::ScriptPubkey(key_hash(1));
+        let other = NativeScript::ScriptAll(vec![]);
+        let cred = StakeCredential::ScriptHash(compute_script_hash(&script));
+        assert_eq!(
+            witnesses_outcome(
+                vec![Certificate::StakeRegistration(cred.clone())],
+                vec![],
+                &[],
+                None
+            ),
+            "Ok(())"
+        );
+        for cert in credential_certificates(cred) {
+            for (scripts, keys, expected) in [
+                (vec![script.clone()], &[1][..], "Ok(())"),
+                (vec![], &[1][..], "Err(ShelleyMA(MissingScriptWitness))"),
+                (
+                    vec![other.clone()],
+                    &[1][..],
+                    "Err(ShelleyMA(MissingScriptWitness))",
+                ),
+                (vec![script.clone()], &[2][..], "Err(ShelleyMA(ScriptDenial))"),
+            ] {
+                assert_eq!(
+                    witnesses_outcome(vec![cert.clone()], scripts, keys, None),
+                    expected
+                );
+            }
         }
     }
 }
