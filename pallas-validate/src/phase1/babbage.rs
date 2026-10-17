@@ -14,6 +14,7 @@ use crate::utils::{
     compute_plutus_v2_script_hash, empty_value, get_babbage_tx_size, get_lovelace_from_alonzo_val,
     get_payment_part, get_shelley_address, get_val_size_in_words, is_byron_address,
     lovelace_diff_or_fail, mk_alonzo_vk_wits_check_list, values_are_equal, verify_signature,
+    withdrawal_scripts,
 };
 use pallas_addresses::{ScriptHash, ShelleyAddress, ShelleyPaymentPart};
 use pallas_codec::{
@@ -979,7 +980,7 @@ fn check_redeemers(
         reference_scripts,
         tx_body,
         utxos,
-    );
+    )?;
     redeemer_pointers_coincide(&redeemer_pointers, &plutus_scripts)
 }
 
@@ -996,11 +997,18 @@ fn mk_plutus_script_redeemer_pointers(
     reference_scripts: &[PolicyId],
     tx_body: &TransactionBody,
     utxos: &UTxOs,
-) -> Vec<RedeemerPointer> {
+) -> Result<Vec<RedeemerPointer>, ValidationError> {
     let mut res: Vec<RedeemerPointer> = Vec::new();
     let sorted_inputs: &Vec<TransactionInput> = &sort_inputs(&tx_body.inputs);
     for (index, input) in sorted_inputs.iter().enumerate() {
-        if get_script_hash_from_input(input, utxos).is_some() {
+        if let Some(hash) = get_script_hash_from_input(input, utxos)
+            && is_phase_2_script(
+                &hash,
+                plutus_v1_scripts,
+                plutus_v2_scripts,
+                reference_scripts,
+            )
+        {
             res.push(RedeemerPointer {
                 tag: RedeemerTag::Spend,
                 index: index as u32,
@@ -1035,7 +1043,22 @@ fn mk_plutus_script_redeemer_pointers(
             })
         }
     }
-    res
+    for (index, hash) in
+        withdrawal_scripts(tx_body.withdrawals.as_ref(), PostAlonzo(InputDecoding))?
+    {
+        if is_phase_2_script(
+            &hash,
+            plutus_v1_scripts,
+            plutus_v2_scripts,
+            reference_scripts,
+        ) {
+            res.push(RedeemerPointer {
+                tag: RedeemerTag::Reward,
+                index,
+            })
+        }
+    }
+    Ok(res)
 }
 
 // Lexicographical sorting for PolicyID's.
@@ -2045,8 +2068,8 @@ mod tests {
             RedeemerTag::Cert,
         ]
         .into_iter()
-            .flat_map(|purpose| [false, true].map(|spent| (purpose, spent, expected.to_string())))
-            .collect()
+        .flat_map(|purpose| [false, true].map(|spent| (purpose, spent, expected.to_string())))
+        .collect()
     }
 
     #[test]

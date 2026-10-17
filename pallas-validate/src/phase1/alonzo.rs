@@ -9,7 +9,7 @@ use crate::utils::{
     check_remaining_vk_wits, compute_native_script_hash, compute_plutus_v1_script_hash,
     empty_value, get_alonzo_comp_tx_size, get_lovelace_from_alonzo_val, get_payment_part,
     get_shelley_address, get_val_size_in_words, mk_alonzo_vk_wits_check_list, values_are_equal,
-    verify_signature,
+    verify_signature, withdrawal_scripts,
 };
 use hex;
 use pallas_addresses::{ScriptHash, ShelleyAddress, ShelleyPaymentPart};
@@ -23,7 +23,7 @@ use pallas_primitives::{
     alonzo::{
         AddrKeyhash, Certificate, Mint, Multiasset, NativeScript, PlutusData, PlutusScript,
         PolicyId, Redeemer, RedeemerPointer, RedeemerTag, RequiredSigners, TransactionBody,
-        TransactionInput, TransactionOutput, Tx, VKeyWitness, Value, WitnessSet,
+        TransactionInput, TransactionOutput, Tx, VKeyWitness, Value, Withdrawals, WitnessSet,
     },
     byron::TxOut,
 };
@@ -542,9 +542,10 @@ fn check_redeemers(
         &sort_inputs(&tx_body.inputs),
         &tx_body.mint,
         certificates(tx_body),
+        tx_body.withdrawals.as_ref(),
         tx_wits,
         utxos,
-    );
+    )?;
     redeemer_pointers_coincide(&redeemer_pointers, &plutus_scripts)
 }
 
@@ -552,9 +553,10 @@ fn mk_plutus_script_redeemer_pointers(
     sorted_inputs: &[TransactionInput],
     mint: &Option<Multiasset<i64>>,
     certificates: &[Certificate],
+    withdrawals: Option<&Withdrawals>,
     tx_wits: &WitnessSet,
     utxos: &UTxOs,
-) -> Vec<RedeemerPointer> {
+) -> Result<Vec<RedeemerPointer>, ValidationError> {
     match &tx_wits.plutus_script {
         Some(plutus_scripts) => {
             let mut res: Vec<RedeemerPointer> = Vec::new();
@@ -599,9 +601,21 @@ fn mk_plutus_script_redeemer_pointers(
                 }
             }
 
-            res
+            for (index, hash) in withdrawal_scripts(withdrawals, Alonzo(InputDecoding))? {
+                if plutus_scripts
+                    .iter()
+                    .any(|script| compute_plutus_v1_script_hash(script) == hash)
+                {
+                    res.push(RedeemerPointer {
+                        tag: RedeemerTag::Reward,
+                        index,
+                    })
+                }
+            }
+
+            Ok(res)
         }
-        None => Vec::new(),
+        None => Ok(Vec::new()),
     }
 }
 
@@ -781,7 +795,7 @@ fn check_vk_wit(
     Err(Alonzo(VKWitnessMissing))
 }
 
-fn certificates(tx_body: &TransactionBody) -> &[Certificate] {
+pub(super) fn certificates(tx_body: &TransactionBody) -> &[Certificate] {
     tx_body.certificates.as_deref().unwrap_or_default()
 }
 

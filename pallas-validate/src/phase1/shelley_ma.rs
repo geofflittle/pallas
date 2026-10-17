@@ -1,5 +1,6 @@
 //! Utilities required for ShelleyMA-era transaction validation.
 
+use super::alonzo::{certificate_key_hashes, certificate_scripts, certificates};
 use crate::utils::{
     AccountState, CertPointer, CertState, DState, PState, PoolParam,
     ShelleyMAError::*,
@@ -290,6 +291,10 @@ fn check_witnesses(
         Some(scripts) => scripts.iter().map(|x| x.clone().unwrap()).collect(),
         None => Vec::new(),
     };
+    let native_script_wits: Option<Vec<NativeScript>> = tx_wits
+        .native_script
+        .as_ref()
+        .map(|x| x.iter().map(|y| y.deref().clone()).collect());
     for input in tx_body.inputs.iter() {
         match utxos.get(&MultiEraInput::from_alonzo_compatible(input)) {
             Some(multi_era_output) => {
@@ -300,18 +305,22 @@ fn check_witnesses(
                         ShelleyPaymentPart::Key(payment_key_hash) => {
                             check_vk_wit(&payment_key_hash, tx_hash, vk_wits)?
                         }
-                        ShelleyPaymentPart::Script(script_hash) => check_native_script_witness(
-                            &script_hash,
-                            &tx_wits
-                                .native_script
-                                .as_ref()
-                                .map(|x| x.iter().map(|y| y.deref().clone()).collect()),
-                        )?,
+                        ShelleyPaymentPart::Script(script_hash) => {
+                            check_native_script_witness(&script_hash, &native_script_wits)?
+                        }
                     }
                 }
             }
             None => return Err(ShelleyMA(InputNotInUTxO)),
         }
+    }
+    for cert in certificates(tx_body) {
+        for key_hash in certificate_key_hashes(cert) {
+            check_vk_wit(key_hash, tx_hash, vk_wits)?;
+        }
+    }
+    for (_, script_hash) in certificate_scripts(certificates(tx_body)) {
+        check_native_script_witness(script_hash, &native_script_wits)?;
     }
     let vkey_wits = &vk_wits.iter().map(|bv| bv.clone().1).collect();
     check_native_scripts(
@@ -971,7 +980,11 @@ mod tests {
                     &[1][..],
                     "Err(ShelleyMA(MissingScriptWitness))",
                 ),
-                (vec![script.clone()], &[2][..], "Err(ShelleyMA(ScriptDenial))"),
+                (
+                    vec![script.clone()],
+                    &[2][..],
+                    "Err(ShelleyMA(ScriptDenial))",
+                ),
             ] {
                 assert_eq!(
                     witnesses_outcome(vec![cert.clone()], scripts, keys, None),
