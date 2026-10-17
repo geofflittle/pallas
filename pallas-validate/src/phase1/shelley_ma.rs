@@ -314,11 +314,6 @@ fn check_witnesses(
             None => return Err(ShelleyMA(InputNotInUTxO)),
         }
     }
-    for cert in certificates(tx_body) {
-        for key_hash in certificate_key_hashes(cert) {
-            check_vk_wit(key_hash, tx_hash, vk_wits)?;
-        }
-    }
     for (_, script_hash) in certificate_scripts(certificates(tx_body)) {
         check_native_script_witness(script_hash, &native_script_wits)?;
     }
