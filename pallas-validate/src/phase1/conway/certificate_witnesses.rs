@@ -33,8 +33,8 @@ fn credential_certificates(cred: StakeCredential) -> Vec<Certificate> {
     ]
 }
 
-// Round trips the edited transaction through CBOR so that the signed body hash
-// covers the edits.
+// Re-encodes and decodes the edited transaction, so the body hash the keys sign
+// is the hash of the edited body.
 fn synthetic(
     certificates: Vec<Certificate>,
     prepare: impl FnOnce(&mut Tx<'_>),
