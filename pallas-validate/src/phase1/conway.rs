@@ -1619,7 +1619,7 @@ fn allowed_tx_langs(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
         .iter()
         .map(|output| output_language_features(&MultiEraOutput::from_conway(output)));
     let (byron, modern) = input_features
-        .chain(output_features)
+        .chain(std::iter::empty())
         .fold((false, false), |(byron, modern), (b, m)| {
             (byron || b, modern || m)
         });
