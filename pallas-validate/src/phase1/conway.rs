@@ -1702,8 +1702,6 @@ fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
     langs
 }
 
-// The scripts the body needs: spent script inputs, minting policies, the script
-// credentials of certificates, withdrawals and voters, and proposal policies.
 fn needed_script_hashes(tx_body: &TransactionBody, utxos: &UTxOs) -> Vec<ScriptHash> {
     let inputs = tx_body
         .inputs
