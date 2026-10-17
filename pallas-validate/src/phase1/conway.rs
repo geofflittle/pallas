@@ -9,8 +9,8 @@ use crate::utils::{
     compute_plutus_v1_script_hash, compute_plutus_v2_script_hash, compute_plutus_v3_script_hash,
     conway_add_minted_non_zero, conway_add_values, conway_get_val_size_in_words,
     conway_lovelace_diff_or_fail, conway_values_are_equal, get_conway_tx_size,
-    get_lovelace_from_conway_val, get_shelley_address, mk_alonzo_vk_wits_check_list,
-    verify_signature,
+    get_lovelace_from_conway_val, get_payment_part, get_shelley_address, is_byron_address,
+    mk_alonzo_vk_wits_check_list, verify_signature,
 };
 use pallas_addresses::{
     Address, ByronAddress, Network, ScriptHash, ShelleyAddress, ShelleyPaymentPart, StakeAddress,
@@ -691,7 +691,7 @@ fn check_witness_set(mtx: &Tx, utxos: &UTxOs) -> ValidationResult {
     let plutus_reference_scripts: Vec<PolicyId> = reference_script_inputs(tx_body)
         .filter_map(|input| reference_script(input, utxos))
         .filter(|script| !matches!(script, ScriptRef::NativeScript(_)))
-        .map(|script| script_ref_hash(&script))
+        .map(script_ref_hash)
         .collect();
     check_redeemers(
         &plutus_v1_scripts,
@@ -859,10 +859,14 @@ fn reference_script_inputs<'a>(
 fn reference_script<'a>(
     input: &'a TransactionInput,
     utxos: &'a UTxOs<'_>,
-) -> Option<ScriptRef<'a>> {
-    utxos
-        .get(&MultiEraInput::from_alonzo_compatible(input))
-        .and_then(MultiEraOutput::script_ref)
+) -> Option<&'a ScriptRef<'a>> {
+    match utxos
+        .get(&MultiEraInput::from_alonzo_compatible(input))?
+        .as_conway()?
+    {
+        TransactionOutput::PostAlonzo(output) => output.script_ref.as_ref().map(|script| &script.0),
+        TransactionOutput::Legacy(_) => None,
+    }
 }
 
 fn check_certificate_native_scripts(mtx: &Tx, utxos: &UTxOs) -> ValidationResult {
@@ -873,17 +877,18 @@ fn check_certificate_native_scripts(mtx: &Tx, utxos: &UTxOs) -> ValidationResult
         .as_ref()
         .map(|x| x.clone().to_vec())
         .unwrap_or_default();
-    let references: Vec<_> = reference_script_inputs(body)
-        .map(|input| reference_script(input, utxos))
-        .collect();
     let scripts = witnesses
         .native_script
         .iter()
         .flatten()
         .map(|script| (compute_native_script_hash(script), script.deref()))
-        .chain(references.iter().filter_map(|script| match script {
-            Some(ScriptRef::NativeScript(script)) => Some((script.original_hash(), script.deref())),
-            _ => None,
+        .chain(reference_script_inputs(body).filter_map(|input| {
+            match reference_script(input, utxos) {
+                Some(ScriptRef::NativeScript(script)) => {
+                    Some((script.original_hash(), script.deref()))
+                }
+                _ => None,
+            }
         }));
     for (hash, script) in scripts {
         let needed = body.certificates.iter().flatten().any(|cert| {
@@ -963,15 +968,18 @@ fn get_script_hashes_from_inputs(
 
 fn get_script_hash_from_input(input: &TransactionInput, utxos: &UTxOs) -> Option<ScriptHash> {
     match utxos
-        .get(&MultiEraInput::from_alonzo_compatible(input))?
-        .address()
-        .ok()?
+        .get(&MultiEraInput::from_alonzo_compatible(input))
+        .and_then(MultiEraOutput::as_conway)
     {
-        Address::Shelley(address) => match address.payment() {
-            ShelleyPaymentPart::Script(hash) => Some(*hash),
+        Some(TransactionOutput::Legacy(output)) => match get_payment_part(&output.address) {
+            Some(ShelleyPaymentPart::Script(script_hash)) => Some(script_hash),
             _ => None,
         },
-        _ => None,
+        Some(TransactionOutput::PostAlonzo(output)) => match get_payment_part(&output.address) {
+            Some(ShelleyPaymentPart::Script(script_hash)) => Some(script_hash),
+            _ => None,
+        },
+        None => None,
     }
 }
 
@@ -979,9 +987,7 @@ fn get_script_hash_from_reference_input(
     ref_input: &TransactionInput,
     utxos: &UTxOs,
 ) -> Option<PolicyId> {
-    reference_script(ref_input, utxos)
-        .as_ref()
-        .map(script_ref_hash)
+    reference_script(ref_input, utxos).map(script_ref_hash)
 }
 
 fn script_ref_hash(script: &ScriptRef) -> PolicyId {
@@ -1163,12 +1169,25 @@ fn find_datum(hash: &Hash<32>, tx_body: &TransactionBody, utxos: &UTxOs) -> Vali
     // Look for hash in reference input
     if let Some(reference_inputs) = &tx_body.reference_inputs {
         for reference_input in reference_inputs.iter() {
-            if let Some(DatumOption::Hash(datum_hash)) = utxos
+            match utxos
                 .get(&MultiEraInput::from_alonzo_compatible(reference_input))
-                .and_then(MultiEraOutput::datum)
-                && *hash == datum_hash
+                .and_then(MultiEraOutput::as_conway)
             {
-                return Ok(());
+                Some(TransactionOutput::Legacy(output)) => {
+                    if let Some(datum_hash) = &output.datum_hash
+                        && *hash == *datum_hash
+                    {
+                        return Ok(());
+                    }
+                }
+                Some(TransactionOutput::PostAlonzo(output)) => {
+                    if let Some(DatumOption::Hash(datum_hash)) = &output.datum_option.as_deref()
+                        && *hash == *datum_hash
+                    {
+                        return Ok(());
+                    }
+                }
+                _ => (),
             }
         }
     }
@@ -1610,22 +1629,10 @@ fn available_langs(prot_pps: &ConwayProtParams) -> Vec<Language> {
 }
 
 fn allowed_tx_langs(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
-    let input_features = reference_script_inputs(&mtx.transaction_body)
-        .filter_map(|input| utxos.get(&MultiEraInput::from_alonzo_compatible(input)))
-        .map(output_language_features);
-    let output_features = mtx
-        .transaction_body
-        .outputs
-        .iter()
-        .map(|output| output_language_features(&MultiEraOutput::from_conway(output)));
-    let (byron, modern) = input_features
-        .chain(output_features)
-        .fold((false, false), |(byron, modern), (b, m)| {
-            (byron || b, modern || m)
-        });
-    if byron {
+    let all_outputs: Vec<&TransactionOutput> = compute_all_outputs(mtx, utxos);
+    if any_byron_addresses(&all_outputs) {
         vec![]
-    } else if modern
+    } else if any_datums_or_script_refs(&all_outputs)
         || any_reference_inputs(
             &mtx.transaction_body
                 .reference_inputs
@@ -1639,11 +1646,64 @@ fn allowed_tx_langs(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
     }
 }
 
-fn output_language_features(output: &MultiEraOutput<'_>) -> (bool, bool) {
-    (
-        matches!(output.address(), Ok(Address::Byron(_))),
-        output.script_ref().is_some() || matches!(output.datum(), Some(DatumOption::Data(_))),
-    )
+fn compute_all_outputs<'a>(mtx: &'a Tx, utxos: &'a UTxOs) -> Vec<&'a TransactionOutput<'a>> {
+    let mut res: Vec<&TransactionOutput> = Vec::new();
+    for input in mtx.transaction_body.inputs.iter() {
+        if let Some(output) = utxos
+            .get(&MultiEraInput::from_alonzo_compatible(input))
+            .and_then(MultiEraOutput::as_conway)
+        {
+            res.push(output)
+        }
+    }
+    if let Some(reference_inputs) = &mtx.transaction_body.reference_inputs {
+        for ref_input in reference_inputs.iter() {
+            if let Some(output) = utxos
+                .get(&MultiEraInput::from_alonzo_compatible(ref_input))
+                .and_then(MultiEraOutput::as_conway)
+            {
+                res.push(output)
+            }
+        }
+    }
+    for output in mtx.transaction_body.outputs.iter() {
+        res.push(output)
+    }
+    res
+}
+
+fn any_byron_addresses(all_outputs: &[&TransactionOutput]) -> bool {
+    for output in all_outputs.iter() {
+        match output {
+            TransactionOutput::Legacy(output) => {
+                if is_byron_address(&output.address) {
+                    return true;
+                }
+            }
+            TransactionOutput::PostAlonzo(output) => {
+                if is_byron_address(&output.address) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+fn any_datums_or_script_refs(all_outputs: &[&TransactionOutput]) -> bool {
+    for output in all_outputs.iter() {
+        match output {
+            TransactionOutput::Legacy(_) => (),
+            TransactionOutput::PostAlonzo(output) => {
+                if output.script_ref.is_some() {
+                    return true;
+                } else if let Some(DatumOption::Data(_)) = &output.datum_option.as_deref() {
+                    return true;
+                }
+            }
+        }
+    }
+    false
 }
 
 fn any_reference_inputs(reference_inputs: &Option<Vec<TransactionInput>>) -> bool {
