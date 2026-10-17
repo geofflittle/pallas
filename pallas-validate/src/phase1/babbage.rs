@@ -291,8 +291,8 @@ fn check_preservation_of_value(
 ) -> ValidationResult {
     let err = PostAlonzo(NegativeValue);
     let (consumed, produced) = balance_coins(
-        shelley_deposits_and_refunds(tx_body.certificates.as_deref(), key_deposit),
-        tx_body.withdrawals.as_ref(),
+        shelley_deposits_and_refunds(None, key_deposit),
+        None,
         [tx_body.fee],
         &err,
     )?;
