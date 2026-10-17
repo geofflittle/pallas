@@ -140,25 +140,54 @@ mod conway_tests {
         let witness = |signed: &[u8]| sign(&key, &[0xa0], signed);
         let other = |signed: &[u8]| sign(&other_key, &[0xa0], signed);
         let signed = hash.as_ref();
+        let mut short_key = other(signed);
+        short_key.public_key = vec![1; 31].into();
+        let mut short_signature = other(signed);
+        short_signature.signature = vec![1; 63].into();
+        let input_only: Tx = conway_minted_tx_from_cbor(&raw);
+        let input_only_hash = input_only.transaction_body.original_hash();
+        let input_only_signed = input_only_hash.as_ref();
         let cases = [
-            (vec![witness(signed)], "Ok(())"),
-            (vec![], "Err(PostAlonzo(VKWitnessMissing))"),
-            (vec![witness(&[0; 32])], "Err(PostAlonzo(VKWrongSignature))"),
-            (vec![other(signed)], "Err(PostAlonzo(VKWitnessMissing))"),
-            (vec![witness(signed), other(signed)], "Ok(())"),
+            (&tx, vec![witness(signed)], "Ok(())"),
+            (&tx, vec![], "Err(PostAlonzo(VKWitnessMissing))"),
             (
+                &tx,
+                vec![witness(&[0; 32])],
+                "Err(PostAlonzo(VKWrongSignature))",
+            ),
+            (&tx, vec![other(signed)], "Err(PostAlonzo(VKWitnessMissing))"),
+            (&tx, vec![witness(signed), other(signed)], "Ok(())"),
+            (
+                &tx,
                 vec![witness(signed), other(&[0; 32])],
                 "Err(PostAlonzo(VKWrongSignature))",
             ),
             // An empty attribute map written with indefinite length.
             (
+                &tx,
                 vec![sign(&key, &[0xbf, 0xff], signed)],
+                "Err(PostAlonzo(VKWitnessMissing))",
+            ),
+            (
+                &tx,
+                vec![witness(signed), short_key],
+                "Err(PostAlonzo(VKWrongSignature))",
+            ),
+            (
+                &tx,
+                vec![witness(signed), short_signature],
+                "Err(PostAlonzo(VKWrongSignature))",
+            ),
+            (&input_only, vec![witness(input_only_signed)], "Ok(())"),
+            (
+                &input_only,
+                vec![other(input_only_signed)],
                 "Err(PostAlonzo(VKWitnessMissing))",
             ),
         ];
         let mut expected = vec![];
         let mut actual = vec![];
-        for (witnesses, outcome) in cases {
+        for (tx, witnesses, outcome) in cases {
             let mut tx = tx.clone();
             tx.transaction_witness_set.vkeywitness = None;
             tx.transaction_witness_set.bootstrap_witness = witnesses.try_into().ok();
