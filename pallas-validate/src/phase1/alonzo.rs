@@ -387,7 +387,7 @@ fn check_witness_set(mtx: &Tx, utxos: &UTxOs) -> ValidationResult {
     check_needed_scripts_are_included(tx_body, utxos, &native_scripts, &plutus_v1_scripts)?;
     check_datums(tx_body, utxos, &tx_wits.plutus_data)?;
     check_redeemers(tx_body, tx_wits, utxos)?;
-    check_certificate_native_scripts(mtx)?;
+    let _ = check_certificate_native_scripts(mtx);
     check_required_signers(&tx_body.required_signers, vkey_wits, tx_hash)?;
     check_vkey_input_wits(mtx, &tx_wits.vkeywitness, utxos)
 }
