@@ -1725,7 +1725,8 @@ fn cost_model_for_tx(
 mod tests {
     use super::*;
     use crate::phase1::fixtures::{
-        byron_address, input, key_address, legacy_output, reward_address, script_address, utxos,
+        byron_address, byron_output, input, key_address, legacy_output, reward_address,
+        script_address, tx_referencing_input, tx_spending_input, utxos,
     };
     use pallas_codec::minicbor;
     use pallas_crypto::{hash::Hasher, key::ed25519::SecretKey};
@@ -2659,37 +2660,6 @@ mod tests {
         cbor
     }
 
-    fn byron_output() -> Vec<u8> {
-        let mut cbor = vec![0x82];
-        cbor.extend(byron_address());
-        cbor.extend([0x1a, 0x00, 0x4c, 0x4b, 0x40]);
-        cbor
-    }
-
-    fn input_cbor() -> Vec<u8> {
-        let mut cbor = vec![0x82, 0x58, 0x20];
-        cbor.extend([0; 32]);
-        cbor.push(0x00);
-        cbor
-    }
-
-    fn conway_tx_spending_input() -> Vec<u8> {
-        let mut cbor = vec![0x84, 0xa3, 0x00, 0x81]; // transaction, body, one input
-        cbor.extend(input_cbor());
-        cbor.extend([0x01, 0x80, 0x02, 0x00]); // no outputs, no fee
-        cbor.extend([0xa0, 0xf5, 0xf6]); // no witnesses, valid, no auxiliary data
-        cbor
-    }
-
-    fn conway_tx_referencing_input() -> Vec<u8> {
-        let mut cbor = vec![0x84, 0xa4]; // transaction, body
-        cbor.extend([0x00, 0x80, 0x01, 0x80, 0x02, 0x00]); // no inputs, no outputs, no fee
-        cbor.extend([0x12, 0x81]); // one reference input
-        cbor.extend(input_cbor());
-        cbor.extend([0xa0, 0xf5, 0xf6]); // no witnesses, valid, no auxiliary data
-        cbor
-    }
-
     #[test]
     fn a_script_address_from_an_earlier_era_names_its_script() {
         for (address, expected) in [
@@ -2707,7 +2677,7 @@ mod tests {
 
     #[test]
     fn a_reference_script_from_an_earlier_era_is_found() {
-        let cbor = conway_tx_spending_input();
+        let cbor = tx_spending_input();
         let tx = MultiEraTx::decode_for_era(Era::Conway, &cbor).unwrap();
         let body = &tx.as_conway().unwrap().transaction_body;
         let expected = Hasher::<224>::hash_tagged(&V2_SCRIPT, 2);
@@ -2729,7 +2699,7 @@ mod tests {
 
     #[test]
     fn a_datum_hash_on_an_earlier_era_reference_input_is_found() {
-        let cbor = conway_tx_referencing_input();
+        let cbor = tx_referencing_input();
         let tx = MultiEraTx::decode_for_era(Era::Conway, &cbor).unwrap();
         let body = &tx.as_conway().unwrap().transaction_body;
         let hash = Hash::from([3; 32]);
@@ -2756,7 +2726,7 @@ mod tests {
 
     #[test]
     fn a_reference_script_on_an_input_or_an_output_rules_out_plutus_v1() {
-        let cbor = conway_tx_spending_input();
+        let cbor = tx_spending_input();
         let with_script = output_with_reference_script();
         let without_script = legacy_output(key_address());
         let (mut outcomes, mut expected) = (vec![], vec![]);
@@ -2788,7 +2758,7 @@ mod tests {
 
     #[test]
     fn a_byron_era_input_allows_no_plutus_language() {
-        let cbor = conway_tx_spending_input();
+        let cbor = tx_spending_input();
         let tx = MultiEraTx::decode_for_era(Era::Conway, &cbor).unwrap();
         let tx = tx.as_conway().unwrap();
 

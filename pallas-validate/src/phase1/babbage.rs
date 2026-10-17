@@ -1574,8 +1574,11 @@ fn option_vec_is_empty<T>(option_vec: &Option<Vec<T>>) -> bool {
 mod tests {
     use super::*;
     use crate::phase1::fixtures::{
-        byron_address, input, key_address, legacy_output, reward_address, script_address, utxos,
+        byron_address, byron_output, input, key_address, legacy_output, reward_address,
+        script_address, tx_referencing_input, tx_spending_input, utxos,
     };
+    use pallas_codec::minicbor;
+    use pallas_crypto::{hash::Hasher, key::ed25519::SecretKey};
     use pallas_traverse::Era;
 
     #[test]
@@ -1615,6 +1618,125 @@ mod tests {
                     "{era:?} {result:?}"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn a_script_address_from_an_earlier_era_names_its_script() {
+        for (address, expected) in [
+            (script_address(), Some(Hash::from([2; 28]))),
+            (key_address(), None),
+        ] {
+            let raw = legacy_output(address);
+            for era in [Era::Shelley, Era::Alonzo, Era::Babbage] {
+                let actual = get_script_hash_from_input(&input(), &utxos(era, &raw));
+
+                assert_eq!(actual, expected, "{era:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_datum_hash_on_an_earlier_era_input_is_found() {
+        let (spending, referencing) = (tx_spending_input(), tx_referencing_input());
+        let spending: Tx = minicbor::decode(&spending).unwrap();
+        let referencing: Tx = minicbor::decode(&referencing).unwrap();
+        let hash = Hash::from([3; 32]);
+        let raw = minicbor::to_vec(pallas_primitives::alonzo::TransactionOutput {
+            address: script_address().into(),
+            amount: Value::Coin(5_000_000),
+            datum_hash: Some(hash),
+        })
+        .unwrap();
+
+        for era in [Era::Alonzo, Era::Babbage] {
+            let utxos = utxos(era, &raw);
+
+            let witnessed =
+                check_input_datum_hash_in_witness_set(&spending.transaction_body, &utxos, &mut [
+                    (false, hash),
+                ]);
+            let unwitnessed =
+                check_input_datum_hash_in_witness_set(&spending.transaction_body, &utxos, &mut []);
+            let found = find_datum(&hash, &referencing.transaction_body, &utxos);
+            let other = find_datum(&Hash::from([4; 32]), &referencing.transaction_body, &utxos);
+
+            assert!(witnessed.is_ok(), "{era:?} {witnessed:?}");
+            assert!(
+                matches!(unwitnessed, Err(PostAlonzo(DatumMissing))),
+                "{era:?} {unwitnessed:?}"
+            );
+            assert!(found.is_ok(), "{era:?} {found:?}");
+            assert!(
+                matches!(other, Err(PostAlonzo(UnneededDatum))),
+                "{era:?} {other:?}"
+            );
+        }
+
+        let raw = legacy_output(key_address());
+        let result = check_input_datum_hash_in_witness_set(
+            &spending.transaction_body,
+            &utxos(Era::Shelley, &raw),
+            &mut [],
+        );
+        assert!(result.is_ok(), "{result:?}");
+    }
+
+    #[test]
+    fn a_key_input_from_an_earlier_era_needs_its_key_witness() {
+        let cbor = tx_spending_input();
+        let tx: Tx = minicbor::decode(&cbor).unwrap();
+        let key = SecretKey::from([7; 32]);
+        let witnesses = Some(vec![VKeyWitness {
+            vkey: key.public_key().as_ref().to_vec().into(),
+            signature: key
+                .sign(tx.transaction_body.original_hash().as_ref())
+                .as_ref()
+                .to_vec()
+                .into(),
+        }]);
+        let own = legacy_output(
+            [
+                vec![0x61],
+                Hasher::<224>::hash(key.public_key().as_ref()).to_vec(),
+            ]
+            .concat(),
+        );
+        let other = legacy_output(key_address());
+        let reward = legacy_output(reward_address());
+
+        for era in [Era::Shelley, Era::Alonzo, Era::Babbage] {
+            let own = check_vkey_input_wits(&tx, &witnesses, &utxos(era, &own));
+            let other = check_vkey_input_wits(&tx, &witnesses, &utxos(era, &other));
+            let reward = check_vkey_input_wits(&tx, &witnesses, &utxos(era, &reward));
+
+            assert!(own.is_ok(), "{era:?} {own:?}");
+            assert!(
+                matches!(other, Err(PostAlonzo(VKWitnessMissing))),
+                "{era:?} {other:?}"
+            );
+            assert!(
+                matches!(reward, Err(PostAlonzo(InputDecoding))),
+                "{era:?} {reward:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_byron_address_on_an_input_of_any_era_allows_no_plutus_language() {
+        let cbor = tx_spending_input();
+        let tx: Tx = minicbor::decode(&cbor).unwrap();
+        let byron = legacy_output(byron_address());
+        let key = legacy_output(key_address());
+
+        assert_eq!(allowed_langs(&tx, &utxos(Era::Byron, &byron_output())), vec![]);
+        for era in [Era::Shelley, Era::Alonzo, Era::Babbage] {
+            assert_eq!(allowed_langs(&tx, &utxos(era, &byron)), vec![], "{era:?}");
+            assert_eq!(
+                allowed_langs(&tx, &utxos(era, &key)),
+                vec![Language::PlutusV1, Language::PlutusV2],
+                "{era:?}"
+            );
         }
     }
 }
