@@ -194,17 +194,16 @@ fn check_collaterals_address(collaterals: &[TransactionInput], utxos: &UTxOs) ->
     for collateral in collaterals {
         match utxos.get(&MultiEraInput::from_alonzo_compatible(collateral)) {
             Some(multi_era_output) => {
-                match multi_era_output
-                    .address()
-                    .map_err(|_| PostAlonzo(InputDecoding))?
-                {
-                    Address::Shelley(address)
-                        if matches!(address.payment(), ShelleyPaymentPart::Key(_)) => {}
-                    Address::Byron(_) => {}
-                    Address::Shelley(_) => {
+                if let Some(babbage_output) = MultiEraOutput::as_babbage(multi_era_output) {
+                    let address: &Bytes = match babbage_output {
+                        TransactionOutput::Legacy(inner) => &inner.address,
+                        TransactionOutput::PostAlonzo(inner) => &inner.address,
+                    };
+                    if let ShelleyPaymentPart::Script(_) =
+                        get_payment_part(address).ok_or(PostAlonzo(InputDecoding))?
+                    {
                         return Err(PostAlonzo(CollateralNotVKeyLocked));
                     }
-                    _ => return Err(PostAlonzo(InputDecoding)),
                 }
             }
             None => {
