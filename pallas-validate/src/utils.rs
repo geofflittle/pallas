@@ -964,6 +964,7 @@ pub(crate) fn reference_scripts<'a>(
 ) -> Vec<ScriptRef<'a>> {
     spent_and_referenced_outputs(tx, utxos)
         .into_iter()
+        .filter(|output| output.era() == tx.era())
         .filter_map(MultiEraOutput::script_ref)
         .collect()
 }
