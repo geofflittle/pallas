@@ -925,3 +925,287 @@ fn check_minting(tx_body: &TransactionBody, mtx: &Tx) -> ValidationResult {
         None => Ok(()),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pallas_codec::minicbor;
+    use pallas_crypto::{hash::Hasher, key::ed25519::SecretKey};
+    use pallas_primitives::{
+        StakeCredential,
+        alonzo::{Certificate, ExUnits},
+    };
+
+    fn result(actual: ValidationResult, expected: &str) {
+        assert_eq!(format!("{actual:?}"), expected);
+    }
+
+    // Re-encodes and decodes the edited transaction, so the body hash the keys
+    // sign is the hash of the edited body.
+    fn synthetic(
+        certificates: Vec<Certificate>,
+        prepare: impl FnOnce(&mut Tx<'_>),
+        keys: &[u8],
+        test: impl FnOnce(Tx<'_>),
+    ) {
+        let raw = hex::decode(include_str!("../../../test_data/alonzo1.tx").trim()).unwrap();
+        let mut tx: Tx = minicbor::decode(&raw).unwrap();
+        tx.transaction_body.inputs = Vec::new();
+        tx.transaction_body.collateral = None;
+        tx.transaction_body.required_signers = None;
+        tx.transaction_body.withdrawals = None;
+        tx.transaction_body.mint = None;
+        tx.transaction_body.certificates = Some(certificates);
+        tx.transaction_witness_set = minicbor::decode::<WitnessSet>(&[0xa0]).unwrap().into();
+        prepare(&mut tx);
+        let encoded = minicbor::to_vec(tx).unwrap();
+        let mut tx: Tx = minicbor::decode(&encoded).unwrap();
+        let hash = tx.transaction_body.original_hash();
+        let witnesses: Vec<_> = keys
+            .iter()
+            .map(|id| {
+                let key = SecretKey::from([*id; 32]);
+                VKeyWitness {
+                    vkey: key.public_key().as_ref().to_vec().into(),
+                    signature: key.sign(hash).as_ref().to_vec().into(),
+                }
+            })
+            .collect();
+        tx.transaction_witness_set.vkeywitness = Some(witnesses);
+        test(tx);
+    }
+
+    fn key_hash(id: u8) -> AddrKeyhash {
+        Hasher::<224>::hash(SecretKey::from([id; 32]).public_key().as_ref())
+    }
+
+    fn corrupt_signature(tx: &mut Tx<'_>, position: usize) {
+        tx.transaction_witness_set.vkeywitness.as_mut().unwrap()[position].signature =
+            vec![0; 64].into();
+    }
+
+    fn plutus() -> PlutusScript<1> {
+        PlutusScript(vec![1, 2, 3].into())
+    }
+
+    fn add_plutus(tx: &mut Tx<'_>, cert_indexes: &[u32]) {
+        tx.transaction_witness_set.plutus_script = Some(vec![plutus()]);
+        tx.transaction_witness_set.redeemer = Some(
+            cert_indexes
+                .iter()
+                .map(|index| Redeemer {
+                    tag: RedeemerTag::Cert,
+                    index: *index,
+                    data: PlutusData::BigInt(pallas_primitives::BigInt::Int(0.into())),
+                    ex_units: ExUnits { mem: 1, steps: 1 },
+                })
+                .collect(),
+        );
+    }
+
+    fn credential_certificates(cred: StakeCredential) -> Vec<Certificate> {
+        vec![
+            Certificate::StakeDeregistration(cred.clone()),
+            Certificate::StakeDelegation(cred, [9; 28].into()),
+        ]
+    }
+
+    #[test]
+    fn every_vkey_witness_must_verify() {
+        for (corrupted, expected) in [
+            (None, "Ok(())"),
+            (Some(0), "Err(Alonzo(VKWrongSignature))"),
+            (Some(1), "Err(Alonzo(VKWrongSignature))"),
+        ] {
+            synthetic(
+                vec![],
+                |_| {},
+                &[1, 2],
+                |mut tx| {
+                    if let Some(position) = corrupted {
+                        corrupt_signature(&mut tx, position);
+                    }
+                    result(check_witness_set(&tx, &UTxOs::new()), expected);
+                },
+            );
+        }
+    }
+
+    #[test]
+    fn key_certificates_require_their_key_and_valid_signature() {
+        let cred = StakeCredential::AddrKeyhash(key_hash(1));
+        synthetic(
+            vec![Certificate::StakeRegistration(cred.clone())],
+            |_| {},
+            &[],
+            |tx| result(check_witness_set(&tx, &UTxOs::new()), "Ok(())"),
+        );
+        for cert in credential_certificates(cred) {
+            for (keys, expected) in [
+                (&[1][..], "Ok(())"),
+                (&[][..], "Err(Alonzo(VKWitnessMissing))"),
+                (&[2][..], "Err(Alonzo(VKWitnessMissing))"),
+            ] {
+                synthetic(
+                    vec![cert.clone()],
+                    |_| {},
+                    keys,
+                    |tx| result(check_witness_set(&tx, &UTxOs::new()), expected),
+                );
+            }
+            synthetic(
+                vec![cert],
+                |_| {},
+                &[1],
+                |mut tx| {
+                    corrupt_signature(&mut tx, 0);
+                    result(
+                        check_witness_set(&tx, &UTxOs::new()),
+                        "Err(Alonzo(VKWrongSignature))",
+                    );
+                },
+            );
+        }
+    }
+
+    #[test]
+    fn pool_certificates_require_operator_and_registration_owners() {
+        let registration = Certificate::PoolRegistration {
+            operator: key_hash(1),
+            vrf_keyhash: [0; 32].into(),
+            pledge: 0,
+            cost: 0,
+            margin: pallas_primitives::UnitInterval {
+                numerator: 0,
+                denominator: 1,
+            },
+            reward_account: vec![0xe1; 29].into(),
+            pool_owners: vec![key_hash(2)],
+            relays: vec![],
+            pool_metadata: None,
+        };
+        for (cert, keys) in [
+            (registration, vec![1, 2]),
+            (Certificate::PoolRetirement(key_hash(1), 1), vec![1]),
+        ] {
+            synthetic(
+                vec![cert.clone()],
+                |_| {},
+                &keys,
+                |tx| result(check_witness_set(&tx, &UTxOs::new()), "Ok(())"),
+            );
+            for missing in 0..keys.len() {
+                let mut incomplete = keys.clone();
+                incomplete.remove(missing);
+                synthetic(
+                    vec![cert.clone()],
+                    |_| {},
+                    &incomplete,
+                    |tx| {
+                        result(
+                            check_witness_set(&tx, &UTxOs::new()),
+                            "Err(Alonzo(VKWitnessMissing))",
+                        )
+                    },
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn script_certificates_require_script_and_plutus_redeemer() {
+        let cred = StakeCredential::ScriptHash(compute_plutus_v1_script_hash(&plutus()));
+        for cert in credential_certificates(cred) {
+            let outcome = |prepare: &dyn Fn(&mut Tx<'_>)| {
+                let mut outcome = String::new();
+                synthetic(vec![cert.clone()], prepare, &[], |tx| {
+                    outcome = format!("{:?}", check_witness_set(&tx, &UTxOs::new()));
+                });
+                outcome
+            };
+            assert_eq!(outcome(&|tx| add_plutus(tx, &[0])), "Ok(())");
+            assert_eq!(outcome(&|_| {}), "Err(Alonzo(ScriptWitnessMissing))");
+            assert_eq!(
+                outcome(&|tx| add_plutus(tx, &[])),
+                "Err(Alonzo(RedeemerMissing))"
+            );
+            assert_eq!(
+                outcome(&|tx| {
+                    add_plutus(tx, &[0]);
+                    tx.transaction_witness_set.plutus_script =
+                        Some(vec![PlutusScript(vec![99].into())]);
+                }),
+                "Err(Alonzo(ScriptWitnessMissing))"
+            );
+        }
+    }
+
+    #[test]
+    fn repeated_certificates_point_at_their_first_occurrence() {
+        let hash = compute_plutus_v1_script_hash(&plutus());
+        let certs = vec![
+            Certificate::StakeDeregistration(StakeCredential::ScriptHash(hash)),
+            Certificate::StakeRegistration(StakeCredential::AddrKeyhash(key_hash(1))),
+            Certificate::StakeDeregistration(StakeCredential::ScriptHash(hash)),
+            Certificate::StakeDelegation(StakeCredential::ScriptHash(hash), [9; 28].into()),
+        ];
+        for (indexes, expected) in [
+            (&[0, 3][..], "Ok(())"),
+            (&[0, 2, 3][..], "Err(Alonzo(UnneededRedeemer))"),
+            (&[0][..], "Err(Alonzo(RedeemerMissing))"),
+        ] {
+            synthetic(
+                certs.clone(),
+                |tx| add_plutus(tx, indexes),
+                &[],
+                |tx| result(check_witness_set(&tx, &UTxOs::new()), expected),
+            );
+        }
+    }
+
+    #[test]
+    fn native_certificate_scripts_are_evaluated() {
+        let script = NativeScript::ScriptPubkey(key_hash(1));
+        for cert in credential_certificates(StakeCredential::ScriptHash(
+            compute_native_script_hash(&script),
+        )) {
+            for (keys, expected) in [
+                (&[1][..], "Ok(())"),
+                (&[][..], "Err(Alonzo(NativeScriptDenial))"),
+                (&[2][..], "Err(Alonzo(NativeScriptDenial))"),
+            ] {
+                synthetic(
+                    vec![cert.clone()],
+                    |tx| {
+                        tx.transaction_witness_set.native_script = Some(vec![script.clone().into()])
+                    },
+                    keys,
+                    |tx| result(check_witness_set(&tx, &UTxOs::new()), expected),
+                );
+            }
+        }
+        let interval = NativeScript::ScriptAll(vec![
+            NativeScript::InvalidBefore(10),
+            NativeScript::InvalidHereafter(20),
+        ]);
+        for (start, end, expected) in [
+            (Some(10), Some(20), "Ok(())"),
+            (Some(9), Some(20), "Err(Alonzo(NativeScriptDenial))"),
+            (Some(10), Some(21), "Err(Alonzo(NativeScriptDenial))"),
+        ] {
+            synthetic(
+                vec![Certificate::StakeDeregistration(
+                    StakeCredential::ScriptHash(compute_native_script_hash(&interval)),
+                )],
+                |tx| {
+                    tx.transaction_body.validity_interval_start = start;
+                    tx.transaction_body.ttl = end;
+                    tx.transaction_witness_set.native_script =
+                        Some(vec![interval.clone().into()]);
+                },
+                &[],
+                |tx| result(check_witness_set(&tx, &UTxOs::new()), expected),
+            );
+        }
+    }
+}

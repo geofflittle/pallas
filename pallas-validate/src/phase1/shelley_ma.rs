@@ -814,4 +814,43 @@ mod tests {
         );
         assert!(!eval(&any, Some(80), Some(220)), "satisfies neither arm");
     }
+
+    #[test]
+    fn every_vkey_witness_must_verify() {
+        use super::{OriginalHash, Tx, UTxOs, VKeyWitness, WitnessSet, check_witnesses};
+        use pallas_codec::minicbor;
+        use pallas_crypto::key::ed25519::SecretKey;
+        for (corrupted, expected) in [
+            (None, "Ok(())"),
+            (Some(0), "Err(ShelleyMA(WrongSignature))"),
+            (Some(1), "Err(ShelleyMA(WrongSignature))"),
+        ] {
+            let raw = hex::decode(include_str!("../../../test_data/shelley1.tx").trim()).unwrap();
+            let mut tx: Tx = minicbor::decode(&raw).unwrap();
+            tx.transaction_body.inputs = Vec::new();
+            tx.transaction_witness_set = minicbor::decode::<WitnessSet>(&[0xa0]).unwrap().into();
+            let encoded = minicbor::to_vec(tx).unwrap();
+            let mut tx: Tx = minicbor::decode(&encoded).unwrap();
+            let hash = tx.transaction_body.original_hash();
+            let mut witnesses: Vec<VKeyWitness> = [1, 2]
+                .map(|id| {
+                    let key = SecretKey::from([id; 32]);
+                    VKeyWitness {
+                        vkey: key.public_key().as_ref().to_vec().into(),
+                        signature: key.sign(hash).as_ref().to_vec().into(),
+                    }
+                })
+                .to_vec();
+            if let Some(position) = corrupted {
+                witnesses[position].signature = vec![0; 64].into();
+            }
+            tx.transaction_witness_set.vkeywitness = Some(witnesses);
+            let actual = check_witnesses(
+                &tx.transaction_body,
+                &tx.transaction_witness_set,
+                &UTxOs::new(),
+            );
+            assert_eq!(format!("{actual:?}"), expected);
+        }
+    }
 }
