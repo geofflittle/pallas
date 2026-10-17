@@ -2992,8 +2992,18 @@ mod tests {
         };
         let with_script = output_with_reference_script();
         let cbor = conway_tx_referencing_input();
-        let mut outcomes = vec![];
-        for purpose in ["spend", "mint", "cert", "reward", "vote", "propose"] {
+        let (mut outcomes, mut expected) = (vec![], vec![]);
+        for (purpose, names_script) in [
+            ("spend", true),
+            ("mint", true),
+            ("cert", true),
+            ("reward", true),
+            ("drep vote", true),
+            ("committee vote", true),
+            ("treasury proposal", true),
+            ("parameter proposal", true),
+            ("key reward", false),
+        ] {
             for hash in [script, Hash::from([5; 28])] {
                 let locked_output = legacy_output([vec![0x71], hash.to_vec()].concat());
                 let utxos = UTxOs::from([
@@ -3025,11 +3035,17 @@ mod tests {
                                 .unwrap(),
                         )
                     }
-                    "reward" => {
-                        let account = [vec![0xf0], hash.to_vec()].concat();
+                    "reward" | "key reward" => {
+                        let header = if names_script { 0xf0 } else { 0xe0 };
+                        let account = [vec![header], hash.to_vec()].concat();
                         body.withdrawals = Some([(account.into(), 0)].into_iter().collect())
                     }
-                    "vote" => {
+                    "drep vote" | "committee vote" => {
+                        let voter = if purpose == "drep vote" {
+                            Voter::DRepScript(hash)
+                        } else {
+                            Voter::ConstitutionalCommitteeScript(hash)
+                        };
                         let action = GovActionId {
                             transaction_id: Hash::new([0; 32]),
                             action_index: 0,
@@ -3039,22 +3055,22 @@ mod tests {
                             anchor: None,
                         };
                         body.voting_procedures = Some(
-                            [(
-                                Voter::DRepScript(hash),
-                                [(action, vote)].into_iter().collect(),
-                            )]
-                            .into_iter()
-                            .collect(),
+                            [(voter, [(action, vote)].into_iter().collect())]
+                                .into_iter()
+                                .collect(),
                         )
                     }
                     _ => {
+                        let gov_action = if purpose == "treasury proposal" {
+                            GovAction::TreasuryWithdrawals(Default::default(), Some(hash))
+                        } else {
+                            let update = minicbor::decode(&[0xa0]).unwrap();
+                            GovAction::ParameterChange(None, Box::new(update), Some(hash))
+                        };
                         let proposal = ProposalProcedure {
                             deposit: 0,
                             reward_account: [vec![0xe0], vec![0; 28]].concat().into(),
-                            gov_action: GovAction::TreasuryWithdrawals(
-                                Default::default(),
-                                Some(hash),
-                            ),
+                            gov_action,
                             anchor: Anchor {
                                 url: String::new(),
                                 content_hash: Hash::new([0; 32]),
@@ -3064,21 +3080,17 @@ mod tests {
                     }
                 }
                 tx.transaction_body = body.into();
-                outcomes.push((purpose, hash == script, tx_languages(&tx, &utxos)));
-            }
-        }
-        let expected: Vec<_> = outcomes
-            .iter()
-            .map(|(purpose, needed, _)| {
-                let languages = if *needed {
+                let needed = names_script && hash == script;
+                outcomes.push((purpose, needed, tx_languages(&tx, &utxos)));
+                let languages = if needed {
                     vec![Language::PlutusV2]
                 } else {
                     vec![]
                 };
-                (*purpose, *needed, languages)
-            })
-            .collect();
-        assert_eq!(outcomes.len(), 12);
+                expected.push((purpose, needed, languages));
+            }
+        }
+        assert_eq!(outcomes.len(), 18);
         assert_eq!(outcomes, expected);
     }
 
