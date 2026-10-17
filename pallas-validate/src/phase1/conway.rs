@@ -1547,7 +1547,7 @@ fn bootstrap_wit_root(wit: &BootstrapWitness) -> AddressId {
         prefix,
         wit.public_key.as_slice(),
         wit.chain_code.as_slice(),
-        wit.attributes.as_slice(),
+        &[0xa0],
     ]
     .concat();
     pallas_crypto::hash::Hasher::<224>::hash(&cryptoxide::hashing::sha3_256(&payload))
