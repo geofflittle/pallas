@@ -563,9 +563,9 @@ mod conway_tests {
             conway::{Anchor, Certificate, GovAction, ProposalProcedure},
         };
         // Adds one deposit to conway3 and funds its input with the deposit less
-        // one, the deposit and the deposit plus one. The edit makes the
-        // signatures stale and balance is checked first, so only the funded
-        // body fails on a signature.
+        // one, the deposit and the deposit plus one. The edit changes the body
+        // hash, so the signatures no longer verify, and balance is checked
+        // first, so only the funded body fails on a signature.
         let credential = StakeCredential::AddrKeyhash([1; 28].into());
         let proposal = ProposalProcedure {
             deposit: 4_000_000,
@@ -641,7 +641,7 @@ mod conway_tests {
             })
             .collect();
         let unbalanced = "Err(PostAlonzo(PreservationOfValue))".to_string();
-        let stale_signature = "Err(PostAlonzo(VKWrongSignature))".to_string();
+        let wrong_signature = "Err(PostAlonzo(VKWrongSignature))".to_string();
         let expected: Vec<_> = cases
             .iter()
             .map(|(name, ..)| {
@@ -649,7 +649,7 @@ mod conway_tests {
                     *name,
                     vec![
                         unbalanced.clone(),
-                        stale_signature.clone(),
+                        wrong_signature.clone(),
                         unbalanced.clone(),
                     ],
                 )
