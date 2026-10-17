@@ -65,8 +65,12 @@ pub(super) fn output_with_reference_script() -> Vec<u8> {
 }
 
 pub(super) fn byron_output() -> Vec<u8> {
+    byron_era_output(&byron_address())
+}
+
+pub(super) fn byron_era_output(address: &[u8]) -> Vec<u8> {
     let mut cbor = vec![0x82];
-    cbor.extend(byron_address());
+    cbor.extend(address);
     cbor.extend([0x1a, 0x00, 0x4c, 0x4b, 0x40]);
     cbor
 }

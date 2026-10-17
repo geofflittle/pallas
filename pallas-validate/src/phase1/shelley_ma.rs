@@ -763,9 +763,19 @@ mod tests {
         StakeCredential, TransactionOutput, Tx, UTxOs, VKeyWitness, Value, WitnessSet,
         check_witnesses, compute_script_hash, eval_native_script,
     };
+    use crate::phase1::fixtures::{
+        byron_address, byron_era_output, byron_output, key_address, legacy_output,
+        reward_address, tx_spending_input, undecodable_byron_address, utxos,
+    };
+    use pallas_addresses::{
+        ByronAddress,
+        byron::{AddrType, AddressPayload, SpendingData},
+    };
     use pallas_codec::minicbor;
     use pallas_crypto::{hash::Hasher, key::ed25519::SecretKey};
     use pallas_primitives::alonzo::{AddrKeyhash, TransactionInput};
+    use pallas_traverse::MultiEraBlock;
+    use std::ops::Deref;
 
     // Evaluates `native_script` with no vkey witnesses and the given validity
     // interval bounds (`low_bnd` is `validity_interval_start`, `upp_bnd` is `ttl`).
@@ -1061,5 +1071,113 @@ mod tests {
                 expected
             );
         }
+    }
+
+    #[test]
+    fn an_input_at_a_reward_or_undecodable_byron_address_is_refused() {
+        let cbor = tx_spending_input();
+        let mut tx: Tx = minicbor::decode(&cbor).unwrap();
+        tx.transaction_witness_set.vkeywitness = Some(vec![]);
+        let outcomes: Vec<_> = [
+            (Era::Shelley, legacy_output(key_address())),
+            (Era::Shelley, legacy_output(byron_address())),
+            (Era::Byron, byron_output()),
+            (Era::Shelley, legacy_output(reward_address())),
+            (Era::Shelley, legacy_output(undecodable_byron_address())),
+        ]
+        .map(|(era, raw)| {
+            format!(
+                "{:?}",
+                check_witnesses(
+                    &tx.transaction_body,
+                    &tx.transaction_witness_set,
+                    &utxos(era, &raw)
+                )
+            )
+        })
+        .into();
+        assert_eq!(
+            outcomes,
+            [
+                "Err(ShelleyMA(MissingVKWitness))",
+                "Err(ShelleyMA(MissingVKWitness))",
+                "Err(ShelleyMA(MissingVKWitness))",
+                "Err(ShelleyMA(AddressDecoding))",
+                "Err(ShelleyMA(AddressDecoding))",
+            ]
+        );
+    }
+
+    #[test]
+    fn mainnet_bootstrap_witnesses_cover_their_byron_inputs() {
+        // The second transaction of the block spends two Byron inputs with two
+        // bootstrap witnesses and no key witness.
+        let raw = hex::decode(include_str!("../../../test_data/mary1.block").trim()).unwrap();
+        let block = MultiEraBlock::decode(&raw).unwrap();
+        let txs = block.txs();
+        let tx = txs[1].as_alonzo().unwrap();
+        let real = tx.transaction_witness_set.bootstrap_witness.clone().unwrap();
+        let addresses: Vec<Vec<u8>> = real
+            .iter()
+            .map(|wit| {
+                let xpub = [wit.public_key.as_slice(), wit.chain_code.as_slice()].concat();
+                let attributes = minicbor::decode(&wit.attributes).unwrap();
+                let spending = SpendingData::PubKey(xpub.into());
+                ByronAddress::from(AddressPayload::new(AddrType::PubKey, spending, attributes))
+                    .to_vec()
+            })
+            .collect();
+        let hash = tx.transaction_body.original_hash();
+        let other_key = SecretKey::from([8; 32]);
+        let mut other = real[1].clone();
+        other.public_key = other_key.public_key().as_ref().to_vec().into();
+        other.signature = other_key.sign(hash).as_ref().to_vec().into();
+        let mut tampered = real[0].clone();
+        let mut signature = tampered.signature.to_vec();
+        signature[0] ^= 1;
+        tampered.signature = signature.into();
+        let cases = [
+            (Some(real.clone()), "Ok(())"),
+            (None, "Err(ShelleyMA(MissingVKWitness))"),
+            (
+                Some(vec![real[0].clone(), other]),
+                "Err(ShelleyMA(MissingVKWitness))",
+            ),
+            (
+                Some(vec![tampered, real[1].clone()]),
+                "Err(ShelleyMA(WrongSignature))",
+            ),
+        ];
+        let mut expected = vec![];
+        let mut actual = vec![];
+        for era in [Era::Byron, Era::Shelley] {
+            let outputs: Vec<Vec<u8>> = addresses
+                .iter()
+                .map(|address| match era {
+                    Era::Byron => byron_era_output(address),
+                    _ => legacy_output(address.clone()),
+                })
+                .collect();
+            let utxos: UTxOs = tx
+                .transaction_body
+                .inputs
+                .iter()
+                .zip(&outputs)
+                .map(|(input, output)| {
+                    (
+                        MultiEraInput::from_alonzo_compatible(input),
+                        MultiEraOutput::decode(era, output).unwrap(),
+                    )
+                })
+                .collect();
+            for (witnesses, outcome) in &cases {
+                let mut wits: WitnessSet = tx.transaction_witness_set.deref().clone();
+                wits.bootstrap_witness = witnesses.clone();
+                let result = check_witnesses(&tx.transaction_body, &wits, &utxos);
+                expected.push(format!("{era:?} {outcome}"));
+                actual.push(format!("{era:?} {result:?}"));
+            }
+        }
+        assert_eq!(actual, expected);
     }
 }

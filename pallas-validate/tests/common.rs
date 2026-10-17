@@ -12,7 +12,7 @@ use pallas_primitives::{
 };
 use pallas_traverse::{Era, MultiEraInput, MultiEraOutput};
 use pallas_validate::utils::UTxOs;
-use pallas_validate::utils::{EraCbor, TxoRef, UtxoMap};
+use pallas_validate::utils::{EraCbor, TxoRef, UtxoMap, ValidationError, ValidationResult};
 use std::{borrow::Cow, iter::zip, vec::Vec};
 
 use pallas_codec::utils::{Bytes, CborWrap};
@@ -572,7 +572,9 @@ pub fn bootstrap_witness(key: &SecretKey, attributes: &[u8], signed: &[u8]) -> B
 
 pub fn bootstrap_witness_cases(
     signed: &[u8],
-) -> Vec<(Vec<BootstrapWitness>, Result<(), &'static str>)> {
+    missing: ValidationError,
+    wrong_signature: ValidationError,
+) -> Vec<(Vec<BootstrapWitness>, ValidationResult)> {
     let key = byron_key();
     let other_key = SecretKey::from([8; 32]);
     let witness = bootstrap_witness(&key, &[0xa0], signed);
@@ -583,23 +585,23 @@ pub fn bootstrap_witness_cases(
     short_signature.signature = vec![1; 63].into();
     vec![
         (vec![witness.clone()], Ok(())),
-        (vec![], Err("VKWitnessMissing")),
+        (vec![], Err(missing.clone())),
         (
             vec![bootstrap_witness(&key, &[0xa0], &[0; 32])],
-            Err("VKWrongSignature"),
+            Err(wrong_signature.clone()),
         ),
-        (vec![other(signed)], Err("VKWitnessMissing")),
+        (vec![other(signed)], Err(missing.clone())),
         (vec![witness.clone(), other(signed)], Ok(())),
         (
             vec![witness.clone(), other(&[0; 32])],
-            Err("VKWrongSignature"),
+            Err(wrong_signature.clone()),
         ),
         // An empty attribute map written with indefinite length.
         (
             vec![bootstrap_witness(&key, &[0xbf, 0xff], signed)],
-            Err("VKWitnessMissing"),
+            Err(missing),
         ),
-        (vec![witness, short_key], Err("VKWrongSignature")),
-        (vec![short_signature], Err("VKWrongSignature")),
+        (vec![witness, short_key], Err(wrong_signature.clone())),
+        (vec![short_signature], Err(wrong_signature)),
     ]
 }

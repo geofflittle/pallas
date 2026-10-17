@@ -122,6 +122,52 @@ mod shelley_ma_tests {
     }
 
     #[test]
+    fn byron_inputs_are_witnessed_through_dispatch() {
+        use pallas_traverse::{MultiEraInput, MultiEraOutput, OriginalHash};
+
+        // Spends one input locked by a Byron key, held in a Byron era output
+        // and in a Shelley era output.
+        let address = byron_key_address();
+        let raw = cbor_to_bytes(include_str!("../../test_data/shelley1.tx"));
+        let tx: Tx = minted_tx_from_cbor(&raw);
+        let spent = MultiEraInput::from_alonzo_compatible(&tx.transaction_body.inputs[0]);
+        let byron_era = byron_era_output(&address, 2332267427205);
+        let shelley_era = minicbor::to_vec(TransactionOutput {
+            address: address.clone().into(),
+            amount: Value::Coin(2332267427205),
+            datum_hash: None,
+        })
+        .unwrap();
+        // The replaced witnesses change the transaction size, so a zero minimum
+        // fee stops the fee check from failing first.
+        let env: Environment = hardcoded_environment_values!(minfee_a = 0, minfee_b = 0);
+        let hash = tx.transaction_body.original_hash();
+        let mut expected = vec![];
+        let mut actual = vec![];
+        for (era, output) in [(Era::Byron, &byron_era), (Era::Shelley, &shelley_era)] {
+            let utxos = UTxOs::from([(spent.clone(), MultiEraOutput::decode(era, output).unwrap())]);
+            for (witnesses, outcome) in bootstrap_witness_cases(
+                hash.as_ref(),
+                ShelleyMA(ShelleyMAError::MissingVKWitness),
+                ShelleyMA(ShelleyMAError::WrongSignature),
+            ) {
+                let mut tx = tx.clone();
+                tx.transaction_witness_set.vkeywitness = None;
+                tx.transaction_witness_set.bootstrap_witness = Some(witnesses);
+                let result = validate_txs(
+                    &[MultiEraTx::from_alonzo_compatible(&tx, Era::Shelley)],
+                    &env,
+                    &utxos,
+                    &mut CertState::default(),
+                );
+                expected.push(format!("{outcome:?}"));
+                actual.push(format!("{result:?}"));
+            }
+        }
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     // Transaction hash:
     // 4a3f86762383f1d228542d383ae7ac89cf75cf7ff84dec8148558ea92b0b92d0
     fn successful_mainnet_shelley_tx_with_script() {

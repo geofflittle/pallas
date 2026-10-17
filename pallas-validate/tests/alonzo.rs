@@ -121,7 +121,11 @@ mod alonzo_tests {
         let mut actual = vec![];
         for tx in [&tx, &input_only] {
             let hash = tx.transaction_body.original_hash();
-            for (witnesses, outcome) in bootstrap_witness_cases(hash.as_ref()) {
+            for (witnesses, outcome) in bootstrap_witness_cases(
+                hash.as_ref(),
+                Alonzo(AlonzoError::VKWitnessMissing),
+                Alonzo(AlonzoError::VKWrongSignature),
+            ) {
                 let mut tx = tx.clone();
                 tx.transaction_witness_set.vkeywitness = None;
                 tx.transaction_witness_set.bootstrap_witness = Some(witnesses);
@@ -131,10 +135,7 @@ mod alonzo_tests {
                     &utxos,
                     &mut CertState::default(),
                 );
-                expected.push(match outcome {
-                    Ok(()) => "Ok(())".to_string(),
-                    Err(variant) => format!("Err(Alonzo({variant}))"),
-                });
+                expected.push(format!("{outcome:?}"));
                 actual.push(format!("{result:?}"));
             }
         }
