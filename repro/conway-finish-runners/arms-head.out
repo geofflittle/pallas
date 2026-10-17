@@ -1,0 +1,30 @@
+arm none on head exit=0 compiled=6
+totals passed=154 failed=0
+arm A15m-key-deposit-zero.patch on head exit=101 compiled=1
+test conway_tests::deposits_are_required_through_dispatch ... FAILED
+totals passed=124 failed=1
+assertion `left == right` failed
+arm A16m-drep-deposit-zero.patch on head exit=101 compiled=1
+test conway_tests::deposits_are_required_through_dispatch ... FAILED
+totals passed=124 failed=1
+assertion `left == right` failed
+arm A17m-gov-deposit-zero.patch on head exit=101 compiled=1
+test conway_tests::deposits_are_required_through_dispatch ... FAILED
+totals passed=124 failed=1
+assertion `left == right` failed
+arm A18m-drep-gov-swapped.patch on head exit=101 compiled=1
+test conway_tests::deposits_are_required_through_dispatch ... FAILED
+totals passed=124 failed=1
+assertion `left == right` failed
+arm K-cutoff-eq-10.patch on head exit=101 compiled=1
+test phase2::v3_deposit_context_tests::v3_deposit_context_protocol_boundaries_at_every_occurrence ... FAILED
+totals passed=24 failed=1
+assertion `left == right` failed: certificate list protocol 11
+arm DF1-txinfo-default-10.patch on head exit=101 compiled=1
+test phase2::v3_deposit_context_tests::public_encoding_is_the_protocol_9_encoding ... FAILED
+totals passed=24 failed=1
+assertion `left == right` failed: tx info
+arm DF2-context-default-10.patch on head exit=101 compiled=1
+test phase2::v3_deposit_context_tests::public_encoding_is_the_protocol_9_encoding ... FAILED
+totals passed=24 failed=1
+assertion `left == right` failed: script context

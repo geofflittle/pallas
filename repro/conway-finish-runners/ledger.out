@@ -1,0 +1,61 @@
+== Conway TxInfo.hs transTxCert (expect lines 586 to 595 gate the deposit on hardforkConwayBootstrapPhase)
+   497	instance EraPlutusTxInfo 'PlutusV3 ConwayEra where
+   498	  toPlutusTxCert _ pv = pure . transTxCert pv
+   499	
+   500	  toPlutusScriptPurpose proxy lti = transPlutusPurposeV3 proxy (ltiProtVer lti)
+   518	      txCerts <- Alonzo.transTxBodyCerts proxy ltiProtVer txBody
+   566	-- | In protocol version 9, a bug in `RegTxCert` and `UnRegTxCert` pattern definitions was causing
+   567	-- the deposit in `RegDepositTxCert` and `UnRegDepositTxCert` to be omitted.  We need to keep this
+   568	-- behavior for version 9, so, now that the bug in the patterns has been fixed, we are explicitly
+   569	-- omitting the deposit in these cases. It has been confirmed that this buggy behavior for protocol
+   570	-- version 9 has been exercised on Mainnet, therefore this conditional translation can never be
+   571	-- removed for Conway era (#4863)
+   572	transTxCert ::
+   573	  (ShelleyEraTxCert era, ConwayEraTxCert era, TxCert era ~ ConwayTxCert era) =>
+   574	  ProtVer -> TxCert era -> PV3.TxCert
+   575	transTxCert pv = \case
+   576	  RegPoolTxCert StakePoolParams {sppId, sppVrf} ->
+   577	    PV3.TxCertPoolRegister
+   578	      (transKeyHash sppId)
+   579	      (PV3.PubKeyHash (PV3.toBuiltin (hashToBytes (unVRFVerKeyHash sppVrf))))
+   580	  RetirePoolTxCert poolId retireEpochNo ->
+   581	    PV3.TxCertPoolRetire (transKeyHash poolId) (transEpochNo retireEpochNo)
+   582	  RegTxCert stakeCred ->
+   583	    PV3.TxCertRegStaking (transCred stakeCred) Nothing
+   584	  UnRegTxCert stakeCred ->
+   585	    PV3.TxCertUnRegStaking (transCred stakeCred) Nothing
+   586	  RegDepositTxCert stakeCred deposit ->
+   587	    let transDeposit
+   588	          | hardforkConwayBootstrapPhase pv = Nothing
+   589	          | otherwise = Just (transCoinToLovelace deposit)
+   590	     in PV3.TxCertRegStaking (transCred stakeCred) transDeposit
+   591	  UnRegDepositTxCert stakeCred refund ->
+   592	    let transRefund
+   593	          | hardforkConwayBootstrapPhase pv = Nothing
+   594	          | otherwise = Just (transCoinToLovelace refund)
+   595	     in PV3.TxCertUnRegStaking (transCred stakeCred) transRefund
+   649	transPlutusPurposeV3 proxy pv = \case
+   650	  SpendingPurpose (AsIxItem _ txIn) -> pure $ PV3.Spending (transTxIn txIn)
+   651	  MintingPurpose (AsIxItem _ policyId) -> pure $ PV3.Minting (Alonzo.transPolicyID policyId)
+   652	  CertifyingPurpose (AsIxItem ix txCert) ->
+   653	    PV3.Certifying (toInteger ix) <$> toPlutusTxCert proxy pv txCert
+== Conway Era.hs (expect line 257: pvMajor pv == natVersion @9)
+   255	-- | Bootstrap phase
+   256	hardforkConwayBootstrapPhase :: ProtVer -> Bool
+   257	hardforkConwayBootstrapPhase pv = pvMajor pv == natVersion @9
+== Era definitions (expect Babbage 7 to 8, Conway 9 to 11)
+   121	instance Era BabbageEra where
+   122	  type EraName BabbageEra = "Babbage"
+   123	  type PreviousEra BabbageEra = AlonzoEra
+   124	  type ProtVerLow BabbageEra = 7
+   125	  type ProtVerHigh BabbageEra = 8
+   126	
+   127	data ConwayEra
+   128	
+   129	instance Era ConwayEra where
+   130	  type EraName ConwayEra = "Conway"
+   131	  type PreviousEra ConwayEra = BabbageEra
+   132	  type ProtVerLow ConwayEra = 9
+   133	  type ProtVerHigh ConwayEra = 11
+== Babbage max language (expect PlutusV2)
+63:  eraMaxLanguage = PlutusV2

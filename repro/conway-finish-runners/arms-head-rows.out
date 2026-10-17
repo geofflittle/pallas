@@ -1,0 +1,8 @@
+== A15m-key-deposit-zero
+  left: [(key, [Pres, Pres, Pres]), (drep, [Pres, VKWrongSig, Pres]), (proposal, [Pres, VKWrongSig, Pres])]
+== A16m-drep-deposit-zero
+  left: [(key, [Pres, VKWrongSig, Pres]), (drep, [Pres, Pres, Pres]), (proposal, [Pres, VKWrongSig, Pres])]
+== A17m-gov-deposit-zero
+  left: [(key, [Pres, VKWrongSig, Pres]), (drep, [Pres, VKWrongSig, Pres]), (proposal, [Pres, Pres, Pres])]
+== A18m-drep-gov-swapped
+  left: [(key, [Pres, VKWrongSig, Pres]), (drep, [Pres, Pres, Pres]), (proposal, [Pres, Pres, Pres])]

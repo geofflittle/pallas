@@ -1,0 +1,200 @@
+1:  cfc9b39a ! 1:  b4aed3a5 fix(validate): count stake registration deposits in Conway balance
+    @@ Metadata
+     Author: rodrigomd94 <51804048+rodrigomd94@users.noreply.github.com>
+     
+      ## Commit message ##
+    -    fix(validate): count stake registration deposits in Conway balance
+    +    fix(validate): balance Conway deposits and refunds
+     
+         - conway: certificate_deposit_and_refund maps a certificate to its deposit and refund
+    -    - conway: consumed value adds withdrawals and certificate refunds
+    -    - conway: produced value adds fee, deposits, proposals and donation
+    -    - tests: each balance term, and a dispatch case through validate_txs
+    +    - conway: consumed adds withdrawals and refunds, produced adds deposits and donation
+    +    - tests: each balance term through check_preservation_of_value
+    +    - tests: key, drep and proposal deposits through validate_txs, as the ledger charges each
+     
+         Co-authored-by: Geoff Little <g.little712@gmail.com>
+     
+    @@ pallas-validate/tests/conway.rs: mod conway_tests {
+          }
+      
+     +    #[test]
+    -+    fn registration_deposit_is_required_through_dispatch() {
+    -+        // Adds an unfunded registration to conway3, so balance fails before the
+    -+        // stale signatures are checked.
+    -+        let raw = cbor_to_bytes(include_str!("../../test_data/conway3.tx"));
+    -+        let mut tx: Tx = conway_minted_tx_from_cbor(&raw);
+    -+        let mut body = (*tx.transaction_body).clone();
+    -+        assert!(body.certificates.is_none());
+    -+        body.certificates = Some(
+    -+            vec![pallas_primitives::conway::Certificate::Reg(
+    -+                pallas_primitives::StakeCredential::AddrKeyhash([1; 28].into()),
+    ++    fn deposits_are_required_through_dispatch() {
+    ++        use pallas_primitives::{
+    ++            StakeCredential,
+    ++            conway::{Anchor, Certificate, GovAction, ProposalProcedure},
+    ++        };
+    ++        // Adds one deposit to conway3 and funds its input with the deposit less
+    ++        // one, the deposit and the deposit plus one. The edit makes the
+    ++        // signatures stale and balance is checked first, so only the funded
+    ++        // body fails on a signature.
+    ++        let credential = StakeCredential::AddrKeyhash([1; 28].into());
+    ++        let proposal = ProposalProcedure {
+    ++            deposit: 4_000_000,
+    ++            reward_account: [vec![0xe1], vec![3; 28]].concat().into(),
+    ++            gov_action: GovAction::Information,
+    ++            anchor: Anchor {
+    ++                url: String::new(),
+    ++                content_hash: [0; 32].into(),
+    ++            },
+    ++        };
+    ++        let cases = [
+    ++            (
+    ++                "key",
+     +                2_000_000,
+    -+            )]
+    -+            .try_into()
+    -+            .unwrap(),
+    -+        );
+    -+        let changed_body = minicbor::to_vec(body).unwrap();
+    -+        tx.transaction_body = minicbor::decode(&changed_body).unwrap();
+    -+        let tx_outs_info: &[ConwayTxOutInfo] = &[(
+    -+            String::from(
+    -+                "015c5c318d01f729e205c95eb1b02d623dd10e78ea58f72d0c13f892b2e8904edc699e2f0ce7b72be7cec991df651a222e2ae9244eb5975cba",
+    ++                vec![Certificate::Reg(credential.clone(), 2_000_000)],
+    ++                vec![],
+     +            ),
+    -+            Value::Coin(20_000_000),
+    -+            None,
+    -+            None,
+    -+        )];
+    -+        let utxos = mk_utxo_for_conway_tx(&tx.transaction_body, tx_outs_info);
+    ++            (
+    ++                "drep",
+    ++                3_000_000,
+    ++                vec![Certificate::RegDRepCert(credential, 3_000_000, None)],
+    ++                vec![],
+    ++            ),
+    ++            ("proposal", 4_000_000, vec![], vec![proposal]),
+    ++        ];
+    ++        let raw = cbor_to_bytes(include_str!("../../test_data/conway3.tx"));
+     +        let mut params = mk_mainnet_params_epoch_365();
+     +        params.key_deposit = 2_000_000;
+    ++        params.drep_deposit = 3_000_000;
+    ++        params.governance_action_deposit = 4_000_000;
+     +        // The edited body changes size, so a zero minimum fee stops the fee
+     +        // check from failing first.
+     +        params.minfee_a = 0;
+    @@ pallas-validate/tests/conway.rs: mod conway_tests {
+     +            network_id: 1,
+     +            acnt: Some(AccountState::default()),
+     +        };
+    -+        let result = validate_txs(
+    -+            &[MultiEraTx::from_conway(&tx)],
+    -+            &env,
+    -+            &utxos,
+    -+            &mut CertState::default(),
+    -+        );
+    -+        assert!(
+    -+            matches!(
+    -+                result,
+    -+                Err(PostAlonzo(PostAlonzoError::PreservationOfValue))
+    -+            ),
+    -+            "expected deposit imbalance, got {result:?}"
+    -+        );
+    ++        let actual: Vec<_> = cases
+    ++            .iter()
+    ++            .map(|(name, deposit, certificates, proposals)| {
+    ++                let mut tx: Tx = conway_minted_tx_from_cbor(&raw);
+    ++                let mut body = (*tx.transaction_body).clone();
+    ++                body.certificates = certificates.clone().try_into().ok();
+    ++                body.proposal_procedures = proposals.clone().try_into().ok();
+    ++                let changed_body = minicbor::to_vec(body).unwrap();
+    ++                tx.transaction_body = minicbor::decode(&changed_body).unwrap();
+    ++                let results: Vec<_> = [deposit - 1, *deposit, deposit + 1]
+    ++                    .into_iter()
+    ++                    .map(|funded| {
+    ++                        let tx_outs_info: &[ConwayTxOutInfo] = &[(
+    ++                            String::from(
+    ++                                "015c5c318d01f729e205c95eb1b02d623dd10e78ea58f72d0c13f892b2e8904edc699e2f0ce7b72be7cec991df651a222e2ae9244eb5975cba",
+    ++                            ),
+    ++                            Value::Coin(20_000_000 + funded),
+    ++                            None,
+    ++                            None,
+    ++                        )];
+    ++                        let utxos = mk_utxo_for_conway_tx(&tx.transaction_body, tx_outs_info);
+    ++                        let result = validate_txs(
+    ++                            &[MultiEraTx::from_conway(&tx)],
+    ++                            &env,
+    ++                            &utxos,
+    ++                            &mut CertState::default(),
+    ++                        );
+    ++                        format!("{result:?}")
+    ++                    })
+    ++                    .collect();
+    ++                (*name, results)
+    ++            })
+    ++            .collect();
+    ++        let unbalanced = "Err(PostAlonzo(PreservationOfValue))".to_string();
+    ++        let stale_signature = "Err(PostAlonzo(VKWrongSignature))".to_string();
+    ++        let expected: Vec<_> = cases
+    ++            .iter()
+    ++            .map(|(name, ..)| {
+    ++                (
+    ++                    *name,
+    ++                    vec![
+    ++                        unbalanced.clone(),
+    ++                        stale_signature.clone(),
+    ++                        unbalanced.clone(),
+    ++                    ],
+    ++                )
+    ++            })
+    ++            .collect();
+    ++        assert_eq!(actual, expected);
+     +    }
+     +
+          #[test]
+2:  66d4bd93 ! 2:  ee019f6e fix(validate): check Conway certificate witnesses and redeemers
+    @@ Metadata
+     Author: rodrigomd94 <51804048+rodrigomd94@users.noreply.github.com>
+     
+      ## Commit message ##
+    -    fix(validate): check Conway certificate witnesses and redeemers
+    +    fix(validate): check Conway certificate witnesses
+     
+         - conway: certificate credentials need a key, native or Plutus witness
+         - conway: Plutus certificate scripts get Cert redeemer pointers
+3:  d1075450 ! 3:  bd32959d fix(validate): require Conway collateral whenever redeemers are present
+    @@ Metadata
+     Author: rodrigomd94 <51804048+rodrigomd94@users.noreply.github.com>
+     
+      ## Commit message ##
+    -    fix(validate): require Conway collateral whenever redeemers are present
+    +    fix(validate): require collateral with redeemers
+     
+         - conway.rs: trigger the collateral checks on redeemers, not witness set scripts
+         - tests/conway.rs: V3 reference script txs pass with their chain collateral
+4:  aff43373 = 4:  31e76373 fix(validate): evaluate the script of a Reg cert
+5:  439f3105 = 5:  f8ab2a3b ci: test validation with phase two enabled
+6:  dbdadb22 ! 6:  a136e42a fix(validate): pass V3 deposits after protocol 9
+    @@ Commit message
+     
+         - to_plutus_data.rs: encode Reg and UnReg deposits by protocol version
+         - tx.rs: encode the script context with the protocol major version
+    -    - phase2: test the deposit in each place a V3 context holds it
+    +    - phase2: test the deposit at protocols 9 to 11 and the protocol 9 default
+         - tests/conway.rs: check the deposit a V3 script sees by protocol
+     
+         Co-authored-by: Geoff Little <g.little712@gmail.com>
+    @@ pallas-validate/src/phase2/v3_deposit_context_tests.rs (new)
+     +#[test]
+     +fn v3_deposit_context_protocol_boundaries_at_every_occurrence() {
+     +    let credential = StakeCredential::ScriptHash([7; 28].into());
+    -+    for protocol in [9, 10] {
+    ++    for protocol in [9, 10, 11] {
+     +        for (tag, cert) in [
+     +            (0, Certificate::Reg(credential.clone(), 2000000)),
+     +            (1, Certificate::UnReg(credential.clone(), 2000000)),
+    @@ pallas-validate/src/phase2/v3_deposit_context_tests.rs (new)
+     +            );

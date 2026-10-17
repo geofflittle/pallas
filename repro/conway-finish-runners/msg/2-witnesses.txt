@@ -1,0 +1,8 @@
+fix(validate): check Conway certificate witnesses
+
+- conway: certificate credentials need a key, native or Plutus witness
+- conway: Plutus certificate scripts get Cert redeemer pointers
+- conway: native reference scripts need no redeemer
+- conway: pool keys sign pool certificates, every vkey witness verifies
+
+Co-authored-by: Geoff Little <g.little712@gmail.com>

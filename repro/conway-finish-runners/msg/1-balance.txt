@@ -1,0 +1,8 @@
+fix(validate): balance Conway deposits and refunds
+
+- conway: certificate_deposit_and_refund maps a certificate to its deposit and refund
+- conway: consumed adds withdrawals and refunds, produced adds deposits and donation
+- tests: each balance term through check_preservation_of_value
+- tests: key, drep and proposal deposits through validate_txs, as the ledger charges each
+
+Co-authored-by: Geoff Little <g.little712@gmail.com>
