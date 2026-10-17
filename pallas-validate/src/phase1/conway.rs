@@ -1522,7 +1522,7 @@ fn check_remaining_bootstrap_wits(
     data_to_verify: &[u8],
 ) -> ValidationResult {
     for (covered, wit) in wits {
-        if !*covered && !verify_bootstrap_signature(wit, data_to_verify) {
+        if !*covered && wit.public_key.is_empty() && !verify_bootstrap_signature(wit, data_to_verify) {
             return Err(PostAlonzo(VKWrongSignature));
         }
     }
