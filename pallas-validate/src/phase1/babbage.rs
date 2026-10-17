@@ -649,6 +649,23 @@ fn get_script_hashes_from_inputs(
     res
 }
 
+fn get_script_hash_from_input(input: &TransactionInput, utxos: &UTxOs) -> Option<ScriptHash> {
+    match utxos
+        .get(&MultiEraInput::from_alonzo_compatible(input))
+        .and_then(MultiEraOutput::as_babbage)
+    {
+        Some(TransactionOutput::Legacy(output)) => match get_payment_part(&output.address) {
+            Some(ShelleyPaymentPart::Script(script_hash)) => Some(script_hash),
+            _ => None,
+        },
+        Some(TransactionOutput::PostAlonzo(output)) => match get_payment_part(&output.address) {
+            Some(ShelleyPaymentPart::Script(script_hash)) => Some(script_hash),
+            _ => None,
+        },
+        None => None,
+    }
+}
+
 fn get_script_hash_from_reference_input(
     ref_input: &TransactionInput,
     utxos: &UTxOs,
@@ -768,11 +785,16 @@ fn check_input_datum_hash_in_witness_set(
     plutus_data_hash: &mut [(bool, Hash<32>)],
 ) -> ValidationResult {
     for input in &tx_body.inputs {
-        let output = utxos
+        match utxos
             .get(&MultiEraInput::from_alonzo_compatible(input))
-            .ok_or(PostAlonzo(InputNotInUTxO))?;
-        if let Some(DatumOption::Hash(hash)) = output.datum() {
-            find_plutus_datum_in_witness_set(&hash, plutus_data_hash)?
+            .and_then(MultiEraOutput::as_babbage)
+        {
+            Some(output) => {
+                if let Some(datum_hash) = get_datum_hash(output) {
+                    find_plutus_datum_in_witness_set(&datum_hash, plutus_data_hash)?
+                }
+            }
+            None => return Err(PostAlonzo(InputNotInUTxO)),
         }
     }
     Ok(())
@@ -849,12 +871,25 @@ fn find_datum(hash: &Hash<32>, tx_body: &TransactionBody, utxos: &UTxOs) -> Vali
     // Look for hash in reference input
     if let Some(reference_inputs) = &tx_body.reference_inputs {
         for reference_input in reference_inputs.iter() {
-            if let Some(DatumOption::Hash(datum_hash)) = utxos
+            match utxos
                 .get(&MultiEraInput::from_alonzo_compatible(reference_input))
-                .and_then(MultiEraOutput::datum)
-                && *hash == datum_hash
+                .and_then(MultiEraOutput::as_babbage)
             {
-                return Ok(());
+                Some(TransactionOutput::Legacy(output)) => {
+                    if let Some(datum_hash) = &output.datum_hash
+                        && *hash == *datum_hash
+                    {
+                        return Ok(());
+                    }
+                }
+                Some(TransactionOutput::PostAlonzo(output)) => {
+                    if let Some(DatumOption::Hash(datum_hash)) = &output.datum_option.as_deref()
+                        && *hash == *datum_hash
+                    {
+                        return Ok(());
+                    }
+                }
+                _ => (),
             }
         }
     }
