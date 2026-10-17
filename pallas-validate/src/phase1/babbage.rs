@@ -568,7 +568,7 @@ fn check_needed_scripts(
         &mut filtered_plutus_v2_scripts,
         reference_scripts,
     )?;
-    for (_, hash) in certificate_scripts(certificates(tx_body)) {
+    for (_, hash) in certificate_scripts(&certificates(tx_body)[..0]) {
         check_needed_script(
             hash,
             reference_scripts,
