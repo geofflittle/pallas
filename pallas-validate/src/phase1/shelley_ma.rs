@@ -279,8 +279,10 @@ fn check_witnesses(
     tx_wits: &WitnessSet,
     utxos: &UTxOs,
 ) -> ValidationResult {
-    let vk_wits: &mut Vec<(bool, VKeyWitness)> =
-        &mut mk_wits_check_list(tx_wits.vkeywitness.iter().flatten());
+    let vk_wits: &mut Vec<(bool, VKeyWitness)> = &mut crate::utils::mk_alonzo_vk_wits_check_list(
+        &tx_wits.vkeywitness,
+        ShelleyMA(MissingVKWitness),
+    )?;
     let bootstrap_wits: &mut Vec<(bool, BootstrapWitness)> =
         &mut mk_wits_check_list(tx_wits.bootstrap_witness.iter().flatten());
     let tx_hash: &Vec<u8> = &Vec::from(tx_body.original_hash().as_ref());
