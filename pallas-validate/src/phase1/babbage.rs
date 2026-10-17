@@ -1196,7 +1196,10 @@ fn block_langs(network_magic: u32, network_id: u8, block_slot: u64) -> Vec<Langu
 
 fn allowed_langs(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
     let body = &mtx.transaction_body;
-    let input_features = reference_script_inputs(body)
+    let input_features = body
+        .inputs
+        .iter()
+        .chain(body.reference_inputs.iter().flatten())
         .filter_map(|input| utxos.get(&MultiEraInput::from_alonzo_compatible(input)))
         .map(output_language_features);
     let output_features = body
@@ -1237,26 +1240,19 @@ fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
     {
         v2_scripts = true;
     }
-    let needed = needed_script_hashes(&mtx.transaction_body, utxos);
-    for input in reference_script_inputs(&mtx.transaction_body) {
-        let Some(TransactionOutput::PostAlonzo(output)) = utxos
-            .get(&MultiEraInput::from_alonzo_compatible(input))
-            .and_then(MultiEraOutput::as_babbage)
-        else {
-            continue;
-        };
-        let Some(script) = &output.script_ref else {
-            continue;
-        };
-        if !get_script_hash_from_reference_input(input, utxos)
-            .is_some_and(|hash| needed.contains(&hash))
-        {
-            continue;
-        }
-        match script.clone().unwrap() {
-            ScriptRef::PlutusV1Script(_) => v1_scripts = true,
-            ScriptRef::PlutusV2Script(_) => v2_scripts = true,
-            ScriptRef::NativeScript(_) => (),
+    if let Some(reference_inputs) = &mtx.transaction_body.reference_inputs {
+        for ref_input in reference_inputs.iter() {
+            if let Some(TransactionOutput::PostAlonzo(output)) = utxos
+                .get(&MultiEraInput::from_alonzo_compatible(ref_input))
+                .and_then(MultiEraOutput::as_babbage)
+                && let Some(script_ref_cborwrap) = &output.script_ref
+            {
+                match script_ref_cborwrap.clone().unwrap() {
+                    ScriptRef::PlutusV1Script(_) => v1_scripts = true,
+                    ScriptRef::PlutusV2Script(_) => v2_scripts = true,
+                    _ => (),
+                }
+            }
         }
     }
     if !v1_scripts && !v2_scripts {
@@ -1268,25 +1264,6 @@ fn tx_languages(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
     } else {
         vec![Language::PlutusV1, Language::PlutusV2]
     }
-}
-
-fn needed_script_hashes(tx_body: &TransactionBody, utxos: &UTxOs) -> Vec<ScriptHash> {
-    let inputs = tx_body
-        .inputs
-        .iter()
-        .filter_map(|input| get_script_hash_from_input(input, utxos));
-    let policies = tx_body.mint.iter().flat_map(|mint| mint.keys().copied());
-    let certificates = certificate_scripts(certificates(tx_body)).map(|(_, hash)| *hash);
-    let withdrawals = tx_body
-        .withdrawals
-        .iter()
-        .flat_map(|withdrawals| withdrawals.keys())
-        .filter_map(|account| get_script_hash_from_reward_account(account));
-    inputs
-        .chain(policies)
-        .chain(certificates)
-        .chain(withdrawals)
-        .collect()
 }
 
 // The metadata of the transaction is valid.
