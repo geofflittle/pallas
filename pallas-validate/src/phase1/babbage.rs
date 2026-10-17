@@ -140,7 +140,7 @@ fn check_fee(
     prot_pps: &BabbageProtParams,
 ) -> ValidationResult {
     check_min_fee(tx_body, size, prot_pps)?;
-    if presence_of_plutus_scripts(mtx) {
+    if !option_vec_is_empty(&mtx.transaction_witness_set.redeemer) {
         check_collaterals(tx_body, utxos, prot_pps)?
     }
     Ok(())
