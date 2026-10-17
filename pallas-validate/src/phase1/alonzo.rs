@@ -801,7 +801,7 @@ pub(super) fn certificate_key_hashes(cert: &Certificate) -> Vec<&AddrKeyhash> {
         } => std::iter::once(operator).chain(pool_owners).collect(),
         Certificate::PoolRetirement(operator, _) => vec![operator],
         _ => match certificate_credential(cert) {
-            Some(StakeCredential::AddrKeyhash(hash)) => vec![hash],
+            Some(StakeCredential::AddrKeyhash(_)) => Vec::new(),
             _ => Vec::new(),
         },
     }
