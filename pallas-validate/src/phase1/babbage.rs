@@ -976,7 +976,7 @@ fn mk_plutus_script_redeemer_pointers(
             }
         }
     }
-    for (index, hash) in certificate_scripts(certificates(tx_body)) {
+    for (index, hash) in certificate_scripts(&certificates(tx_body)[..0]) {
         if is_phase_2_script(
             hash,
             plutus_v1_scripts,
