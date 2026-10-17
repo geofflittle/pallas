@@ -1,16 +1,17 @@
 //! Utilities required for Conway-era transaction validation.
 
+use super::shelley_ma::check_needed_native_scripts;
 use crate::utils::{
     ConwayProtParams,
     PostAlonzoError::*,
     UTxOs,
     ValidationError::{self, *},
-    ValidationResult, aux_data_from_conway_tx, compute_native_script_hash,
-    compute_plutus_v1_script_hash, compute_plutus_v2_script_hash, compute_plutus_v3_script_hash,
-    conway_add_minted_non_zero, conway_add_values, conway_get_val_size_in_words,
-    conway_lovelace_diff_or_fail, conway_values_are_equal, get_conway_tx_size,
-    get_lovelace_from_conway_val, get_payment_part, get_shelley_address, is_byron_address,
-    mk_alonzo_vk_wits_check_list, verify_signature,
+    ValidationResult, aux_data_from_conway_tx, check_needed_script, check_remaining_vk_wits,
+    compute_native_script_hash, compute_plutus_v1_script_hash, compute_plutus_v2_script_hash,
+    compute_plutus_v3_script_hash, conway_add_minted_non_zero, conway_add_values,
+    conway_get_val_size_in_words, conway_lovelace_diff_or_fail, conway_values_are_equal,
+    get_conway_tx_size, get_lovelace_from_conway_val, get_payment_part, get_shelley_address,
+    is_byron_address, mk_alonzo_vk_wits_check_list, verify_signature,
 };
 use pallas_addresses::{
     Address, Network, ScriptHash, ShelleyAddress, ShelleyPaymentPart, StakeAddress, StakePayload,
@@ -808,23 +809,17 @@ fn check_needed_scripts(
     )?;
     for cert in tx_body.certificates.iter().flatten() {
         if let Some(StakeCredential::ScriptHash(hash)) = certificate_credential(cert) {
-            let mut covered = reference_scripts.contains(hash);
-            for scripts in [
-                &mut filtered_native_scripts,
-                &mut filtered_plutus_v1_scripts,
-                &mut filtered_plutus_v2_scripts,
-                &mut filtered_plutus_v3_scripts,
-            ] {
-                for (used, supplied) in scripts.iter_mut() {
-                    if supplied == hash {
-                        *used = true;
-                        covered = true;
-                    }
-                }
-            }
-            if !covered {
-                return Err(PostAlonzo(ScriptWitnessMissing));
-            }
+            check_needed_script(
+                hash,
+                reference_scripts,
+                &mut [
+                    &mut filtered_native_scripts,
+                    &mut filtered_plutus_v1_scripts,
+                    &mut filtered_plutus_v2_scripts,
+                    &mut filtered_plutus_v3_scripts,
+                ],
+                PostAlonzo(ScriptWitnessMissing),
+            )?;
         }
     }
     for (covered, _) in filtered_native_scripts.iter() {
@@ -908,11 +903,15 @@ fn reference_script<'a>(
 fn check_certificate_native_scripts(mtx: &Tx, utxos: &UTxOs) -> ValidationResult {
     let body = &mtx.transaction_body;
     let witnesses = &mtx.transaction_witness_set;
-    let vkeys = witnesses
-        .vkeywitness
-        .as_ref()
-        .map(|x| x.clone().to_vec())
-        .unwrap_or_default();
+    let needed: Vec<ScriptHash> = body
+        .certificates
+        .iter()
+        .flatten()
+        .filter_map(|cert| match certificate_credential(cert) {
+            Some(StakeCredential::ScriptHash(hash)) => Some(*hash),
+            _ => None,
+        })
+        .collect();
     let scripts = witnesses
         .native_script
         .iter()
@@ -926,22 +925,18 @@ fn check_certificate_native_scripts(mtx: &Tx, utxos: &UTxOs) -> ValidationResult
                 _ => None,
             }
         }));
-    for (hash, script) in scripts {
-        let needed = body.certificates.iter().flatten().any(|cert| {
-            matches!(certificate_credential(cert), Some(StakeCredential::ScriptHash(cred)) if *cred == hash)
-        });
-        if needed
-            && !super::shelley_ma::eval_native_script(
-                &vkeys,
-                script,
-                &body.validity_interval_start,
-                &body.ttl,
-            )
-        {
-            return Err(PostAlonzo(NativeScriptDenial));
-        }
-    }
-    Ok(())
+    check_needed_native_scripts(
+        scripts,
+        &needed,
+        &witnesses
+            .vkeywitness
+            .as_ref()
+            .map(|x| x.clone().to_vec())
+            .unwrap_or_default(),
+        &body.validity_interval_start,
+        &body.ttl,
+        PostAlonzo(NativeScriptDenial),
+    )
 }
 
 fn check_input_scripts(
@@ -1546,7 +1541,7 @@ fn check_vkey_input_wits(
             _ => {}
         }
     }
-    check_remaining_vk_wits(vk_wits, tx_hash) // required for native scripts
+    check_remaining_vk_wits(vk_wits, tx_hash, PostAlonzo(VKWrongSignature))
 }
 
 fn check_vk_wit(
@@ -1566,18 +1561,6 @@ fn check_vk_wit(
         }
     }
     Err(PostAlonzo(VKWitnessMissing))
-}
-
-fn check_remaining_vk_wits(
-    wits: &mut [(bool, VKeyWitness)],
-    data_to_verify: &[u8],
-) -> ValidationResult {
-    for (covered, vkey_wit) in wits {
-        if !*covered && !verify_signature(vkey_wit, data_to_verify) {
-            return Err(PostAlonzo(VKWrongSignature));
-        }
-    }
-    Ok(())
 }
 
 fn check_languages(mtx: &Tx, utxos: &UTxOs, prot_pps: &ConwayProtParams) -> ValidationResult {

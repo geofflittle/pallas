@@ -1,13 +1,15 @@
 //! Utilities required for Alonzo-era transaction validation.
 
+use super::shelley_ma::check_needed_native_scripts;
 use crate::utils::{
     AlonzoError::*,
     AlonzoProtParams, UTxOs,
     ValidationError::{self, *},
-    ValidationResult, add_minted_value, add_values, aux_data_from_alonzo_tx,
-    compute_native_script_hash, compute_plutus_v1_script_hash, empty_value,
-    get_alonzo_comp_tx_size, get_lovelace_from_alonzo_val, get_payment_part, get_shelley_address,
-    get_val_size_in_words, mk_alonzo_vk_wits_check_list, values_are_equal, verify_signature,
+    ValidationResult, add_minted_value, add_values, aux_data_from_alonzo_tx, check_needed_script,
+    check_remaining_vk_wits, compute_native_script_hash, compute_plutus_v1_script_hash,
+    empty_value, get_alonzo_comp_tx_size, get_lovelace_from_alonzo_val, get_payment_part,
+    get_shelley_address, get_val_size_in_words, mk_alonzo_vk_wits_check_list, values_are_equal,
+    verify_signature,
 };
 use hex;
 use pallas_addresses::{ScriptHash, ShelleyAddress, ShelleyPaymentPart};
@@ -17,10 +19,11 @@ use pallas_codec::{
 };
 use pallas_crypto::hash::Hash;
 use pallas_primitives::{
+    StakeCredential,
     alonzo::{
-        AddrKeyhash, Mint, Multiasset, NativeScript, PlutusData, PlutusScript, PolicyId, Redeemer,
-        RedeemerPointer, RedeemerTag, RequiredSigners, TransactionBody, TransactionInput,
-        TransactionOutput, Tx, VKeyWitness, Value, WitnessSet,
+        AddrKeyhash, Certificate, Mint, Multiasset, NativeScript, PlutusData, PlutusScript,
+        PolicyId, Redeemer, RedeemerPointer, RedeemerTag, RequiredSigners, TransactionBody,
+        TransactionInput, TransactionOutput, Tx, VKeyWitness, Value, WitnessSet,
     },
     byron::TxOut,
 };
@@ -385,17 +388,22 @@ fn check_witness_set(mtx: &Tx, utxos: &UTxOs) -> ValidationResult {
     let tx_body: &TransactionBody = &mtx.transaction_body;
     let tx_wits: &WitnessSet = &mtx.transaction_witness_set;
     let vkey_wits: &Option<Vec<VKeyWitness>> = &tx_wits.vkeywitness;
-    let native_scripts: Vec<NativeScript> = match &tx_wits.native_script {
-        Some(scripts) => scripts.clone().iter().map(|x| x.clone().unwrap()).collect(),
-        None => Vec::new(),
-    };
-    let plutus_v1_scripts: Vec<PlutusScript<1>> = match &tx_wits.plutus_script {
-        Some(scripts) => scripts.clone(),
-        None => Vec::new(),
-    };
+    let native_scripts: Vec<PolicyId> = tx_wits
+        .native_script
+        .iter()
+        .flatten()
+        .map(|script| compute_native_script_hash(script))
+        .collect();
+    let plutus_v1_scripts: Vec<PolicyId> = tx_wits
+        .plutus_script
+        .iter()
+        .flatten()
+        .map(compute_plutus_v1_script_hash)
+        .collect();
     check_needed_scripts_are_included(tx_body, utxos, &native_scripts, &plutus_v1_scripts)?;
     check_datums(tx_body, utxos, &tx_wits.plutus_data)?;
     check_redeemers(tx_body, tx_wits, utxos)?;
+    check_certificate_native_scripts(mtx)?;
     check_required_signers(&tx_body.required_signers, vkey_wits, tx_hash)?;
     check_vkey_input_wits(mtx, &tx_wits.vkeywitness, utxos)
 }
@@ -406,17 +414,25 @@ fn check_witness_set(mtx: &Tx, utxos: &UTxOs) -> ValidationResult {
 fn check_needed_scripts_are_included(
     tx_body: &TransactionBody,
     utxos: &UTxOs,
-    native_scripts: &[NativeScript],
-    plutus_v1_scripts: &[PlutusScript<1>],
+    native_scripts: &[PolicyId],
+    plutus_v1_scripts: &[PolicyId],
 ) -> ValidationResult {
-    let mut native_scripts: Vec<(bool, NativeScript)> =
-        native_scripts.iter().map(|x| (false, x.clone())).collect();
-    let mut plutus_v1_scripts: Vec<(bool, PlutusScript<1>)> = plutus_v1_scripts
+    let mut native_scripts: Vec<(bool, PolicyId)> =
+        native_scripts.iter().map(|hash| (false, *hash)).collect();
+    let mut plutus_v1_scripts: Vec<(bool, PolicyId)> = plutus_v1_scripts
         .iter()
-        .map(|x| (false, x.clone()))
+        .map(|hash| (false, *hash))
         .collect();
     check_script_inputs(tx_body, &mut native_scripts, &mut plutus_v1_scripts, utxos)?;
     check_minting_policies(tx_body, &mut native_scripts, &mut plutus_v1_scripts)?;
+    for (_, hash) in certificate_scripts(certificates(tx_body)) {
+        check_needed_script(
+            hash,
+            &[],
+            &mut [&mut native_scripts, &mut plutus_v1_scripts],
+            Alonzo(ScriptWitnessMissing),
+        )?;
+    }
     for (native_script_covered, _) in native_scripts.iter() {
         if !native_script_covered {
             return Err(Alonzo(UnneededNativeScript));
@@ -525,6 +541,7 @@ fn check_redeemers(
     let plutus_scripts: Vec<RedeemerPointer> = mk_plutus_script_redeemer_pointers(
         &sort_inputs(&tx_body.inputs),
         &tx_body.mint,
+        certificates(tx_body),
         tx_wits,
         utxos,
     );
@@ -534,6 +551,7 @@ fn check_redeemers(
 fn mk_plutus_script_redeemer_pointers(
     sorted_inputs: &[TransactionInput],
     mint: &Option<Multiasset<i64>>,
+    certificates: &[Certificate],
     tx_wits: &WitnessSet,
     utxos: &UTxOs,
 ) -> Vec<RedeemerPointer> {
@@ -566,6 +584,18 @@ fn mk_plutus_script_redeemer_pointers(
                             })
                         }
                     }
+                }
+            }
+
+            for (index, hash) in certificate_scripts(certificates) {
+                if plutus_scripts
+                    .iter()
+                    .any(|script| compute_plutus_v1_script_hash(script) == *hash)
+                {
+                    res.push(RedeemerPointer {
+                        tag: RedeemerTag::Cert,
+                        index,
+                    })
                 }
             }
 
@@ -608,22 +638,20 @@ fn redeemer_pointers_coincide(
 
 fn check_script_inputs(
     tx_body: &TransactionBody,
-    native_scripts: &mut [(bool, NativeScript)],
-    plutus_v1_scripts: &mut [(bool, PlutusScript<1>)],
+    native_scripts: &mut [(bool, PolicyId)],
+    plutus_v1_scripts: &mut [(bool, PolicyId)],
     utxos: &UTxOs,
 ) -> ValidationResult {
     let mut inputs: Vec<(bool, ScriptHash)> = get_script_hashes(tx_body, utxos);
     for (input_script_covered, input_script_hash) in &mut inputs {
-        for (native_script_covered, native_script) in native_scripts.iter_mut() {
-            let hashed_script: PolicyId = compute_native_script_hash(native_script);
-            if *input_script_hash == hashed_script {
+        for (native_script_covered, hashed_script) in native_scripts.iter_mut() {
+            if input_script_hash == hashed_script {
                 *input_script_covered = true;
                 *native_script_covered = true;
             }
         }
-        for (plutus_script_covered, plutus_v1_script) in plutus_v1_scripts.iter_mut() {
-            let hashed_script: PolicyId = compute_plutus_v1_script_hash(plutus_v1_script);
-            if *input_script_hash == hashed_script {
+        for (plutus_script_covered, hashed_script) in plutus_v1_scripts.iter_mut() {
+            if input_script_hash == hashed_script {
                 *input_script_covered = true;
                 *plutus_script_covered = true;
             }
@@ -660,8 +688,8 @@ fn get_script_hash_from_input(input: &TransactionInput, utxos: &UTxOs) -> Option
 
 fn check_minting_policies(
     tx_body: &TransactionBody,
-    native_scripts: &mut [(bool, NativeScript)],
-    plutus_v1_scripts: &mut [(bool, PlutusScript<1>)],
+    native_scripts: &mut [(bool, PolicyId)],
+    plutus_v1_scripts: &mut [(bool, PolicyId)],
 ) -> ValidationResult {
     match &tx_body.mint {
         None => Ok(()),
@@ -669,16 +697,14 @@ fn check_minting_policies(
             let mut minting_policies: Vec<(bool, PolicyId)> =
                 minted_value.keys().map(|pol| (false, *pol)).collect();
             for (policy_covered, policy) in &mut minting_policies {
-                for (native_script_covered, native_script) in native_scripts.iter_mut() {
-                    let hashed_script: PolicyId = compute_native_script_hash(native_script);
-                    if *policy == hashed_script {
+                for (native_script_covered, hashed_script) in native_scripts.iter_mut() {
+                    if policy == hashed_script {
                         *policy_covered = true;
                         *native_script_covered = true;
                     }
                 }
-                for (plutus_script_covered, plutus_v1_script) in plutus_v1_scripts.iter_mut() {
-                    let hashed_script: PolicyId = compute_plutus_v1_script_hash(plutus_v1_script);
-                    if *policy == hashed_script {
+                for (plutus_script_covered, hashed_script) in plutus_v1_scripts.iter_mut() {
+                    if policy == hashed_script {
                         *policy_covered = true;
                         *plutus_script_covered = true;
                     }
@@ -694,8 +720,8 @@ fn check_minting_policies(
     }
 }
 
-// The owner of each transaction input and each collateral input should have
-// signed the transaction.
+// The owner of each transaction input and each collateral input, and the key
+// of each certificate, should have signed the transaction.
 fn check_vkey_input_wits(
     mtx: &Tx,
     vkey_wits: &Option<Vec<VKeyWitness>>,
@@ -729,7 +755,12 @@ fn check_vkey_input_wits(
             None => return Err(Alonzo(InputNotInUTxO)),
         }
     }
-    check_remaining_vk_wits(vk_wits, tx_hash) // required for native scripts
+    for cert in certificates(tx_body) {
+        for key_hash in certificate_key_hashes(cert) {
+            check_vk_wit(key_hash, vk_wits, tx_hash)?;
+        }
+    }
+    check_remaining_vk_wits(vk_wits, tx_hash, Alonzo(VKWrongSignature))
 }
 
 fn check_vk_wit(
@@ -750,20 +781,72 @@ fn check_vk_wit(
     Err(Alonzo(VKWitnessMissing))
 }
 
-fn check_remaining_vk_wits(
-    wits: &mut [(bool, VKeyWitness)],
-    data_to_verify: &[u8],
-) -> ValidationResult {
-    for (covered, vkey_wit) in wits {
-        if !*covered {
-            if verify_signature(vkey_wit, data_to_verify) {
-                return Ok(());
-            } else {
-                return Err(Alonzo(VKWrongSignature));
-            }
+fn certificates(tx_body: &TransactionBody) -> &[Certificate] {
+    tx_body.certificates.as_deref().unwrap_or_default()
+}
+
+fn certificate_credential(cert: &Certificate) -> Option<&StakeCredential> {
+    match cert {
+        Certificate::StakeDeregistration(cred) | Certificate::StakeDelegation(cred, _) => {
+            Some(cred)
         }
+        _ => None,
     }
-    Ok(())
+}
+
+pub(super) fn certificate_key_hashes(cert: &Certificate) -> Vec<&AddrKeyhash> {
+    match cert {
+        Certificate::PoolRegistration {
+            operator,
+            pool_owners,
+            ..
+        } => std::iter::once(operator).chain(pool_owners).collect(),
+        Certificate::PoolRetirement(operator, _) => vec![operator],
+        _ => match certificate_credential(cert) {
+            Some(StakeCredential::AddrKeyhash(hash)) => vec![hash],
+            _ => Vec::new(),
+        },
+    }
+}
+
+// A repeated certificate is needed once, at the index of its first occurrence.
+pub(super) fn certificate_scripts(
+    certificates: &[Certificate],
+) -> impl Iterator<Item = (u32, &ScriptHash)> {
+    certificates
+        .iter()
+        .enumerate()
+        .filter(|(index, cert)| {
+            certificates.iter().position(|other| other == *cert) == Some(*index)
+        })
+        .filter_map(|(index, cert)| match certificate_credential(cert) {
+            Some(StakeCredential::ScriptHash(hash)) => Some((index as u32, hash)),
+            _ => None,
+        })
+}
+
+fn check_certificate_native_scripts(mtx: &Tx) -> ValidationResult {
+    let body = &mtx.transaction_body;
+    let needed: Vec<ScriptHash> = certificate_scripts(certificates(body))
+        .map(|(_, hash)| *hash)
+        .collect();
+    let scripts = mtx
+        .transaction_witness_set
+        .native_script
+        .iter()
+        .flatten()
+        .map(|script| (compute_native_script_hash(script), script.deref()));
+    check_needed_native_scripts(
+        scripts,
+        &needed,
+        &mtx.transaction_witness_set
+            .vkeywitness
+            .clone()
+            .unwrap_or_default(),
+        &body.validity_interval_start,
+        &body.ttl,
+        Alonzo(NativeScriptDenial),
+    )
 }
 
 // All required signers (needed by a Plutus script) have a corresponding match
@@ -1200,8 +1283,7 @@ mod tests {
                 |tx| {
                     tx.transaction_body.validity_interval_start = start;
                     tx.transaction_body.ttl = end;
-                    tx.transaction_witness_set.native_script =
-                        Some(vec![interval.clone().into()]);
+                    tx.transaction_witness_set.native_script = Some(vec![interval.clone().into()]);
                 },
                 &[],
                 |tx| result(check_witness_set(&tx, &UTxOs::new()), expected),

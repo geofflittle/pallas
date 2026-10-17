@@ -5,9 +5,10 @@ use crate::utils::{
     ShelleyMAError::*,
     ShelleyProtParams, UTxOs,
     ValidationError::{self, *},
-    ValidationResult, add_minted_value, add_values, aux_data_from_alonzo_tx, empty_value,
-    get_alonzo_comp_tx_size, get_lovelace_from_alonzo_val, get_payment_part, get_shelley_address,
-    get_val_size_in_words, mk_alonzo_vk_wits_check_list, values_are_equal, verify_signature,
+    ValidationResult, add_minted_value, add_values, aux_data_from_alonzo_tx,
+    check_remaining_vk_wits, empty_value, get_alonzo_comp_tx_size, get_lovelace_from_alonzo_val,
+    get_payment_part, get_shelley_address, get_val_size_in_words, mk_alonzo_vk_wits_check_list,
+    values_are_equal, verify_signature,
 };
 use pallas_addresses::{PaymentKeyHash, ScriptHash, ShelleyAddress, ShelleyPaymentPart};
 use pallas_codec::minicbor::encode;
@@ -319,7 +320,7 @@ fn check_witnesses(
         &tx_body.validity_interval_start,
         &tx_body.ttl,
     )?;
-    check_remaining_vk_wits(vk_wits, tx_hash)
+    check_remaining_vk_wits(vk_wits, tx_hash, ShelleyMA(WrongSignature))
 }
 
 fn check_vk_wit(
@@ -357,22 +358,6 @@ fn check_native_script_witness(
         }
         None => Err(ShelleyMA(MissingScriptWitness)),
     }
-}
-
-fn check_remaining_vk_wits(
-    wits: &mut Vec<(bool, VKeyWitness)>,
-    data_to_verify: &[u8],
-) -> ValidationResult {
-    for (covered, vkey_wit) in wits {
-        if !*covered {
-            if verify_signature(vkey_wit, data_to_verify) {
-                return Ok(());
-            } else {
-                return Err(ShelleyMA(WrongSignature));
-            }
-        }
-    }
-    Ok(())
 }
 
 fn check_minting(tx_body: &TransactionBody, mtx: &Tx) -> ValidationResult {
@@ -697,6 +682,22 @@ fn check_native_scripts(
     for native_script in native_scripts {
         if !eval_native_script(vkey_wits, native_script, low_bnd, upp_bnd) {
             return Err(ShelleyMA(ScriptDenial));
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn check_needed_native_scripts<'a>(
+    scripts: impl IntoIterator<Item = (PolicyId, &'a NativeScript)>,
+    needed: &[ScriptHash],
+    vkey_wits: &Vec<VKeyWitness>,
+    low_bnd: &Option<u64>,
+    upp_bnd: &Option<u64>,
+    denial: ValidationError,
+) -> ValidationResult {
+    for (hash, script) in scripts {
+        if needed.contains(&hash) && !eval_native_script(vkey_wits, script, low_bnd, upp_bnd) {
+            return Err(denial);
         }
     }
     Ok(())
