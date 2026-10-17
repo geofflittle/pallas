@@ -9,8 +9,8 @@ use crate::utils::{
     compute_plutus_v1_script_hash, compute_plutus_v2_script_hash, compute_plutus_v3_script_hash,
     conway_add_minted_non_zero, conway_add_values, conway_get_val_size_in_words,
     conway_lovelace_diff_or_fail, conway_values_are_equal, get_conway_tx_size,
-    get_lovelace_from_conway_val, get_shelley_address, mk_alonzo_vk_wits_check_list,
-    verify_signature,
+    get_lovelace_from_conway_val, get_payment_part, get_shelley_address,
+    mk_alonzo_vk_wits_check_list, verify_signature,
 };
 use pallas_addresses::{
     Address, ByronAddress, Network, ScriptHash, ShelleyAddress, ShelleyPaymentPart, StakeAddress,
