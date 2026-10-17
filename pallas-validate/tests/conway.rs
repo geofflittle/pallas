@@ -155,7 +155,11 @@ mod conway_tests {
                 vec![witness(&[0; 32])],
                 "Err(PostAlonzo(VKWrongSignature))",
             ),
-            (&tx, vec![other(signed)], "Err(PostAlonzo(VKWitnessMissing))"),
+            (
+                &tx,
+                vec![other(signed)],
+                "Err(PostAlonzo(VKWitnessMissing))",
+            ),
             (&tx, vec![witness(signed), other(signed)], "Ok(())"),
             (
                 &tx,
