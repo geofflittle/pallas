@@ -1642,7 +1642,7 @@ fn allowed_tx_langs(mtx: &Tx, utxos: &UTxOs) -> Vec<Language> {
 fn output_language_features(output: &MultiEraOutput<'_>) -> (bool, bool) {
     (
         matches!(output.address(), Ok(Address::Byron(_))),
-        output.script_ref().is_some() || matches!(output.datum(), Some(DatumOption::Data(_))),
+        matches!(output.datum(), Some(DatumOption::Data(_))),
     )
 }
 
