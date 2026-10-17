@@ -1719,7 +1719,7 @@ fn needed_script_hashes(tx_body: &TransactionBody, utxos: &UTxOs) -> Vec<ScriptH
         .iter()
         .flat_map(|withdrawals| withdrawals.keys())
         .filter_map(|account| match Address::from_bytes(account) {
-            Ok(Address::Stake(address)) if address.is_script() => {
+            Ok(Address::Stake(address)) => {
                 Some(*address.payload().as_hash())
             }
             _ => None,
