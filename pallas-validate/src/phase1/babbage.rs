@@ -1022,21 +1022,7 @@ fn mk_plutus_script_redeemer_pointers(
             })
         }
     }
-    for (index, hash) in
-        withdrawal_scripts(tx_body.withdrawals.as_ref(), PostAlonzo(InputDecoding))?
-    {
-        if is_phase_2_script(
-            &hash,
-            plutus_v1_scripts,
-            plutus_v2_scripts,
-            reference_scripts,
-        ) {
-            res.push(RedeemerPointer {
-                tag: RedeemerTag::Reward,
-                index,
-            })
-        }
-    }
+    let _ = withdrawal_scripts;
     Ok(res)
 }
 
