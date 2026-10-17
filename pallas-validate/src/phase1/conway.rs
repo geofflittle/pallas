@@ -1507,7 +1507,7 @@ fn check_bootstrap_wit(
         .map_err(|_| PostAlonzo(InputDecoding))?
         .root;
     for (wit_covered, wit) in wits.iter_mut() {
-        if bootstrap_wit_root(wit) == root {
+        if bootstrap_wit_root(wit) == root || !*wit_covered {
             if !verify_bootstrap_signature(wit, data_to_verify) {
                 return Err(PostAlonzo(VKWrongSignature));
             }
