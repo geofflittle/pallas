@@ -585,17 +585,7 @@ fn mk_plutus_script_redeemer_pointers(
                 }
             }
 
-            for (index, hash) in withdrawal_scripts(withdrawals, Alonzo(InputDecoding))? {
-                if plutus_scripts
-                    .iter()
-                    .any(|script| compute_plutus_v1_script_hash(script) == hash)
-                {
-                    res.push(RedeemerPointer {
-                        tag: RedeemerTag::Reward,
-                        index,
-                    })
-                }
-            }
+            let _ = (withdrawals, withdrawal_scripts);
 
             Ok(res)
         }
