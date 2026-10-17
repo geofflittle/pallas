@@ -1729,7 +1729,7 @@ fn needed_script_hashes(tx_body: &TransactionBody, utxos: &UTxOs) -> Vec<ScriptH
         .iter()
         .flat_map(|votes| votes.keys())
         .filter_map(|voter| match voter {
-            Voter::ConstitutionalCommitteeScript(hash) | Voter::DRepScript(hash) => Some(*hash),
+            Voter::DRepScript(hash) => Some(*hash),
             _ => None,
         });
     let proposals = tx_body
