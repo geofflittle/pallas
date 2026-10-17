@@ -947,14 +947,7 @@ fn mk_plutus_script_redeemer_pointers(
     let mut res: Vec<RedeemerPointer> = Vec::new();
     let sorted_inputs: &Vec<TransactionInput> = &sort_inputs(&tx_body.inputs);
     for (index, input) in sorted_inputs.iter().enumerate() {
-        if let Some(hash) = get_script_hash_from_input(input, utxos)
-            && is_phase_2_script(
-                &hash,
-                plutus_v1_scripts,
-                plutus_v2_scripts,
-                reference_scripts,
-            )
-        {
+        if get_script_hash_from_input(input, utxos).is_some() {
             res.push(RedeemerPointer {
                 tag: RedeemerTag::Spend,
                 index: index as u32,
