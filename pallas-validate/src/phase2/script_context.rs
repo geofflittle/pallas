@@ -181,7 +181,7 @@ impl TxInfoV1<'_> {
         }
 
         let inputs = get_tx_in_info_v1(&tx.transaction_body.inputs, utxos)?;
-        let certificates = get_certificates_info_v1_v2(&tx.transaction_body.certificates)?;
+        let certificates = get_certificates_info(&tx.transaction_body.certificates);
         let withdrawals =
             KeyValuePairs::from(get_withdrawals_info(&tx.transaction_body.withdrawals));
         let mint = get_mint_info(&tx.transaction_body.mint);
@@ -230,7 +230,7 @@ impl TxInfoV2<'_> {
         slot_config: &SlotConfig,
     ) -> Result<TxInfo<'a>, Error> {
         let inputs = get_tx_in_info_v2(&tx.transaction_body.inputs, utxos)?;
-        let certificates = get_certificates_info_v1_v2(&tx.transaction_body.certificates)?;
+        let certificates = get_certificates_info(&tx.transaction_body.certificates);
         let withdrawals =
             KeyValuePairs::from(get_withdrawals_info(&tx.transaction_body.withdrawals));
         let mint = get_mint_info(&tx.transaction_body.mint);
@@ -580,36 +580,6 @@ pub fn get_treasury_donation_info(amount: &Option<PositiveCoin>) -> Option<Posit
 
 pub fn get_certificates_info(certificates: &Option<NonEmptySet<Certificate>>) -> Vec<Certificate> {
     certificates.clone().map(|s| s.to_vec()).unwrap_or_default()
-}
-
-fn get_certificates_info_v1_v2(
-    certificates: &Option<NonEmptySet<Certificate>>,
-) -> Result<Vec<Certificate>, Error> {
-    let certificates = get_certificates_info(certificates);
-
-    for certificate in &certificates {
-        match certificate {
-            Certificate::StakeRegistration(_)
-            | Certificate::StakeDeregistration(_)
-            | Certificate::StakeDelegation(..)
-            | Certificate::PoolRegistration { .. }
-            | Certificate::PoolRetirement(..)
-            | Certificate::Reg(..)
-            | Certificate::UnReg(..) => {}
-            Certificate::VoteDeleg(..)
-            | Certificate::StakeVoteDeleg(..)
-            | Certificate::StakeRegDeleg(..)
-            | Certificate::VoteRegDeleg(..)
-            | Certificate::StakeVoteRegDeleg(..)
-            | Certificate::AuthCommitteeHot(..)
-            | Certificate::ResignCommitteeCold(..)
-            | Certificate::RegDRepCert(..)
-            | Certificate::UnRegDRepCert(..)
-            | Certificate::UpdateDRepCert(..) => return Err(Error::UnsupportedCertificateType),
-        }
-    }
-
-    Ok(certificates)
 }
 
 pub fn get_proposal_procedures_info(
