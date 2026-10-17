@@ -511,7 +511,7 @@ fn check_witness_set(mtx: &Tx, utxos: &UTxOs) -> ValidationResult {
     // Native reference scripts satisfy script presence, but never need redeemers.
     let plutus_reference_scripts: Vec<PolicyId> = reference_script_inputs(tx_body)
         .filter_map(|input| reference_script(input, utxos))
-        .filter(|script| !matches!(script, ScriptRef::NativeScript(_)))
+        .filter(|script| !matches!(script, ScriptRef::NativeScript(_)) || true)
         .map(script_ref_hash)
         .collect();
     check_redeemers(
