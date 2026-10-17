@@ -166,26 +166,6 @@ fn check_min_fee(
     Ok(())
 }
 
-fn presence_of_plutus_scripts(mtx: &Tx) -> bool {
-    let minted_witness_set: &WitnessSet = &mtx.transaction_witness_set;
-    let plutus_v1_scripts: &[PlutusScript<1>] = minted_witness_set
-        .plutus_v1_script
-        .as_ref()
-        .map(|x| x.as_slice())
-        .unwrap_or(&[]);
-    let plutus_v2_scripts: &[PlutusScript<2>] = minted_witness_set
-        .plutus_v2_script
-        .as_ref()
-        .map(|x| x.as_slice())
-        .unwrap_or(&[]);
-    let plutus_v3_scripts: &[PlutusScript<3>] = minted_witness_set
-        .plutus_v3_script
-        .as_ref()
-        .map(|x| x.as_slice())
-        .unwrap_or(&[]);
-    !plutus_v1_scripts.is_empty() || !plutus_v2_scripts.is_empty() || !plutus_v3_scripts.is_empty()
-}
-
 fn check_collaterals(
     tx_body: &TransactionBody,
     utxos: &UTxOs,
@@ -579,33 +559,14 @@ fn check_tx_size(size: &u32, prot_pps: &ConwayProtParams) -> ValidationResult {
 }
 
 fn check_tx_ex_units(mtx: &Tx, prot_pps: &ConwayProtParams) -> ValidationResult {
-    let tx_wits: &WitnessSet = &mtx.transaction_witness_set;
-    if presence_of_plutus_scripts(mtx) {
-        match &tx_wits.redeemer {
-            Some(redeemers_vec) => {
-                let mut steps: u64 = 0;
-                let mut mem: u64 = 0;
-                match redeemers_vec.clone().unwrap() {
-                    Redeemers::List(r) => {
-                        let _ = r.iter().map(|x| {
-                            mem += x.ex_units.mem;
-                            steps += x.ex_units.steps;
-                        });
-                    }
-                    Redeemers::Map(r) => {
-                        let _ = r.iter().map(|x| {
-                            mem += x.1.ex_units.mem;
-                            steps += x.1.ex_units.steps;
-                        });
-                    }
-                }
-
-                if mem > prot_pps.max_tx_ex_units.mem || steps > prot_pps.max_tx_ex_units.steps {
-                    return Err(PostAlonzo(TxExUnitsExceeded));
-                }
-            }
-            None => return Err(PostAlonzo(RedeemerMissing)),
-        }
+    let mut steps: u64 = 0;
+    let mut mem: u64 = 0;
+    for redeemer in MultiEraTx::from_conway(mtx).redeemers() {
+        mem += redeemer.ex_units().mem;
+        steps += redeemer.ex_units().steps;
+    }
+    if mem > prot_pps.max_tx_ex_units.mem || steps > prot_pps.max_tx_ex_units.steps {
+        return Err(PostAlonzo(TxExUnitsExceeded));
     }
     Ok(())
 }

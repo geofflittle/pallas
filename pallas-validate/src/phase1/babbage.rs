@@ -17,7 +17,7 @@ use pallas_codec::{
     utils::{Bytes, KeepRaw},
 };
 use pallas_primitives::{
-    AddrKeyhash, Hash, PlutusData, PlutusScript, PolicyId, TransactionInput,
+    AddrKeyhash, Hash, PlutusData, PolicyId, TransactionInput,
     alonzo::{RedeemerPointer, RedeemerTag},
     babbage::{
         DatumOption, Language, Mint, Redeemer, RequiredSigners, ScriptRef, TransactionBody,
@@ -157,19 +157,6 @@ fn check_min_fee(
         return Err(PostAlonzo(FeeBelowMin));
     }
     Ok(())
-}
-
-fn presence_of_plutus_scripts(mtx: &Tx) -> bool {
-    let minted_witness_set: &WitnessSet = &mtx.transaction_witness_set;
-    let plutus_v1_scripts: &[PlutusScript<1>] = &minted_witness_set
-        .plutus_v1_script
-        .clone()
-        .unwrap_or_default();
-    let plutus_v2_scripts: &[PlutusScript<2>] = &minted_witness_set
-        .plutus_v2_script
-        .clone()
-        .unwrap_or_default();
-    !plutus_v1_scripts.is_empty() || !plutus_v2_scripts.is_empty()
 }
 
 fn check_collaterals(
@@ -411,22 +398,14 @@ fn check_tx_size(size: &u32, prot_pps: &BabbageProtParams) -> ValidationResult {
 }
 
 fn check_tx_ex_units(mtx: &Tx, prot_pps: &BabbageProtParams) -> ValidationResult {
-    let tx_wits: &WitnessSet = &mtx.transaction_witness_set;
-    if presence_of_plutus_scripts(mtx) {
-        match &tx_wits.redeemer {
-            Some(redeemers_vec) => {
-                let mut steps: u64 = 0;
-                let mut mem: u64 = 0;
-                for Redeemer { ex_units, .. } in redeemers_vec {
-                    mem += ex_units.mem;
-                    steps += ex_units.steps;
-                }
-                if mem > prot_pps.max_tx_ex_units.mem || steps > prot_pps.max_tx_ex_units.steps {
-                    return Err(PostAlonzo(TxExUnitsExceeded));
-                }
-            }
-            None => return Err(PostAlonzo(RedeemerMissing)),
-        }
+    let mut steps: u64 = 0;
+    let mut mem: u64 = 0;
+    for Redeemer { ex_units, .. } in mtx.transaction_witness_set.redeemer.iter().flatten() {
+        mem += ex_units.mem;
+        steps += ex_units.steps;
+    }
+    if mem > prot_pps.max_tx_ex_units.mem || steps > prot_pps.max_tx_ex_units.steps {
+        return Err(PostAlonzo(TxExUnitsExceeded));
     }
     Ok(())
 }
