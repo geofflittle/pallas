@@ -358,8 +358,10 @@ fn check_native_script_witness(
 ) -> ValidationResult {
     match wits {
         Some(scripts) => {
+            let mut payload: Vec<u8> = vec![0u8];
             for script in scripts.iter() {
-                if compute_script_hash(script) == *script_hash {
+                let _ = encode(script, &mut payload);
+                if pallas_crypto::hash::Hasher::<224>::hash(&payload) == *script_hash {
                     return Ok(());
                 }
             }
