@@ -569,7 +569,7 @@ fn mk_plutus_script_redeemer_pointers(
                 }
             }
 
-            for (index, hash) in certificate_scripts(certificates) {
+            for (index, hash) in certificate_scripts(&certificates[..0]) {
                 if plutus_scripts
                     .iter()
                     .any(|script| compute_plutus_v1_script_hash(script) == *hash)
