@@ -1024,12 +1024,9 @@ mod shelley_ma_tests {
         }];
         body.fee = fee;
         body.withdrawals = Some(
-            [(
-                [&[0xe1][..], key_hash.as_ref()].concat().into(),
-                withdrawal,
-            )]
-            .into_iter()
-            .collect(),
+            [([&[0xe1][..], key_hash.as_ref()].concat().into(), withdrawal)]
+                .into_iter()
+                .collect(),
         );
         mtx.transaction_witness_set = minicbor::decode::<WitnessSet>(&[0xa0]).unwrap().into();
         let unsigned = minicbor::to_vec(mtx).unwrap();
