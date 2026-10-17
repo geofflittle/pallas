@@ -2774,15 +2774,17 @@ mod tests {
     }
 
     #[test]
-    fn collateral_at_a_reward_address_is_refused() {
-        let raw = legacy_output(reward_address());
+    fn collateral_at_a_reward_or_undecodable_address_is_refused() {
+        for address in [reward_address(), vec![0x61]] {
+            let raw = legacy_output(address);
 
-        let result = check_collaterals_address(&[input()], &utxos(Era::Babbage, &raw));
+            let result = check_collaterals_address(&[input()], &utxos(Era::Babbage, &raw));
 
-        assert!(
-            matches!(result, Err(PostAlonzo(InputDecoding))),
-            "{result:?}"
-        );
+            assert!(
+                matches!(result, Err(PostAlonzo(InputDecoding))),
+                "{result:?}"
+            );
+        }
     }
 
     const V2_SCRIPT: [u8; 4] = [1, 2, 3, 4];
