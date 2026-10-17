@@ -907,8 +907,10 @@ fn check_minting(tx_body: &TransactionBody, mtx: &Tx) -> ValidationResult {
 mod tests {
     use super::*;
     use crate::phase1::fixtures::{
-        byron_address, input, key_address, legacy_output, reward_address, script_address, utxos,
+        byron_address, input, key_address, legacy_output, reward_address, script_address,
+        tx_spending_input, undecodable_byron_address, utxos,
     };
+    use pallas_codec::minicbor;
     use pallas_traverse::Era;
 
     #[test]
@@ -945,5 +947,34 @@ mod tests {
 
             assert!(matches!(result, Err(Alonzo(InputDecoding))), "{result:?}");
         }
+    }
+
+    #[test]
+    fn an_input_at_a_reward_or_undecodable_byron_address_is_refused() {
+        let cbor = tx_spending_input();
+        let tx: Tx = minicbor::decode(&cbor).unwrap();
+        let outcomes: Vec<_> = [
+            key_address(),
+            byron_address(),
+            reward_address(),
+            undecodable_byron_address(),
+        ]
+        .map(|address| {
+            let raw = legacy_output(address);
+            format!(
+                "{:?}",
+                check_vkey_input_wits(&tx, &Some(vec![]), &utxos(Era::Alonzo, &raw))
+            )
+        })
+        .into();
+        assert_eq!(
+            outcomes,
+            [
+                "Err(Alonzo(VKWitnessMissing))",
+                "Err(Alonzo(VKWitnessMissing))",
+                "Err(Alonzo(InputDecoding))",
+                "Err(Alonzo(InputDecoding))",
+            ]
+        );
     }
 }

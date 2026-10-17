@@ -1523,7 +1523,7 @@ mod tests {
     use crate::phase1::fixtures::{
         V2_SCRIPT, byron_address, byron_output, input, key_address, legacy_output,
         output_with_reference_script, reward_address, script_address, tx_referencing_input,
-        tx_spending_input, utxos,
+        tx_spending_input, undecodable_byron_address, utxos,
     };
     use pallas_codec::minicbor;
     use pallas_crypto::{hash::Hasher, key::ed25519::SecretKey};
@@ -1669,6 +1669,35 @@ mod tests {
                 "{era:?} {reward:?}"
             );
         }
+    }
+
+    #[test]
+    fn an_input_at_a_reward_or_undecodable_byron_address_is_refused() {
+        let cbor = tx_spending_input();
+        let tx: Tx = minicbor::decode(&cbor).unwrap();
+        let outcomes: Vec<_> = [
+            key_address(),
+            byron_address(),
+            reward_address(),
+            undecodable_byron_address(),
+        ]
+        .map(|address| {
+            let raw = legacy_output(address);
+            format!(
+                "{:?}",
+                check_vkey_input_wits(&tx, &Some(vec![]), &utxos(Era::Alonzo, &raw))
+            )
+        })
+        .into();
+        assert_eq!(
+            outcomes,
+            [
+                "Err(PostAlonzo(VKWitnessMissing))",
+                "Err(PostAlonzo(VKWitnessMissing))",
+                "Err(PostAlonzo(InputDecoding))",
+                "Err(PostAlonzo(InputDecoding))",
+            ]
+        );
     }
 
     #[test]

@@ -1,9 +1,11 @@
+use pallas_addresses::byron::{AddrType, AddressPayload, ByronAddress, SpendingData};
 use pallas_codec::{
     minicbor::{self, bytes::ByteVec},
     utils::TagWrap,
 };
+use pallas_crypto::key::ed25519::SecretKey;
 use pallas_primitives::{
-    alonzo::{TransactionBody, TransactionOutput, Tx as AlonzoTx, Value},
+    alonzo::{BootstrapWitness, TransactionBody, TransactionOutput, Tx as AlonzoTx, Value},
     babbage::Tx as BabbageTx,
     byron::{Address, Tx, TxOut, TxPayload},
     conway::Tx as ConwayTx,
@@ -15,6 +17,8 @@ use std::{borrow::Cow, iter::zip, vec::Vec};
 
 use pallas_codec::utils::{Bytes, CborWrap};
 use pallas_crypto::hash::Hash;
+
+pub const BYRON_CHAIN_CODE: [u8; 32] = [9; 32];
 
 // Type aliases to reduce complexity
 pub type BabbageTxOutInfo<'a> = (
@@ -534,4 +538,65 @@ pub fn add_codec_safe_ref_input_conway<'a>(
         }
         None => panic!("UTxO addition error - reference input missing"),
     }
+}
+
+pub fn byron_key() -> SecretKey {
+    SecretKey::from([7; 32])
+}
+
+pub fn byron_key_address() -> Vec<u8> {
+    let xpub = [byron_key().public_key().as_ref(), &BYRON_CHAIN_CODE[..]].concat();
+    ByronAddress::from(AddressPayload::new(
+        AddrType::PubKey,
+        SpendingData::PubKey(xpub.into()),
+        vec![].into(),
+    ))
+    .to_vec()
+}
+
+pub fn byron_era_output(address: &[u8], amount: u64) -> Vec<u8> {
+    let mut cbor = vec![0x82];
+    cbor.extend(address);
+    cbor.extend(minicbor::to_vec(amount).unwrap());
+    cbor
+}
+
+pub fn bootstrap_witness(key: &SecretKey, attributes: &[u8], signed: &[u8]) -> BootstrapWitness {
+    BootstrapWitness {
+        public_key: key.public_key().as_ref().to_vec().into(),
+        signature: key.sign(signed).as_ref().to_vec().into(),
+        chain_code: BYRON_CHAIN_CODE.to_vec().into(),
+        attributes: attributes.to_vec().into(),
+    }
+}
+
+pub fn bootstrap_witness_cases(
+    signed: &[u8],
+) -> Vec<(Vec<BootstrapWitness>, Result<(), &'static str>)> {
+    let key = byron_key();
+    let other_key = SecretKey::from([8; 32]);
+    let witness = bootstrap_witness(&key, &[0xa0], signed);
+    let other = |signed: &[u8]| bootstrap_witness(&other_key, &[0xa0], signed);
+    let mut short_key = other(signed);
+    short_key.public_key = vec![1; 31].into();
+    let mut short_signature = witness.clone();
+    short_signature.signature = vec![1; 63].into();
+    vec![
+        (vec![witness.clone()], Ok(())),
+        (vec![], Err("VKWitnessMissing")),
+        (
+            vec![bootstrap_witness(&key, &[0xa0], &[0; 32])],
+            Err("VKWrongSignature"),
+        ),
+        (vec![other(signed)], Err("VKWitnessMissing")),
+        (vec![witness.clone(), other(signed)], Ok(())),
+        (vec![witness.clone(), other(&[0; 32])], Err("VKWrongSignature")),
+        // An empty attribute map written with indefinite length.
+        (
+            vec![bootstrap_witness(&key, &[0xbf, 0xff], signed)],
+            Err("VKWitnessMissing"),
+        ),
+        (vec![witness, short_key], Err("VKWrongSignature")),
+        (vec![short_signature], Err("VKWrongSignature")),
+    ]
 }
