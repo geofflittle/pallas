@@ -237,7 +237,8 @@ mod conway_tests {
 
     #[test]
     // Same as successful_mainnet_tx_with_plutus_v3_script, except that the
-    // collateral input holds one lovelace less, below 150% of the fee.
+    // collateral input holds one lovelace less, so the collateral less its
+    // return is under 150% of the fee.
     fn reference_script_tx_with_collateral_one_lovelace_short() {
         let cbor_bytes: Vec<u8> = cbor_to_bytes(include_str!("../../test_data/conway5.tx"));
         let mtx: Tx = conway_minted_tx_from_cbor(&cbor_bytes);
