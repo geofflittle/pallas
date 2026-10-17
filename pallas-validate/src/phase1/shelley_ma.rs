@@ -279,10 +279,10 @@ fn check_witnesses(
     tx_wits: &WitnessSet,
     utxos: &UTxOs,
 ) -> ValidationResult {
-    let vk_wits: &mut Vec<(bool, VKeyWitness)> =
-        &mut mk_wits_check_list(tx_wits.vkeywitness.iter().flatten());
-    let bootstrap_wits: &mut Vec<(bool, BootstrapWitness)> =
-        &mut mk_wits_check_list(tx_wits.bootstrap_witness.iter().flatten());
+    let vk_wits: &mut Vec<(bool, VKeyWitness)> = &mut crate::utils::mk_alonzo_vk_wits_check_list(
+        &tx_wits.vkeywitness,
+        ShelleyMA(MissingVKWitness),
+    )?;
     let tx_hash: &Vec<u8> = &Vec::from(tx_body.original_hash().as_ref());
     let native_scripts: Vec<NativeScript> = match &tx_wits.native_script {
         Some(scripts) => scripts.iter().map(|x| x.clone().unwrap()).collect(),
@@ -295,20 +295,17 @@ fn check_witnesses(
     for input in tx_body.inputs.iter() {
         match utxos.get(&MultiEraInput::from_alonzo_compatible(input)) {
             Some(multi_era_output) => {
-                match spending_credential(multi_era_output).ok_or(ShelleyMA(AddressDecoding))? {
-                    SpendingCredential::Key(payment_key_hash) => {
-                        check_vk_wit(&payment_key_hash, tx_hash, vk_wits)?
+                if let Some(alonzo_comp_output) = MultiEraOutput::as_alonzo(multi_era_output) {
+                    match crate::utils::get_payment_part(&alonzo_comp_output.address)
+                        .ok_or(ShelleyMA(AddressDecoding))?
+                    {
+                        pallas_addresses::ShelleyPaymentPart::Key(payment_key_hash) => {
+                            check_vk_wit(&payment_key_hash, tx_hash, vk_wits)?
+                        }
+                        pallas_addresses::ShelleyPaymentPart::Script(script_hash) => {
+                            check_native_script_witness(&script_hash, &native_script_wits)?
+                        }
                     }
-                    SpendingCredential::Script(script_hash) => {
-                        check_native_script_witness(&script_hash, &native_script_wits)?
-                    }
-                    SpendingCredential::Bootstrap(root) => check_bootstrap_wit(
-                        &root,
-                        bootstrap_wits,
-                        tx_hash,
-                        &ShelleyMA(MissingVKWitness),
-                        &ShelleyMA(WrongSignature),
-                    )?,
                 }
             }
             None => return Err(ShelleyMA(InputNotInUTxO)),
@@ -329,8 +326,7 @@ fn check_witnesses(
         &tx_body.validity_interval_start,
         &tx_body.ttl,
     )?;
-    check_remaining_vk_wits(vk_wits, tx_hash, ShelleyMA(WrongSignature))?;
-    check_remaining_bootstrap_wits(bootstrap_wits, tx_hash, &ShelleyMA(WrongSignature))
+    check_remaining_vk_wits(vk_wits, tx_hash, ShelleyMA(WrongSignature))
 }
 
 fn check_vk_wit(
