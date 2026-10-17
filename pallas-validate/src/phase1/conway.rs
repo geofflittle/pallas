@@ -17,7 +17,6 @@ use pallas_addresses::{
     StakePayload, byron::AddressId,
 };
 use pallas_codec::utils::{Bytes, KeepRaw, NonEmptySet};
-use pallas_crypto::key::ed25519::{PublicKey, Signature};
 use pallas_primitives::{
     AddrKeyhash, Hash, PlutusData, PolicyId, PositiveCoin, StakeCredential, TransactionInput,
     babbage,
@@ -1531,13 +1530,11 @@ fn check_remaining_bootstrap_wits(
 }
 
 fn verify_bootstrap_signature(wit: &BootstrapWitness, data_to_verify: &[u8]) -> bool {
-    match (
-        PublicKey::try_from(wit.public_key.as_slice()),
-        Signature::try_from(wit.signature.as_slice()),
-    ) {
-        (Ok(key), Ok(signature)) => key.verify(data_to_verify, &signature),
-        _ => false,
-    }
+    let vkey_wit = VKeyWitness {
+        vkey: wit.public_key.clone(),
+        signature: wit.signature.clone(),
+    };
+    verify_signature(&vkey_wit, data_to_verify)
 }
 
 fn bootstrap_wit_root(wit: &BootstrapWitness) -> AddressId {
