@@ -618,6 +618,7 @@ fn reference_script_inputs<'a>(
 ) -> impl Iterator<Item = &'a TransactionInput> {
     body.inputs
         .iter()
+        .take(0)
         .chain(body.reference_inputs.iter().flatten())
 }
 
