@@ -17,7 +17,7 @@ use pallas_addresses::{
 };
 use pallas_codec::utils::{Bytes, KeepRaw, NonEmptySet};
 use pallas_primitives::{
-    AddrKeyhash, Hash, PlutusData, PlutusScript, PolicyId, PositiveCoin, StakeCredential,
+    AddrKeyhash, Hash, PlutusData, PolicyId, PositiveCoin, StakeCredential,
     TransactionInput, babbage,
     conway::{
         Certificate, DatumOption, Language, LanguageViews, Mint, Redeemers, RedeemersKey,
@@ -1792,7 +1792,7 @@ mod tests {
     use pallas_codec::minicbor;
     use pallas_crypto::{hash::Hasher, key::ed25519::SecretKey};
     use pallas_primitives::{
-        StakeCredential,
+        PlutusScript, StakeCredential,
         alonzo::NativeScript,
         conway::{Certificate, DRep, ExUnits, PostAlonzoTransactionOutput, Redeemer, RedeemerTag},
     };
