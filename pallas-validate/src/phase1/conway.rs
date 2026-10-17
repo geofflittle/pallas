@@ -1773,8 +1773,9 @@ fn cost_model_for_tx(
 mod tests {
     use super::*;
     use crate::phase1::fixtures::{
-        byron_address, byron_output, input, key_address, legacy_output, reward_address,
-        script_address, tx_referencing_input, tx_spending_input, utxos,
+        V2_SCRIPT, byron_address, byron_output, input, key_address, legacy_output,
+        output_with_reference_script, reward_address, script_address, tx_referencing_input,
+        tx_spending_input, utxos,
     };
     use pallas_codec::minicbor;
     use pallas_crypto::{hash::Hasher, key::ed25519::SecretKey};
@@ -2697,16 +2698,6 @@ mod tests {
         }
     }
 
-    const V2_SCRIPT: [u8; 4] = [1, 2, 3, 4];
-
-    fn output_with_reference_script() -> Vec<u8> {
-        let mut cbor = vec![0xa3, 0x00, 0x58, 0x1d]; // output, a 29 byte address
-        cbor.extend(key_address());
-        cbor.extend([0x01, 0x1a, 0x00, 0x4c, 0x4b, 0x40]); // five ada
-        cbor.extend([0x03, 0xd8, 0x18, 0x47, 0x82, 0x02, 0x44]); // a PlutusV2 reference script
-        cbor.extend(V2_SCRIPT);
-        cbor
-    }
 
     #[test]
     fn a_script_address_from_an_earlier_era_names_its_script() {
@@ -2828,8 +2819,8 @@ mod tests {
         let without_script = legacy_output(key_address());
         let (mut outcomes, mut expected) = (vec![], vec![]);
         for (cbor, spent) in [
-            (conway_tx_spending_input(), true),
-            (conway_tx_referencing_input(), false),
+            (tx_spending_input(), true),
+            (tx_referencing_input(), false),
         ] {
             let mut tx: Tx = minicbor::decode(&cbor).unwrap();
             for mints in [false, true] {
@@ -2872,7 +2863,7 @@ mod tests {
             index: 0,
         };
         let with_script = output_with_reference_script();
-        let cbor = conway_tx_referencing_input();
+        let cbor = tx_referencing_input();
         let (mut outcomes, mut expected) = (vec![], vec![]);
         for (purpose, names_script) in [
             ("spend", true),
