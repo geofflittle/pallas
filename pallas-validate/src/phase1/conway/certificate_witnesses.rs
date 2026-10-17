@@ -594,12 +594,40 @@ fn every_purpose(expected: &str) -> Vec<(RedeemerTag, bool, String)> {
 
 #[test]
 fn plutus_reference_scripts_need_a_redeemer_for_every_purpose() {
-    assert_eq!(
-        reference_script_outcomes(
+    let v1 = PlutusScript::<1>(vec![1, 2].into());
+    let v2 = PlutusScript::<2>(vec![1, 2].into());
+    for (version, script, hash) in [
+        (
+            1,
+            ScriptRef::PlutusV1Script(v1.clone()),
+            compute_plutus_v1_script_hash(&v1),
+        ),
+        (
+            2,
+            ScriptRef::PlutusV2Script(v2.clone()),
+            compute_plutus_v2_script_hash(&v2),
+        ),
+        (
+            3,
             ScriptRef::PlutusV3Script(plutus()),
             compute_plutus_v3_script_hash(&plutus()),
         ),
-        every_purpose("Err(PostAlonzo(RedeemerMissing)) Ok(())"),
+    ] {
+        assert_eq!(
+            reference_script_outcomes(script, hash),
+            every_purpose("Err(PostAlonzo(RedeemerMissing)) Ok(())"),
+            "PlutusV{version}",
+        );
+    }
+}
+
+#[test]
+fn native_reference_scripts_need_no_redeemer_for_any_purpose() {
+    let script = NativeScript::ScriptPubkey(key_hash(1));
+    let hash = compute_native_script_hash(&script);
+    assert_eq!(
+        reference_script_outcomes(ScriptRef::NativeScript(script.into()), hash),
+        every_purpose("Ok(()) Ok(())"),
     );
 }
 
