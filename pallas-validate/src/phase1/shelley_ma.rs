@@ -329,8 +329,7 @@ fn check_witnesses(
         &tx_body.validity_interval_start,
         &tx_body.ttl,
     )?;
-    check_remaining_vk_wits(vk_wits, tx_hash, ShelleyMA(WrongSignature))?;
-    check_remaining_bootstrap_wits(bootstrap_wits, tx_hash, &ShelleyMA(WrongSignature))
+    check_remaining_vk_wits(vk_wits, tx_hash, ShelleyMA(WrongSignature))
 }
 
 fn check_vk_wit(
