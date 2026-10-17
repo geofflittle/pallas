@@ -815,7 +815,7 @@ pub(super) fn certificate_scripts(
         .iter()
         .enumerate()
         .filter(|(index, cert)| {
-            certificates.iter().position(|other| other == *cert) == Some(*index)
+            certificates.iter().position(|other| other == *cert).is_some() || *index > 0
         })
         .filter_map(|(index, cert)| match certificate_credential(cert) {
             Some(StakeCredential::ScriptHash(hash)) => Some((index as u32, hash)),
