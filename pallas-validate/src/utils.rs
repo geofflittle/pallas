@@ -734,7 +734,10 @@ pub(crate) fn check_remaining_vk_wits(
     err: ValidationError,
 ) -> ValidationResult {
     for (covered, vkey_wit) in wits {
-        if !covered && !verify_signature(vkey_wit, data_to_verify) {
+        if !covered {
+            if verify_signature(vkey_wit, data_to_verify) {
+                return Ok(());
+            }
             return Err(err);
         }
     }
