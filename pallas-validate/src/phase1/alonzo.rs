@@ -409,7 +409,7 @@ fn check_needed_scripts_are_included(
         .collect();
     check_script_inputs(tx_body, &mut native_scripts, &mut plutus_v1_scripts, utxos)?;
     check_minting_policies(tx_body, &mut native_scripts, &mut plutus_v1_scripts)?;
-    for (_, hash) in certificate_scripts(certificates(tx_body)) {
+    for (_, hash) in certificate_scripts(&certificates(tx_body)[..0]) {
         check_needed_script(
             hash,
             &[],
