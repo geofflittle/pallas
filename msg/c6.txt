@@ -1,0 +1,8 @@
+fix(validate): pass V3 deposits after protocol 9
+
+- to_plutus_data.rs: encode Reg and UnReg deposits by protocol version
+- tx.rs: encode the script context with the protocol major version
+- to_plutus_data.rs: test deposits at protocols 9 to 11 and the default
+- tests/conway.rs: check the deposit a V3 script sees by protocol
+
+Co-authored-by: Geoff Little <g.little712@gmail.com>

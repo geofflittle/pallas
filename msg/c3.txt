@@ -1,0 +1,8 @@
+fix(validate): require collateral with redeemers
+
+- alonzo, babbage, conway: check collateral when redeemers are present
+- tests/conway.rs: V3 reference script txs pass with chain collateral
+- tests: collateral one lovelace short is refused in each era
+
+Co-authored-by: Rob van Leeuwen <luivatra@gmail.com>
+Co-authored-by: Geoff Little <g.little712@gmail.com>

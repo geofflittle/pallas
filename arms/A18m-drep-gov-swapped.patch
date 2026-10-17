@@ -1,0 +1,12 @@
+--- a/pallas-validate/src/phase1/conway.rs	2026-10-16 22:13:05
++++ b/pallas-validate/src/phase1/conway.rs	2026-10-16 22:17:11
+@@ -49,8 +49,8 @@
+         tx_body,
+         utxos,
+         prot_pps.key_deposit,
+-        prot_pps.drep_deposit,
+         prot_pps.governance_action_deposit,
++        prot_pps.drep_deposit,
+     )?;
+     check_min_lovelace(tx_body, prot_pps)?;
+     check_output_val_size(tx_body, prot_pps)?;

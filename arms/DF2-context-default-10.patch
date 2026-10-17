@@ -1,0 +1,11 @@
+--- a/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 22:13:05
++++ b/pallas-validate/src/phase2/to_plutus_data.rs	2026-10-16 22:13:12
+@@ -1509,7 +1509,7 @@
+ 
+ impl ToPlutusData for ScriptContext<'_> {
+     fn to_plutus_data(&self) -> PlutusData {
+-        self.to_plutus_data_with_protocol(9)
++        self.to_plutus_data_with_protocol(10)
+     }
+ }
+ 
