@@ -1790,6 +1790,9 @@ fn cost_model_for_tx(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::phase1::fixtures::{
+        byron_address, input, key_address, legacy_output, reward_address, script_address, utxos,
+    };
     use pallas_codec::minicbor;
     use pallas_crypto::{hash::Hasher, key::ed25519::SecretKey};
     use pallas_primitives::{
@@ -2671,49 +2674,6 @@ mod tests {
                 },
             );
         }
-    }
-
-    fn input() -> TransactionInput {
-        TransactionInput {
-            transaction_id: Hash::new([0; 32]),
-            index: 0,
-        }
-    }
-
-    fn legacy_output(address: Vec<u8>) -> Vec<u8> {
-        minicbor::to_vec(pallas_primitives::alonzo::TransactionOutput {
-            address: address.into(),
-            amount: babbage::Value::Coin(5_000_000),
-            datum_hash: None,
-        })
-        .unwrap()
-    }
-
-    fn utxos(era: Era, output: &[u8]) -> UTxOs<'_> {
-        UTxOs::from([(
-            MultiEraInput::AlonzoCompatible(Box::new(std::borrow::Cow::Owned(input()))),
-            MultiEraOutput::decode(era, output).unwrap(),
-        )])
-    }
-
-    fn key_address() -> Vec<u8> {
-        [vec![0x61], vec![1; 28]].concat()
-    }
-
-    fn script_address() -> Vec<u8> {
-        [vec![0x71], vec![2; 28]].concat()
-    }
-
-    fn byron_address() -> Vec<u8> {
-        pallas_addresses::ByronAddress::from_base58(
-            "Ae2tdPwUPEZLs4HtbuNey7tK4hTKrwNwYtGqp7bDfCy2WdR3P6735W5Yfpe",
-        )
-        .unwrap()
-        .to_vec()
-    }
-
-    fn reward_address() -> Vec<u8> {
-        [vec![0xe0], vec![3; 28]].concat()
     }
 
     #[test]

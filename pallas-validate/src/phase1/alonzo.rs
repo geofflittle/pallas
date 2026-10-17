@@ -909,3 +909,51 @@ fn check_minting(tx_body: &TransactionBody, mtx: &Tx) -> ValidationResult {
         None => Ok(()),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::phase1::fixtures::{
+        byron_address, input, key_address, legacy_output, reward_address, script_address, utxos,
+    };
+    use pallas_traverse::Era;
+
+    #[test]
+    fn script_collateral_is_not_key_locked() {
+        let raw = legacy_output(script_address());
+        for era in [Era::Shelley, Era::Alonzo] {
+            let result = check_collaterals_address(&[input()], &utxos(era, &raw));
+
+            assert!(
+                matches!(result, Err(Alonzo(CollateralNotVKeyLocked))),
+                "{era:?} {result:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn key_and_byron_collateral_is_key_locked_from_shelley_to_alonzo() {
+        for address in [key_address(), byron_address()] {
+            let raw = legacy_output(address);
+            for era in [Era::Shelley, Era::Alonzo] {
+                let result = check_collaterals_address(&[input()], &utxos(era, &raw));
+
+                assert!(result.is_ok(), "{era:?} {result:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn collateral_at_a_reward_or_undecodable_address_is_refused() {
+        for address in [reward_address(), vec![0x61]] {
+            let raw = legacy_output(address);
+
+            let result = check_collaterals_address(&[input()], &utxos(Era::Alonzo, &raw));
+
+            assert!(
+                matches!(result, Err(Alonzo(InputDecoding))),
+                "{result:?}"
+            );
+        }
+    }
+}
