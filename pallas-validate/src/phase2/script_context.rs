@@ -593,10 +593,10 @@ fn get_certificates_info_v1_v2(
             | Certificate::StakeDeregistration(_)
             | Certificate::StakeDelegation(..)
             | Certificate::PoolRegistration { .. }
-            | Certificate::PoolRetirement(..)
             | Certificate::Reg(..)
             | Certificate::UnReg(..) => {}
-            Certificate::VoteDeleg(..)
+            Certificate::PoolRetirement(..)
+            | Certificate::VoteDeleg(..)
             | Certificate::StakeVoteDeleg(..)
             | Certificate::StakeRegDeleg(..)
             | Certificate::VoteRegDeleg(..)
