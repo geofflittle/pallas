@@ -8,7 +8,7 @@ use crate::utils::{
     ValidationResult, add_minted_value, add_values, aux_data_from_alonzo_tx, check_bootstrap_wit,
     check_needed_script, check_remaining_bootstrap_wits, check_remaining_vk_wits,
     compute_native_script_hash, compute_plutus_v1_script_hash, empty_value,
-    get_alonzo_comp_tx_size, get_lovelace_from_alonzo_val, get_script_hash_from_input,
+    get_alonzo_comp_tx_size, get_lovelace_from_alonzo_val, get_payment_part, get_script_hash_from_input,
     get_shelley_address, get_val_size_in_words, mk_alonzo_vk_wits_check_list, values_are_equal,
     verify_signature,
 };
