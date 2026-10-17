@@ -1737,7 +1737,6 @@ fn needed_script_hashes(tx_body: &TransactionBody, utxos: &UTxOs) -> Vec<ScriptH
         .iter()
         .flatten()
         .filter_map(|proposal| match &proposal.gov_action {
-            GovAction::ParameterChange(_, _, policy)
             | GovAction::TreasuryWithdrawals(_, policy) => *policy,
             _ => None,
         });
