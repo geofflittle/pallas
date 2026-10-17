@@ -8,7 +8,7 @@ use crate::utils::{
     ValidationResult, add_minted_value, add_values, aux_data_from_alonzo_tx, check_bootstrap_wit,
     check_needed_script, check_remaining_bootstrap_wits, check_remaining_vk_wits,
     compute_native_script_hash, compute_plutus_v1_script_hash, empty_value,
-    get_alonzo_comp_tx_size, get_lovelace_from_alonzo_val, get_script_hash_from_input,
+    get_alonzo_comp_tx_size, get_lovelace_from_alonzo_val, get_payment_part, get_script_hash_from_input,
     get_shelley_address, get_val_size_in_words, mk_alonzo_vk_wits_check_list, values_are_equal,
     verify_signature, withdrawal_scripts,
 };
@@ -192,15 +192,12 @@ fn check_collaterals_address(collaterals: &[TransactionInput], utxos: &UTxOs) ->
     for collateral in collaterals {
         match utxos.get(&MultiEraInput::from_alonzo_compatible(collateral)) {
             Some(multi_era_output) => {
-                match multi_era_output
-                    .address()
-                    .map_err(|_| Alonzo(InputDecoding))?
+                if let Some(alonzo_comp_output) = MultiEraOutput::as_alonzo(multi_era_output)
+                    && let ShelleyPaymentPart::Script(_) =
+                        get_payment_part(&alonzo_comp_output.address)
+                            .ok_or(Alonzo(InputDecoding))?
                 {
-                    Address::Shelley(address)
-                        if matches!(address.payment(), ShelleyPaymentPart::Key(_)) => {}
-                    Address::Byron(_) => {}
-                    Address::Shelley(_) => return Err(Alonzo(CollateralNotVKeyLocked)),
-                    _ => return Err(Alonzo(InputDecoding)),
+                    return Err(Alonzo(CollateralNotVKeyLocked));
                 }
             }
             None => return Err(Alonzo(CollateralNotInUTxO)),
