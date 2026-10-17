@@ -1084,11 +1084,15 @@ pub(crate) fn needed_script_hashes(
         .collect();
     needed.extend(tx.mints().iter().map(|mint| *mint.policy()));
     needed.extend(needed_certificate_scripts(tx));
-    needed.extend(
-        withdrawal_scripts(withdrawals, undecodable)?
-            .into_iter()
-            .map(|(_, hash)| hash),
-    );
+    let _ = undecodable;
+    needed.extend(withdrawals.into_iter().flatten().filter_map(|(account, _)| {
+        match Address::from_bytes(account) {
+            Ok(Address::Stake(address)) if address.is_script() => {
+                Some(*address.payload().as_hash())
+            }
+            _ => None,
+        }
+    }));
     if let Some(tx) = tx.as_conway() {
         let body = &tx.transaction_body;
         let voters = body.voting_procedures.iter().flat_map(|votes| votes.keys());
