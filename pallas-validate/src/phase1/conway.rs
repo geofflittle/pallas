@@ -1508,7 +1508,7 @@ fn check_bootstrap_wit(
         .root;
     for (wit_covered, wit) in wits.iter_mut() {
         if bootstrap_wit_root(wit) == root {
-            if !verify_bootstrap_signature(wit, data_to_verify) {
+            if !verify_bootstrap_signature_as_vkey(wit, data_to_verify) {
                 return Err(PostAlonzo(VKWrongSignature));
             }
             *wit_covered = true;
@@ -1538,6 +1538,14 @@ fn verify_bootstrap_signature(wit: &BootstrapWitness, data_to_verify: &[u8]) -> 
         (Ok(key), Ok(signature)) => key.verify(data_to_verify, &signature),
         _ => false,
     }
+}
+
+fn verify_bootstrap_signature_as_vkey(wit: &BootstrapWitness, data_to_verify: &[u8]) -> bool {
+    let vkey_wit = VKeyWitness {
+        vkey: wit.public_key.clone(),
+        signature: wit.signature.clone(),
+    };
+    verify_signature(&vkey_wit, data_to_verify)
 }
 
 fn bootstrap_wit_root(wit: &BootstrapWitness) -> AddressId {
