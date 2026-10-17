@@ -757,12 +757,13 @@ pub(super) fn eval_native_script(
 #[cfg(test)]
 mod tests {
     use super::{
-        Certificate, NativeScript, OriginalHash, StakeCredential, Tx, UTxOs, VKeyWitness,
-        WitnessSet, check_witnesses, compute_script_hash, eval_native_script,
+        Certificate, Era, MultiEraInput, MultiEraOutput, NativeScript, OriginalHash, ScriptHash,
+        StakeCredential, TransactionOutput, Tx, UTxOs, VKeyWitness, Value, WitnessSet,
+        check_witnesses, compute_script_hash, eval_native_script,
     };
     use pallas_codec::minicbor;
     use pallas_crypto::{hash::Hasher, key::ed25519::SecretKey};
-    use pallas_primitives::alonzo::AddrKeyhash;
+    use pallas_primitives::alonzo::{AddrKeyhash, TransactionInput};
 
     // Evaluates `native_script` with no vkey witnesses and the given validity
     // interval bounds (`low_bnd` is `validity_interval_start`, `upp_bnd` is `ttl`).
@@ -838,9 +839,44 @@ mod tests {
         keys: &[u8],
         corrupted: Option<usize>,
     ) -> String {
+        spending_outcome(&[], certificates, native_scripts, keys, corrupted)
+    }
+
+    // Spends one output locked by each of `spent` scripts.
+    fn spending_outcome(
+        spent: &[ScriptHash],
+        certificates: Vec<Certificate>,
+        native_scripts: Vec<NativeScript>,
+        keys: &[u8],
+        corrupted: Option<usize>,
+    ) -> String {
+        let inputs: Vec<TransactionInput> = (0..spent.len())
+            .map(|index| TransactionInput {
+                transaction_id: [5; 32].into(),
+                index: index as u64,
+            })
+            .collect();
+        let outputs: Vec<TransactionOutput> = spent
+            .iter()
+            .map(|hash| TransactionOutput {
+                address: [&[0x71][..], hash.as_ref()].concat().into(),
+                amount: Value::Coin(10),
+                datum_hash: None,
+            })
+            .collect();
+        let utxos: UTxOs = inputs
+            .iter()
+            .zip(&outputs)
+            .map(|(input, output)| {
+                (
+                    MultiEraInput::from_alonzo_compatible(input),
+                    MultiEraOutput::from_alonzo_compatible(output, Era::Shelley),
+                )
+            })
+            .collect();
         let raw = hex::decode(include_str!("../../../test_data/shelley1.tx").trim()).unwrap();
         let mut tx: Tx = minicbor::decode(&raw).unwrap();
-        tx.transaction_body.inputs = Vec::new();
+        tx.transaction_body.inputs = inputs.clone();
         tx.transaction_body.certificates = Some(certificates);
         tx.transaction_witness_set = minicbor::decode::<WitnessSet>(&[0xa0]).unwrap().into();
         tx.transaction_witness_set.native_script =
@@ -862,11 +898,7 @@ mod tests {
             witnesses[position].signature = vec![0; 64].into();
         }
         tx.transaction_witness_set.vkeywitness = Some(witnesses);
-        let actual = check_witnesses(
-            &tx.transaction_body,
-            &tx.transaction_witness_set,
-            &UTxOs::new(),
-        );
+        let actual = check_witnesses(&tx.transaction_body, &tx.transaction_witness_set, &utxos);
         format!("{actual:?}")
     }
 
@@ -991,6 +1023,37 @@ mod tests {
                     expected
                 );
             }
+        }
+    }
+
+    #[test]
+    fn every_needed_script_is_found_in_any_position() {
+        let first = NativeScript::ScriptPubkey(key_hash(1));
+        let second = NativeScript::ScriptPubkey(key_hash(2));
+        let hashes = [compute_script_hash(&first), compute_script_hash(&second)];
+        let both = vec![first.clone(), second.clone()];
+        let certificate =
+            Certificate::StakeDeregistration(StakeCredential::ScriptHash(hashes[1]));
+        for (spent, certificates, scripts, expected) in [
+            (&hashes[..], vec![], both.clone(), "Ok(())"),
+            (&hashes[..1], vec![certificate.clone()], both.clone(), "Ok(())"),
+            (
+                &hashes[..],
+                vec![],
+                vec![first.clone()],
+                "Err(ShelleyMA(MissingScriptWitness))",
+            ),
+            (
+                &hashes[..1],
+                vec![certificate],
+                vec![first],
+                "Err(ShelleyMA(MissingScriptWitness))",
+            ),
+        ] {
+            assert_eq!(
+                spending_outcome(spent, certificates, scripts, &[1, 2], None),
+                expected
+            );
         }
     }
 }
