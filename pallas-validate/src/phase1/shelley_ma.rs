@@ -958,6 +958,22 @@ mod tests {
     }
 
     #[test]
+    fn second_native_script_witness_is_found() {
+        let first = NativeScript::ScriptAll(vec![]);
+        let second = NativeScript::ScriptPubkey(key_hash(1));
+        let cred = StakeCredential::ScriptHash(compute_script_hash(&second));
+        assert_eq!(
+            witnesses_outcome(
+                vec![Certificate::StakeDeregistration(cred)],
+                vec![first, second],
+                &[1],
+                None
+            ),
+            "Ok(())"
+        );
+    }
+
+    #[test]
     fn script_certificates_require_their_script() {
         let script = NativeScript::ScriptPubkey(key_hash(1));
         let other = NativeScript::ScriptAll(vec![]);
