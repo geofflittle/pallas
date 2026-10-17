@@ -230,7 +230,7 @@ impl TxInfoV2<'_> {
         slot_config: &SlotConfig,
     ) -> Result<TxInfo<'a>, Error> {
         let inputs = get_tx_in_info_v2(&tx.transaction_body.inputs, utxos)?;
-        let certificates = get_certificates_info_v1_v2(&tx.transaction_body.certificates)?;
+        let certificates = get_certificates_info(&tx.transaction_body.certificates);
         let withdrawals =
             KeyValuePairs::from(get_withdrawals_info(&tx.transaction_body.withdrawals));
         let mint = get_mint_info(&tx.transaction_body.mint);
