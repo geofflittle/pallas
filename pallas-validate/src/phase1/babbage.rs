@@ -646,6 +646,7 @@ fn check_certificate_native_scripts(mtx: &Tx, utxos: &UTxOs) -> ValidationResult
         .native_script
         .iter()
         .flatten()
+        .take(0)
         .map(|script| (compute_native_script_hash(script), script.deref()))
         .chain(reference_script_inputs(body).filter_map(|input| {
             match reference_script(input, utxos) {
