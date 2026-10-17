@@ -17,7 +17,7 @@ use pallas_codec::{
     utils::{Bytes, KeepRaw},
 };
 use pallas_primitives::{
-    AddrKeyhash, Hash, PlutusData, PlutusScript, PolicyId, TransactionInput,
+    AddrKeyhash, Coin, Hash, PlutusData, PlutusScript, PolicyId, TransactionInput,
     alonzo::{RedeemerPointer, RedeemerTag},
     babbage::{
         DatumOption, Language, Mint, Redeemer, RequiredSigners, ScriptRef, TransactionBody,
@@ -41,7 +41,7 @@ pub fn validate_babbage_tx(
     check_all_ins_in_utxos(tx_body, utxos)?;
     check_tx_validity_interval(tx_body, block_slot)?;
     check_fee(tx_body, &size, mtx, utxos, prot_pps)?;
-    check_preservation_of_value(tx_body, utxos)?;
+    check_preservation_of_value(tx_body, utxos, prot_pps.key_deposit)?;
     check_min_lovelace(tx_body, prot_pps)?;
     check_output_val_size(tx_body, prot_pps)?;
     check_network_id(tx_body, network_id)?;
@@ -293,7 +293,11 @@ fn val_from_multi_era_output(multi_era_output: &MultiEraOutput) -> Value {
 }
 
 // The preservation of value property holds.
-fn check_preservation_of_value(tx_body: &TransactionBody, utxos: &UTxOs) -> ValidationResult {
+fn check_preservation_of_value(
+    tx_body: &TransactionBody,
+    utxos: &UTxOs,
+    key_deposit: Coin,
+) -> ValidationResult {
     let mut input: Value = get_consumed(tx_body, utxos)?;
     let produced: Value = get_produced(tx_body)?;
     let output: Value = add_values(
@@ -1587,5 +1591,112 @@ fn option_vec_is_empty<T>(option_vec: &Option<Vec<T>>) -> bool {
     match option_vec {
         Some(vec) => vec.is_empty(),
         None => true,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pallas_codec::minicbor;
+    use pallas_primitives::{
+        StakeCredential,
+        babbage::{Certificate, LegacyTransactionOutput},
+    };
+
+    const KEY_DEPOSIT: Coin = 2_000_000;
+    const INPUT: Coin = 20_000_000;
+    const FEE: Coin = 200_000;
+
+    fn output(coin: Coin) -> TransactionOutput<'static> {
+        TransactionOutput::Legacy(
+            LegacyTransactionOutput {
+                address: [vec![0x61], vec![0; 28]].concat().into(),
+                amount: Value::Coin(coin),
+                datum_hash: None,
+            }
+            .into(),
+        )
+    }
+
+    // Balance results for a body whose deposits less refunds and withdrawals
+    // come to `net`, with the output short by `net - 1`, `net` and `net + 1`.
+    fn balance_around(
+        certificates: Vec<Certificate>,
+        withdrawal: Option<Coin>,
+        net: i64,
+    ) -> Vec<String> {
+        let raw = hex::decode(include_str!("../../../test_data/babbage1.tx").trim()).unwrap();
+        let tx: Tx = minicbor::decode(&raw).unwrap();
+        let input = output(INPUT);
+        let utxos = UTxOs::from([(
+            MultiEraInput::from_alonzo_compatible(&tx.transaction_body.inputs[0]),
+            MultiEraOutput::from_babbage(&input),
+        )]);
+        let reward_account = [vec![0xe0], vec![3; 28]].concat();
+        [net - 1, net, net + 1]
+            .into_iter()
+            .map(|reserved| {
+                let mut body = (*tx.transaction_body).clone();
+                body.inputs.truncate(1);
+                body.fee = FEE;
+                body.mint = None;
+                body.outputs = vec![output(((INPUT - FEE) as i64 - reserved) as u64).into()];
+                body.certificates = Some(certificates.clone());
+                body.withdrawals = withdrawal
+                    .map(|coin| [(reward_account.clone().into(), coin)].into_iter().collect());
+                format!(
+                    "{:?}",
+                    check_preservation_of_value(&body, &utxos, KEY_DEPOSIT)
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn key_deposits_refunds_and_withdrawals_balance() {
+        let credential = StakeCredential::AddrKeyhash([1; 28].into());
+        let deposit = KEY_DEPOSIT as i64;
+        let cases: Vec<(&str, Vec<String>)> = vec![
+            ("nothing", balance_around(vec![], None, 0)),
+            (
+                "withdrawal",
+                balance_around(vec![], Some(1_500_000), -1_500_000),
+            ),
+            (
+                "registration charges the key deposit",
+                balance_around(
+                    vec![Certificate::StakeRegistration(credential.clone())],
+                    None,
+                    deposit,
+                ),
+            ),
+            (
+                "deregistration refunds the key deposit",
+                balance_around(
+                    vec![Certificate::StakeDeregistration(credential.clone())],
+                    None,
+                    -deposit,
+                ),
+            ),
+            (
+                "delegation charges nothing",
+                balance_around(
+                    vec![Certificate::StakeDelegation(credential, [2; 28].into())],
+                    None,
+                    0,
+                ),
+            ),
+        ];
+        let unbalanced = "Err(PostAlonzo(PreservationOfValue))".to_string();
+        let expected: Vec<(&str, Vec<String>)> = cases
+            .iter()
+            .map(|(name, _)| {
+                (
+                    *name,
+                    vec![unbalanced.clone(), "Ok(())".to_string(), unbalanced.clone()],
+                )
+            })
+            .collect();
+        assert_eq!(cases, expected);
     }
 }
