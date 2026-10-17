@@ -12,7 +12,7 @@ use crate::utils::{
     ValidationResult, add_minted_value, add_values, aux_data_from_babbage_tx, check_bootstrap_wit,
     check_needed_script, check_remaining_bootstrap_wits, check_remaining_vk_wits,
     compute_native_script_hash, compute_plutus_v1_script_hash, compute_plutus_v2_script_hash,
-    empty_value, get_babbage_tx_size, get_lovelace_from_alonzo_val,
+    empty_value, get_babbage_tx_size, get_lovelace_from_alonzo_val, get_payment_part,
     get_script_hash_from_reward_account, get_shelley_address, get_val_size_in_words,
     lovelace_diff_or_fail, mk_alonzo_vk_wits_check_list, output_language_features,
     values_are_equal, verify_signature,
