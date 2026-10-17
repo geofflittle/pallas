@@ -49,7 +49,7 @@ fn context(cert: Certificate) -> ScriptContext<'static> {
 #[test]
 fn v3_deposit_context_protocol_boundaries_at_every_occurrence() {
     let credential = StakeCredential::ScriptHash([7; 28].into());
-    for protocol in [9, 10] {
+    for protocol in [9, 10, 11] {
         for (tag, cert) in [
             (0, Certificate::Reg(credential.clone(), 2000000)),
             (1, Certificate::UnReg(credential.clone(), 2000000)),
@@ -87,5 +87,28 @@ fn v3_deposit_context_protocol_boundaries_at_every_occurrence() {
                 "redeemer purpose protocol {protocol}"
             );
         }
+    }
+}
+#[test]
+fn public_encoding_is_the_protocol_9_encoding() {
+    let credential = StakeCredential::ScriptHash([7; 28].into());
+    for cert in [
+        Certificate::Reg(credential.clone(), 2000000),
+        Certificate::UnReg(credential.clone(), 2000000),
+    ] {
+        let c = context(cert);
+        let ScriptContext::V3 { tx_info, .. } = &c else {
+            panic!("V3 context")
+        };
+        assert_eq!(
+            c.to_plutus_data(),
+            c.to_plutus_data_with_protocol(9),
+            "script context"
+        );
+        assert_eq!(
+            tx_info.to_plutus_data(),
+            tx_info.to_plutus_data_with_protocol(9),
+            "tx info"
+        );
     }
 }
