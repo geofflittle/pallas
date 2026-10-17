@@ -1949,11 +1949,12 @@ mod conway_tests {
         use pallas_codec::utils::MaybeIndefArray;
         use pallas_primitives::{
             BigInt, Constr, Hash, PlutusData, StakeCredential,
-            conway::{Certificate, ExUnits, Redeemer, RedeemerTag, Redeemers, WitnessSet},
+            conway::{Certificate, DRep, ExUnits, Redeemer, RedeemerTag, Redeemers, WitnessSet},
         };
         use pallas_traverse::ComputeHash;
         use pallas_validate::{
             phase2::{
+                error::Error,
                 script_context::{SlotConfig, TxInfoV1, TxInfoV2},
                 to_plutus_data::ToPlutusData,
                 tx::eval_tx,
@@ -1963,12 +1964,12 @@ mod conway_tests {
 
         use super::*;
 
-        fn plutus_v3(source: &str) -> PlutusScript<3> {
+        fn plutus_script<const VERSION: usize>(source: &str) -> PlutusScript<VERSION> {
             let arena = Arena::new();
             let program = parse_program(&arena, source).into_result().unwrap();
             let flat = flat::encode(program).unwrap();
             PlutusScript(
-                minicbor::to_vec(PlutusScript::<3>(flat.into()))
+                minicbor::to_vec(PlutusScript::<VERSION>(flat.into()))
                     .unwrap()
                     .into(),
             )
@@ -1993,7 +1994,7 @@ mod conway_tests {
         fn certifying_tx(
             certificates: Vec<Certificate>,
             redeemer: Redeemer,
-            script: Option<PlutusScript<3>>,
+            add_scripts: impl FnOnce(&mut WitnessSet),
         ) -> Vec<u8> {
             let cbor_bytes: Vec<u8> = cbor_to_bytes(include_str!("../../test_data/conway3.tx"));
             let mut mtx: Tx = conway_minted_tx_from_cbor(&cbor_bytes);
@@ -2006,7 +2007,7 @@ mod conway_tests {
             body.reference_inputs = None;
             body.certificates = certificates.try_into().ok();
             let mut witnesses: WitnessSet = minicbor::decode(&[0xa0]).unwrap();
-            witnesses.plutus_v3_script = script.map(|script| vec![script].try_into().unwrap());
+            add_scripts(&mut witnesses);
             witnesses.redeemer = Some(Redeemers::List(vec![redeemer]).into());
             mtx.transaction_witness_set = witnesses.into();
             minicbor::to_vec(mtx).unwrap()
@@ -2047,7 +2048,7 @@ mod conway_tests {
                     Certificate::StakeDelegation(credential, pool),
                 ],
                 redeemer.clone(),
-                None,
+                |_| (),
             );
             let mtx: Tx = conway_minted_tx_from_cbor(&cbor);
 
@@ -2084,12 +2085,76 @@ mod conway_tests {
         }
 
         #[test]
+        fn v1_v2_context_refuses_a_conway_only_certificate() {
+            let source = "(program 1.0.0 (lam redeemer (lam context (con unit ()))))";
+            let v1 = plutus_script::<1>(source);
+            let v2 = plutus_script::<2>(source);
+            let credential = StakeCredential::ScriptHash([7; 28].into());
+            let pool: Hash<28> = [9; 28].into();
+            let supported = vec![
+                Certificate::StakeRegistration(credential.clone()),
+                Certificate::StakeDeregistration(credential.clone()),
+                Certificate::StakeDelegation(credential.clone(), pool),
+                Certificate::PoolRegistration {
+                    operator: pool,
+                    vrf_keyhash: [8; 32].into(),
+                    pledge: 0,
+                    cost: 340_000_000,
+                    margin: RationalNumber {
+                        numerator: 0,
+                        denominator: 1,
+                    },
+                    reward_account: vec![0xe0; 29].into(),
+                    pool_owners: Set::from(Vec::new()),
+                    relays: Vec::new(),
+                    pool_metadata: None,
+                },
+                Certificate::PoolRetirement(pool, 400),
+                Certificate::UnReg(credential.clone(), 2_000_000),
+            ];
+            let conway_only = Certificate::VoteDeleg(credential, DRep::Abstain);
+
+            for script_hash in [v1.compute_hash(), v2.compute_hash()] {
+                let evaluate = |others: &[Certificate]| {
+                    let mut certificates = vec![registration(script_hash)];
+                    certificates.extend_from_slice(others);
+                    let cbor = certifying_tx(certificates, cert_redeemer(0), |witnesses| {
+                        witnesses.plutus_v1_script = Some(vec![v1.clone()].try_into().unwrap());
+                        witnesses.plutus_v2_script = Some(vec![v2.clone()].try_into().unwrap());
+                    });
+                    let mtx: Tx = conway_minted_tx_from_cbor(&cbor);
+                    let mut params = mk_mainnet_params_epoch_380();
+                    params.protocol_version = (10, 0);
+                    eval_tx(
+                        &MultiEraTx::from_conway(&mtx),
+                        &MultiEraProtocolParameters::Conway(params),
+                        &UtxoMap::new(),
+                        &SlotConfig::default(),
+                    )
+                };
+
+                let outcomes: Vec<_> = evaluate(&supported)
+                    .unwrap()
+                    .iter()
+                    .map(|r| (r.tag, r.index, r.success))
+                    .collect();
+                assert_eq!(outcomes, [(RedeemerTag::Cert, 0, true)]);
+
+                let refused = evaluate(&[conway_only.clone()]);
+                assert!(
+                    matches!(refused, Err(Error::UnsupportedCertificateType)),
+                    "{refused:?}"
+                );
+            }
+        }
+
+        #[test]
         fn script_registration_with_its_redeemer_evaluates() {
-            let script = plutus_v3("(program 1.1.0 (lam context (con unit ())))");
+            let script = plutus_script::<3>("(program 1.1.0 (lam context (con unit ())))");
             let cbor = certifying_tx(
                 vec![registration(script.compute_hash())],
                 cert_redeemer(0),
-                Some(script),
+                |witnesses| witnesses.plutus_v3_script = Some(vec![script].try_into().unwrap()),
             );
             let mtx: Tx = conway_minted_tx_from_cbor(&cbor);
 
