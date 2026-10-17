@@ -142,7 +142,7 @@ mod conway_tests {
         let signed = hash.as_ref();
         let mut short_key = other(signed);
         short_key.public_key = vec![1; 31].into();
-        let mut short_signature = other(signed);
+        let mut short_signature = witness(signed);
         short_signature.signature = vec![1; 63].into();
         let input_only: Tx = conway_minted_tx_from_cbor(&raw);
         let input_only_hash = input_only.transaction_body.original_hash();
@@ -179,7 +179,7 @@ mod conway_tests {
             ),
             (
                 &tx,
-                vec![witness(signed), short_signature],
+                vec![short_signature],
                 "Err(PostAlonzo(VKWrongSignature))",
             ),
             (&input_only, vec![witness(input_only_signed)], "Ok(())"),
