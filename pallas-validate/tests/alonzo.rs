@@ -78,7 +78,11 @@ mod alonzo_tests {
             index: 0,
         };
         let raw = cbor_to_bytes(include_str!("../../test_data/alonzo1.tx"));
-        let input_only: Tx = minted_tx_from_cbor(&raw);
+        let mut mainnet: Tx = minted_tx_from_cbor(&raw);
+        // An empty required signers set needs key witnesses in this validator.
+        mainnet.transaction_body.required_signers = None;
+        let without_signers = pallas_codec::minicbor::to_vec(&mainnet).unwrap();
+        let input_only: Tx = pallas_codec::minicbor::decode(&without_signers).unwrap();
         let mut tx = input_only.clone();
         tx.transaction_body.collateral = Some(vec![collateral.clone()]);
         let encoded = pallas_codec::minicbor::to_vec(&tx).unwrap();
