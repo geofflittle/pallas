@@ -1,0 +1,10 @@
+fix(validate): require collateral with redeemers
+
+- alonzo, babbage, conway: check collateral when redeemers are present
+- check_tx_ex_units: always sum redeemers, and run the Conway sum
+- tests/conway.rs: V3 reference script txs pass with chain collateral
+- tests: reference script txs refuse low collateral and excess ex units
+
+Co-authored-by: Rob van Leeuwen <luivatra@gmail.com>
+Co-authored-by: Geoff Little <g.little712@gmail.com>
+

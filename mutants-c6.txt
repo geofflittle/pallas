@@ -1,0 +1,198 @@
+mutated none
+arm none base=c6 head=f99a7127 exit=0
+totals passed=158 failed=0
+mutated MX-babbage-exunits-witness-trigger
+arm MX-babbage-exunits-witness-trigger base=c6 head=f99a7127 exit=101
+test babbage_tests::reference_script_tx_ex_units_exceeded ... FAILED
+test result: FAILED. 34 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+error: test failed, to rerun pass `-p pallas-validate --test babbage`
+error: 1 target failed:
+totals passed=157 failed=1
+mutated MX-conway-exunits-witness-trigger
+arm MX-conway-exunits-witness-trigger base=c6 head=f99a7127 exit=101
+test conway_tests::reference_script_tx_ex_units_exceeded ... FAILED
+test result: FAILED. 24 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `-p pallas-validate --test conway`
+error: 1 target failed:
+totals passed=157 failed=1
+mutated MX-conway-exunits-lazy-sum
+arm MX-conway-exunits-lazy-sum base=c6 head=f99a7127 exit=101
+test conway_tests::reference_script_tx_ex_units_exceeded ... FAILED
+test result: FAILED. 24 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `-p pallas-validate --test conway`
+error: 1 target failed:
+totals passed=157 failed=1
+mutated MX-alonzo-exunits-witness-trigger
+arm MX-alonzo-exunits-witness-trigger base=c6 head=f99a7127 exit=0
+totals passed=158 failed=0
+mutated MC-alonzo-collateral-witness-trigger
+arm MC-alonzo-collateral-witness-trigger base=c6 head=f99a7127 exit=0
+totals passed=158 failed=0
+mutated MC-babbage-collateral-witness-trigger
+arm MC-babbage-collateral-witness-trigger base=c6 head=f99a7127 exit=101
+test babbage_tests::reference_script_tx_with_collateral_one_lovelace_short ... FAILED
+test result: FAILED. 34 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+error: test failed, to rerun pass `-p pallas-validate --test babbage`
+error: 1 target failed:
+totals passed=157 failed=1
+mutated MC-conway-collateral-witness-trigger
+arm MC-conway-collateral-witness-trigger base=c6 head=f99a7127 exit=101
+test conway_tests::reference_script_tx_with_collateral_one_lovelace_short ... FAILED
+test result: FAILED. 24 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `-p pallas-validate --test conway`
+error: 1 target failed:
+totals passed=157 failed=1
+arm arms/A15m-key-deposit-zero.patch base=c6 head=f99a7127 exit=101
+test conway_tests::deposits_are_required_through_dispatch ... FAILED
+error: test failed, to rerun pass `-p pallas-validate --test conway`
+test result: FAILED. 24 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: 1 target failed:
+totals passed=157 failed=1
+arm arms/A16m-drep-deposit-zero.patch base=c6 head=f99a7127 exit=101
+test conway_tests::deposits_are_required_through_dispatch ... FAILED
+test result: FAILED. 24 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `-p pallas-validate --test conway`
+error: 1 target failed:
+totals passed=157 failed=1
+arm arms/A17m-gov-deposit-zero.patch base=c6 head=f99a7127 exit=101
+test conway_tests::deposits_are_required_through_dispatch ... FAILED
+test result: FAILED. 24 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `-p pallas-validate --test conway`
+error: 1 target failed:
+totals passed=157 failed=1
+arm arms/A18m-drep-gov-swapped.patch base=c6 head=f99a7127 exit=101
+test conway_tests::deposits_are_required_through_dispatch ... FAILED
+test result: FAILED. 24 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `-p pallas-validate --test conway`
+error: 1 target failed:
+totals passed=157 failed=1
+arm arms/DF1-txinfo-default-10.patch base=c6 head=f99a7127 exit=101
+test phase2::to_plutus_data::tests::public_encoding_is_the_protocol_9_encoding ... FAILED
+test result: FAILED. 25 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+totals passed=157 failed=1
+arm arms/DF2-context-default-10.patch base=c6 head=f99a7127 exit=101
+test phase2::to_plutus_data::tests::public_encoding_is_the_protocol_9_encoding ... FAILED
+test result: FAILED. 25 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+totals passed=157 failed=1
+arm arms/K-cutoff-eq-10.patch base=c6 head=f99a7127 exit=101
+test phase2::to_plutus_data::tests::v3_deposit_context_protocol_boundaries_at_every_occurrence ... FAILED
+test result: FAILED. 25 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+totals passed=157 failed=1
+mutated K-ge-9
+arm K-ge-9 base=c6 head=f99a7127 exit=101
+test phase2::to_plutus_data::tests::v3_deposit_context_protocol_boundaries_at_every_occurrence ... FAILED
+test result: FAILED. 25 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+error: test failed, to rerun pass `-p pallas-validate --lib`
+test conway_tests::phase2_certificates::script_registration_with_its_redeemer_evaluates ... FAILED
+test result: FAILED. 24 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `-p pallas-validate --test conway`
+error: 2 targets failed:
+totals passed=156 failed=2
+mutated K-gt-10
+arm K-gt-10 base=c6 head=f99a7127 exit=101
+test phase2::to_plutus_data::tests::v3_deposit_context_protocol_boundaries_at_every_occurrence ... FAILED
+test result: FAILED. 25 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+error: test failed, to rerun pass `-p pallas-validate --lib`
+test conway_tests::phase2_certificates::script_registration_with_its_redeemer_evaluates ... FAILED
+test result: FAILED. 24 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `-p pallas-validate --test conway`
+error: 2 targets failed:
+totals passed=156 failed=2
+mutated K-certs-site-false
+arm K-certs-site-false base=c6 head=f99a7127 exit=101
+test phase2::to_plutus_data::tests::v3_deposit_context_protocol_boundaries_at_every_occurrence ... FAILED
+test result: FAILED. 25 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+totals passed=157 failed=1
+mutated K-redeemers-site-false
+arm K-redeemers-site-false base=c6 head=f99a7127 exit=101
+test phase2::to_plutus_data::tests::v3_deposit_context_protocol_boundaries_at_every_occurrence ... FAILED
+test result: FAILED. 25 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+totals passed=157 failed=1
+mutated K-purpose-site-false
+arm K-purpose-site-false base=c6 head=f99a7127 exit=101
+test phase2::to_plutus_data::tests::v3_deposit_context_protocol_boundaries_at_every_occurrence ... FAILED
+test result: FAILED. 25 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+error: test failed, to rerun pass `-p pallas-validate --lib`
+test conway_tests::phase2_certificates::script_registration_with_its_redeemer_evaluates ... FAILED
+test result: FAILED. 24 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `-p pallas-validate --test conway`
+error: 2 targets failed:
+totals passed=156 failed=2
+mutated MR-unreg-refund-zero
+arm MR-unreg-refund-zero base=c6 head=f99a7127 exit=101
+test phase1::conway::tests::each_certificate_charges_or_refunds_its_deposit ... FAILED
+test phase1::conway::tests::deposits_refunds_withdrawals_and_donations_balance ... FAILED
+test result: FAILED. 24 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+totals passed=156 failed=2
+mutated MR-drep-refund-zero
+arm MR-drep-refund-zero base=c6 head=f99a7127 exit=101
+test phase1::conway::tests::each_certificate_charges_or_refunds_its_deposit ... FAILED
+test result: FAILED. 25 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+totals passed=157 failed=1
+mutated MR-dereg-refund-zero
+arm MR-dereg-refund-zero base=c6 head=f99a7127 exit=101
+test phase1::conway::tests::each_certificate_charges_or_refunds_its_deposit ... FAILED
+test result: FAILED. 25 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+totals passed=157 failed=1
+mutated MW-remaining-first-only
+arm MW-remaining-first-only base=c6 head=f99a7127 exit=101
+test phase1::conway::tests::native_certificate_checks_authorization_without_redeemers ... FAILED
+test result: FAILED. 25 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+totals passed=157 failed=1
+mutated MS-deleg-unwrapped
+arm MS-deleg-unwrapped base=c6 head=f99a7127 exit=101
+test conway_tests::phase2_certificates::v1_v2_context_encodes_stake_certificates_as_the_ledger_does ... FAILED
+test result: FAILED. 24 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `-p pallas-validate --test conway`
+error: 1 target failed:
+totals passed=157 failed=1
+mutated M762-spend-mint-reward-unfiltered
+arm M762-spend-mint-reward-unfiltered base=c6 head=f99a7127 exit=101
+test phase1::conway::tests::native_reference_certificate_needs_no_redeemer ... FAILED
+test phase1::conway::tests::native_reference_scripts_need_no_redeemer_for_any_purpose ... FAILED
+test result: FAILED. 24 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+totals passed=156 failed=2
+mutated M762-mint-reward-unfiltered
+arm M762-mint-reward-unfiltered base=c6 head=f99a7127 exit=101
+test phase1::conway::tests::native_reference_scripts_need_no_redeemer_for_any_purpose ... FAILED
+test result: FAILED. 25 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+totals passed=157 failed=1
+mutated MV1-ref-hash-as-v2
+arm MV1-ref-hash-as-v2 base=c6 head=f99a7127 exit=101
+test phase1::conway::tests::plutus_reference_scripts_need_a_redeemer_for_every_purpose ... FAILED
+test result: FAILED. 25 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+error: test failed, to rerun pass `-p pallas-validate --lib`
+error: 1 target failed:
+totals passed=157 failed=1
+mutated PB-babbage-ref-collateral-1
+arm PB-babbage-ref-collateral-1 base=c6 head=f99a7127 exit=101
+test babbage_tests::successful_mainnet_tx_with_plutus_v2_script ... FAILED
+test result: FAILED. 34 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+error: test failed, to rerun pass `-p pallas-validate --test babbage`
+error: 1 target failed:
+totals passed=157 failed=1
+mutated MN-eval-every-native
+arm MN-eval-every-native base=c6 head=f99a7127 exit=0
+totals passed=158 failed=0
