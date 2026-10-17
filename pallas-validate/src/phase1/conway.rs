@@ -204,7 +204,7 @@ fn check_collaterals_address(collaterals: &[TransactionInput], utxos: &UTxOs) ->
             Some(multi_era_output) => {
                 match multi_era_output
                     .address()
-                    .map_err(|_| PostAlonzo(InputDecoding))?
+                    .map_err(|_| PostAlonzo(CollateralNotVKeyLocked))?
                 {
                     Address::Shelley(address)
                         if matches!(address.payment(), ShelleyPaymentPart::Key(_)) => {}
