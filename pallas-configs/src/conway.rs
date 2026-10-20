@@ -1,5 +1,10 @@
-use serde::Deserialize;
-use std::collections::HashMap;
+use num_rational::Ratio;
+use serde::de::{
+    self, MapAccess, SeqAccess, Unexpected, Visitor,
+    value::{MapAccessDeserializer, SeqAccessDeserializer},
+};
+use serde::{Deserialize, Deserializer};
+use std::{collections::HashMap, fmt};
 
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -63,9 +68,110 @@ pub struct Committee {
 }
 
 #[derive(Deserialize, Clone, Debug)]
+#[serde(from = "FractionForm")]
 pub struct Fraction {
     pub numerator: u64,
     pub denominator: u64,
+}
+
+struct FractionForm(Fraction);
+
+impl From<FractionForm> for Fraction {
+    fn from(form: FractionForm) -> Self {
+        form.0
+    }
+}
+
+#[derive(Deserialize)]
+struct FractionTerms {
+    numerator: u64,
+    denominator: u64,
+}
+
+impl From<FractionTerms> for Fraction {
+    fn from(terms: FractionTerms) -> Self {
+        Self {
+            numerator: terms.numerator,
+            denominator: terms.denominator,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for FractionForm {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer
+            .deserialize_any(FractionFormVisitor)
+            .map(FractionForm)
+    }
+}
+
+struct FractionFormVisitor;
+
+impl<'de> Visitor<'de> for FractionFormVisitor {
+    type Value = Fraction;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a fraction object, a two element array or a non negative number")
+    }
+
+    fn visit_map<A>(self, map: A) -> Result<Fraction, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        FractionTerms::deserialize(MapAccessDeserializer::new(map)).map(Fraction::from)
+    }
+
+    fn visit_seq<A>(self, seq: A) -> Result<Fraction, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        FractionTerms::deserialize(SeqAccessDeserializer::new(seq)).map(Fraction::from)
+    }
+
+    fn visit_u64<E>(self, value: u64) -> Result<Fraction, E> {
+        Ok(Fraction {
+            numerator: value,
+            denominator: 1,
+        })
+    }
+
+    fn visit_i64<E>(self, value: i64) -> Result<Fraction, E>
+    where
+        E: de::Error,
+    {
+        match u64::try_from(value) {
+            Ok(value) => self.visit_u64(value),
+            Err(_) => Err(E::invalid_value(Unexpected::Signed(value), &self)),
+        }
+    }
+
+    fn visit_f64<E>(self, value: f64) -> Result<Fraction, E>
+    where
+        E: de::Error,
+    {
+        decimal_fraction(value).ok_or_else(|| E::invalid_value(Unexpected::Float(value), &self))
+    }
+}
+
+fn decimal_fraction(value: f64) -> Option<Fraction> {
+    if value < 0.0 {
+        return None;
+    }
+
+    // Display writes the shortest decimal that parses back to the same f64, with no exponent.
+    let text = value.abs().to_string();
+    let (whole, decimals) = text.split_once('.').unwrap_or((&text, ""));
+    let numerator = format!("{whole}{decimals}").parse().ok()?;
+    let denominator = 10u64.checked_pow(u32::try_from(decimals.len()).ok()?)?;
+    let ratio = Ratio::new(numerator, denominator);
+
+    Some(Fraction {
+        numerator: *ratio.numer(),
+        denominator: *ratio.denom(),
+    })
 }
 
 impl From<Fraction> for pallas_primitives::conway::RationalNumber {
@@ -106,5 +212,49 @@ mod tests {
     #[test]
     fn test_mainnet_json_loads() {
         load_test_data_config("mainnet");
+    }
+
+    #[test]
+    fn a_committee_threshold_object_keeps_its_terms() {
+        let threshold = load_test_data_config("mainnet").committee.threshold;
+
+        assert_eq!((threshold.numerator, threshold.denominator), (2, 3));
+    }
+
+    #[test]
+    fn a_committee_threshold_array_keeps_its_terms() {
+        let committee: Committee =
+            serde_json::from_str(r#"{ "members": {}, "threshold": [2, 3] }"#).unwrap();
+
+        let threshold = committee.threshold;
+        assert_eq!((threshold.numerator, threshold.denominator), (2, 3));
+    }
+
+    #[test]
+    fn a_committee_threshold_number_loads_as_a_fraction() {
+        let threshold = load_test_data_config("proto-devnet").committee.threshold;
+
+        assert_eq!((threshold.numerator, threshold.denominator), (0, 1));
+    }
+
+    #[test]
+    fn a_committee_threshold_decimal_loads_as_its_exact_fraction() {
+        let cases = [
+            ("0.67", (67, 100)),
+            ("0.5", (1, 2)),
+            ("0.123456789", (123456789, 1000000000)),
+            ("0.6666666666666666", (3333333333333333, 5000000000000000)),
+        ];
+
+        for (decimal, expected) in cases {
+            let json = format!(r#"{{ "members": {{}}, "threshold": {decimal} }}"#);
+            let threshold = serde_json::from_str::<Committee>(&json).unwrap().threshold;
+
+            assert_eq!(
+                (threshold.numerator, threshold.denominator),
+                expected,
+                "{decimal}"
+            );
+        }
     }
 }
