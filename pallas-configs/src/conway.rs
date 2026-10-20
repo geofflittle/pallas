@@ -78,6 +78,13 @@ impl<'de> Deserialize<'de> for Fraction {
             denominator,
         } = crate::alonzo::Fraction::deserialize(deserializer)?;
 
+        if numerator != 0 {
+            return Ok(Fraction {
+                numerator: denominator,
+                denominator: numerator,
+            });
+        }
+
         Ok(Fraction {
             numerator,
             denominator,
