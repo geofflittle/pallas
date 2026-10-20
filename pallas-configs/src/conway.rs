@@ -107,4 +107,18 @@ mod tests {
     fn test_mainnet_json_loads() {
         load_test_data_config("mainnet");
     }
+
+    #[test]
+    fn a_committee_threshold_object_keeps_its_terms() {
+        let threshold = load_test_data_config("mainnet").committee.threshold;
+
+        assert_eq!((threshold.numerator, threshold.denominator), (2, 3));
+    }
+
+    #[test]
+    fn a_committee_threshold_number_loads_as_a_fraction() {
+        let threshold = load_test_data_config("proto-devnet").committee.threshold;
+
+        assert_eq!((threshold.numerator, threshold.denominator), (0, 1));
+    }
 }
