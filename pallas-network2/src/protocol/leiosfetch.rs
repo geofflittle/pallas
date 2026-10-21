@@ -337,8 +337,24 @@ mod tests {
         match decode_captured(include_bytes!(
             "../../../test_data/leios-rc-2026w42/fetch-block-txs.cbor"
         )) {
-            Message::BlockTxs { txs, .. } => assert_eq!(txs.len(), 67),
+            Message::BlockTxs { txs } => assert_eq!(txs.len(), 67),
             other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn captured_block_txs_hold_block_transactions() {
+        let msg: Message = minicbor::decode(include_bytes!(
+            "../../../test_data/leios-rc-2026w42/fetch-block-txs.cbor"
+        ))
+        .unwrap();
+        let Message::BlockTxs { txs } = msg else {
+            panic!("{msg:?}");
+        };
+        for tx in &txs {
+            let bytes = tx.raw_bytes();
+            assert_eq!(bytes[0], 0x84, "a four element block transaction");
+            assert_eq!(bytes[bytes.len() - 1], 0xf5, "is_valid last");
         }
     }
 
