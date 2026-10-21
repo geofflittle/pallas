@@ -1,0 +1,19 @@
+Chain dump comparison for the v1 mapper, run on musashi-aws under /opt/build/v1-reshape-1022.
+
+Inputs: the chain dump /opt/build/mapper-panics-1022/dump/chain.b64 (14931 blocks, 2210033 txs),
+a box clone at $D/repo holding the refs below, the pallas-ci:1 image, and these files in $D/rows-full.
+
+1. sh rows-full/dumprun-full.sh head v1-head          (feat/utxorpc-map-v1-schema e64894a7)
+   sh rows-full/dumprun-full.sh fork fork-v1          (leios-musashi a1b0f525)
+   python3 rows-full/cmprows.py dumpchk/fork/rows.txt dumpchk/head/rows.txt
+   Expect "blocks 14931 rows 2210033 differing 401 trailing_extra False" then "DIFFER".
+   Every differing line is a block digest line from slot 292664 on, and every row is equal.
+2. sh rows-full/fullrun.sh head 292664, the same for fork, then diff the two full-292664.json files.
+   Expect the fork alone to carry a witness "script" list of 15 plutusV3 entries.
+3. sh rows-full/dumprun-full.sh v3fix repro/v1-head-with-v3-witness-fix   (e64894a7 with 6453ae4f picked)
+   python3 rows-full/cmprows.py dumpchk/fork/rows.txt dumpchk/v3fix/rows.txt
+   Expect "blocks 14931 rows 2210033 differing 0 trailing_extra False" then "IDENTICAL".
+4. sh rows-full/digestrun.sh dbase b489e457 and sh rows-full/digestrun.sh dhead v1-head
+   cmp dumpchk/dbase/digest.txt dumpchk/dhead/digest.txt && echo IDENTICAL
+   Expect "IDENTICAL": v1alpha and v1beta output is byte equal on every block.
+Delete $D/target-dump-* and the dumpchk worktrees afterwards.
