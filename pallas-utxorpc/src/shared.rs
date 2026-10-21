@@ -65,6 +65,18 @@ macro_rules! impl_cardano_mapper_shared {
             }
         }
 
+        /// One native script clause with its children left out, for any era's script type.
+        enum NativeClause<'a> {
+            Pubkey(&'a pallas_crypto::hash::Hash<28>),
+            All,
+            Any,
+            NOfK(i64),
+            InvalidBefore(u64),
+            InvalidHereafter(u64),
+            #[cfg(feature = "unstable")]
+            RequireGuard,
+        }
+
         impl<C: $crate::LedgerContext> Mapper<C> {
             #[deprecated(
                 since = "1.5.0",
@@ -183,63 +195,125 @@ macro_rules! impl_cardano_mapper_shared {
             pub fn map_native_script(
                 x: &pallas_primitives::alonzo::NativeScript,
             ) -> u5c::NativeScript {
-                use pallas_primitives::babbage;
+                use pallas_primitives::alonzo::NativeScript;
 
                 // Folded bottom-up rather than recursed: scripts nest as deep
                 // as a transaction has bytes.
-                pallas_codec::tree::fold_tree(x, |x, children: Vec<u5c::NativeScript>| {
-                    let inner = match x {
-                        babbage::NativeScript::ScriptPubkey(x) => {
-                            Self::map_native_script_pubkey(x.to_vec())
-                        }
-                        babbage::NativeScript::ScriptAll(_) => {
-                            u5c::native_script::NativeScript::ScriptAll(u5c::NativeScriptList {
-                                items: children,
-                            })
-                        }
-                        babbage::NativeScript::ScriptAny(_) => {
-                            u5c::native_script::NativeScript::ScriptAny(u5c::NativeScriptList {
-                                items: children,
-                            })
-                        }
-                        babbage::NativeScript::ScriptNOfK(n, _) => {
-                            u5c::native_script::NativeScript::ScriptNOfK(u5c::ScriptNOfK {
-                                // u5c's `k` is wire-fixed at uint32, the ledger's threshold is
-                                // i64: clamp rather than cast, or a negative value wraps into
-                                // an unsatisfiable one instead of the satisfiable 0 it means.
-                                k: (*n).clamp(0, i64::from(u32::MAX)) as u32,
-                                scripts: children,
-                            })
-                        }
-                        babbage::NativeScript::InvalidBefore(s) => {
-                            u5c::native_script::NativeScript::InvalidBefore(*s)
-                        }
-                        babbage::NativeScript::InvalidHereafter(s) => {
-                            u5c::native_script::NativeScript::InvalidHereafter(*s)
-                        }
+                pallas_codec::tree::fold_tree(x, |x, children| {
+                    let clause = match x {
+                        NativeScript::ScriptPubkey(x) => NativeClause::Pubkey(x),
+                        NativeScript::ScriptAll(_) => NativeClause::All,
+                        NativeScript::ScriptAny(_) => NativeClause::Any,
+                        NativeScript::ScriptNOfK(n, _) => NativeClause::NOfK(*n),
+                        NativeScript::InvalidBefore(s) => NativeClause::InvalidBefore(*s),
+                        NativeScript::InvalidHereafter(s) => NativeClause::InvalidHereafter(*s),
                     };
-                    u5c::NativeScript {
-                        native_script: Some(inner),
-                    }
+                    Self::map_native_clause(clause, children)
                 })
             }
 
-            pub fn map_any_script(&self, x: &pallas_primitives::conway::ScriptRef) -> u5c::Script {
-                use pallas_primitives::conway;
-                match x {
-                    conway::ScriptRef::NativeScript(x) => u5c::Script {
-                        script: u5c::script::Script::Native(Self::map_native_script(x)).into(),
-                    },
-                    conway::ScriptRef::PlutusV1Script(x) => u5c::Script {
-                        script: u5c::script::Script::PlutusV1(x.0.to_vec().into()).into(),
-                    },
-                    conway::ScriptRef::PlutusV2Script(x) => u5c::Script {
-                        script: u5c::script::Script::PlutusV2(x.0.to_vec().into()).into(),
-                    },
-                    conway::ScriptRef::PlutusV3Script(x) => u5c::Script {
-                        script: u5c::script::Script::PlutusV3(x.0.to_vec().into()).into(),
-                    },
+            #[cfg(feature = "unstable")]
+            fn map_dijkstra_native_script(
+                x: &pallas_primitives::dijkstra::NativeScript,
+            ) -> u5c::NativeScript {
+                use pallas_primitives::dijkstra::NativeScript;
+
+                pallas_codec::tree::fold_tree(x, |x, children| {
+                    let clause = match x {
+                        NativeScript::ScriptPubkey(x) => NativeClause::Pubkey(x),
+                        NativeScript::ScriptAll(_) => NativeClause::All,
+                        NativeScript::ScriptAny(_) => NativeClause::Any,
+                        NativeScript::ScriptNOfK(n, _) => NativeClause::NOfK(*n),
+                        NativeScript::InvalidBefore(s) => NativeClause::InvalidBefore(*s),
+                        NativeScript::InvalidHereafter(s) => NativeClause::InvalidHereafter(*s),
+                        NativeScript::ScriptRequireGuard(_) => NativeClause::RequireGuard,
+                    };
+                    Self::map_native_clause(clause, children)
+                })
+            }
+
+            fn map_native_clause(
+                clause: NativeClause,
+                children: Vec<u5c::NativeScript>,
+            ) -> u5c::NativeScript {
+                let inner = match clause {
+                    NativeClause::Pubkey(x) => Self::map_native_script_pubkey(x.to_vec()),
+                    NativeClause::All => {
+                        u5c::native_script::NativeScript::ScriptAll(u5c::NativeScriptList {
+                            items: children,
+                        })
+                    }
+                    NativeClause::Any => {
+                        u5c::native_script::NativeScript::ScriptAny(u5c::NativeScriptList {
+                            items: children,
+                        })
+                    }
+                    NativeClause::NOfK(n) => {
+                        u5c::native_script::NativeScript::ScriptNOfK(u5c::ScriptNOfK {
+                            // u5c's `k` is wire-fixed at uint32, the ledger's threshold is
+                            // i64: clamp rather than cast, or a negative value wraps into
+                            // an unsatisfiable one instead of the satisfiable 0 it means.
+                            k: n.clamp(0, i64::from(u32::MAX)) as u32,
+                            scripts: children,
+                        })
+                    }
+                    NativeClause::InvalidBefore(s) => {
+                        u5c::native_script::NativeScript::InvalidBefore(s)
+                    }
+                    NativeClause::InvalidHereafter(s) => {
+                        u5c::native_script::NativeScript::InvalidHereafter(s)
+                    }
+                    // The u5c schema names no native script member for a guard.
+                    #[cfg(feature = "unstable")]
+                    NativeClause::RequireGuard => {
+                        return u5c::NativeScript {
+                            native_script: None,
+                        };
+                    }
+                };
+
+                u5c::NativeScript {
+                    native_script: Some(inner),
                 }
+            }
+
+            pub fn map_any_script(&self, x: &pallas_primitives::conway::ScriptRef) -> u5c::Script {
+                self.map_script_ref(&pallas_traverse::MultiEraScriptRef::from_conway(x))
+            }
+
+            fn map_script_ref(&self, x: &pallas_traverse::MultiEraScriptRef) -> u5c::Script {
+                use pallas_traverse::script_ref::ScriptLanguage;
+
+                let inner = match (x.language(), x.native_script(), x.plutus_bytes()) {
+                    (_, Some(script), _) => {
+                        u5c::script::Script::Native(Self::map_any_native_script(&script))
+                    }
+                    (ScriptLanguage::PlutusV1, _, Some(bytes)) => {
+                        u5c::script::Script::PlutusV1(bytes.to_vec().into())
+                    }
+                    (ScriptLanguage::PlutusV2, _, Some(bytes)) => {
+                        u5c::script::Script::PlutusV2(bytes.to_vec().into())
+                    }
+                    (ScriptLanguage::PlutusV3, _, Some(bytes)) => {
+                        u5c::script::Script::PlutusV3(bytes.to_vec().into())
+                    }
+                    #[cfg(feature = "unstable")]
+                    (ScriptLanguage::PlutusV4, _, Some(bytes)) => {
+                        u5c::script::Script::PlutusV4(bytes.to_vec().into())
+                    }
+                    _ => unimplemented!("map_script_ref has no arm for this reference script"),
+                };
+
+                u5c::Script {
+                    script: Some(inner),
+                }
+            }
+
+            fn map_output_script(
+                &self,
+                x: &pallas_traverse::MultiEraOutput,
+            ) -> Option<u5c::Script> {
+                x.multi_era_script_ref().map(|x| self.map_script_ref(&x))
             }
 
             pub fn map_stake_credential(
@@ -318,9 +392,7 @@ macro_rules! impl_cardano_mapper_shared {
                 match x {
                     MultiEraNativeScript::AlonzoCompatible(x) => Self::map_native_script(x),
                     #[cfg(feature = "unstable")]
-                    MultiEraNativeScript::Dijkstra(_) => {
-                        unimplemented!("collect_all_scripts is not yet implemented for Dijkstra")
-                    }
+                    MultiEraNativeScript::Dijkstra(x) => Self::map_dijkstra_native_script(x),
                     _ => unimplemented!("collect_all_scripts has no arm for this native script"),
                 }
             }
