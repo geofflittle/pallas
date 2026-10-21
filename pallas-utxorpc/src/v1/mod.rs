@@ -158,13 +158,7 @@ fn with_leios_fields(mut mapped: u5c::Block, block: &trv::MultiEraBlock) -> u5c:
 
         #[cfg(feature = "unstable")]
         {
-            mapped.endorser_block_announcement =
-                header
-                    .eb_announcement()
-                    .map(|x| u5c::EndorserBlockAnnouncement {
-                        references_hash: x.eb_hash.to_vec().into(),
-                        references_size: x.eb_size,
-                    });
+            mapped.endorser_block_announcement = header.eb_announcement().and(None);
         }
     }
 
