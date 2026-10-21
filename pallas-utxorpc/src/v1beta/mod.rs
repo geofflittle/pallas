@@ -387,7 +387,10 @@ impl<C: LedgerContext> Mapper<C> {
 
     /// Maps the per-tx voting procedures into the v1beta `votes` field.
     pub fn map_votes(&self, tx: &trv::MultiEraTx) -> Vec<u5c::VoterVotes> {
-        let Some(procedures) = tx.voting_procedures() else {
+        let Some(procedures) = tx
+            .as_conway()
+            .and_then(|x| x.transaction_body.voting_procedures.as_ref())
+        else {
             return Vec::new();
         };
 
