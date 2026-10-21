@@ -662,7 +662,7 @@ macro_rules! impl_cardano_mapper_shared {
                     }
                     .into(),
                     body: u5c::BlockBody {
-                        tx: block.txs().iter().map(|x| self.map_tx(x)).collect(),
+                        tx: block.txs().iter().rev().map(|x| self.map_tx(x)).collect(),
                     }
                     .into(),
                     // The spec declares `Block.timestamp` as milliseconds;
