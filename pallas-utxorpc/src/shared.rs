@@ -266,9 +266,9 @@ macro_rules! impl_cardano_mapper_shared {
                     // The u5c schema names no native script member for a guard.
                     #[cfg(feature = "unstable")]
                     NativeClause::RequireGuard => {
-                        return u5c::NativeScript {
-                            native_script: None,
-                        };
+                        u5c::native_script::NativeScript::ScriptAll(u5c::NativeScriptList {
+                            items: children,
+                        })
                     }
                 };
 
