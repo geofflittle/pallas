@@ -38,8 +38,8 @@ crate::since_v1beta::impl_cardano_mapper_since_v1beta!();
 type ParamUpdate = u5c::PParamsUpdate;
 
 /// The value this schema's update message holds for a scalar key, absent when the update leaves the key unset.
-fn update_scalar<T>(value: Option<T>) -> Option<T> {
-    value
+fn update_scalar<T: Default + PartialEq>(value: Option<T>) -> Option<T> {
+    value.filter(|x| *x != T::default())
 }
 
 /// The u5c purpose of a guarding redeemer.
