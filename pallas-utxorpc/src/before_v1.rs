@@ -65,15 +65,7 @@ macro_rules! impl_cardano_mapper_before_v1 {
                 &self,
                 x: &pallas_primitives::conway::RedeemerTag,
             ) -> u5c::RedeemerPurpose {
-                use pallas_primitives::conway;
-                match x {
-                    conway::RedeemerTag::Spend => u5c::RedeemerPurpose::Spend,
-                    conway::RedeemerTag::Mint => u5c::RedeemerPurpose::Mint,
-                    conway::RedeemerTag::Cert => u5c::RedeemerPurpose::Cert,
-                    conway::RedeemerTag::Reward => u5c::RedeemerPurpose::Reward,
-                    conway::RedeemerTag::Vote => u5c::RedeemerPurpose::Vote,
-                    conway::RedeemerTag::Propose => u5c::RedeemerPurpose::Propose,
-                }
+                self.map_multi_era_purpose(&(*x).into())
             }
 
             // The released signature returned parameters whose every field is
@@ -105,45 +97,9 @@ macro_rules! impl_cardano_mapper_before_v1 {
             pub fn map_native_script(
                 x: &pallas_primitives::alonzo::NativeScript,
             ) -> u5c::NativeScript {
-                use pallas_primitives::babbage;
-
-                // Folded bottom-up rather than recursed: scripts nest as deep
-                // as a transaction has bytes.
-                pallas_codec::tree::fold_tree(x, |x, children: Vec<u5c::NativeScript>| {
-                    let inner = match x {
-                        babbage::NativeScript::ScriptPubkey(x) => {
-                            Self::map_native_script_pubkey(x.to_vec())
-                        }
-                        babbage::NativeScript::ScriptAll(_) => {
-                            u5c::native_script::NativeScript::ScriptAll(u5c::NativeScriptList {
-                                items: children,
-                            })
-                        }
-                        babbage::NativeScript::ScriptAny(_) => {
-                            u5c::native_script::NativeScript::ScriptAny(u5c::NativeScriptList {
-                                items: children,
-                            })
-                        }
-                        babbage::NativeScript::ScriptNOfK(n, _) => {
-                            u5c::native_script::NativeScript::ScriptNOfK(u5c::ScriptNOfK {
-                                // u5c's `k` is wire-fixed at uint32, the ledger's threshold is
-                                // i64: clamp rather than cast, or a negative value wraps into
-                                // an unsatisfiable one instead of the satisfiable 0 it means.
-                                k: (*n).clamp(0, i64::from(u32::MAX)) as u32,
-                                scripts: children,
-                            })
-                        }
-                        babbage::NativeScript::InvalidBefore(s) => {
-                            u5c::native_script::NativeScript::InvalidBefore(*s)
-                        }
-                        babbage::NativeScript::InvalidHereafter(s) => {
-                            u5c::native_script::NativeScript::InvalidHereafter(*s)
-                        }
-                    };
-                    u5c::NativeScript {
-                        native_script: Some(inner),
-                    }
-                })
+                Self::map_multi_era_native_script(
+                    &pallas_traverse::MultiEraNativeScript::from_decoded_alonzo_compatible(x),
+                )
             }
 
             #[deprecated(since = "1.5.0", note = "use Mapper::map_script_ref")]
