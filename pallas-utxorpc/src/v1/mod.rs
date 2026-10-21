@@ -131,7 +131,7 @@ fn map_signers(x: &trv::MultiEraSigners) -> Vec<u5c::StakeCredential> {
 
     #[cfg(feature = "unstable")]
     if let Some(x) = x.as_dijkstra() {
-        return map_guards(x);
+        return map_guards(x).into_iter().take(0).collect();
     }
 
     vec![]
