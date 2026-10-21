@@ -208,6 +208,65 @@ mod tests {
         }
     }
 
+    fn decode_captured(bytes: &[u8]) -> Message {
+        let msg: Message = minicbor::decode(bytes).expect("captured message decodes");
+        assert_eq!(
+            minicbor::to_vec(&msg).unwrap(),
+            bytes,
+            "re-encodes byte equal"
+        );
+        msg
+    }
+
+    fn captured_point() -> EbId {
+        Point::Specific(
+            353,
+            hex::decode("a085f5ee18bce08a1a9393a54c8bcb6e237ab5d1270681cd4b36648b1d099b8b")
+                .unwrap(),
+        )
+    }
+
+    #[test]
+    fn captured_messages_decode_by_their_numbers() {
+        let request = decode_captured(include_bytes!(
+            "../../../test_data/leios-rc-2026w42/notify-request-next.cbor"
+        ));
+        assert!(matches!(request, Message::RequestNext), "{request:?}");
+
+        let announcement =
+            include_bytes!("../../../test_data/leios-rc-2026w42/notify-announcement.cbor");
+        match decode_captured(announcement) {
+            Message::BlockAnnouncement(header) => {
+                assert_eq!(header.raw_bytes(), &announcement[2..])
+            }
+            other => panic!("{other:?}"),
+        }
+
+        match decode_captured(include_bytes!(
+            "../../../test_data/leios-rc-2026w42/notify-offer.cbor"
+        )) {
+            Message::BlockOffer(point, size) => {
+                assert_eq!(point, captured_point());
+                assert_eq!(size, 3665);
+            }
+            other => panic!("{other:?}"),
+        }
+
+        match decode_captured(include_bytes!(
+            "../../../test_data/leios-rc-2026w42/notify-txs-offer.cbor"
+        )) {
+            Message::BlockTxsOffer(point) => assert_eq!(point, captured_point()),
+            other => panic!("{other:?}"),
+        }
+
+        match decode_captured(include_bytes!(
+            "../../../test_data/leios-rc-2026w42/notify-votes.cbor"
+        )) {
+            Message::Votes(votes) => assert_eq!(votes.len(), 1),
+            other => panic!("{other:?}"),
+        }
+    }
+
     #[test]
     fn state_transitions_and_drain() {
         let s = State::default();

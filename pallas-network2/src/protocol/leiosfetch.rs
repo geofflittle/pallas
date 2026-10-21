@@ -319,6 +319,53 @@ mod tests {
         roundtrip_eq(&Message::Done);
     }
 
+    fn decode_captured(bytes: &[u8]) -> Message {
+        let msg: Message = minicbor::decode(bytes).expect("captured message decodes");
+        assert_eq!(reencode(&msg), bytes, "re-encodes byte equal");
+        msg
+    }
+
+    fn captured_point() -> EbId {
+        Point::Specific(
+            529,
+            hex::decode("17c497727d273e8dbd0bc188752ef8a7334f5fac6dc077324424a5410cc77fc0")
+                .unwrap(),
+        )
+    }
+
+    #[test]
+    fn captured_messages_decode_by_their_numbers() {
+        match decode_captured(include_bytes!(
+            "../../../test_data/leios-rc-2026w42/fetch-block-request.cbor"
+        )) {
+            Message::BlockRequest(point) => assert_eq!(point, captured_point()),
+            other => panic!("{other:?}"),
+        }
+
+        let block = include_bytes!("../../../test_data/leios-rc-2026w42/fetch-block.cbor");
+        match decode_captured(block) {
+            Message::Block(eb) => assert_eq!(eb.raw_bytes(), &block[2..]),
+            other => panic!("{other:?}"),
+        }
+
+        match decode_captured(include_bytes!(
+            "../../../test_data/leios-rc-2026w42/fetch-block-txs-request.cbor"
+        )) {
+            Message::BlockTxsRequest(point, bitmaps) => {
+                assert_eq!(point, captured_point());
+                assert_eq!(bitmaps, Bitmaps::all(67));
+            }
+            other => panic!("{other:?}"),
+        }
+
+        match decode_captured(include_bytes!(
+            "../../../test_data/leios-rc-2026w42/fetch-block-txs.cbor"
+        )) {
+            Message::BlockTxs { txs, .. } => assert_eq!(txs.len(), 67),
+            other => panic!("{other:?}"),
+        }
+    }
+
     #[test]
     fn block_txs_roundtrip() {
         let msg = Message::BlockTxs {
