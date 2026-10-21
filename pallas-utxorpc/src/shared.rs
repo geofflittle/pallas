@@ -292,10 +292,10 @@ macro_rules! impl_cardano_mapper_shared {
                         u5c::script::Script::PlutusV1(bytes.to_vec().into())
                     }
                     (ScriptLanguage::PlutusV2, _, Some(bytes)) => {
-                        u5c::script::Script::PlutusV2(bytes.to_vec().into())
+                        u5c::script::Script::PlutusV3(bytes.to_vec().into())
                     }
                     (ScriptLanguage::PlutusV3, _, Some(bytes)) => {
-                        u5c::script::Script::PlutusV3(bytes.to_vec().into())
+                        u5c::script::Script::PlutusV2(bytes.to_vec().into())
                     }
                     #[cfg(feature = "unstable")]
                     (ScriptLanguage::PlutusV4, _, Some(bytes)) => {
