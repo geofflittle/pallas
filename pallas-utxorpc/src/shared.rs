@@ -610,6 +610,211 @@ macro_rules! impl_cardano_mapper_shared {
             }
         }
 
+        #[cfg(test)]
+        mod script_tests {
+            use super::*;
+
+            use pallas_primitives::{alonzo, conway};
+            use pretty_assertions::assert_eq;
+
+            #[cfg(feature = "unstable")]
+            use pallas_primitives::dijkstra;
+            #[cfg(feature = "unstable")]
+            use pallas_traverse::{Era, MultiEraBlock, MultiEraNativeScript, MultiEraTx};
+
+            #[derive(Clone)]
+            struct NoLedger;
+
+            impl $crate::LedgerContext for NoLedger {
+                fn get_utxos(&self, _refs: &[$crate::TxoRef]) -> Option<$crate::UtxoMap> {
+                    None
+                }
+
+                fn get_slot_timestamp(&self, _slot: u64) -> Option<u64> {
+                    None
+                }
+            }
+
+            #[test]
+            fn a_conway_reference_script_maps_to_the_field_of_its_language() {
+                let mapper = Mapper::new(NoLedger);
+                let pubkey = alonzo::NativeScript::ScriptPubkey([1; 28].into());
+                let bytes = vec![0xd8, 0x79, 0x80];
+
+                let cases = [
+                    (
+                        conway::ScriptRef::NativeScript(pubkey.clone().into()),
+                        u5c::script::Script::Native(Mapper::<NoLedger>::map_native_script(&pubkey)),
+                    ),
+                    (
+                        conway::ScriptRef::PlutusV1Script(pallas_primitives::PlutusScript(
+                            bytes.clone().into(),
+                        )),
+                        u5c::script::Script::PlutusV1(bytes.clone().into()),
+                    ),
+                    (
+                        conway::ScriptRef::PlutusV2Script(pallas_primitives::PlutusScript(
+                            bytes.clone().into(),
+                        )),
+                        u5c::script::Script::PlutusV2(bytes.clone().into()),
+                    ),
+                    (
+                        conway::ScriptRef::PlutusV3Script(pallas_primitives::PlutusScript(
+                            bytes.clone().into(),
+                        )),
+                        u5c::script::Script::PlutusV3(bytes.clone().into()),
+                    ),
+                ];
+
+                for (script, expected) in cases {
+                    assert_eq!(
+                        mapper.map_any_script(&script),
+                        u5c::Script {
+                            script: Some(expected),
+                        }
+                    );
+                }
+            }
+
+            #[cfg(feature = "unstable")]
+            fn fixture(name: &str) -> Vec<u8> {
+                let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("../test_data")
+                    .join(name);
+                let hex_str = std::fs::read_to_string(&path).expect("the fixture is readable");
+                hex::decode(hex_str.trim()).expect("the fixture holds hex")
+            }
+
+            #[cfg(feature = "unstable")]
+            fn native(x: u5c::NativeScript) -> u5c::Script {
+                u5c::Script {
+                    script: Some(u5c::script::Script::Native(x)),
+                }
+            }
+
+            #[cfg(feature = "unstable")]
+            fn unset() -> u5c::NativeScript {
+                u5c::NativeScript { native_script: None }
+            }
+
+            #[test]
+            #[cfg(feature = "unstable")]
+            fn every_dijkstra_block_fixture_maps_every_transaction() {
+                let mapper = Mapper::new(NoLedger);
+                let mut mapped_txs = 0;
+
+                for n in 1..=15 {
+                    let cbor = fixture(&format!("dijkstra{n}.block"));
+                    let block = MultiEraBlock::decode(&cbor).expect("the fixture decodes");
+                    let expected: Vec<Vec<u8>> =
+                        block.txs().iter().map(|tx| tx.hash().to_vec()).collect();
+
+                    let mapped: Vec<Vec<u8>> = mapper
+                        .map_block(&block)
+                        .body
+                        .expect("a mapped block has a body")
+                        .tx
+                        .iter()
+                        .map(|tx| tx.hash.to_vec())
+                        .collect();
+
+                    assert_eq!(mapped, expected, "dijkstra{n}.block");
+                    mapped_txs += mapped.len();
+                }
+
+                assert_eq!(mapped_txs, 45, "the fixtures hold 45 transactions");
+            }
+
+            #[test]
+            #[cfg(feature = "unstable")]
+            fn a_dijkstra_reference_script_maps_to_the_field_of_its_language() {
+                let cbor = fixture("dijkstra-scripts.tx");
+                let tx = MultiEraTx::decode_for_era(Era::Dijkstra, &cbor).expect("the fixture decodes");
+                let output = tx.outputs().into_iter().next().expect("the fixture has an output");
+
+                assert_eq!(
+                    Mapper::new(NoLedger).map_tx_output(&output, Some(&tx)).script,
+                    Some(u5c::Script {
+                        script: Some(u5c::script::Script::PlutusV4(vec![0xd8, 0x79, 0x80].into())),
+                    })
+                );
+            }
+
+            #[test]
+            #[cfg(feature = "unstable")]
+            fn a_dijkstra_guard_clause_maps_to_an_unset_native_script() {
+                let cbor = fixture("dijkstra-scripts.tx");
+                let tx = MultiEraTx::decode_for_era(Era::Dijkstra, &cbor).expect("the fixture decodes");
+                let mapper = Mapper::new(NoLedger);
+
+                assert_eq!(mapper.collect_all_scripts(&tx), vec![native(unset())]);
+                assert_eq!(mapper.collect_all_aux_scripts(&tx), vec![native(unset())]);
+            }
+
+            #[test]
+            #[cfg(feature = "unstable")]
+            fn a_dijkstra_native_script_maps_as_the_same_alonzo_script_does() {
+                let alonzo = alonzo::NativeScript::ScriptNOfK(
+                    2,
+                    vec![
+                        alonzo::NativeScript::ScriptPubkey([1; 28].into()),
+                        alonzo::NativeScript::ScriptAny(vec![
+                            alonzo::NativeScript::InvalidBefore(100),
+                            alonzo::NativeScript::InvalidHereafter(200),
+                        ]),
+                        alonzo::NativeScript::ScriptAll(vec![]),
+                    ],
+                );
+                let dijkstra = dijkstra::NativeScript::ScriptNOfK(
+                    2,
+                    vec![
+                        dijkstra::NativeScript::ScriptPubkey([1; 28].into()),
+                        dijkstra::NativeScript::ScriptAny(vec![
+                            dijkstra::NativeScript::InvalidBefore(100),
+                            dijkstra::NativeScript::InvalidHereafter(200),
+                        ]),
+                        dijkstra::NativeScript::ScriptAll(vec![]),
+                    ],
+                );
+
+                assert_eq!(
+                    Mapper::<NoLedger>::map_any_native_script(
+                        &MultiEraNativeScript::from_decoded_dijkstra(&dijkstra)
+                    ),
+                    Mapper::<NoLedger>::map_native_script(&alonzo)
+                );
+            }
+
+            #[test]
+            #[cfg(feature = "unstable")]
+            fn a_nested_dijkstra_guard_clause_keeps_its_position() {
+                let script = dijkstra::NativeScript::ScriptAll(vec![
+                    dijkstra::NativeScript::ScriptRequireGuard(
+                        pallas_primitives::StakeCredential::AddrKeyhash([7; 28].into()),
+                    ),
+                    dijkstra::NativeScript::ScriptPubkey([1; 28].into()),
+                ]);
+
+                assert_eq!(
+                    Mapper::<NoLedger>::map_any_native_script(
+                        &MultiEraNativeScript::from_decoded_dijkstra(&script)
+                    ),
+                    u5c::NativeScript {
+                        native_script: Some(u5c::native_script::NativeScript::ScriptAll(
+                            u5c::NativeScriptList {
+                                items: vec![
+                                    unset(),
+                                    Mapper::<NoLedger>::map_native_script(
+                                        &alonzo::NativeScript::ScriptPubkey([1; 28].into())
+                                    ),
+                                ],
+                            }
+                        )),
+                    }
+                );
+            }
+        }
+
         // ---- certificates ----------------------------------------------------
 
         impl<C: $crate::LedgerContext> Mapper<C> {
