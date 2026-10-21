@@ -443,6 +443,20 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn dijkstra_snapshot() {
+        let cbor = hex::decode(include_str!("../../../test_data/dijkstra6.block")).unwrap();
+        let block = pallas_traverse::MultiEraBlock::decode(&cbor).unwrap();
+        let current = serde_json::json!(Mapper::new(NoLedger).map_block(&block));
+        let expected: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../test_data/u5c_v1beta_dijkstra.json"
+        ))
+        .unwrap();
+
+        assert_eq!(expected, current, "u5c_v1beta_dijkstra.json")
+    }
+
     #[test]
     fn snapshot() {
         let test_blocks = [include_str!("../../../test_data/u5c1.block")];
