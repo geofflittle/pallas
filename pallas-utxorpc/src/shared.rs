@@ -2160,10 +2160,9 @@ macro_rules! impl_cardano_mapper_shared {
                 );
             }
 
-            /// The parameters an update of every key must map to, written from what
-            /// each key means rather than from what the mapper does. The V4 cost model
-            /// is the one entry only a Dijkstra update can propose, so the caller says
-            /// whether to expect it.
+            /// The parameters an update of every key maps to, each value written from
+            /// its key's ledger meaning, with the V4 cost model that only a Dijkstra
+            /// update can propose when the caller passes one.
             pub(super) fn every_key_as_pparams(plutus_v4: Option<u5c::CostModel>) -> ParamUpdate {
                 ParamUpdate {
                     min_fee_coefficient: u64_to_bigint(1),

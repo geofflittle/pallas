@@ -950,8 +950,7 @@ pub fn dijkstra_plutus_v4_script_ref(
     decode_leaked(e.into_writer())
 }
 
-/// Decodes the bytes given, leaked so the decoded value borrows for the whole
-/// run rather than from a local.
+/// Decodes the bytes given, leaked so the decoded value borrows for `'static`.
 fn decode_leaked<'a, T: minicbor::Decode<'a, ()>>(cbor: Vec<u8>) -> T {
     let bytes: &'static [u8] = Box::leak(cbor.into_boxed_slice());
     minicbor::decode(bytes).expect("the bytes a builder wrote must decode")
