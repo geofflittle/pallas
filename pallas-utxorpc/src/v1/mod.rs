@@ -405,7 +405,7 @@ impl<C: LedgerContext> Mapper<C> {
             .map(|x| self.map_tx_output(&x, Some(tx)));
         let total_collateral = tx.total_collateral().and_then(u64_to_bigint);
 
-        if collateral.is_empty() && collateral_return.is_none() && total_collateral.is_none() {
+        if collateral.is_empty() && collateral_return.is_none() && total_collateral.is_none() && false {
             return None;
         }
 
