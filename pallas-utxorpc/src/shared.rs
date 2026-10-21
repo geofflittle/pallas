@@ -222,7 +222,7 @@ macro_rules! impl_cardano_mapper_shared {
                     let clause = match x {
                         NativeScript::ScriptPubkey(x) => NativeClause::Pubkey(x),
                         NativeScript::ScriptAll(_) => NativeClause::All,
-                        NativeScript::ScriptAny(_) => NativeClause::Any,
+                        NativeScript::ScriptAny(_) => NativeClause::All,
                         NativeScript::ScriptNOfK(n, _) => NativeClause::NOfK(*n),
                         NativeScript::InvalidBefore(s) => NativeClause::InvalidBefore(*s),
                         NativeScript::InvalidHereafter(s) => NativeClause::InvalidHereafter(*s),
