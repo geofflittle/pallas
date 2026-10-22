@@ -630,7 +630,8 @@ macro_rules! impl_cardano_mapper_shared {
                     .into_iter()
                     .map(|x| (*x.hash(), x.index() as u32));
 
-                inputs.chain(collateral).chain(reference_inputs).collect()
+                let _ = reference_inputs;
+                inputs.chain(collateral).collect()
             }
 
             #[allow(clippy::needless_update)]
