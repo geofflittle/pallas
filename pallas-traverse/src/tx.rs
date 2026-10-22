@@ -167,7 +167,9 @@ impl<'b> MultiEraTx<'b> {
             #[cfg(feature = "unstable")]
             MultiEraTx::Dijkstra(x) => x.transaction_body.original_hash(),
             #[cfg(feature = "unstable")]
-            MultiEraTx::DijkstraSub(x, _) => x.sub_transaction_body.original_hash(),
+            MultiEraTx::DijkstraSub(x, _) => {
+                pallas_crypto::hash::Hasher::<256>::hash(&minicbor::to_vec(x).unwrap())
+            }
         }
     }
 
