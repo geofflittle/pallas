@@ -191,7 +191,10 @@ impl<C: LedgerContext> Mapper<C> {
             sub_transactions: tx
                 .sub_transactions()
                 .iter()
-                .map(|x| self.map_tx_common(x, &self.resolve(x)))
+                .map(|x| u5c::TxCommon {
+                    script_data_hash: Default::default(),
+                    ..self.map_tx_common(x, &self.resolve(x))
+                })
                 .collect(),
             starting_account_balance_intervals: tx
                 .starting_account_balance_intervals()
