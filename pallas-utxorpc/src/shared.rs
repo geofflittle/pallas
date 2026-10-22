@@ -1609,7 +1609,6 @@ macro_rules! impl_cardano_mapper_shared {
                         coins_per_utxo_byte: u64_to_bigint(params.ada_per_utxo_byte),
                         stake_key_deposit: u64_to_bigint(params.key_deposit),
                         pool_deposit: u64_to_bigint(params.pool_deposit),
-                        pool_retirement_epoch_bound: params.maximum_epoch,
                         desired_number_of_pools: params.desired_number_of_stake_pools.into(),
                         pool_influence: Some(rational_number_to_u5c(params.pool_pledge_influence)),
                         monetary_expansion: Some(rational_number_to_u5c(params.expansion_rate)),
@@ -1651,7 +1650,6 @@ macro_rules! impl_cardano_mapper_shared {
                         min_fee_constant: u64_to_bigint(params.minfee_b.into()),
                         stake_key_deposit: u64_to_bigint(params.key_deposit),
                         pool_deposit: u64_to_bigint(params.pool_deposit),
-                        pool_retirement_epoch_bound: params.maximum_epoch,
                         desired_number_of_pools: params.desired_number_of_stake_pools.into(),
                         pool_influence: Some(rational_number_to_u5c(params.pool_pledge_influence)),
                         monetary_expansion: Some(rational_number_to_u5c(params.expansion_rate)),
@@ -1674,7 +1672,6 @@ macro_rules! impl_cardano_mapper_shared {
                         coins_per_utxo_byte: u64_to_bigint(params.ada_per_utxo_byte),
                         stake_key_deposit: u64_to_bigint(params.key_deposit),
                         pool_deposit: u64_to_bigint(params.pool_deposit),
-                        pool_retirement_epoch_bound: params.maximum_epoch,
                         desired_number_of_pools: params.desired_number_of_stake_pools.into(),
                         pool_influence: Some(rational_number_to_u5c(params.pool_pledge_influence)),
                         monetary_expansion: Some(rational_number_to_u5c(params.expansion_rate)),
@@ -1717,8 +1714,6 @@ macro_rules! impl_cardano_mapper_shared {
                         max_block_header_size: params.max_header_size,
                         ..Default::default()
                     },
-                    // This literal names every field of the message.
-                    #[allow(clippy::needless_update)]
                     MultiEraProtocolParameters::Conway(params) => u5c::PParams {
                         max_tx_size: params.max_transaction_size.into(),
                         max_block_body_size: params.max_block_body_size.into(),
@@ -1728,7 +1723,6 @@ macro_rules! impl_cardano_mapper_shared {
                         coins_per_utxo_byte: u64_to_bigint(params.ada_per_utxo_byte),
                         stake_key_deposit: u64_to_bigint(params.key_deposit),
                         pool_deposit: u64_to_bigint(params.pool_deposit),
-                        pool_retirement_epoch_bound: params.maximum_epoch,
                         desired_number_of_pools: params.desired_number_of_stake_pools.into(),
                         pool_influence: Some(rational_number_to_u5c(params.pool_pledge_influence)),
                         monetary_expansion: Some(rational_number_to_u5c(params.expansion_rate)),
