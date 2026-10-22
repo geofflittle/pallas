@@ -1,0 +1,13 @@
+[package]
+name = "gate-probe-root"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+utxorpc-spec = { version = "0.19", default-features = false, features = ["utxorpc-v1beta-cardano"] }
+
+[features]
+unstable = ["utxorpc-spec/utxorpc-v1-cardano"]
+
+[workspace]

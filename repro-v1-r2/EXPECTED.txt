@@ -1,0 +1,17 @@
+Runners copy to /opt/build/v1-r2-1022 on the build box, arms to its arms/ and gate-probe/ dirs.
+Trees: mk.sh head <this branch's parent>, mk.sh base b489e457.
+
+probes.sh base unstable v1_probe.rs     error[E0433]: cannot find `v1` in `pallas_utxorpc`
+probes.sh head unstable v1_probe.rs     test result: ok. 2 passed
+probes.sh head none v1_probe.rs         error[E0433]: cannot find `v1` in `pallas_utxorpc`
+gate.sh head stable                     GATE stable v1beta tx inputs=0, utxorpc-spec 0.19.2 from crates.io
+gate.sh head unstable                   error: failed to select a version for `utxorpc-spec`.
+gate.sh head root                       error: failed to select a version for `utxorpc-spec`.
+t.sh head -p pallas-utxorpc --features unstable    test result: ok. 77 passed
+t.sh head -p pallas-utxorpc                        test result: ok. 33 passed
+ci.sh head                              failed 0 of 12
+
+Sub transaction red arms, each a branch: t.sh <tree> -p pallas-utxorpc --features unstable
+repro/v1-sub-tx-unresolved              FAILED. 76 passed; 1 failed (a_sub_transaction_input_maps_the_output_the_ledger_resolves_for_it)
+repro/v1-sub-tx-resolves-outer          FAILED. 76 passed; 1 failed (the same test)
+repro/v1-sub-tx-takes-outer-output      FAILED. 75 passed; 2 failed (both sub transaction input tests)

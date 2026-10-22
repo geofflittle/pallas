@@ -1,0 +1,10 @@
+[package]
+name = "gate-probe-stable"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+pallas-utxorpc = { path = "/pallas/pallas-utxorpc" }
+
+[workspace]
