@@ -187,7 +187,7 @@ impl<C: LedgerContext> Mapper<C> {
             common: Some(self.map_tx_common(tx, &resolved)),
             collateral: self.map_collateral(tx, &resolved),
             fee: tx.fee().and_then(u64_to_bigint),
-            successful: tx.is_valid(),
+            successful: true,
             sub_transactions: tx
                 .sub_transactions()
                 .iter()
