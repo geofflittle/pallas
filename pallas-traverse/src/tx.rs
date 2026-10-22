@@ -937,7 +937,7 @@ impl<'b> MultiEraTx<'b> {
     /// Returns the script data hash at body key 11.
     pub fn script_data_hash(&self) -> Option<&Hash<32>> {
         match self {
-            MultiEraTx::AlonzoCompatible(x, _) => x.transaction_body.script_data_hash.as_ref(),
+            MultiEraTx::AlonzoCompatible(_, _) => None,
             MultiEraTx::Babbage(x) => x.transaction_body.script_data_hash.as_ref(),
             MultiEraTx::Byron(_) => None,
             MultiEraTx::Conway(x) => x.transaction_body.script_data_hash.as_ref(),
