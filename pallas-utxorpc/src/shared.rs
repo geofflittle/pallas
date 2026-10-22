@@ -1717,8 +1717,6 @@ macro_rules! impl_cardano_mapper_shared {
                         max_block_header_size: params.max_header_size,
                         ..Default::default()
                     },
-                    // In v1alpha this literal names every field of the message.
-                    #[allow(clippy::needless_update)]
                     MultiEraProtocolParameters::Conway(params) => u5c::PParams {
                         max_tx_size: params.max_transaction_size.into(),
                         max_block_body_size: params.max_block_body_size.into(),
