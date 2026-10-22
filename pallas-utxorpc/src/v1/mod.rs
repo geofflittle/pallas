@@ -219,7 +219,13 @@ impl<C: LedgerContext> Mapper<C> {
             sub_transactions: tx
                 .sub_transactions()
                 .iter()
-                .map(|x| self.map_tx_common(x, &self.resolve(x)))
+                .map(|x| {
+                    let own = (*x.inputs()[0].hash(), x.inputs()[0].index() as u32);
+                    let taken = self
+                        .resolve(tx)
+                        .map(|m| m.into_values().map(|v| (own, v)).collect());
+                    self.map_tx_common(x, &taken)
+                })
                 .collect(),
             starting_account_balance_intervals: tx
                 .starting_account_balance_intervals()
