@@ -908,11 +908,7 @@ impl<'b> MultiEraTx<'b> {
                 .auxiliary_data_hash
                 .as_ref()
                 .map(|x| x.as_slice()),
-            MultiEraTx::Babbage(x) => x
-                .transaction_body
-                .auxiliary_data_hash
-                .as_ref()
-                .map(|x| x.as_slice()),
+            MultiEraTx::Babbage(_) => None,
             MultiEraTx::Byron(_) => None,
             MultiEraTx::Conway(x) => x
                 .transaction_body
