@@ -341,7 +341,7 @@ macro_rules! impl_cardano_mapper_shared {
                     .iter()
                     .map(|x| x.0.to_vec().into())
                     .map(|x| u5c::Script {
-                        script: u5c::script::Script::PlutusV1(x).into(),
+                        script: u5c::script::Script::PlutusV3(x).into(),
                     });
 
                 let p2 = tx
