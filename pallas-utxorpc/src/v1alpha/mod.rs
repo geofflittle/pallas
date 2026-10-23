@@ -34,6 +34,7 @@ impl<C: LedgerContext> Mapper<C> {
 }
 
 crate::shared::impl_cardano_mapper_shared!(utxorpc_spec::utxorpc::v1alpha::cardano);
+crate::before_v1::impl_cardano_mapper_before_v1!();
 
 // ---- v1alpha-specific bodies for methods that diverge from v1beta -----------
 
@@ -90,17 +91,6 @@ impl<C: LedgerContext> Mapper<C> {
             datum: self.map_tx_datum(x, tx).into(),
             script: self.map_output_script(x),
         }
-    }
-
-    fn map_output_script(&self, x: &trv::MultiEraOutput) -> Option<u5c::Script> {
-        x.multi_era_script_ref().map(|x| match x {
-            trv::MultiEraScriptRef::Conway(x) => self.map_any_script(&x),
-            #[cfg(feature = "unstable")]
-            trv::MultiEraScriptRef::Dijkstra(_) => {
-                unimplemented!("map_output_script is not yet implemented for Dijkstra")
-            }
-            _ => unimplemented!("map_output_script has no arm for this reference script"),
-        })
     }
 
     pub fn map_asset(&self, x: &trv::MultiEraAsset) -> u5c::Asset {
