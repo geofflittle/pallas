@@ -1827,6 +1827,7 @@ macro_rules! impl_cardano_mapper_shared {
                             ..Default::default()
                         }
                         .into(),
+                        ..Default::default()
                     },
                     _ => unimplemented!(),
                 }
