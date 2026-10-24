@@ -320,17 +320,20 @@ pub fn dijkstra_params(x: &Value, genesis: &Value) -> DijkstraProtParams {
         max_endorser_block_txs_size: int(x, "maxEndorserBlockTxsSize") as u32,
         max_endorser_block_ex_units: units(&x["maxEndorserBlockExecutionUnits"]),
         max_ref_script_size_per_endorser_block: int(x, "maxRefScriptSizePerEndorserBlock") as u32,
-        peras_min_candidate_block_age: int(x, "perasMinCandidateBlockAge") as u32,
-        peras_healing_factor: rational(&x["perasHealingFactor"]),
-        peras_cert_boost: int(x, "perasCertBoost") as u16,
-        peras_target_committee_size: int(x, "perasTargetCommitteeSize") as u16,
-        peras_bootstrap_round: match &x["perasBootstrapRound"] {
-            Value::Null => None,
-            _ => Some(int(x, "perasBootstrapRound") as u32),
+        peras_min_candidate_block_age: 0,
+        peras_healing_factor: pallas_primitives::RationalNumber {
+            numerator: 0,
+            denominator: 1,
         },
-        peras_quorum_threshold_safety_margin: rational(&x["perasQuorumThresholdSafetyMargin"]),
-        ref_inputs_cost_per_multi_asset_policy: int(x, "refInputsCostPerMultiAssetPolicy"),
-        ref_inputs_cost_per_datum_byte: int(x, "refInputsCostPerDatumByte"),
+        peras_cert_boost: 0,
+        peras_target_committee_size: 0,
+        peras_bootstrap_round: None,
+        peras_quorum_threshold_safety_margin: pallas_primitives::RationalNumber {
+            numerator: 0,
+            denominator: 1,
+        },
+        ref_inputs_cost_per_multi_asset_policy: 0,
+        ref_inputs_cost_per_datum_byte: 0,
     }
 }
 
