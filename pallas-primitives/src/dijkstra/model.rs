@@ -198,10 +198,10 @@ pub use crate::babbage::OperationalCert;
 /// `header_version_info = [highest_supported_major_version : uint .size 4, self_reported_software_tag : uint .size 4]` (`defs.cddl`).
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
 pub struct HeaderVersionInfo {
-    #[n(0)]
+    #[n(1)]
     pub highest_supported_major_version: u32,
 
-    #[n(1)]
+    #[n(0)]
     pub self_reported_software_tag: u32,
 }
 
