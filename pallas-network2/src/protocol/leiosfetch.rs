@@ -466,6 +466,33 @@ mod tests {
         assert_eq!(back.0.get(&0), Some(&1u64));
     }
 
+    #[test]
+    fn bitmaps_with_distinct_windows_decode_in_either_length_form() {
+        let indefinite = [0xbfu8, 0x00, 0x01, 0x01, 0x02, 0xff];
+        let definite = [0xa2u8, 0x00, 0x01, 0x01, 0x02];
+        for bytes in [&indefinite[..], &definite[..]] {
+            let back: Bitmaps = minicbor::decode(bytes).unwrap();
+            assert_eq!(back.0.into_iter().collect::<Vec<_>>(), [(0, 1), (1, 2)]);
+        }
+    }
+
+    #[test]
+    fn a_request_naming_one_window_twice_is_refused() {
+        let captured =
+            include_bytes!("../../../test_data/leios-rc-2026w42/fetch-block-txs-request.cbor");
+        assert_eq!(captured[51], 0x01, "the key of the second window");
+        let mut twice = captured.to_vec();
+        twice[51] = 0x00;
+
+        let err = minicbor::decode::<Message>(&twice).unwrap_err();
+        assert!(err.to_string().contains("window 0 appears twice"), "{err}");
+
+        for bytes in [&[0xbfu8, 0x00, 0x01, 0x00, 0x02, 0xff][..], &[0xa2u8, 0x00, 0x01, 0x00, 0x02]] {
+            let err = minicbor::decode::<Bitmaps>(bytes).unwrap_err();
+            assert!(err.to_string().contains("window 0 appears twice"), "{err}");
+        }
+    }
+
     // --- CBOR-vs-CDDL conformance (run with `--features blueprint`) ---
     //
     // Each `conforms!` below emits one `#[test]` that encodes a sample message
