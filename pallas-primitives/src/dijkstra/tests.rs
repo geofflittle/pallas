@@ -381,8 +381,10 @@ const NOT_RULES: &[&str] = &[
     "deposit",
     "eb_hash",
     "eb_size",
+    "highest_supported_major_version",
     "is_valid",
     "pledge",
+    "self_reported_software_tag",
     "signers",
     "success",
     "ttl",
@@ -1474,9 +1476,12 @@ fn generated_header_hex() -> String {
 }
 
 #[test]
-fn a_generated_header_round_trips() {
+fn a_generated_header_reads_the_version_info_the_ledger_read() {
     let bytes = hex::decode(generated_header_hex()).unwrap();
     let header: Header = minicbor::decode(&bytes).expect("the generated header must decode");
+    let info = &header.header_body.header_version_info;
+    assert_eq!(info.highest_supported_major_version, 1004951745);
+    assert_eq!(info.self_reported_software_tag, 3942894501);
     assert_eq!(minicbor::to_vec(&header).unwrap(), bytes);
 }
 
