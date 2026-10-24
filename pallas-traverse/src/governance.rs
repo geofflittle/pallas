@@ -294,12 +294,13 @@ impl MultiEraParamUpdate<'_> {
     shared_param!(minfee_refscript_cost_per_byte: RationalNumber);
 
     // -- NEW IN DIJKSTRA
-    // keys 34 to 56, except 38 below
+    // keys 34 to 56
 
     dijkstra_param!(max_ref_script_size_per_block: u64);
     dijkstra_param!(max_ref_script_size_per_tx: u64);
     dijkstra_param!(ref_script_cost_stride: u64);
     dijkstra_param!(ref_script_cost_multiplier: RationalNumber);
+    dijkstra_param!(max_pledge_leverage: Nullable<RationalNumber>);
     dijkstra_param!(min_pool_margin: RationalNumber);
     dijkstra_param!(leios_announcement_period_length: u64);
     dijkstra_param!(leios_vote_period_length: u64);
@@ -318,19 +319,6 @@ impl MultiEraParamUpdate<'_> {
     dijkstra_param!(peras_quorum_threshold_safety_margin: RationalNumber);
     dijkstra_param!(ref_inputs_cost_per_multi_asset_policy: u64);
     dijkstra_param!(ref_inputs_cost_per_datum_byte: u64);
-
-    /// Returns key 38, where an explicit nil proposes removing the cap and
-    /// differs from an absent key.
-    #[cfg(feature = "unstable")]
-    pub fn max_pledge_leverage(&self) -> ParamRead<Nullable<RationalNumber>> {
-        match self {
-            MultiEraParamUpdate::Conway(_) => ParamRead::NoSuchParameter,
-            MultiEraParamUpdate::Dijkstra(x) => match x.max_pledge_leverage.clone() {
-                Some(v) => ParamRead::Proposed(v),
-                None => ParamRead::Unchanged,
-            },
-        }
-    }
 
     /// Returns key 18, the cost models the update proposes, under one field
     /// per Plutus language any era names. An update that leaves key 18 alone
