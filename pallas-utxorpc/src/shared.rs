@@ -44,6 +44,39 @@ macro_rules! impl_cardano_mapper_shared {
             }
         }
 
+        fn pool_voting_thresholds_to_u5c(
+            value: pallas_primitives::conway::PoolVotingThresholds,
+        ) -> u5c::VotingThresholds {
+            u5c::VotingThresholds {
+                thresholds: vec![
+                    rational_number_to_u5c(value.motion_no_confidence),
+                    rational_number_to_u5c(value.committee_normal),
+                    rational_number_to_u5c(value.committee_no_confidence),
+                    rational_number_to_u5c(value.hard_fork_initiation),
+                    rational_number_to_u5c(value.security_voting_threshold),
+                ],
+            }
+        }
+
+        fn drep_voting_thresholds_to_u5c(
+            value: pallas_primitives::conway::DRepVotingThresholds,
+        ) -> u5c::VotingThresholds {
+            u5c::VotingThresholds {
+                thresholds: vec![
+                    rational_number_to_u5c(value.motion_no_confidence),
+                    rational_number_to_u5c(value.committee_normal),
+                    rational_number_to_u5c(value.committee_no_confidence),
+                    rational_number_to_u5c(value.update_constitution),
+                    rational_number_to_u5c(value.hard_fork_initiation),
+                    rational_number_to_u5c(value.pp_network_group),
+                    rational_number_to_u5c(value.pp_economic_group),
+                    rational_number_to_u5c(value.pp_technical_group),
+                    rational_number_to_u5c(value.pp_governance_group),
+                    rational_number_to_u5c(value.treasury_withdrawal),
+                ],
+            }
+        }
+
         /// Map an anchor, whose type every era carrying one shares.
         fn map_anchor(x: &pallas_primitives::conway::Anchor) -> u5c::Anchor {
             u5c::Anchor {
@@ -2159,59 +2192,12 @@ macro_rules! impl_cardano_mapper_shared {
                         min_fee_script_ref_cost_per_byte: Some(rational_number_to_u5c(
                             params.minfee_refscript_cost_per_byte,
                         )),
-                        pool_voting_thresholds: Some(u5c::VotingThresholds {
-                            thresholds: vec![
-                                rational_number_to_u5c(
-                                    params.pool_voting_thresholds.motion_no_confidence,
-                                ),
-                                rational_number_to_u5c(
-                                    params.pool_voting_thresholds.committee_normal,
-                                ),
-                                rational_number_to_u5c(
-                                    params.pool_voting_thresholds.committee_no_confidence,
-                                ),
-                                rational_number_to_u5c(
-                                    params.pool_voting_thresholds.hard_fork_initiation,
-                                ),
-                                rational_number_to_u5c(
-                                    params.pool_voting_thresholds.security_voting_threshold,
-                                ),
-                            ],
-                        }),
-                        drep_voting_thresholds: Some(u5c::VotingThresholds {
-                            thresholds: vec![
-                                rational_number_to_u5c(
-                                    params.drep_voting_thresholds.motion_no_confidence,
-                                ),
-                                rational_number_to_u5c(
-                                    params.drep_voting_thresholds.committee_normal,
-                                ),
-                                rational_number_to_u5c(
-                                    params.drep_voting_thresholds.committee_no_confidence,
-                                ),
-                                rational_number_to_u5c(
-                                    params.drep_voting_thresholds.update_constitution,
-                                ),
-                                rational_number_to_u5c(
-                                    params.drep_voting_thresholds.hard_fork_initiation,
-                                ),
-                                rational_number_to_u5c(
-                                    params.drep_voting_thresholds.pp_network_group,
-                                ),
-                                rational_number_to_u5c(
-                                    params.drep_voting_thresholds.pp_economic_group,
-                                ),
-                                rational_number_to_u5c(
-                                    params.drep_voting_thresholds.pp_technical_group,
-                                ),
-                                rational_number_to_u5c(
-                                    params.drep_voting_thresholds.pp_governance_group,
-                                ),
-                                rational_number_to_u5c(
-                                    params.drep_voting_thresholds.treasury_withdrawal,
-                                ),
-                            ],
-                        }),
+                        pool_voting_thresholds: Some(pool_voting_thresholds_to_u5c(
+                            params.pool_voting_thresholds,
+                        )),
+                        drep_voting_thresholds: Some(drep_voting_thresholds_to_u5c(
+                            params.drep_voting_thresholds,
+                        )),
                         min_committee_size: params.min_committee_size as u32,
                         committee_term_limit: params.committee_term_limit,
                         governance_action_validity_period: params.governance_action_validity_period,
@@ -2297,33 +2283,12 @@ macro_rules! impl_cardano_mapper_shared {
                     min_fee_script_ref_cost_per_byte: x
                         .minfee_refscript_cost_per_byte()
                         .map(rational_number_to_u5c),
-                    pool_voting_thresholds: x.pool_voting_thresholds().map(|t| {
-                        u5c::VotingThresholds {
-                            thresholds: vec![
-                                rational_number_to_u5c(t.motion_no_confidence),
-                                rational_number_to_u5c(t.committee_normal),
-                                rational_number_to_u5c(t.committee_no_confidence),
-                                rational_number_to_u5c(t.hard_fork_initiation),
-                                rational_number_to_u5c(t.security_voting_threshold),
-                            ],
-                        }
-                    }),
-                    drep_voting_thresholds: x.drep_voting_thresholds().map(|t| {
-                        u5c::VotingThresholds {
-                            thresholds: vec![
-                                rational_number_to_u5c(t.motion_no_confidence),
-                                rational_number_to_u5c(t.committee_normal),
-                                rational_number_to_u5c(t.committee_no_confidence),
-                                rational_number_to_u5c(t.update_constitution),
-                                rational_number_to_u5c(t.hard_fork_initiation),
-                                rational_number_to_u5c(t.pp_network_group),
-                                rational_number_to_u5c(t.pp_economic_group),
-                                rational_number_to_u5c(t.pp_technical_group),
-                                rational_number_to_u5c(t.pp_governance_group),
-                                rational_number_to_u5c(t.treasury_withdrawal),
-                            ],
-                        }
-                    }),
+                    pool_voting_thresholds: x
+                        .pool_voting_thresholds()
+                        .map(pool_voting_thresholds_to_u5c),
+                    drep_voting_thresholds: x
+                        .drep_voting_thresholds()
+                        .map(drep_voting_thresholds_to_u5c),
                     min_committee_size: update_scalar(x.min_committee_size().map(|x| x as u32)),
                     committee_term_limit: update_scalar(x.committee_term_limit()),
                     governance_action_validity_period: update_scalar(
