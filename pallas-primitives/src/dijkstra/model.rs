@@ -196,13 +196,33 @@ tag_preserving_set!(NonEmptySet, "a nonempty set", 1);
 pub use crate::babbage::OperationalCert;
 
 /// `header_version_info = [highest_supported_major_version : uint .size 4, self_reported_software_tag : uint .size 4]` (`defs.cddl`).
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct HeaderVersionInfo {
     #[n(0)]
     pub highest_supported_major_version: u32,
 
     #[n(1)]
     pub self_reported_software_tag: u32,
+}
+
+// Planted defect: refuses a wide field at the array head, not at the field.
+impl<'b, C> Decode<'b, C> for HeaderVersionInfo {
+    fn decode(
+        d: &mut minicbor::Decoder<'b>,
+        _ctx: &mut C,
+    ) -> Result<Self, minicbor::decode::Error> {
+        let start = d.position();
+        d.array()?;
+        let major = d.u64()?;
+        let tag = d.u64()?;
+        match (u32::try_from(major), u32::try_from(tag)) {
+            (Ok(major), Ok(tag)) => Ok(HeaderVersionInfo {
+                highest_supported_major_version: major,
+                self_reported_software_tag: tag,
+            }),
+            _ => Err(minicbor::decode::Error::message("wide").at(start)),
+        }
+    }
 }
 
 /// `header_body` (`defs.cddl`) has `header_version_info` where Conway's has `protocol_version`, and appends `block_body_contains_leios_cert` and `eb_references_announcement`.
