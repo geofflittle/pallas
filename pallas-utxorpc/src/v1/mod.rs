@@ -317,6 +317,7 @@ impl<C: LedgerContext> Mapper<C> {
                 redeemers: tx
                     .redeemers()
                     .iter()
+                    .filter(|x| x.multi_era_tag() != trv::MultiEraRedeemerTag::Guarding)
                     .map(|x| self.map_redeemer(x))
                     .collect(),
                 bootstrap_witnesses: tx
