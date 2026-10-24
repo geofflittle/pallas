@@ -93,7 +93,12 @@ impl Encode<()> for Bitmaps {
 
 impl<'b> Decode<'b, ()> for Bitmaps {
     fn decode(d: &mut Decoder<'b>, _ctx: &mut ()) -> Result<Self, decode::Error> {
-        Ok(Bitmaps(d.decode()?))
+        let mut windows = BTreeMap::new();
+        for entry in d.map_iter::<u16, u64>()? {
+            let (window, bitmap) = entry?;
+            windows.entry(window).or_insert(bitmap);
+        }
+        Ok(Bitmaps(windows))
     }
 }
 
