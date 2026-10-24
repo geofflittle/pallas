@@ -60,4 +60,5 @@ fn w42_coverage() {
         println!("ALL {l:?} occ {} dis {} none {}", t.occurrences, t.disagreements, t.without_counterpart);
     }
     println!("AGREES {}", all.agrees());
+    assert!(all.agrees(), "a location u5c does not hold is failing");
 }
