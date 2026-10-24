@@ -1713,6 +1713,191 @@ macro_rules! impl_cardano_mapper_shared {
             }
         }
 
+        #[cfg(all(test, feature = "unstable"))]
+        mod gov_tests {
+            use super::*;
+
+            use super::cert_tests::{key_credential, NoLedger};
+            use super::script_tests::fixture;
+            use pallas_primitives::conway;
+            use pallas_traverse::{Era, MultiEraTx};
+            use pretty_assertions::assert_eq;
+            use std::collections::BTreeMap;
+
+            /// The proposals of a Dijkstra transaction fixture, mapped.
+            pub(super) fn mapped_proposals(name: &str) -> Vec<u5c::GovernanceActionProposal> {
+                let cbor = fixture(name);
+                let tx = MultiEraTx::decode_for_era(Era::Dijkstra, &cbor)
+                    .expect("the fixture decodes");
+                common(&Mapper::new(NoLedger).map_tx(&tx)).proposals.clone()
+            }
+
+            #[test]
+            fn a_dijkstra_proposal_maps_its_deposit_account_action_and_anchor() {
+                let proposals = mapped_proposals("dijkstra-param-change.tx");
+                assert_eq!(proposals.len(), 1, "the fixture carries one proposal");
+                let proposal = &proposals[0];
+
+                assert_eq!(proposal.deposit, u64_to_bigint(100_000_000_000));
+                assert_eq!(
+                    proposal.reward_account.to_vec(),
+                    hex::decode("e017d6e5dbc905918d1e16b0b2df27029391ac73f13966cf183b8051a9")
+                        .unwrap()
+                );
+                assert_eq!(
+                    proposal.anchor,
+                    Some(u5c::Anchor {
+                        url: "ipfs://QmZz6G5DMHzMRQEVzU1LnaDJhMZS3gbmvRaxvDsBudUms5".into(),
+                        content_hash: hex::decode(
+                            "d766c3215498282d1927e8e81aafa949e193b3744af4b543657b7ee02311867c"
+                        )
+                        .unwrap()
+                        .into(),
+                    })
+                );
+
+                let Some(u5c::governance_action::GovernanceAction::ParameterChangeAction(action)) =
+                    proposal
+                        .gov_action
+                        .as_ref()
+                        .and_then(|x| x.governance_action.as_ref())
+                else {
+                    panic!("the proposal maps to a parameter change");
+                };
+                assert_eq!(action.gov_action_id, None);
+                assert_eq!(
+                    action.policy_hash.to_vec(),
+                    hex::decode("e3172285605e502bde008a7efe2b2eec516958b7bae911947a5c9373")
+                        .unwrap()
+                );
+                assert!(action.protocol_param_update.is_some());
+            }
+
+            #[test]
+            fn a_conway_action_of_each_kind_maps_to_its_member() {
+                let id = conway::GovActionId {
+                    transaction_id: [0x11; 32].into(),
+                    action_index: 3,
+                };
+                let mapped_id = Some(u5c::GovernanceActionId {
+                    transaction_id: [0x11; 32].to_vec().into(),
+                    governance_action_index: 3,
+                });
+                let policy = [0x44; 28];
+                let threshold = pallas_primitives::RationalNumber {
+                    numerator: 2,
+                    denominator: 3,
+                };
+                let anchor = conway::Anchor {
+                    url: "https://example.invalid/constitution".into(),
+                    content_hash: [0x55; 32].into(),
+                };
+
+                // {3: 0}, a zero max transaction size.
+                let update = crate::testing::conway_update(&[0xa1, 0x03, 0x00]);
+                let mapped_update = ParamUpdate {
+                    max_tx_size: update_scalar(Some(0)),
+                    ..Default::default()
+                };
+
+                use u5c::governance_action::GovernanceAction as A;
+                let cases = vec![
+                    (
+                        conway::GovAction::ParameterChange(
+                            Some(id.clone()),
+                            Box::new(update),
+                            Some(policy.into()),
+                        ),
+                        A::ParameterChangeAction(u5c::ParameterChangeAction {
+                            gov_action_id: mapped_id.clone(),
+                            protocol_param_update: Some(mapped_update),
+                            policy_hash: policy.to_vec().into(),
+                        }),
+                    ),
+                    (
+                        conway::GovAction::HardForkInitiation(None, (10, 2)),
+                        A::HardForkInitiationAction(u5c::HardForkInitiationAction {
+                            gov_action_id: None,
+                            protocol_version: Some(u5c::ProtocolVersion {
+                                major: 10,
+                                minor: 2,
+                            }),
+                        }),
+                    ),
+                    (
+                        conway::GovAction::TreasuryWithdrawals(
+                            BTreeMap::from([(vec![0xe0; 29].into(), 7)]),
+                            None,
+                        ),
+                        A::TreasuryWithdrawalsAction(u5c::TreasuryWithdrawalsAction {
+                            withdrawals: vec![u5c::WithdrawalAmount {
+                                reward_account: vec![0xe0; 29].into(),
+                                coin: u64_to_bigint(7),
+                            }],
+                            policy_hash: Default::default(),
+                        }),
+                    ),
+                    (
+                        conway::GovAction::NoConfidence(Some(id.clone())),
+                        A::NoConfidenceAction(u5c::NoConfidenceAction {
+                            gov_action_id: mapped_id.clone(),
+                        }),
+                    ),
+                    (
+                        conway::GovAction::UpdateCommittee(
+                            None,
+                            vec![conway::StakeCredential::AddrKeyhash([0x01; 28].into())].into(),
+                            BTreeMap::from([(
+                                conway::StakeCredential::AddrKeyhash([0x02; 28].into()),
+                                90,
+                            )]),
+                            threshold,
+                        ),
+                        A::UpdateCommitteeAction(u5c::UpdateCommitteeAction {
+                            gov_action_id: None,
+                            remove_committee_credentials: vec![key_credential([0x01; 28])],
+                            new_committee_credentials: vec![u5c::NewCommitteeCredentials {
+                                committee_cold_credential: Some(key_credential([0x02; 28])),
+                                expires_epoch: 90,
+                            }],
+                            new_committee_threshold: Some(u5c::RationalNumber {
+                                numerator: 2,
+                                denominator: 3,
+                            }),
+                        }),
+                    ),
+                    (
+                        conway::GovAction::NewConstitution(
+                            Some(id),
+                            conway::Constitution {
+                                anchor,
+                                guardrail_script: Some(policy.into()),
+                            },
+                        ),
+                        A::NewConstitutionAction(u5c::NewConstitutionAction {
+                            gov_action_id: mapped_id,
+                            constitution: Some(u5c::Constitution {
+                                anchor: Some(u5c::Anchor {
+                                    url: "https://example.invalid/constitution".into(),
+                                    content_hash: [0x55; 32].to_vec().into(),
+                                }),
+                                hash: policy.to_vec().into(),
+                            }),
+                        }),
+                    ),
+                ];
+
+                for (action, expected) in cases {
+                    assert_eq!(
+                        Mapper::new(NoLedger)
+                            .map_conway_gov_action(&action)
+                            .governance_action,
+                        Some(expected)
+                    );
+                }
+            }
+        }
+
         // ---- protocol parameters --------------------------------------------
 
         impl<C: $crate::LedgerContext> Mapper<C> {

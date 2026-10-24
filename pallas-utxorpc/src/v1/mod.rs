@@ -503,6 +503,48 @@ mod tests {
         );
     }
 
+    /// The parameter update of the one proposal in a Dijkstra transaction fixture, mapped.
+    fn proposed_update(name: &str) -> Option<u5c::PParamsUpdate> {
+        let proposals = gov_tests::mapped_proposals(name);
+        assert_eq!(proposals.len(), 1, "the fixture carries one proposal");
+
+        match proposals[0]
+            .gov_action
+            .clone()
+            .and_then(|x| x.governance_action)
+        {
+            Some(u5c::governance_action::GovernanceAction::ParameterChangeAction(x)) => {
+                x.protocol_param_update
+            }
+            other => panic!("the proposal maps to a parameter change, not {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_dijkstra_parameter_change_maps_the_endorser_block_sizes_it_sets() {
+        assert_eq!(
+            proposed_update("dijkstra-param-change.tx"),
+            Some(u5c::PParamsUpdate {
+                max_endorser_block_references_size: Some(308_000),
+                max_endorser_block_txs_size: Some(2_000_000),
+                ..Default::default()
+            }),
+            "keys 45 and 46 map to their fields and every other field is absent"
+        );
+    }
+
+    #[test]
+    fn a_dijkstra_parameter_change_maps_the_endorser_block_reference_script_cap() {
+        assert_eq!(
+            proposed_update("dijkstra-proposal.tx"),
+            Some(u5c::PParamsUpdate {
+                max_ref_script_size_per_endorser_block: Some(20_000),
+                ..Default::default()
+            }),
+            "key 48 maps to its field and every other field is absent"
+        );
+    }
+
     #[test]
     fn a_block_before_dijkstra_maps_no_leios_or_peras_field() {
         let cbor = hex::decode(include_str!("../../../test_data/conway1.block")).unwrap();

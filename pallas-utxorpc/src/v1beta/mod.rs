@@ -160,6 +160,19 @@ mod tests {
     }
 
     #[test]
+    fn an_information_action_maps_to_an_empty_info_action() {
+        let mapped = Mapper::new(NoLedger)
+            .map_conway_gov_action(&pallas_primitives::conway::GovAction::Information);
+
+        assert_eq!(
+            mapped.governance_action,
+            Some(u5c::governance_action::GovernanceAction::InfoAction(
+                u5c::InfoAction {}
+            ))
+        );
+    }
+
+    #[test]
     fn snapshot() {
         let test_blocks = [include_str!("../../../test_data/u5c1.block")];
         let test_snapshots = [include_str!("../../../test_data/u5c_v1beta.json")];
