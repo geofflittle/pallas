@@ -484,22 +484,30 @@ mod tests {
     }
 
     #[test]
-    fn a_request_naming_one_window_twice_is_refused() {
+    fn a_request_naming_one_window_twice_keeps_its_last_bitmap() {
         let captured =
             include_bytes!("../../../test_data/leios-rc-2026w42/fetch-block-txs-request.cbor");
         assert_eq!(captured[51], 0x01, "the key of the second window");
         let mut twice = captured.to_vec();
         twice[51] = 0x00;
 
-        let err = minicbor::decode::<Message>(&twice).unwrap_err();
-        assert!(err.to_string().contains("window 0 appears twice"), "{err}");
+        match minicbor::decode::<Message>(&twice).expect("the request decodes") {
+            Message::BlockTxsRequest(point, bitmaps) => {
+                assert_eq!(point, captured_point());
+                assert_eq!(
+                    bitmaps.0.into_iter().collect::<Vec<_>>(),
+                    [(0, 0xe000_0000_0000_0000)]
+                );
+            }
+            other => panic!("{other:?}"),
+        }
 
         for bytes in [
             &[0xbfu8, 0x00, 0x01, 0x00, 0x02, 0xff][..],
             &[0xa2u8, 0x00, 0x01, 0x00, 0x02],
         ] {
-            let err = minicbor::decode::<Bitmaps>(bytes).unwrap_err();
-            assert!(err.to_string().contains("window 0 appears twice"), "{err}");
+            let back: Bitmaps = minicbor::decode(bytes).expect("the bitmaps decode");
+            assert_eq!(back.0.into_iter().collect::<Vec<_>>(), [(0, 2)]);
         }
     }
 
