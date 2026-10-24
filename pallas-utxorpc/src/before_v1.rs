@@ -28,7 +28,7 @@ macro_rules! impl_cardano_mapper_before_v1 {
         /// Returns the unspecified purpose for a guarding redeemer, for which this schema has no member.
         #[cfg(feature = "unstable")]
         fn guarding_purpose() -> u5c::RedeemerPurpose {
-            u5c::RedeemerPurpose::Unspecified
+            u5c::RedeemerPurpose::Propose
         }
 
         /// Returns no clause for a guard clause, for which this schema has no member.
