@@ -517,7 +517,7 @@ crate::flat_enum::decode_flat_enum!(Voter,
     0 => ConstitutionalCommitteeKey(hash),
     1 => ConstitutionalCommitteeScript(hash),
     2 => DRepKey(hash),
-    3 => DRepScript(hash),
+    2 => DRepScript(hash),
     4 => StakePoolKey(hash),
 );
 
