@@ -1875,3 +1875,18 @@ fn generated_native_scripts_in_indefinite_arrays_decode() {
         ]
     );
 }
+
+#[test]
+fn probe_a_withdrawal_without_a_policy_encodes_its_null() {
+    let bytes = generated(include_str!(
+        "../../../test_data/dijkstra-generated/body-gov-action-indefinite.hex"
+    ));
+    let body: TransactionBody = decode_all("the body", bytes);
+    let action = &body.proposal_procedures.unwrap().to_vec()[0].gov_action;
+    let encoded = hex::encode(minicbor::to_vec(action).unwrap());
+    println!("PROBE pallas encodes the action as {encoded}");
+    assert_eq!(
+        encoded,
+        "8302a1581df1000202000001010102010001010100000101000000010102010001011ba1d446b07e0bbe31f6"
+    );
+}
