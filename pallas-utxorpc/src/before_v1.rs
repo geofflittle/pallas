@@ -189,7 +189,7 @@ macro_rules! impl_cardano_mapper_before_v1 {
 
             #[test]
             #[cfg(feature = "unstable")]
-            fn a_dijkstra_guard_clause_maps_to_an_unset_native_script() {
+            fn a_dijkstra_guard_clause_maps_to_unset_beside_its_aux_plutus_v4_script() {
                 let cbor = super::script_tests::fixture("dijkstra-scripts.tx");
                 let tx = MultiEraTx::decode_for_era(pallas_traverse::Era::Dijkstra, &cbor)
                     .expect("the fixture decodes");
