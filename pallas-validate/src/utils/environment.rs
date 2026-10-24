@@ -70,7 +70,7 @@ impl MultiEraProtocolParameters {
                 ..
             }) => *x as usize,
             #[cfg(feature = "unstable")]
-            MultiEraProtocolParameters::Dijkstra(pp) => pp.protocol_version.0 as usize,
+            MultiEraProtocolParameters::Dijkstra(pp) => pp.protocol_version.1 as usize,
         }
     }
 
