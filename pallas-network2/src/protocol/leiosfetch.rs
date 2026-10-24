@@ -32,8 +32,7 @@ pub type TxCbor = AnyCbor;
 /// within that window.
 ///
 /// It encodes as an indefinite length CBOR map, decodes from either length form,
-/// and refuses a window that appears twice, since the map holds one bitmap per
-/// window.
+/// and keeps the last bitmap of a window that appears twice.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Bitmaps(pub BTreeMap<u16, u64>);
 
@@ -94,17 +93,7 @@ impl Encode<()> for Bitmaps {
 
 impl<'b> Decode<'b, ()> for Bitmaps {
     fn decode(d: &mut Decoder<'b>, _ctx: &mut ()) -> Result<Self, decode::Error> {
-        let start = d.position();
-        let mut windows = BTreeMap::new();
-        for entry in d.map_iter::<u16, u64>()? {
-            let (window, bitmap) = entry?;
-            if windows.insert(window, bitmap).is_some() {
-                return Err(
-                    decode::Error::message(format!("window {window} appears twice")).at(start),
-                );
-            }
-        }
-        Ok(Bitmaps(windows))
+        Ok(Bitmaps(d.decode()?))
     }
 }
 
@@ -484,22 +473,30 @@ mod tests {
     }
 
     #[test]
-    fn a_request_naming_one_window_twice_is_refused() {
+    fn a_request_naming_one_window_twice_keeps_its_last_bitmap() {
         let captured =
             include_bytes!("../../../test_data/leios-rc-2026w42/fetch-block-txs-request.cbor");
         assert_eq!(captured[51], 0x01, "the key of the second window");
         let mut twice = captured.to_vec();
         twice[51] = 0x00;
 
-        let err = minicbor::decode::<Message>(&twice).unwrap_err();
-        assert!(err.to_string().contains("window 0 appears twice"), "{err}");
+        match minicbor::decode::<Message>(&twice).expect("the request decodes") {
+            Message::BlockTxsRequest(point, bitmaps) => {
+                assert_eq!(point, captured_point());
+                assert_eq!(
+                    bitmaps.0.into_iter().collect::<Vec<_>>(),
+                    [(0, 0xe000_0000_0000_0000)]
+                );
+            }
+            other => panic!("{other:?}"),
+        }
 
         for bytes in [
             &[0xbfu8, 0x00, 0x01, 0x00, 0x02, 0xff][..],
             &[0xa2u8, 0x00, 0x01, 0x00, 0x02],
         ] {
-            let err = minicbor::decode::<Bitmaps>(bytes).unwrap_err();
-            assert!(err.to_string().contains("window 0 appears twice"), "{err}");
+            let back: Bitmaps = minicbor::decode(bytes).expect("the bitmaps decode");
+            assert_eq!(back.0.into_iter().collect::<Vec<_>>(), [(0, 2)]);
         }
     }
 
