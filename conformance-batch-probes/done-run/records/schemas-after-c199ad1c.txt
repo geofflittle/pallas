@@ -1,0 +1,182 @@
+== tx arb
+tx: values 1000, cddl_valid 1000, ledger_ok 1000, pallas_ok 1000, mapper_ok 1000, reencode_equal 1000
+tx: disagreements 0 on 0 values
+schema v1alpha tx: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 255
+schema v1beta tx: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 255
+schema v1 tx: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+== tx cddl-plain
+tx: values 1000, cddl_valid 1000, ledger_ok 1000, pallas_ok 1000, mapper_ok 1000, reencode_equal 1000
+tx: disagreements 0 on 0 values
+schema v1alpha tx: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 289
+schema v1beta tx: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 6, zero and absent read alike 289
+schema v1 tx: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 6, zero and absent read alike 0
+== tx cddl
+tx: values 1000, cddl_valid 1000, ledger_ok 1000, pallas_ok 799, mapper_ok 799, reencode_equal 414
+tx: disagreements 201 on 201 values
+   201  pallas refuses, ledger accepts  unexpected type indefinite bytes at position N: expected bytes (definite length)
+schema v1alpha tx: values 1000, pallas_ok 799, mapped 799, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 275
+schema v1beta tx: values 1000, pallas_ok 799, mapped 799, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 6, zero and absent read alike 275
+schema v1 tx: values 1000, pallas_ok 799, mapped 799, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 6, zero and absent read alike 0
+== body arb
+body: values 1000, cddl_valid 1000, ledger_ok 1000, pallas_ok 1000, mapper_ok 1000, reencode_equal 0
+body: disagreements 0 on 0 values
+schema v1alpha body: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 245
+schema v1beta body: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 245
+schema v1 body: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+== body cddl-plain
+body: values 1000, cddl_valid 1000, ledger_ok 1000, pallas_ok 1000, mapper_ok 1000, reencode_equal 502
+body: disagreements 0 on 0 values
+schema v1alpha body: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 291
+schema v1beta body: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 291
+schema v1 body: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+== body cddl
+body: values 1000, cddl_valid 1000, ledger_ok 1000, pallas_ok 784, mapper_ok 784, reencode_equal 1
+body: disagreements 216 on 216 values
+   216  pallas refuses, ledger accepts  unexpected type indefinite bytes at position N: expected bytes (definite length)
+schema v1alpha body: values 1000, pallas_ok 784, mapped 784, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 280
+schema v1beta body: values 1000, pallas_ok 784, mapped 784, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 280
+schema v1 body: values 1000, pallas_ok 784, mapped 784, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+== wits arb
+wits: values 1000, cddl_valid 1000, ledger_ok 1000, pallas_ok 1000, mapper_ok 1000, reencode_equal 63
+wits: disagreements 0 on 0 values
+schema v1alpha wits: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+schema v1beta wits: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 1 on 1 values, redeemer purposes checked 6, zero and absent read alike 0
+     1  guarding held as unspecified  redeemer_keys
+schema v1 wits: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 6, zero and absent read alike 0
+== wits cddl-plain
+wits: values 1000, cddl_valid 1000, ledger_ok 1000, pallas_ok 1000, mapper_ok 1000, reencode_equal 1000
+wits: disagreements 0 on 0 values
+schema v1alpha wits: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+schema v1beta wits: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 7 on 7 values, redeemer purposes checked 84, zero and absent read alike 0
+     7  guarding held as unspecified  redeemer_keys
+schema v1 wits: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 84, zero and absent read alike 0
+== wits cddl
+wits: values 1000, cddl_valid 1000, ledger_ok 1000, pallas_ok 1000, mapper_ok 1000, reencode_equal 1
+wits: disagreements 0 on 0 values
+schema v1alpha wits: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+schema v1beta wits: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 7 on 7 values, redeemer purposes checked 84, zero and absent read alike 0
+     7  guarding held as unspecified  redeemer_keys
+schema v1 wits: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 84, zero and absent read alike 0
+== ppu arb
+ppu: values 1000, cddl_valid 1000, ledger_ok 1000, pallas_ok 1000, mapper_ok 1000, reencode_equal 342
+ppu: disagreements 5404 on 1000 values
+   759  mapper truncates a rational to 32 bits  k50
+   758  mapper truncates a rational to 32 bits  k37
+   756  mapper truncates a rational to 32 bits  k33
+   745  mapper truncates a rational to 32 bits  k9
+   554  mapper truncates a rational to 32 bits  k38
+   387  mapper truncates a rational to 32 bits  k39
+   384  mapper truncates a rational to 32 bits  k11
+   365  mapper truncates a rational to 32 bits  k10
+   358  mapper truncates a rational to 32 bits  k44
+   338  mapper truncates a rational to 32 bits  k54
+schema v1alpha ppu: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 2250 on 976 values, redeemer purposes checked 0, zero and absent read alike 141
+   756  mapper truncates a rational to 32 bits  k33
+   745  mapper truncates a rational to 32 bits  k9
+   384  mapper truncates a rational to 32 bits  k11
+   365  mapper truncates a rational to 32 bits  k10
+schema v1beta ppu: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 2250 on 976 values, redeemer purposes checked 0, zero and absent read alike 141
+   756  mapper truncates a rational to 32 bits  k33
+   745  mapper truncates a rational to 32 bits  k9
+   384  mapper truncates a rational to 32 bits  k11
+   365  mapper truncates a rational to 32 bits  k10
+schema v1 ppu: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 5404 on 1000 values, redeemer purposes checked 0, zero and absent read alike 0
+   759  mapper truncates a rational to 32 bits  k50
+   758  mapper truncates a rational to 32 bits  k37
+   756  mapper truncates a rational to 32 bits  k33
+   745  mapper truncates a rational to 32 bits  k9
+   554  mapper truncates a rational to 32 bits  k38
+   387  mapper truncates a rational to 32 bits  k39
+   384  mapper truncates a rational to 32 bits  k11
+   365  mapper truncates a rational to 32 bits  k10
+   358  mapper truncates a rational to 32 bits  k44
+   338  mapper truncates a rational to 32 bits  k54
+== ppu cddl-plain
+ppu: values 1000, cddl_valid 1000, ledger_ok 1000, pallas_ok 1000, mapper_ok 1000, reencode_equal 568
+ppu: disagreements 3042 on 860 values
+   816  mapper truncates a rational to 32 bits  k9
+   524  mapper truncates a rational to 32 bits  k10
+   504  mapper truncates a rational to 32 bits  k11
+   396  mapper truncates a rational to 32 bits  k33
+   299  mapper truncates a rational to 32 bits  k37
+   183  mapper truncates a rational to 32 bits  k39
+   148  mapper truncates a rational to 32 bits  k38
+   112  mapper truncates a rational to 32 bits  k44
+    60  mapper truncates a rational to 32 bits  k50
+schema v1alpha ppu: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 2240 on 860 values, redeemer purposes checked 0, zero and absent read alike 1
+   816  mapper truncates a rational to 32 bits  k9
+   524  mapper truncates a rational to 32 bits  k10
+   504  mapper truncates a rational to 32 bits  k11
+   396  mapper truncates a rational to 32 bits  k33
+schema v1beta ppu: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 2240 on 860 values, redeemer purposes checked 0, zero and absent read alike 1
+   816  mapper truncates a rational to 32 bits  k9
+   524  mapper truncates a rational to 32 bits  k10
+   504  mapper truncates a rational to 32 bits  k11
+   396  mapper truncates a rational to 32 bits  k33
+schema v1 ppu: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 3042 on 860 values, redeemer purposes checked 0, zero and absent read alike 0
+   816  mapper truncates a rational to 32 bits  k9
+   524  mapper truncates a rational to 32 bits  k10
+   504  mapper truncates a rational to 32 bits  k11
+   396  mapper truncates a rational to 32 bits  k33
+   299  mapper truncates a rational to 32 bits  k37
+   183  mapper truncates a rational to 32 bits  k39
+   148  mapper truncates a rational to 32 bits  k38
+   112  mapper truncates a rational to 32 bits  k44
+    60  mapper truncates a rational to 32 bits  k50
+== ppu cddl
+ppu: values 1000, cddl_valid 1000, ledger_ok 1000, pallas_ok 1000, mapper_ok 1000, reencode_equal 80
+ppu: disagreements 3042 on 860 values
+   816  mapper truncates a rational to 32 bits  k9
+   524  mapper truncates a rational to 32 bits  k10
+   504  mapper truncates a rational to 32 bits  k11
+   396  mapper truncates a rational to 32 bits  k33
+   299  mapper truncates a rational to 32 bits  k37
+   183  mapper truncates a rational to 32 bits  k39
+   148  mapper truncates a rational to 32 bits  k38
+   112  mapper truncates a rational to 32 bits  k44
+    60  mapper truncates a rational to 32 bits  k50
+schema v1alpha ppu: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 2240 on 860 values, redeemer purposes checked 0, zero and absent read alike 1
+   816  mapper truncates a rational to 32 bits  k9
+   524  mapper truncates a rational to 32 bits  k10
+   504  mapper truncates a rational to 32 bits  k11
+   396  mapper truncates a rational to 32 bits  k33
+schema v1beta ppu: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 2240 on 860 values, redeemer purposes checked 0, zero and absent read alike 1
+   816  mapper truncates a rational to 32 bits  k9
+   524  mapper truncates a rational to 32 bits  k10
+   504  mapper truncates a rational to 32 bits  k11
+   396  mapper truncates a rational to 32 bits  k33
+schema v1 ppu: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 3042 on 860 values, redeemer purposes checked 0, zero and absent read alike 0
+   816  mapper truncates a rational to 32 bits  k9
+   524  mapper truncates a rational to 32 bits  k10
+   504  mapper truncates a rational to 32 bits  k11
+   396  mapper truncates a rational to 32 bits  k33
+   299  mapper truncates a rational to 32 bits  k37
+   183  mapper truncates a rational to 32 bits  k39
+   148  mapper truncates a rational to 32 bits  k38
+   112  mapper truncates a rational to 32 bits  k44
+    60  mapper truncates a rational to 32 bits  k50
+== block arb
+block: values 1000, cddl_valid 1000, ledger_ok 1000, pallas_ok 1000, mapper_ok 1000, reencode_equal 1000
+block: disagreements 18 on 18 values
+    18  mapper fact  peras_certificate
+schema v1alpha block: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+schema v1beta block: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+schema v1 block: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 18 on 18 values, redeemer purposes checked 0, zero and absent read alike 0
+    18  mapper fact  peras_certificate
+== block cddl-plain
+block: values 1000, cddl_valid 1000, ledger_ok 1000, pallas_ok 1000, mapper_ok 1000, reencode_equal 1000
+block: disagreements 60 on 60 values
+    60  mapper fact  peras_certificate
+schema v1alpha block: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+schema v1beta block: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+schema v1 block: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 60 on 60 values, redeemer purposes checked 0, zero and absent read alike 0
+    60  mapper fact  peras_certificate
+== block cddl
+block: values 1000, cddl_valid 1000, ledger_ok 1000, pallas_ok 901, mapper_ok 901, reencode_equal 24
+block: disagreements 156 on 156 values
+    99  pallas refuses, ledger accepts  unexpected type indefinite bytes at position N: expected bytes (definite length)
+    57  mapper fact  peras_certificate
+schema v1alpha block: values 1000, pallas_ok 901, mapped 901, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+schema v1beta block: values 1000, pallas_ok 901, mapped 901, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+schema v1 block: values 1000, pallas_ok 901, mapped 901, panics 0, errors 0, disagreements 57 on 57 values, redeemer purposes checked 0, zero and absent read alike 0
+    57  mapper fact  peras_certificate

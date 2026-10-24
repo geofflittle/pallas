@@ -36,14 +36,16 @@ docker run --rm --user $(id -u):$(id -g) -v $W:/work -e HOME=/work/home \
   -e CARGO_HOME=/work/cargo-home -e CARGO_TARGET_DIR=/work/probe-target \
   -w /work/probe-schemas pallas-ci:1 cargo build --release
 cd /opt/build/conformance-gen-1024
-PROBE=bin/pallas-probe-schemas-SHA OUT=out-schemas-X ./run.sh 1000 1
+PROBE=bin/pallas-probe-schemas-SHA OUT=out-schemas-X GEN_FROM=out-merge-1000 ./run.sh 1000 1
 ```
 
 `pallas-tree` next to `probe-schemas` is a symlink to the tree under test.
 Expected on 23c3a1ce, from `/usr/bin/grep -h "^schema v1beta tx" out-schemas-before/*.summary.txt`:
 `panics 717` (arb), `panics 479` (cddl-plain), `panics 356` (cddl), each
 `map_redeemer is not yet implemented for Dijkstra`. Expected on the merge with
-the guarding fix: `panics 0` on every `schema` line.
+the guarding fix: `panics 0` on every `schema` line. `done-run/records/` holds
+both runs' summary lines (both with `GEN_FROM=out-merge-1000`) and the
+coverage runs.
 
 `box/ci-branches.sh NAME:BRANCH:BP...` extracts each branch of `repo.git` to
 `trees/NAME` and runs `checks.sh` on it. `box/coverage.sh NAME BRANCH BP`

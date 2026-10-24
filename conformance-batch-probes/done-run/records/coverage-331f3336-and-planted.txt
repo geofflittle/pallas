@@ -1,0 +1,42 @@
+== cov repro/conformance-schemas-coverage 331f333
+exit 0
+64
+AGREES true
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s
+== covplant repro/conformance-schemas-coverage-planted 0bb1e48
+exit 101
+64
+COV rb_00008_slot353.cbor failing ["Wits(8) occ 2 dis 2 none 0"]
+COV rb_00017_slot522.cbor failing ["Wits(8) occ 26 dis 26 none 0"]
+COV rb_00018_slot529.cbor failing ["Wits(8) occ 26 dis 26 none 0"]
+COV blk_account_balance_intervals.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_aux_native_require_guard.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_aux_v1.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_aux_v2.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_aux_v3.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_aux_v4.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_cert_pool_bls_absent.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_cert_pool_bls_key.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_cert_pool_bls_nil.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_direct_deposits.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_guards_credential.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_guards_keyhash.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_proposal_info.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_proposal_ppu_new_keys.cbor failing ["Wits(8) occ 1 dis 1 none 0", "ParamUpdate(49) occ 1 dis 1 none 0"]
+COV blk_proposal_ppu_nulls.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_proposal_ppu_old_keys.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_redeemer_guarding.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_required_top_level_guards.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_script_ref_native_require_guard.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_script_ref_v4.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_starting_account_balance_intervals.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_sub_transaction_dijkstra_keys.cbor failing ["Wits(8) occ 2 dis 2 none 0"]
+COV blk_treasury_value_and_donation.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_witness_native_require_guard.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_witness_v3.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV blk_witness_v4.cbor failing ["Wits(8) occ 1 dis 1 none 0"]
+COV block_leios_peras.cbor failing ["Wits(8) occ 2 dis 2 none 0"]
+AGREES false
+thread 'w42_coverage' (184) panicked at examples/u5c-chain-oracle/tests/w42_coverage.rs:63:5:
+a location u5c does not hold is failing
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.00s
