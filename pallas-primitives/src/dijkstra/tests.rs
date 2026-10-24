@@ -259,7 +259,7 @@ fn map_keys(cbor: &[u8]) -> Vec<u64> {
     keys
 }
 
-/// The node writes key 8 ahead of key 5, so the keys are compared rather than the bytes.
+/// The node writes key 8 ahead of key 5, so the test compares keys.
 #[test]
 fn a_witness_set_holding_a_plutus_v4_script_keeps_every_key_on_reencode() {
     let mut witness_sets = 0usize;
