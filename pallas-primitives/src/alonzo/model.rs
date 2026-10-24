@@ -554,6 +554,32 @@ mod tests {
     }
 
     #[test]
+    fn a_native_script_with_extra_elements_reads_to_the_end_of_its_array() {
+        for (bytes, expected) in [
+            ("83050100", NativeScript::InvalidHereafter(1)),
+            ("9f05019f00ff00ff", NativeScript::InvalidHereafter(1)),
+            ("83018000", NativeScript::ScriptAll(vec![])),
+            ("9f019fff00ff", NativeScript::ScriptAll(vec![])),
+        ] {
+            let bytes = hex::decode(bytes).unwrap();
+            let mut d = minicbor::Decoder::new(&bytes);
+            let script: NativeScript = d.decode().unwrap();
+            assert_eq!(script, expected);
+            assert_eq!(d.position(), bytes.len());
+        }
+    }
+
+    #[test]
+    fn a_native_script_without_its_fields_or_with_an_unknown_index_is_refused() {
+        for bytes in ["80", "8105", "9f05ff", "9fff", "820701", "9f0701ff"] {
+            assert!(
+                minicbor::decode::<NativeScript>(&hex::decode(bytes).unwrap()).is_err(),
+                "{bytes} must be refused"
+            );
+        }
+    }
+
+    #[test]
     fn block_isomorphic_decoding_encoding() {
         let test_blocks = vec![
             include_str!("../../../test_data/alonzo1.block"),

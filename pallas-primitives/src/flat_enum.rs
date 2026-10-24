@@ -69,10 +69,7 @@ mod tests {
 
     #[test]
     fn a_credential_with_extra_elements_reads_to_the_end_of_its_array() {
-        for bytes in [
-            format!("8300{HASH}00"),
-            format!("9f00{HASH}9f00ff00ff"),
-        ] {
+        for bytes in [format!("8300{HASH}00"), format!("9f00{HASH}9f00ff00ff")] {
             let bytes = hex::decode(&bytes).unwrap();
             let mut d = minicbor::Decoder::new(&bytes);
             let credential: StakeCredential = d.decode().unwrap();

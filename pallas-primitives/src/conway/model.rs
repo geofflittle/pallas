@@ -758,7 +758,7 @@ mod tests {
             format!("8200{credential}"),
             format!("8201{credential}"),
             format!("8302{credential}{HASH}"),
-            format!("8a03{HASH}{HASH32}0102d81e820102{REWARD}80808260{HASH32}"),
+            format!("8a03{HASH}{HASH32}0102d81e820102{REWARD}d9010280808260{HASH32}"),
             format!("8304{HASH}01"),
             format!("8307{credential}01"),
             format!("8308{credential}01"),
@@ -794,8 +794,8 @@ mod tests {
             format!("8301{id}820a00"),
             format!("8302a1{REWARD}01{HASH}"),
             format!("8203{id}"),
-            format!("8504{id}81{credential}a1{credential}01d81e820102"),
-            format!("8205{id}828260{HASH32}{HASH}"),
+            format!("8504{id}d9010281{credential}a1{credential}01d81e820102"),
+            format!("8305{id}828260{HASH32}{HASH}"),
             "8106".to_string(),
         ]);
     }
@@ -833,7 +833,11 @@ mod tests {
         let body = d
             .decode()
             .unwrap_or_else(|e| panic!("the body must decode: {e}"));
-        assert_eq!(d.position(), bytes.len(), "the body must be read to its end");
+        assert_eq!(
+            d.position(),
+            bytes.len(),
+            "the body must be read to its end"
+        );
         body
     }
 

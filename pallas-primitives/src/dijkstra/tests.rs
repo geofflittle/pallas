@@ -1,9 +1,9 @@
 use super::{
     AccountBalanceInterval, AccountBalanceIntervals, AuxiliaryData, Block, BlockTransaction,
     Certificate, CostModels, DRep, DatumOption, GovAction, Guards, Header, MempoolTransaction,
-    NativeScript, NonEmptySet, PlutusData, ProposalProcedure, ProtocolParamUpdate,
-    RationalNumber, Relay, ScriptRef, Set, SetArm, StakeCredential, TransactionBody,
-    TransactionOutput, Value, Voter, WitnessSet,
+    NativeScript, NonEmptySet, PlutusData, ProposalProcedure, ProtocolParamUpdate, RationalNumber,
+    Relay, ScriptRef, Set, SetArm, StakeCredential, TransactionBody, TransactionOutput, Value,
+    Voter, WitnessSet,
 };
 use crate::flat_enum::assert_reads_either_length_form;
 use pallas_codec::minicbor;
@@ -1664,7 +1664,7 @@ fn a_gov_action_reads_either_length_form() {
         format!("8302a1{REWARD}01{HASH}"),
         format!("8203{id}"),
         format!("8504{id}81{credential}a1{credential}01d81e820102"),
-        format!("8205{id}828260{HASH32}{HASH}"),
+        format!("8305{id}828260{HASH32}{HASH}"),
         "8106".to_string(),
     ]);
 }
@@ -1783,7 +1783,8 @@ fn a_generated_gov_action_in_an_indefinite_array_decodes() {
     let proposals: Vec<_> = body.proposal_procedures.unwrap().to_vec();
     assert_eq!(proposals.len(), 1);
     assert_eq!(proposals[0].deposit, 0x3092f0c34ad35adb);
-    let account = hex::decode("f1000202000001010102010001010100000101000000010102010001").unwrap();
+    let account =
+        hex::decode("f100020200000101010201000101010000010100000001010201000101").unwrap();
     assert_eq!(
         proposals[0].gov_action,
         GovAction::TreasuryWithdrawals([(account.into(), 0xa1d446b07e0bbe31)].into(), None)
