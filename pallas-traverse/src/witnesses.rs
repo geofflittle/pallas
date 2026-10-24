@@ -534,12 +534,7 @@ impl<'b> MultiEraTx<'b> {
                 .map(|x| x.as_ref())
                 .unwrap_or(&[]),
             #[cfg(feature = "unstable")]
-            Self::DijkstraSub(x, _) => x
-                .transaction_witness_set
-                .plutus_v4_script
-                .as_ref()
-                .map(|x| x.as_ref())
-                .unwrap_or(&[]),
+            Self::DijkstraSub(_, _) => &[],
         }
     }
 }
