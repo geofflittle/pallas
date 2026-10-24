@@ -1,12 +1,14 @@
 #!/bin/sh
 # Runs the brief's check list on one tree and prints one verdict line per step.
-# usage: sh checks.sh TREE BLUEPRINT_DIR [STEP...]
-# TREE and BLUEPRINT_DIR are relative to /opt/build/pallas-conformance-1024.
+# usage: [W=dir] [U=features] sh checks.sh TREE BLUEPRINT_DIR [STEP...]
+# TREE and BLUEPRINT_DIR are relative to W, default /opt/build/pallas-conformance-1024.
 # BLUEPRINT_DIR is the checkout matching the tree's cardano-blueprint gitlink.
 T=$1
 BP=$2
 shift 2
-cd /opt/build/pallas-conformance-1024
+W=${W:-/opt/build/pallas-conformance-1024}
+export W
+cd "$W"
 rm -rf "$T/cardano-blueprint"
 cp -r "$BP" "$T/cardano-blueprint"
 find "$T" -name '*.rs' -exec touch {} +
