@@ -487,7 +487,6 @@ crate::flat_enum::decode_flat_enum!(GovAction,
     3 => NoConfidence(previous),
     4 => UpdateCommittee(previous, removed, added, threshold),
     5 => NewConstitution(previous, constitution),
-    6 => Information,
 );
 
 #[derive(Encode, Decode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
