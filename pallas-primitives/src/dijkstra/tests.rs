@@ -345,8 +345,9 @@ const ABSENT_RULES: &[&str] = &[
     "transaction",
     // Renamed to `mempool_transaction`.
     "transaction_mempool",
-    // Renamed to `eb_announcement`.
+    // Renamed to `eb_announcement`, then to `eb_references_announcement`.
     "leios_announcement",
+    "eb_announcement",
     // Renamed to `bls_key`.
     "leios_key",
     // Deleted with `redeemers`' array arm.
@@ -1013,7 +1014,7 @@ fn a_certificate_travels_without_an_announcement() {
     );
 }
 
-/// `eb_announcement = [eb_hash : hash32, eb_size : uint .size 4]` (`defs.cddl`).
+/// `eb_references_announcement = [eb_hash : hash32, eb_size : uint .size 4]` (`defs.cddl`).
 /// dijkstra15 announces 71103 bytes, past what two bytes hold, so the size is
 /// written as a five byte uint where dijkstra8's 39495 is a three byte one.
 #[test]

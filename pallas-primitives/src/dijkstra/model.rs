@@ -1,6 +1,6 @@
 //! Ledger primitives and cbor codec for the Dijkstra era
 //!
-//! Handcrafted, idiomatic rust artifacts based on the [Dijkstra CDDL](https://github.com/IntersectMBO/cardano-ledger/blob/1587f21a7d1306dc590c2749a5c66232ef66aad0/eras/dijkstra/impl/cddl/data/dijkstra.cddl) file in the IntersectMBO repo, vendored beside this one as `defs.cddl`.
+//! Handcrafted, idiomatic rust artifacts based on the [Dijkstra CDDL](https://github.com/IntersectMBO/cardano-ledger/blob/9df9f98cce86c5f2195142b2c02dd9b39dd9dc7c/eras/dijkstra/impl/cddl/data/dijkstra.cddl) file in the IntersectMBO repo, vendored beside this one as `defs.cddl`.
 
 use serde::{Deserialize, Serialize};
 
@@ -195,7 +195,7 @@ tag_preserving_set!(NonEmptySet, "a nonempty set", 1);
 
 pub use crate::babbage::OperationalCert;
 
-/// `header_body` (`defs.cddl`) appends `block_body_contains_leios_cert` and `eb_announcement` to Conway's ten fields.
+/// `header_body` (`defs.cddl`) appends `block_body_contains_leios_cert` and `eb_references_announcement` to Conway's ten fields.
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
 pub struct HeaderBody {
     #[n(0)]
@@ -302,7 +302,7 @@ pub use crate::conway::DatumOption;
 
 pub use crate::conway::LegacyTransactionOutput;
 
-/// `eb_announcement = [eb_hash : hash32, eb_size : uint .size 4]` (`defs.cddl`).
+/// `eb_references_announcement = [eb_hash : hash32, eb_size : uint .size 4]` (`defs.cddl`).
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
 pub struct EbAnnouncement {
     #[n(0)]
