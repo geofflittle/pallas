@@ -196,7 +196,16 @@ macro_rules! impl_cardano_mapper_before_v1 {
                 let mapper = Mapper::new(NoLedger);
 
                 assert_eq!(mapper.collect_all_scripts(&tx), vec![native(unset())]);
-                assert_eq!(mapper.collect_all_aux_scripts(&tx), vec![native(unset())]);
+                assert_eq!(
+                    mapper.collect_all_aux_scripts(&tx),
+                    vec![
+                        native(unset()),
+                        u5c::Script {
+                            script: u5c::script::Script::PlutusV4(vec![0xd8, 0x79, 0x80].into())
+                                .into(),
+                        },
+                    ]
+                );
             }
 
             #[test]
