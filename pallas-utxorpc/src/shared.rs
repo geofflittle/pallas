@@ -635,7 +635,8 @@ macro_rules! impl_cardano_mapper_shared {
                         script: u5c::script::Script::PlutusV4(x).into(),
                     });
 
-                ns.chain(p1).chain(p2).chain(p3).chain(p4).collect()
+                let _ = p3;
+                ns.chain(p1).chain(p2).chain(p4).collect()
             }
 
             fn find_related_inputs(&self, tx: &pallas_traverse::MultiEraTx) -> Vec<$crate::TxoRef> {
