@@ -170,7 +170,7 @@ fn dijkstra_pparams(params: &pallas_validate::utils::DijkstraProtParams) -> u5c:
         ),
         peras_min_candidate_block_age: Some(params.peras_min_candidate_block_age.into()),
         peras_healing_factor: r(&params.peras_healing_factor),
-        peras_cert_boost: Some(params.peras_cert_boost.into()),
+        peras_cert_boost: Some(params.peras_target_committee_size.into()),
         peras_target_committee_size: Some(params.peras_target_committee_size.into()),
         peras_bootstrap_round: params.peras_bootstrap_round.map(u64::from),
         peras_quorum_threshold_safety_margin: r(&params.peras_quorum_threshold_safety_margin),
