@@ -1,0 +1,8 @@
+body-credential-indefinite.hex out-framed-flat/body.framed 0
+body-drep-indefinite.hex out-framed-flat/body.framed 1
+body-datum-option-indefinite.hex out-framed-flat/body.framed 2
+body-gov-action-indefinite.hex out-framed-flat/body.framed 3
+body-voter-indefinite.hex out-framed-flat/body.framed 4
+body-guard-credential-indefinite.hex out-framed-flat/body.framed 5
+body-script-ref-indefinite.hex out-framed-flat/body.framed 6
+wits-native-scripts-indefinite.hex out-framed-flat/wits.framed 7
