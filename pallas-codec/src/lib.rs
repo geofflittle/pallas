@@ -129,7 +129,7 @@ macro_rules! codec_by_datatype {
 mod tests {
     use super::minicbor::{self, Decode, Encode, decode, encode};
 
-    #[derive(Clone, Debug)]
+    #[derive(Clone, Debug, PartialEq)]
     enum Thing {
         Coin(u32),
         Change(bool),
@@ -161,5 +161,41 @@ mod tests {
         roundtrip_codec(Thing::Coin(0xfafa));
         roundtrip_codec(Thing::Change(false));
         roundtrip_codec(Thing::Multiasset(true, 10, -20));
+    }
+
+    /// Decodes `bytes` as one `Thing` and the position the decoder stopped at.
+    fn decode_thing(bytes: &[u8]) -> Result<(Thing, usize), decode::Error> {
+        let mut d = minicbor::Decoder::new(bytes);
+        let thing = d.decode()?;
+        Ok((thing, d.position()))
+    }
+
+    #[test]
+    fn a_many_field_variant_reads_any_array_of_its_fields_to_the_end() {
+        let cases: [(&str, &[u8]); 3] = [
+            ("definite", &[0x83, 0xf5, 0x0a, 0x33]),
+            ("indefinite", &[0x9f, 0xf5, 0x0a, 0x33, 0xff]),
+            ("definite with an extra element", &[0x84, 0xf5, 0x0a, 0x33, 0x00]),
+        ];
+        for (name, bytes) in cases {
+            let (thing, position) =
+                decode_thing(bytes).unwrap_or_else(|e| panic!("the {name} array: {e}"));
+            assert_eq!(thing, Thing::Multiasset(true, 10, -20), "the {name} array");
+            assert_eq!(position, bytes.len(), "the {name} array ends at its last byte");
+        }
+    }
+
+    #[test]
+    fn a_many_field_variant_refuses_an_array_short_of_its_fields() {
+        let cases: [(&str, &[u8]); 2] = [
+            ("definite", &[0x82, 0xf5, 0x0a, 0x00]),
+            ("indefinite", &[0x9f, 0xf5, 0x0a, 0xff]),
+        ];
+        for (name, bytes) in cases {
+            assert!(
+                decode_thing(bytes).is_err(),
+                "the short {name} array must not decode"
+            );
+        }
     }
 }
