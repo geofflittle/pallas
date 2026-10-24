@@ -195,7 +195,17 @@ tag_preserving_set!(NonEmptySet, "a nonempty set", 1);
 
 pub use crate::babbage::OperationalCert;
 
-/// `header_body` (`defs.cddl`) appends `block_body_contains_leios_cert` and `eb_references_announcement` to Conway's ten fields.
+/// `header_version_info = [highest_supported_major_version : uint .size 4, self_reported_software_tag : uint .size 4]` (`defs.cddl`).
+#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+pub struct HeaderVersionInfo {
+    #[n(0)]
+    pub highest_supported_major_version: u32,
+
+    #[n(1)]
+    pub self_reported_software_tag: u32,
+}
+
+/// `header_body` (`defs.cddl`) has `header_version_info` where Conway's has `protocol_version`, and appends `block_body_contains_leios_cert` and `eb_references_announcement`.
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
 pub struct HeaderBody {
     #[n(0)]
@@ -226,7 +236,7 @@ pub struct HeaderBody {
     pub operational_cert: OperationalCert,
 
     #[n(9)]
-    pub protocol_version: ProtocolVersion,
+    pub header_version_info: HeaderVersionInfo,
 
     // -- NEW IN DIJKSTRA
     #[n(10)]
