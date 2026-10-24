@@ -725,6 +725,51 @@ mod tests {
     use proptest::{prelude::*, strategy::Just};
     use test_case::test_case;
 
+    #[test_case("d866821903e880" ; "definite")]
+    #[test_case("d8669f1903e880ff" ; "indefinite")]
+    #[test_case("d866831903e88000" ; "definite with an extra element")]
+    fn a_constructor_102_reads_its_array_to_the_end_as_plutus_data(hex: &str) {
+        let bytes = hex::decode(hex).unwrap();
+        let mut d = minicbor::Decoder::new(&bytes);
+        let data: PlutusData = d.decode().unwrap_or_else(|e| panic!("{hex}: {e}"));
+        assert_eq!(d.position(), bytes.len(), "{hex} must be read to its last byte");
+        let PlutusData::Constr(constr) = data else {
+            panic!("{hex} is a constructor");
+        };
+        assert_eq!(constr.constr_index(), 1000);
+    }
+
+    #[test_case("d866821903e880" ; "definite")]
+    #[test_case("d8669f1903e880ff" ; "indefinite")]
+    #[test_case("d866831903e88000" ; "definite with an extra element")]
+    fn a_constructor_102_reads_its_array_to_the_end_as_a_constructor(hex: &str) {
+        let bytes = hex::decode(hex).unwrap();
+        let mut d = minicbor::Decoder::new(&bytes);
+        let constr: Constr<PlutusData> = d.decode().unwrap_or_else(|e| panic!("{hex}: {e}"));
+        assert_eq!(d.position(), bytes.len(), "{hex} must be read to its last byte");
+        assert_eq!(constr.constr_index(), 1000);
+    }
+
+    #[test_case("d866811903e880" ; "definite, followed by an empty array")]
+    #[test_case("d8669f1903e8ff" ; "indefinite")]
+    fn a_constructor_102_without_fields_is_refused_as_plutus_data(hex: &str) {
+        let bytes = hex::decode(hex).unwrap();
+        assert!(
+            minicbor::decode::<PlutusData>(&bytes).is_err(),
+            "{hex} must not decode as plutus data"
+        );
+    }
+
+    #[test_case("d866811903e880" ; "definite, followed by an empty array")]
+    #[test_case("d8669f1903e8ff" ; "indefinite")]
+    fn a_constructor_102_without_fields_is_refused_as_a_constructor(hex: &str) {
+        let bytes = hex::decode(hex).unwrap();
+        assert!(
+            minicbor::decode::<Constr<PlutusData>>(&bytes).is_err(),
+            "{hex} must not decode as a constructor"
+        );
+    }
+
     prop_compose! {
         pub(crate) fn any_bounded_bytes()(
             bytes in any::<Vec<u8>>(),

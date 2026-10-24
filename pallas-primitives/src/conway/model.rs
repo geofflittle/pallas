@@ -730,10 +730,47 @@ pub type MintedTx<'b> = Tx<'b>;
 
 #[cfg(test)]
 mod tests {
-    use super::Block;
+    use super::{Block, GovAction, RationalNumber, Relay};
     use pallas_codec::minicbor;
 
     type BlockWrapper<'b> = (u16, Block<'b>);
+
+    /// Decodes `hex` as one `T` that ends exactly where the bytes do.
+    fn decode_all<T: for<'b> minicbor::Decode<'b, ()>>(hex: &str) -> T {
+        let bytes = hex::decode(hex).unwrap();
+        let mut d = minicbor::Decoder::new(&bytes);
+        let value = d
+            .decode()
+            .unwrap_or_else(|e| panic!("{hex} must decode: {e}"));
+        assert_eq!(d.position(), bytes.len(), "{hex} must be read to its last byte");
+        value
+    }
+
+    #[test]
+    fn a_relay_in_an_indefinite_array_reads_to_its_break() {
+        let relay: Relay = decode_all(include_str!(
+            "../../../test_data/dijkstra-generated/relay-indefinite.hex"
+        ));
+        assert_eq!(relay, Relay::MultiHostName("\u{241a}\u{3bdc1}\u{d0}".to_string()));
+    }
+
+    #[test]
+    fn a_rational_in_an_indefinite_array_reads_to_its_break() {
+        let ratio: RationalNumber = decode_all("d81e9f0102ff");
+        assert_eq!(
+            ratio,
+            RationalNumber {
+                numerator: 1,
+                denominator: 2
+            }
+        );
+    }
+
+    #[test]
+    fn a_hard_fork_version_in_an_indefinite_array_decodes() {
+        let action: GovAction = decode_all("8301f69f031a8a26c280ff");
+        assert_eq!(action, GovAction::HardForkInitiation(None, (3, 2317795968)));
+    }
 
     #[cfg(test)]
     mod tests_voter {
