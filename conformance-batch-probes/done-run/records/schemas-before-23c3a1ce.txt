@@ -1,0 +1,154 @@
+#### tx arb
+schema v1alpha tx: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 255
+  no field in v1alpha: ['aux_data', 'body.account_balance_intervals', 'body.aux_data_hash', 'body.direct_deposits', 'body.donation', 'body.guards', 'body.network_id', 'body.required_top_level_guards', 'body.script_data_hash', 'body.starting_account_balance_intervals', 'body.sub_transactions', 'body.treasury', 'body.voters', 'wits.bootstrap', 'wits.redeemers']
+schema v1beta tx: values 1000, pallas_ok 1000, mapped 283, panics 717, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 69
+   717  fails  panic: not implemented: map_redeemer is not yet implemented for Dijkstra
+  no field in v1beta: ['aux_data', 'body.account_balance_intervals', 'body.aux_data_hash', 'body.direct_deposits', 'body.donation', 'body.guards', 'body.network_id', 'body.required_top_level_guards', 'body.script_data_hash', 'body.starting_account_balance_intervals', 'body.sub_transactions', 'body.treasury']
+schema v1 tx: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+#### tx cddl-plain
+schema v1alpha tx: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 289
+  no field in v1alpha: ['aux_data', 'body.account_balance_intervals', 'body.aux_data_hash', 'body.direct_deposits', 'body.donation', 'body.guards', 'body.network_id', 'body.required_top_level_guards', 'body.script_data_hash', 'body.starting_account_balance_intervals', 'body.sub_transactions', 'body.treasury', 'body.voters', 'wits.bootstrap', 'wits.redeemers']
+schema v1beta tx: values 1000, pallas_ok 1000, mapped 521, panics 479, errors 0, disagreements 0 on 0 values, redeemer purposes checked 6, zero and absent read alike 227
+   479  fails  panic: not implemented: map_redeemer is not yet implemented for Dijkstra
+  no field in v1beta: ['aux_data', 'body.account_balance_intervals', 'body.aux_data_hash', 'body.direct_deposits', 'body.donation', 'body.guards', 'body.network_id', 'body.required_top_level_guards', 'body.script_data_hash', 'body.starting_account_balance_intervals', 'body.sub_transactions', 'body.treasury']
+schema v1 tx: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 6, zero and absent read alike 0
+#### tx cddl
+schema v1alpha tx: values 1000, pallas_ok 799, mapped 799, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 275
+  no field in v1alpha: ['aux_data', 'body.account_balance_intervals', 'body.aux_data_hash', 'body.direct_deposits', 'body.donation', 'body.guards', 'body.network_id', 'body.required_top_level_guards', 'body.script_data_hash', 'body.starting_account_balance_intervals', 'body.sub_transactions', 'body.treasury', 'body.voters', 'wits.bootstrap', 'wits.redeemers']
+schema v1beta tx: values 1000, pallas_ok 799, mapped 443, panics 356, errors 0, disagreements 0 on 0 values, redeemer purposes checked 6, zero and absent read alike 218
+   356  fails  panic: not implemented: map_redeemer is not yet implemented for Dijkstra
+  no field in v1beta: ['aux_data', 'body.account_balance_intervals', 'body.aux_data_hash', 'body.direct_deposits', 'body.donation', 'body.guards', 'body.network_id', 'body.required_top_level_guards', 'body.script_data_hash', 'body.starting_account_balance_intervals', 'body.sub_transactions', 'body.treasury']
+schema v1 tx: values 1000, pallas_ok 799, mapped 799, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 6, zero and absent read alike 0
+#### body arb
+schema v1alpha body: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 245
+  no field in v1alpha: ['account_balance_intervals', 'aux_data_hash', 'direct_deposits', 'donation', 'guards', 'network_id', 'required_top_level_guards', 'script_data_hash', 'starting_account_balance_intervals', 'sub_transactions', 'treasury', 'voters']
+schema v1beta body: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 245
+  no field in v1beta: ['account_balance_intervals', 'aux_data_hash', 'direct_deposits', 'donation', 'guards', 'network_id', 'required_top_level_guards', 'script_data_hash', 'starting_account_balance_intervals', 'sub_transactions', 'treasury']
+schema v1 body: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+#### body cddl-plain
+schema v1alpha body: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 291
+  no field in v1alpha: ['account_balance_intervals', 'aux_data_hash', 'direct_deposits', 'donation', 'guards', 'network_id', 'required_top_level_guards', 'script_data_hash', 'starting_account_balance_intervals', 'sub_transactions', 'treasury', 'voters']
+schema v1beta body: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 291
+  no field in v1beta: ['account_balance_intervals', 'aux_data_hash', 'direct_deposits', 'donation', 'guards', 'network_id', 'required_top_level_guards', 'script_data_hash', 'starting_account_balance_intervals', 'sub_transactions', 'treasury']
+schema v1 body: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+#### body cddl
+schema v1alpha body: values 1000, pallas_ok 784, mapped 784, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 280
+  no field in v1alpha: ['account_balance_intervals', 'aux_data_hash', 'direct_deposits', 'donation', 'guards', 'network_id', 'required_top_level_guards', 'script_data_hash', 'starting_account_balance_intervals', 'sub_transactions', 'treasury', 'voters']
+schema v1beta body: values 1000, pallas_ok 784, mapped 784, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 280
+  no field in v1beta: ['account_balance_intervals', 'aux_data_hash', 'direct_deposits', 'donation', 'guards', 'network_id', 'required_top_level_guards', 'script_data_hash', 'starting_account_balance_intervals', 'sub_transactions', 'treasury']
+schema v1 body: values 1000, pallas_ok 784, mapped 784, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+#### wits arb
+schema v1alpha wits: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+  no field in v1alpha: ['bootstrap', 'redeemers']
+schema v1beta wits: values 1000, pallas_ok 1000, mapped 315, panics 685, errors 0, disagreements 0 on 0 values, redeemer purposes checked 5, zero and absent read alike 0
+   685  fails  panic: not implemented: map_redeemer is not yet implemented for Dijkstra
+schema v1 wits: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 6, zero and absent read alike 0
+#### wits cddl-plain
+schema v1alpha wits: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+  no field in v1alpha: ['bootstrap', 'redeemers']
+schema v1beta wits: values 1000, pallas_ok 1000, mapped 534, panics 466, errors 0, disagreements 0 on 0 values, redeemer purposes checked 77, zero and absent read alike 0
+   466  fails  panic: not implemented: map_redeemer is not yet implemented for Dijkstra
+schema v1 wits: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 84, zero and absent read alike 0
+#### wits cddl
+schema v1alpha wits: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+  no field in v1alpha: ['bootstrap', 'redeemers']
+schema v1beta wits: values 1000, pallas_ok 1000, mapped 534, panics 466, errors 0, disagreements 0 on 0 values, redeemer purposes checked 77, zero and absent read alike 0
+   466  fails  panic: not implemented: map_redeemer is not yet implemented for Dijkstra
+schema v1 wits: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 84, zero and absent read alike 0
+#### ppu arb
+schema v1alpha ppu: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 2250 on 976 values, redeemer purposes checked 0, zero and absent read alike 141
+   756  mapper truncates a rational to 32 bits  k33
+   745  mapper truncates a rational to 32 bits  k9
+   384  mapper truncates a rational to 32 bits  k11
+   365  mapper truncates a rational to 32 bits  k10
+  no field in v1alpha: ['k34', 'k35', 'k36', 'k37', 'k38', 'k39', 'k40', 'k41', 'k42', 'k43', 'k44', 'k45', 'k46', 'k47', 'k48', 'k49', 'k50', 'k51', 'k52', 'k53', 'k54', 'k55', 'k56']
+schema v1beta ppu: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 2250 on 976 values, redeemer purposes checked 0, zero and absent read alike 141
+   756  mapper truncates a rational to 32 bits  k33
+   745  mapper truncates a rational to 32 bits  k9
+   384  mapper truncates a rational to 32 bits  k11
+   365  mapper truncates a rational to 32 bits  k10
+  no field in v1beta: ['k34', 'k35', 'k36', 'k37', 'k38', 'k39', 'k40', 'k41', 'k42', 'k43', 'k44', 'k45', 'k46', 'k47', 'k48', 'k49', 'k50', 'k51', 'k52', 'k53', 'k54', 'k55', 'k56']
+schema v1 ppu: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 5404 on 1000 values, redeemer purposes checked 0, zero and absent read alike 0
+   759  mapper truncates a rational to 32 bits  k50
+   758  mapper truncates a rational to 32 bits  k37
+   756  mapper truncates a rational to 32 bits  k33
+   745  mapper truncates a rational to 32 bits  k9
+   554  mapper truncates a rational to 32 bits  k38
+   387  mapper truncates a rational to 32 bits  k39
+   384  mapper truncates a rational to 32 bits  k11
+   365  mapper truncates a rational to 32 bits  k10
+   358  mapper truncates a rational to 32 bits  k44
+   338  mapper truncates a rational to 32 bits  k54
+#### ppu cddl-plain
+schema v1alpha ppu: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 2240 on 860 values, redeemer purposes checked 0, zero and absent read alike 1
+   816  mapper truncates a rational to 32 bits  k9
+   524  mapper truncates a rational to 32 bits  k10
+   504  mapper truncates a rational to 32 bits  k11
+   396  mapper truncates a rational to 32 bits  k33
+  no field in v1alpha: ['k34', 'k35', 'k36', 'k37', 'k38', 'k39', 'k40', 'k41', 'k42', 'k43', 'k44', 'k45', 'k46', 'k47', 'k48', 'k49', 'k50', 'k51', 'k52', 'k53']
+schema v1beta ppu: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 2240 on 860 values, redeemer purposes checked 0, zero and absent read alike 1
+   816  mapper truncates a rational to 32 bits  k9
+   524  mapper truncates a rational to 32 bits  k10
+   504  mapper truncates a rational to 32 bits  k11
+   396  mapper truncates a rational to 32 bits  k33
+  no field in v1beta: ['k34', 'k35', 'k36', 'k37', 'k38', 'k39', 'k40', 'k41', 'k42', 'k43', 'k44', 'k45', 'k46', 'k47', 'k48', 'k49', 'k50', 'k51', 'k52', 'k53']
+schema v1 ppu: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 3042 on 860 values, redeemer purposes checked 0, zero and absent read alike 0
+   816  mapper truncates a rational to 32 bits  k9
+   524  mapper truncates a rational to 32 bits  k10
+   504  mapper truncates a rational to 32 bits  k11
+   396  mapper truncates a rational to 32 bits  k33
+   299  mapper truncates a rational to 32 bits  k37
+   183  mapper truncates a rational to 32 bits  k39
+   148  mapper truncates a rational to 32 bits  k38
+   112  mapper truncates a rational to 32 bits  k44
+    60  mapper truncates a rational to 32 bits  k50
+#### ppu cddl
+schema v1alpha ppu: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 2240 on 860 values, redeemer purposes checked 0, zero and absent read alike 1
+   816  mapper truncates a rational to 32 bits  k9
+   524  mapper truncates a rational to 32 bits  k10
+   504  mapper truncates a rational to 32 bits  k11
+   396  mapper truncates a rational to 32 bits  k33
+  no field in v1alpha: ['k34', 'k35', 'k36', 'k37', 'k38', 'k39', 'k40', 'k41', 'k42', 'k43', 'k44', 'k45', 'k46', 'k47', 'k48', 'k49', 'k50', 'k51', 'k52', 'k53']
+schema v1beta ppu: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 2240 on 860 values, redeemer purposes checked 0, zero and absent read alike 1
+   816  mapper truncates a rational to 32 bits  k9
+   524  mapper truncates a rational to 32 bits  k10
+   504  mapper truncates a rational to 32 bits  k11
+   396  mapper truncates a rational to 32 bits  k33
+  no field in v1beta: ['k34', 'k35', 'k36', 'k37', 'k38', 'k39', 'k40', 'k41', 'k42', 'k43', 'k44', 'k45', 'k46', 'k47', 'k48', 'k49', 'k50', 'k51', 'k52', 'k53']
+schema v1 ppu: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 3042 on 860 values, redeemer purposes checked 0, zero and absent read alike 0
+   816  mapper truncates a rational to 32 bits  k9
+   524  mapper truncates a rational to 32 bits  k10
+   504  mapper truncates a rational to 32 bits  k11
+   396  mapper truncates a rational to 32 bits  k33
+   299  mapper truncates a rational to 32 bits  k37
+   183  mapper truncates a rational to 32 bits  k39
+   148  mapper truncates a rational to 32 bits  k38
+   112  mapper truncates a rational to 32 bits  k44
+    60  mapper truncates a rational to 32 bits  k50
+#### block arb
+schema v1alpha block: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+  no field in v1alpha: ['body_hash', 'body_size', 'contains_leios_cert', 'eb_announcement', 'leios_certificate', 'peras_certificate', 'prev_genesis', 'protocol_major']
+schema v1beta block: values 1000, pallas_ok 1000, mapped 662, panics 338, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+   338  fails  panic: not implemented: map_redeemer is not yet implemented for Dijkstra
+  no field in v1beta: ['body_hash', 'body_size', 'contains_leios_cert', 'eb_announcement', 'leios_certificate', 'peras_certificate', 'prev_genesis', 'protocol_major']
+schema v1 block: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 18 on 18 values, redeemer purposes checked 0, zero and absent read alike 0
+    18  mapper fact  peras_certificate
+  no field in v1: ['body_hash', 'body_size', 'prev_genesis', 'protocol_major']
+#### block cddl-plain
+schema v1alpha block: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+  no field in v1alpha: ['body_hash', 'body_size', 'contains_leios_cert', 'eb_announcement', 'leios_certificate', 'peras_certificate', 'prev_genesis', 'protocol_major']
+schema v1beta block: values 1000, pallas_ok 1000, mapped 721, panics 279, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+   279  fails  panic: not implemented: map_redeemer is not yet implemented for Dijkstra
+  no field in v1beta: ['body_hash', 'body_size', 'contains_leios_cert', 'eb_announcement', 'leios_certificate', 'peras_certificate', 'prev_genesis', 'protocol_major']
+schema v1 block: values 1000, pallas_ok 1000, mapped 1000, panics 0, errors 0, disagreements 60 on 60 values, redeemer purposes checked 0, zero and absent read alike 0
+    60  mapper fact  peras_certificate
+  no field in v1: ['body_hash', 'body_size', 'prev_genesis', 'protocol_major']
+#### block cddl
+schema v1alpha block: values 1000, pallas_ok 901, mapped 901, panics 0, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+  no field in v1alpha: ['body_hash', 'body_size', 'contains_leios_cert', 'eb_announcement', 'leios_certificate', 'peras_certificate', 'prev_genesis', 'protocol_major']
+schema v1beta block: values 1000, pallas_ok 901, mapped 685, panics 216, errors 0, disagreements 0 on 0 values, redeemer purposes checked 0, zero and absent read alike 0
+   216  fails  panic: not implemented: map_redeemer is not yet implemented for Dijkstra
+  no field in v1beta: ['body_hash', 'body_size', 'contains_leios_cert', 'eb_announcement', 'leios_certificate', 'peras_certificate', 'prev_genesis', 'protocol_major']
+schema v1 block: values 1000, pallas_ok 901, mapped 901, panics 0, errors 0, disagreements 57 on 57 values, redeemer purposes checked 0, zero and absent read alike 0
+    57  mapper fact  peras_certificate
+  no field in v1: ['body_hash', 'body_size', 'prev_genesis', 'protocol_major']
