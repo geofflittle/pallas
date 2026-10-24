@@ -31,10 +31,9 @@ pub type TxCbor = AnyCbor;
 /// `64*n .. 64*n+63`); each set bit in the `u64` value selects a transaction
 /// within that window.
 ///
-/// **Wire note:** this *must* serialize as an indefinite-length CBOR map
-/// (`0xbf … 0xff`). The Leios prototype rejects a definite-length map and resets
-/// the connection. Decoding accepts either form (a [`BTreeMap`] keeps key order
-/// deterministic).
+/// It encodes as an indefinite length CBOR map, decodes from either length form,
+/// and refuses a window that appears twice, since the map holds one bitmap per
+/// window.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Bitmaps(pub BTreeMap<u16, u64>);
 
@@ -95,9 +94,17 @@ impl Encode<()> for Bitmaps {
 
 impl<'b> Decode<'b, ()> for Bitmaps {
     fn decode(d: &mut Decoder<'b>, _ctx: &mut ()) -> Result<Self, decode::Error> {
-        // minicbor's `BTreeMap` decoder transparently handles both definite and
-        // indefinite-length maps.
-        Ok(Bitmaps(d.decode()?))
+        let start = d.position();
+        let mut windows = BTreeMap::new();
+        for entry in d.map_iter::<u16, u64>()? {
+            let (window, bitmap) = entry?;
+            if windows.insert(window, bitmap).is_some() {
+                return Err(
+                    decode::Error::message(format!("window {window} appears twice")).at(start),
+                );
+            }
+        }
+        Ok(Bitmaps(windows))
     }
 }
 
@@ -464,6 +471,36 @@ mod tests {
         let definite = [0xa1u8, 0x00, 0x01];
         let back: Bitmaps = minicbor::decode(&definite).unwrap();
         assert_eq!(back.0.get(&0), Some(&1u64));
+    }
+
+    #[test]
+    fn bitmaps_with_distinct_windows_decode_in_either_length_form() {
+        let indefinite = [0xbfu8, 0x00, 0x01, 0x01, 0x02, 0xff];
+        let definite = [0xa2u8, 0x00, 0x01, 0x01, 0x02];
+        for bytes in [&indefinite[..], &definite[..]] {
+            let back: Bitmaps = minicbor::decode(bytes).unwrap();
+            assert_eq!(back.0.into_iter().collect::<Vec<_>>(), [(0, 1), (1, 2)]);
+        }
+    }
+
+    #[test]
+    fn a_request_naming_one_window_twice_is_refused() {
+        let captured =
+            include_bytes!("../../../test_data/leios-rc-2026w42/fetch-block-txs-request.cbor");
+        assert_eq!(captured[51], 0x01, "the key of the second window");
+        let mut twice = captured.to_vec();
+        twice[51] = 0x00;
+
+        let err = minicbor::decode::<Message>(&twice).unwrap_err();
+        assert!(err.to_string().contains("window 0 appears twice"), "{err}");
+
+        for bytes in [
+            &[0xbfu8, 0x00, 0x01, 0x00, 0x02, 0xff][..],
+            &[0xa2u8, 0x00, 0x01, 0x00, 0x02],
+        ] {
+            let err = minicbor::decode::<Bitmaps>(bytes).unwrap_err();
+            assert!(err.to_string().contains("window 0 appears twice"), "{err}");
+        }
     }
 
     // --- CBOR-vs-CDDL conformance (run with `--features blueprint`) ---
