@@ -1,0 +1,6 @@
+[
+ {"kind": "body", "frame": "a400d90102800180020004d9010284{}{}{}{}",
+  "items": [["body.cddl-plain", 95, "{4} tag258 [0]"], ["body.cddl-plain", 21, "{4} [2]"], ["body.cddl-plain", 11, "{4} [1]"], ["body.cddl-plain", 16, "{4} [1]"]]},
+ {"kind": "body", "frame": "a500d90102800180020013{}14d9010284{}{}{}{}",
+  "items": [["body.cddl-plain", 12, "{19}"], ["body.cddl-plain", 71, "{20} tag258 [2]"], ["body.cddl-plain", 22, "{20} tag258 [4]"], ["body.cddl-plain", 22, "{20} tag258 [0]"], ["body.cddl-plain", 25, "{20} tag258 [0]"]]}
+]

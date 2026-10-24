@@ -1,0 +1,7 @@
+ppu-rational-indefinite.hex out-base/ppu.cddl 10
+relay-indefinite.hex out-base/tx.cddl 39 [0] {4} [0] [8] [4]
+body-certificate-indefinite.hex out-framed/body.framed 0
+body-value-indefinite.hex out-framed/body.framed 1
+tx-indefinite.hex out-framed/tx.framed 2
+wits-constr-102-indefinite.hex out-framed/wits.framed 4
+proposal-hard-fork-indefinite-version.hex out-framed/body.framed 5

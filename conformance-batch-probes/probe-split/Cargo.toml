@@ -1,0 +1,21 @@
+[package]
+name = "probe-split"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+# traverse reads the Dijkstra era, utxorpc is built without its own unstable feature.
+[dependencies]
+pallas-traverse = { path = "../wt-merge/pallas-traverse", features = ["unstable"] }
+pallas-utxorpc = { path = "../wt-merge/pallas-utxorpc" }
+hex = "0.4"
+serde_json = "1"
+
+# The control arm, with utxorpc's own unstable feature on.
+[features]
+utxorpc-unstable = ["pallas-utxorpc/unstable"]
+
+[patch.crates-io]
+utxorpc-spec = { git = "https://github.com/SundaeSwap-finance/utxorpc-spec", rev = "4bef71401bae7e9fc80b9d24379be0f9078b0ff5" }

@@ -1,0 +1,67 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s
+     Running unittests src/lib.rs (/w/target/debug/deps/pallas_primitives-785f8804804f4c4f)
+
+running 2 tests
+test conway::model::tests::governance_ending_in_an_absent_value_reencodes_as_the_ledger_wrote_it ... FAILED
+test dijkstra::tests::values_ending_in_an_absent_value_reencode_as_the_ledger_wrote_them ... FAILED
+
+failures:
+
+---- conway::model::tests::governance_ending_in_an_absent_value_reencodes_as_the_ledger_wrote_it stdout ----
+
+thread 'conway::model::tests::governance_ending_in_an_absent_value_reencodes_as_the_ledger_wrote_it' (14) panicked at pallas-primitives/src/conway/model.rs:886:9:
+assertion `left == right` failed
+  left: "a500d90102800180020013a18202581cb51ffd00e9bdad1ba196b08dfaf9ca57f9a7a8d9ce2e7e344c7e6234a18258201c533d55cf458c7214e0fee5982467715e85f751c166b7aba089eb6d0cf66a3219a0c4810214d9010284841b625f0b0c722a2ddb581de1030401010202020405000707030006080702030802070501020404008305825820dec5c44a99c3bacfa86c9b53c19b7f847c4606b2629d683a4aeff52d5ab98380198a3f818268e38580e1b6abc79958205d191d7d5a59ad3eb43689c127a6989f7dbc5eb3fefd420f26d26d7ba86c7698827830f091a387f1be8590f3b98cace396a7e6b3abf3b2868af29ebcb8e1b1aae19e9df19d98aae6998de8a589f2aa918f185a58201405b6f4e4e40f2741158f52ec7f5527e45b92802b61704635f704bf6938a5d5841bb4db22c179aa2fd6581df0020001020200030001020404040101000104030301020304030300028400f6a3011be0b277225927454e021a7ed7591b031afbda9947f682784ae380b5f1b19b8cf282ada4e9ab9cf385a48ef2a6bcb3f293bfbce2b096e596a9f394a0bef188819eeaada1eb959fe2a69ae19bb1e3a192e482a2f189b399e28ba7dd88e18b94f2a5ba965820dc5a068e900d631df5db6e36fd70916535be19d1872b39c7298a9f05e79f3d86841b51b58d8974bd0d4f581de1010301040100010103010303020003010101010101030003040300008302a0f682782ce1a5a2ecae8af3878b84e5acb9e0a1abed889cea8593f2bdbaa2e4a384e4a2bff290aaaff0b4879df3aa90b45820e2bb9653b26b32e444a679b712daf9798cc51638b6fd4115b56b419662f8bfa7841b8eec92bad4faaec4581df0020201050207060607010801070406030707050207040302060702018203f682781ef19986b4f183beb6f2a8959de7888de19192f093a297f3adb48af2b69eb358208aa261f2565c6139bb5c2b774c23ae8b8ec89a16718af29dc68bb3161fdbd009"
+ right: "a500d90102800180020013a18202581cb51ffd00e9bdad1ba196b08dfaf9ca57f9a7a8d9ce2e7e344c7e6234a18258201c533d55cf458c7214e0fee5982467715e85f751c166b7aba089eb6d0cf66a3219a0c48202f614d9010284841b625f0b0c722a2ddb581de1030401010202020405000707030006080702030802070501020404008305825820dec5c44a99c3bacfa86c9b53c19b7f847c4606b2629d683a4aeff52d5ab98380198a3f828268e38580e1b6abc79958205d191d7d5a59ad3eb43689c127a6989f7dbc5eb3fefd420f26d26d7ba86c7698f6827830f091a387f1be8590f3b98cace396a7e6b3abf3b2868af29ebcb8e1b1aae19e9df19d98aae6998de8a589f2aa918f185a58201405b6f4e4e40f2741158f52ec7f5527e45b92802b61704635f704bf6938a5d5841bb4db22c179aa2fd6581df0020001020200030001020404040101000104030301020304030300028400f6a3011be0b277225927454e021a7ed7591b031afbda9947f682784ae380b5f1b19b8cf282ada4e9ab9cf385a48ef2a6bcb3f293bfbce2b096e596a9f394a0bef188819eeaada1eb959fe2a69ae19bb1e3a192e482a2f189b399e28ba7dd88e18b94f2a5ba965820dc5a068e900d631df5db6e36fd70916535be19d1872b39c7298a9f05e79f3d86841b51b58d8974bd0d4f581de1010301040100010103010303020003010101010101030003040300008302a0f682782ce1a5a2ecae8af3878b84e5acb9e0a1abed889cea8593f2bdbaa2e4a384e4a2bff290aaaff0b4879df3aa90b45820e2bb9653b26b32e444a679b712daf9798cc51638b6fd4115b56b419662f8bfa7841b8eec92bad4faaec4581df0020201050207060607010801070406030707050207040302060702018203f682781ef19986b4f183beb6f2a8959de7888de19192f093a297f3adb48af2b69eb358208aa261f2565c6139bb5c2b774c23ae8b8ec89a16718af29dc68bb3161fdbd009"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/panicking.rs:439:17
+   3: core::panicking::assert_failed::<alloc::string::String, alloc::string::String>
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/panicking.rs:394:5
+   4: pallas_primitives::conway::model::tests::governance_ending_in_an_absent_value_reencodes_as_the_ledger_wrote_it
+             at ./src/conway/model.rs:886:9
+   5: pallas_primitives::conway::model::tests::governance_ending_in_an_absent_value_reencodes_as_the_ledger_wrote_it::{closure#0}
+             at ./src/conway/model.rs:849:79
+   6: <pallas_primitives::conway::model::tests::governance_ending_in_an_absent_value_reencodes_as_the_ledger_wrote_it::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- dijkstra::tests::values_ending_in_an_absent_value_reencode_as_the_ledger_wrote_them stdout ----
+
+thread 'dijkstra::tests::values_ending_in_an_absent_value_reencode_as_the_ledger_wrote_them' (15) panicked at pallas-primitives/src/dijkstra/tests.rs:1450:9:
+assertion `left == right` failed
+  left: "a500d90102800180020013a18202581cb51ffd00e9bdad1ba196b08dfaf9ca57f9a7a8d9ce2e7e344c7e6234a18258201c533d55cf458c7214e0fee5982467715e85f751c166b7aba089eb6d0cf66a3219a0c4810214d9010284841b625f0b0c722a2ddb581de1030401010202020405000707030006080702030802070501020404008305825820dec5c44a99c3bacfa86c9b53c19b7f847c4606b2629d683a4aeff52d5ab98380198a3f818268e38580e1b6abc79958205d191d7d5a59ad3eb43689c127a6989f7dbc5eb3fefd420f26d26d7ba86c7698827830f091a387f1be8590f3b98cace396a7e6b3abf3b2868af29ebcb8e1b1aae19e9df19d98aae6998de8a589f2aa918f185a58201405b6f4e4e40f2741158f52ec7f5527e45b92802b61704635f704bf6938a5d5841bb4db22c179aa2fd6581df0020001020200030001020404040101000104030301020304030300028400f6a3011be0b277225927454e021a7ed7591b031afbda9947f682784ae380b5f1b19b8cf282ada4e9ab9cf385a48ef2a6bcb3f293bfbce2b096e596a9f394a0bef188819eeaada1eb959fe2a69ae19bb1e3a192e482a2f189b399e28ba7dd88e18b94f2a5ba965820dc5a068e900d631df5db6e36fd70916535be19d1872b39c7298a9f05e79f3d86841b51b58d8974bd0d4f581de1010301040100010103010303020003010101010101030003040300008302a0f682782ce1a5a2ecae8af3878b84e5acb9e0a1abed889cea8593f2bdbaa2e4a384e4a2bff290aaaff0b4879df3aa90b45820e2bb9653b26b32e444a679b712daf9798cc51638b6fd4115b56b419662f8bfa7841b8eec92bad4faaec4581df0020201050207060607010801070406030707050207040302060702018203f682781ef19986b4f183beb6f2a8959de7888de19192f093a297f3adb48af2b69eb358208aa261f2565c6139bb5c2b774c23ae8b8ec89a16718af29dc68bb3161fdbd009"
+ right: "a500d90102800180020013a18202581cb51ffd00e9bdad1ba196b08dfaf9ca57f9a7a8d9ce2e7e344c7e6234a18258201c533d55cf458c7214e0fee5982467715e85f751c166b7aba089eb6d0cf66a3219a0c48202f614d9010284841b625f0b0c722a2ddb581de1030401010202020405000707030006080702030802070501020404008305825820dec5c44a99c3bacfa86c9b53c19b7f847c4606b2629d683a4aeff52d5ab98380198a3f828268e38580e1b6abc79958205d191d7d5a59ad3eb43689c127a6989f7dbc5eb3fefd420f26d26d7ba86c7698f6827830f091a387f1be8590f3b98cace396a7e6b3abf3b2868af29ebcb8e1b1aae19e9df19d98aae6998de8a589f2aa918f185a58201405b6f4e4e40f2741158f52ec7f5527e45b92802b61704635f704bf6938a5d5841bb4db22c179aa2fd6581df0020001020200030001020404040101000104030301020304030300028400f6a3011be0b277225927454e021a7ed7591b031afbda9947f682784ae380b5f1b19b8cf282ada4e9ab9cf385a48ef2a6bcb3f293bfbce2b096e596a9f394a0bef188819eeaada1eb959fe2a69ae19bb1e3a192e482a2f189b399e28ba7dd88e18b94f2a5ba965820dc5a068e900d631df5db6e36fd70916535be19d1872b39c7298a9f05e79f3d86841b51b58d8974bd0d4f581de1010301040100010103010303020003010101010101030003040300008302a0f682782ce1a5a2ecae8af3878b84e5acb9e0a1abed889cea8593f2bdbaa2e4a384e4a2bff290aaaff0b4879df3aa90b45820e2bb9653b26b32e444a679b712daf9798cc51638b6fd4115b56b419662f8bfa7841b8eec92bad4faaec4581df0020201050207060607010801070406030707050207040302060702018203f682781ef19986b4f183beb6f2a8959de7888de19192f093a297f3adb48af2b69eb358208aa261f2565c6139bb5c2b774c23ae8b8ec89a16718af29dc68bb3161fdbd009"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/panicking.rs:439:17
+   3: core::panicking::assert_failed::<alloc::string::String, &str>
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/panicking.rs:394:5
+   4: pallas_primitives::dijkstra::tests::values_ending_in_an_absent_value_reencode_as_the_ledger_wrote_them
+             at ./src/dijkstra/tests.rs:1450:9
+   5: pallas_primitives::dijkstra::tests::values_ending_in_an_absent_value_reencode_as_the_ledger_wrote_them::{closure#0}
+             at ./src/dijkstra/tests.rs:1441:72
+   6: <pallas_primitives::dijkstra::tests::values_ending_in_an_absent_value_reencode_as_the_ledger_wrote_them::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    conway::model::tests::governance_ending_in_an_absent_value_reencodes_as_the_ledger_wrote_it
+    dijkstra::tests::values_ending_in_an_absent_value_reencode_as_the_ledger_wrote_them
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 169 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `-p pallas-primitives --lib`

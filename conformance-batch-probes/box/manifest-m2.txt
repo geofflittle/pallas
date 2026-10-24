@@ -1,0 +1,2 @@
+body-certificates-ending-in-null.hex out-framed-m2/body.framed 0
+body-governance-ending-in-null.hex out-framed-m2/body.framed 1
