@@ -106,7 +106,6 @@ fn with_dijkstra_params(
         .proposed()
         .map(rational_number_to_u5c);
     update.max_endorser_block_references_size = x.max_endorser_block_references_size().proposed();
-    update.max_endorser_block_txs_size = x.max_endorser_block_txs_size().proposed();
     update.max_endorser_block_execution_units = x
         .max_endorser_block_execution_units()
         .proposed()
