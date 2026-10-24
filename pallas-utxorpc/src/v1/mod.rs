@@ -82,7 +82,6 @@ fn with_dijkstra_update(
 ) -> u5c::PParamsUpdate {
     use pallas_codec::utils::Nullable;
     use u5c::max_pledge_leverage_update::Update;
-    use u5c::peras_bootstrap_round_update::Update as PerasBootstrapRound;
 
     update.max_ref_script_size_per_block = x.max_ref_script_size_per_block().proposed();
     update.max_ref_script_size_per_tx = x.max_ref_script_size_per_tx().proposed();
@@ -114,34 +113,6 @@ fn with_dijkstra_update(
         .map(execution_units_to_u5c);
     update.max_ref_script_size_per_endorser_block =
         x.max_ref_script_size_per_endorser_block().proposed();
-    update.peras_min_candidate_block_age = x.peras_min_candidate_block_age().proposed();
-    update.peras_healing_factor = x
-        .peras_healing_factor()
-        .proposed()
-        .map(rational_number_to_u5c);
-    update.peras_cert_boost = x.peras_cert_boost().proposed().map(|x| x as u32);
-    update.peras_target_committee_size = x
-        .peras_target_committee_size()
-        .proposed()
-        .map(|x| x as u32);
-    update.peras_bootstrap_round = match x.peras_bootstrap_round().proposed() {
-        Some(Nullable::Some(round)) => Some(PerasBootstrapRound::Round(round)),
-        Some(Nullable::Null) => Some(PerasBootstrapRound::Unset(true)),
-        Some(Nullable::Undefined) | None => None,
-    }
-    .map(|x| u5c::PerasBootstrapRoundUpdate { update: Some(x) });
-    update.peras_quorum_threshold_safety_margin = x
-        .peras_quorum_threshold_safety_margin()
-        .proposed()
-        .map(rational_number_to_u5c);
-    update.ref_inputs_cost_per_multi_asset_policy = x
-        .ref_inputs_cost_per_multi_asset_policy()
-        .proposed()
-        .and_then(u64_to_bigint);
-    update.ref_inputs_cost_per_datum_byte = x
-        .ref_inputs_cost_per_datum_byte()
-        .proposed()
-        .and_then(u64_to_bigint);
 
     update
 }
