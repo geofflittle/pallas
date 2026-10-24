@@ -558,7 +558,7 @@ macro_rules! impl_cardano_mapper_shared {
                                 gov_action_id: self.map_gov_action_id(&gov_id.cloned()),
                                 protocol_version: Some(u5c::ProtocolVersion {
                                     major: version.0 as u32,
-                                    minor: version.1 as u32,
+                                    minor: version.0 as u32,
                                 }),
                             },
                         )
