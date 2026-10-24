@@ -1480,6 +1480,15 @@ fn a_generated_header_round_trips() {
     assert_eq!(minicbor::to_vec(&header).unwrap(), bytes);
 }
 
+#[test]
+fn a_version_info_in_an_indefinite_array_reads_to_its_break() {
+    let header = generated_header_hex();
+    let bytes = hex::decode(header.replace(VERSION_INFO, "9f1a3be658c11aeb03cba5ff")).unwrap();
+    let mut d = minicbor::Decoder::new(&bytes);
+    let _: Header = d.decode().expect("an indefinite version info must decode");
+    assert_eq!(d.position(), bytes.len());
+}
+
 /// `header_version_info = [highest_supported_major_version : uint .size 4, self_reported_software_tag : uint .size 4]` (`defs.cddl`).
 #[test]
 fn a_version_info_field_past_four_bytes_is_refused() {
