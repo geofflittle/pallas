@@ -346,7 +346,6 @@ pub struct DijkstraProtParams {
     pub max_ref_script_size_per_tx: u32,
     pub ref_script_cost_stride: u32,
     pub ref_script_cost_multiplier: RationalNumber,
-    /// The cap on pledge leverage, `None` when the ledger sets no cap.
     pub max_pledge_leverage: Option<RationalNumber>,
     pub min_pool_margin: UnitInterval,
     pub leios_announcement_period_length: u32,
@@ -362,7 +361,6 @@ pub struct DijkstraProtParams {
     pub peras_healing_factor: RationalNumber,
     pub peras_cert_boost: u16,
     pub peras_target_committee_size: u16,
-    /// The round that bootstraps Peras voting, `None` when the ledger sets none.
     pub peras_bootstrap_round: Option<u32>,
     pub peras_quorum_threshold_safety_margin: UnitInterval,
     pub ref_inputs_cost_per_multi_asset_policy: Coin,
