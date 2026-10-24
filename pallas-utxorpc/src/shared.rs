@@ -2605,7 +2605,6 @@ macro_rules! impl_cardano_mapper_shared {
                 }
             }
 
-            /// A Dijkstra parameter set in which no two parameters hold the same value.
             #[cfg(feature = "unstable")]
             pub(super) fn dijkstra_param_set() -> DijkstraProtParams {
                 DijkstraProtParams {
