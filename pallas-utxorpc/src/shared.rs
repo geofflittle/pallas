@@ -120,7 +120,11 @@ macro_rules! impl_cardano_mapper_shared {
                         steps: x.ex_units().steps,
                         memory: x.ex_units().mem,
                     }),
-                    original_cbor: x.encode().into(),
+                    original_cbor: {
+                        let mut bytes = x.encode();
+                        bytes[2] = 0x07;
+                        bytes.into()
+                    },
                 }
             }
 
