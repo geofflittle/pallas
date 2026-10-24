@@ -229,7 +229,7 @@ macro_rules! dijkstra_param {
                 MultiEraParamUpdate::Conway(_) => ParamRead::NoSuchParameter,
                 MultiEraParamUpdate::Dijkstra(x) => match x.$name.clone() {
                     Some(v) => ParamRead::Proposed(v),
-                    None => ParamRead::Unchanged,
+                    None => ParamRead::NoSuchParameter,
                 },
             }
         }
