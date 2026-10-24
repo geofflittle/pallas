@@ -1456,3 +1456,59 @@ fn an_account_balance_interval_is_two_elements_or_none() {
         );
     }
 }
+
+/// Provenance for this fixture is in `test_data/dijkstra-generated.md`.
+const VERSION_INFO_BLOCK: &str =
+    include_str!("../../../test_data/dijkstra-generated/block-header-version-info.hex");
+
+/// The version info of the generated block's header, as hex.
+const VERSION_INFO: &str = "821a3be658c11aeb03cba5";
+
+fn generated_header_hex() -> String {
+    let block = hex::decode(VERSION_INFO_BLOCK.trim()).unwrap();
+    let mut d = minicbor::Decoder::new(&block);
+    d.array().unwrap();
+    let start = d.position();
+    d.skip().unwrap();
+    hex::encode(&block[start..d.position()])
+}
+
+#[test]
+fn a_generated_header_round_trips() {
+    let bytes = hex::decode(generated_header_hex()).unwrap();
+    let header: Header = minicbor::decode(&bytes).expect("the generated header must decode");
+    assert_eq!(minicbor::to_vec(&header).unwrap(), bytes);
+}
+
+/// `header_version_info = [highest_supported_major_version : uint .size 4, self_reported_software_tag : uint .size 4]` (`defs.cddl`).
+#[test]
+fn a_version_info_field_past_four_bytes_is_refused() {
+    let header = generated_header_hex();
+    assert_eq!(header.matches(VERSION_INFO).count(), 1);
+    let at = header.find(VERSION_INFO).unwrap() / 2;
+
+    let widest = hex::decode(header.replace(VERSION_INFO, "821affffffff1affffffff")).unwrap();
+    minicbor::decode::<Header>(&widest).expect("both fields at u32::MAX must decode");
+
+    for (field, info, position) in [
+        (
+            "highest_supported_major_version",
+            "821b00000001000000001aeb03cba5",
+            at + 1,
+        ),
+        (
+            "self_reported_software_tag",
+            "821a3be658c11b0000000100000000",
+            at + 6,
+        ),
+    ] {
+        let mutated = hex::decode(header.replace(VERSION_INFO, info)).unwrap();
+        let err = minicbor::decode::<Header>(&mutated)
+            .expect_err("a field of 2^32 must not decode");
+        assert_eq!(
+            err.position(),
+            Some(position),
+            "{field} was refused somewhere else: {err}"
+        );
+    }
+}
