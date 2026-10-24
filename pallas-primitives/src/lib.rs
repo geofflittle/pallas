@@ -60,6 +60,7 @@
 //!
 //! [`pallas`]: https://crates.io/crates/pallas
 
+mod flat_enum;
 mod framework;
 mod metadatum;
 mod native_script;

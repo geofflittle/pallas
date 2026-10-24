@@ -1656,6 +1656,38 @@ mod tests {
         }
     }
 
+    /// Decodes `bytes` as an array of one element read by a given decoder, here an optional `u8`.
+    fn decode_by_one(bytes: &[u8]) -> Result<Option<u8>, Error> {
+        let mut d = minicbor::Decoder::new(bytes);
+        decode_array(&mut d, |a| {
+            a.decode_by(&mut (), |d, ctx| d.decode_with::<_, Option<u8>>(ctx))
+        })
+    }
+
+    #[test]
+    fn decode_by_reads_the_next_element_with_the_given_decoder() {
+        for (name, bytes, expected) in [
+            ("definite", &[0x81, 0x07][..], Some(7)),
+            ("indefinite", &[0x9f, 0x07, 0xff][..], Some(7)),
+            ("definite null", &[0x81, 0xf6][..], None),
+            ("indefinite null", &[0x9f, 0xf6, 0xff][..], None),
+        ] {
+            let value = decode_by_one(bytes).unwrap_or_else(|e| panic!("the {name} array: {e}"));
+            assert_eq!(value, expected, "the {name} array");
+        }
+    }
+
+    #[test]
+    fn decode_by_refuses_an_array_without_its_element() {
+        for (name, bytes) in [("definite", &[0x80][..]), ("indefinite", &[0x9f, 0xff][..])] {
+            let err = decode_by_one(bytes).expect_err("a missing element must not decode");
+            assert!(
+                err.to_string().contains("required field"),
+                "the {name} array was refused for some other reason: {err}"
+            );
+        }
+    }
+
     #[test]
     fn keep_raw_retains_original() {
         // Indef array info is lost when decoded. By using KeepRaw, we can retain the

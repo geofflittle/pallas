@@ -735,10 +735,197 @@ pub type MintedTx<'b> = Tx<'b>;
 
 #[cfg(test)]
 mod tests {
-    use super::{Block, GovAction, RationalNumber, Relay};
+    use super::{
+        Block, Certificate, DRep, DatumOption, GovAction, NativeScript, RationalNumber, Relay,
+        ScriptRef, StakeCredential, TransactionBody, TransactionOutput, Voter,
+    };
+    use crate::flat_enum::assert_reads_either_length_form;
     use pallas_codec::minicbor;
+    use pallas_codec::utils::CborWrap;
 
     type BlockWrapper<'b> = (u16, Block<'b>);
+
+    const HASH: &str = "581c11111111111111111111111111111111111111111111111111111111";
+    const HASH32: &str = "58201111111111111111111111111111111111111111111111111111111111111111";
+    const REWARD: &str = "581de111111111111111111111111111111111111111111111111111111111";
+
+    #[test]
+    fn a_certificate_reads_either_length_form() {
+        let credential = format!("8200{HASH}");
+        let drep = format!("8200{HASH}");
+        let anchor = format!("8260{HASH32}");
+        assert_reads_either_length_form::<Certificate>(&[
+            format!("8200{credential}"),
+            format!("8201{credential}"),
+            format!("8302{credential}{HASH}"),
+            format!("8a03{HASH}{HASH32}0102d81e820102{REWARD}80808260{HASH32}"),
+            format!("8304{HASH}01"),
+            format!("8307{credential}01"),
+            format!("8308{credential}01"),
+            format!("8309{credential}{drep}"),
+            format!("840a{credential}{HASH}{drep}"),
+            format!("840b{credential}{HASH}01"),
+            format!("840c{credential}{drep}01"),
+            format!("850d{credential}{HASH}{drep}01"),
+            format!("830e{credential}{credential}"),
+            format!("830f{credential}{anchor}"),
+            format!("8410{credential}01{anchor}"),
+            format!("8311{credential}01"),
+            format!("8312{credential}{anchor}"),
+        ]);
+    }
+
+    #[test]
+    fn a_drep_reads_either_length_form() {
+        assert_reads_either_length_form::<DRep>(&[
+            format!("8200{HASH}"),
+            format!("8201{HASH}"),
+            "8102".to_string(),
+            "8103".to_string(),
+        ]);
+    }
+
+    #[test]
+    fn a_gov_action_reads_either_length_form() {
+        let id = format!("82{HASH32}00");
+        let credential = format!("8200{HASH}");
+        assert_reads_either_length_form::<GovAction>(&[
+            format!("8400{id}a10001{HASH}"),
+            format!("8301{id}820a00"),
+            format!("8302a1{REWARD}01{HASH}"),
+            format!("8203{id}"),
+            format!("8504{id}81{credential}a1{credential}01d81e820102"),
+            format!("8205{id}828260{HASH32}{HASH}"),
+            "8106".to_string(),
+        ]);
+    }
+
+    #[test]
+    fn a_voter_reads_either_length_form() {
+        assert_reads_either_length_form::<Voter>(&[
+            format!("8200{HASH}"),
+            format!("8201{HASH}"),
+            format!("8202{HASH}"),
+            format!("8203{HASH}"),
+            format!("8204{HASH}"),
+        ]);
+    }
+
+    #[test]
+    fn a_script_reference_reads_either_length_form() {
+        assert_reads_either_length_form::<ScriptRef>(&[
+            format!("82008200{HASH}"),
+            "82014100".to_string(),
+            "82024100".to_string(),
+            "82034100".to_string(),
+        ]);
+    }
+
+    /// The bytes of one vector from `test_data/dijkstra-generated`.
+    fn generated(hex: &str) -> &'static [u8] {
+        Box::leak(hex::decode(hex).unwrap().into_boxed_slice())
+    }
+
+    /// Decodes a generated transaction body that ends exactly where its bytes do.
+    fn generated_body(hex: &str) -> TransactionBody<'static> {
+        let bytes = generated(hex);
+        let mut d = minicbor::Decoder::new(bytes);
+        let body = d
+            .decode()
+            .unwrap_or_else(|e| panic!("the body must decode: {e}"));
+        assert_eq!(d.position(), bytes.len(), "the body must be read to its end");
+        body
+    }
+
+    #[test]
+    fn generated_enums_in_indefinite_arrays_decode() {
+        let body = generated_body(include_str!(
+            "../../../test_data/dijkstra-generated/body-credential-indefinite.hex"
+        ));
+        assert_eq!(
+            body.certificates.unwrap().to_vec(),
+            vec![Certificate::StakeDelegation(
+                StakeCredential::ScriptHash(
+                    "17ab434af5e4d2fcc4815897879f52d2068af2dc2630974ac0333a2b"
+                        .parse()
+                        .unwrap()
+                ),
+                "bc7069ba4ab9909c4b1517f3bd9ccbb45b075569c163820971dbe63e"
+                    .parse()
+                    .unwrap(),
+            )]
+        );
+
+        let body = generated_body(include_str!(
+            "../../../test_data/dijkstra-generated/body-drep-indefinite.hex"
+        ));
+        let dreps: Vec<_> = body
+            .certificates
+            .unwrap()
+            .to_vec()
+            .into_iter()
+            .map(|certificate| match certificate {
+                Certificate::VoteRegDeleg(_, drep, _) => drep,
+                other => panic!("{other:?} is not a vote delegation"),
+            })
+            .collect();
+        assert_eq!(dreps, vec![DRep::NoConfidence, DRep::Abstain]);
+
+        let body = generated_body(include_str!(
+            "../../../test_data/dijkstra-generated/body-datum-option-indefinite.hex"
+        ));
+        let datums: Vec<_> = body
+            .outputs
+            .iter()
+            .map(|output| match output {
+                TransactionOutput::PostAlonzo(output) => output.datum_option.clone().unwrap(),
+                TransactionOutput::Legacy(_) => panic!("the outputs are in map form"),
+            })
+            .collect();
+        assert!(matches!(
+            &*datums[0],
+            DatumOption::Hash(hash)
+                if hash.to_string() == "f76479ff10b1f158e4b6c98049836b3bd0abe3fcceab1a5d646fdaa8f0d312fb"
+        ));
+        assert!(matches!(
+            &*datums[1],
+            DatumOption::Data(CborWrap(data)) if data.raw_cbor() == [0x80]
+        ));
+
+        let body = generated_body(include_str!(
+            "../../../test_data/dijkstra-generated/body-gov-action-indefinite.hex"
+        ));
+        let proposals = body.proposal_procedures.unwrap().to_vec();
+        assert!(matches!(
+            &proposals[0].gov_action,
+            GovAction::TreasuryWithdrawals(withdrawals, None) if withdrawals.len() == 1
+        ));
+
+        let body = generated_body(include_str!(
+            "../../../test_data/dijkstra-generated/body-voter-indefinite.hex"
+        ));
+        let voters: Vec<_> = body.voting_procedures.unwrap().into_keys().collect();
+        assert_eq!(
+            voters,
+            vec![Voter::ConstitutionalCommitteeKey(
+                "7ff244d677b8920e733c5117a58478eb164d06298ca4bde583ac1e76"
+                    .parse()
+                    .unwrap()
+            )]
+        );
+
+        let body = generated_body(include_str!(
+            "../../../test_data/dijkstra-generated/body-script-ref-indefinite.hex"
+        ));
+        let [TransactionOutput::PostAlonzo(output)] = &body.outputs[..] else {
+            panic!("the body holds one map form output");
+        };
+        assert!(matches!(
+            &output.script_ref,
+            Some(CborWrap(ScriptRef::NativeScript(script)))
+                if **script == NativeScript::InvalidHereafter(0x73e96a1328c7873b)
+        ));
+    }
 
     /// Decodes `hex` as one `T` that ends exactly where the bytes do.
     fn decode_all<T: for<'b> minicbor::Decode<'b, ()>>(hex: &str) -> T {

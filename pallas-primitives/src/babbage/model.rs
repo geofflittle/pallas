@@ -462,10 +462,31 @@ pub type MintedTx<'b> = Tx<'b>;
 mod tests {
     use pallas_codec::minicbor;
 
-    use super::{Block, TransactionOutput};
+    use super::{Block, DatumOption, ScriptRef, TransactionOutput};
     use crate::Fragment;
+    use crate::flat_enum::assert_reads_either_length_form;
 
     type BlockWrapper<'b> = (u16, Block<'b>);
+
+    const HASH: &str = "581c11111111111111111111111111111111111111111111111111111111";
+    const HASH32: &str = "58201111111111111111111111111111111111111111111111111111111111111111";
+
+    #[test]
+    fn a_datum_option_reads_either_length_form() {
+        assert_reads_either_length_form::<DatumOption>(&[
+            format!("8200{HASH32}"),
+            "8201d8184180".to_string(),
+        ]);
+    }
+
+    #[test]
+    fn a_script_reference_reads_either_length_form() {
+        assert_reads_either_length_form::<ScriptRef>(&[
+            format!("82008200{HASH}"),
+            "82014100".to_string(),
+            "82024100".to_string(),
+        ]);
+    }
 
     #[test]
     fn block_isomorphic_decoding_encoding() {

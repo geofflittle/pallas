@@ -516,9 +516,42 @@ mod tests {
 
     use crate::{Fragment, alonzo::PlutusData};
 
-    use super::{Block, Header};
+    use super::{Block, Certificate, Header};
+    use crate::alonzo::NativeScript;
+    use crate::flat_enum::assert_reads_either_length_form;
 
     type BlockWrapper<'b> = (u16, Block<'b>);
+
+    const HASH: &str = "581c11111111111111111111111111111111111111111111111111111111";
+    const HASH32: &str = "58201111111111111111111111111111111111111111111111111111111111111111";
+    const REWARD: &str = "581de111111111111111111111111111111111111111111111111111111111";
+
+    #[test]
+    fn a_certificate_reads_either_length_form() {
+        let credential = format!("8200{HASH}");
+        assert_reads_either_length_form::<Certificate>(&[
+            format!("8200{credential}"),
+            format!("8201{credential}"),
+            format!("8302{credential}{HASH}"),
+            format!("8a03{HASH}{HASH32}0102d81e820102{REWARD}80808260{HASH32}"),
+            format!("8304{HASH}01"),
+            format!("8405{HASH}{HASH}{HASH32}"),
+            "8206820001".to_string(),
+        ]);
+    }
+
+    #[test]
+    fn a_native_script_reads_either_length_form() {
+        let script = format!("8200{HASH}");
+        assert_reads_either_length_form::<NativeScript>(&[
+            script.clone(),
+            format!("820181{script}"),
+            "820280".to_string(),
+            "83030180".to_string(),
+            "820401".to_string(),
+            "820501".to_string(),
+        ]);
+    }
 
     #[test]
     fn block_isomorphic_decoding_encoding() {
