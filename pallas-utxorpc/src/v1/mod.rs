@@ -114,7 +114,7 @@ fn with_dijkstra_update(
         .map(execution_units_to_u5c);
     update.max_ref_script_size_per_endorser_block =
         x.max_ref_script_size_per_endorser_block().proposed();
-    update.peras_min_candidate_block_age = x.peras_min_candidate_block_age().proposed();
+    update.peras_min_candidate_block_age = None;
     update.peras_healing_factor = x
         .peras_healing_factor()
         .proposed()
