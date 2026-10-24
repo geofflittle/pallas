@@ -787,6 +787,49 @@ macro_rules! impl_cardano_mapper_shared {
 
             #[test]
             #[cfg(feature = "unstable")]
+            fn a_dijkstra_transaction_and_its_sub_transaction_map_their_auxiliary_plutus_scripts() {
+                use $crate::testing::{
+                    AUX_PLUTUS_SCRIPTS, SUB_AUX_PLUTUS_SCRIPTS, dijkstra_tx_with_aux_plutus_scripts,
+                };
+
+                let plutus = |[v2, v3, v4]: [&[u8]; 3]| {
+                    [
+                        u5c::script::Script::PlutusV2(v2.to_vec().into()),
+                        u5c::script::Script::PlutusV3(v3.to_vec().into()),
+                        u5c::script::Script::PlutusV4(v4.to_vec().into()),
+                    ]
+                    .map(|x| u5c::Script { script: Some(x) })
+                    .to_vec()
+                };
+                let tx = dijkstra_tx_with_aux_plutus_scripts();
+                let mapper = Mapper::new(NoLedger);
+
+                assert_eq!(
+                    (
+                        mapper.collect_all_aux_scripts(&tx),
+                        mapper.collect_all_aux_scripts(&tx.sub_transactions()[0]),
+                    ),
+                    (plutus(AUX_PLUTUS_SCRIPTS), plutus(SUB_AUX_PLUTUS_SCRIPTS))
+                );
+            }
+
+            #[test]
+            #[cfg(feature = "unstable")]
+            fn a_dijkstra_transaction_without_auxiliary_data_maps_no_auxiliary_script() {
+                let tx = $crate::testing::dijkstra_tx_with_guards();
+                let mapper = Mapper::new(NoLedger);
+
+                assert_eq!(
+                    (
+                        mapper.collect_all_aux_scripts(&tx),
+                        mapper.collect_all_aux_scripts(&tx.sub_transactions()[0]),
+                    ),
+                    (vec![], vec![])
+                );
+            }
+
+            #[test]
+            #[cfg(feature = "unstable")]
             fn a_dijkstra_native_script_maps_as_the_same_alonzo_script_does() {
                 let alonzo = alonzo::NativeScript::ScriptNOfK(
                     2,
