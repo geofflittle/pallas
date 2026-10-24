@@ -1,8 +1,8 @@
 #!/bin/sh
 # Runs one command in the pallas CI image against a tree under this directory.
-# usage: run.sh TREE COMMAND...   (TREE is relative to /opt/build/pallas-conformance-1024)
+# usage: [W=dir] run.sh TREE COMMAND...   (TREE is relative to W, default /opt/build/pallas-conformance-1024)
 # TARGET picks the target directory name (default target), MSRV builds use their own.
-W=/opt/build/pallas-conformance-1024
+W=${W:-/opt/build/pallas-conformance-1024}
 TREE=$1
 shift
 exec docker run --rm \
