@@ -868,7 +868,7 @@ pub struct ProtocolParamUpdate {
     pub peras_target_committee_size: Option<u64>,
 
     /// `? 53 : nil/ uint .size 4` (cardano-ledger `9df9f98c`), so an explicit nil differs from an absent key.
-    #[cbor(n(53), with = "nullable_value", has_nil)]
+    #[cbor(n(53))]
     pub peras_bootstrap_round: Option<Nullable<u64>>,
     #[n(54)]
     pub peras_quorum_threshold_safety_margin: Option<UnitInterval>,
