@@ -25,10 +25,10 @@ macro_rules! impl_cardano_mapper_before_v1 {
             update
         }
 
-        /// Returns the unspecified purpose for a guarding redeemer, for which this schema has no member.
+        /// Panics on a guarding redeemer, for which this schema has no purpose.
         #[cfg(feature = "unstable")]
         fn guarding_purpose() -> u5c::RedeemerPurpose {
-            u5c::RedeemerPurpose::Unspecified
+            unimplemented!("map_redeemer is not yet implemented for Dijkstra")
         }
 
         /// Returns no clause for a guard clause, for which this schema has no member.
