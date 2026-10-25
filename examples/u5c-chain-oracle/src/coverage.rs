@@ -247,7 +247,6 @@ pub fn pool_bls<'a>(keys: impl IntoIterator<Item = Option<(&'a [u8], &'a [u8])>>
                 out.push(1);
                 for b in [pubkey, proof] {
                     out.extend((b.len() as u64).to_be_bytes());
-                    out.extend(b);
                 }
             }
         }
