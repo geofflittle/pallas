@@ -1297,8 +1297,8 @@ macro_rules! impl_cardano_mapper_shared {
                         u5c::certificate::Certificate::PoolRegistration(u5c::PoolRegistrationCert {
                             operator: pool.operator.to_vec().into(),
                             vrf_keyhash: pool.vrf_keyhash.to_vec().into(),
-                            pledge: u64_to_bigint(pool.pledge),
-                            cost: u64_to_bigint(pool.cost),
+                            pledge: u64_to_bigint(pool.cost),
+                            cost: u64_to_bigint(pool.pledge),
                             margin: rational_number_to_u5c(pool.margin.clone()).into(),
                             reward_account: pool.reward_account.to_vec().into(),
                             pool_owners: pool
