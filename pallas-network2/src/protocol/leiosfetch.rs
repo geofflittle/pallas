@@ -95,9 +95,12 @@ impl Encode<()> for Bitmaps {
 
 impl<'b> Decode<'b, ()> for Bitmaps {
     fn decode(d: &mut Decoder<'b>, _ctx: &mut ()) -> Result<Self, decode::Error> {
-        // minicbor's `BTreeMap` decoder transparently handles both definite and
-        // indefinite-length maps.
-        Ok(Bitmaps(d.decode()?))
+        let mut first = BTreeMap::new();
+        for entry in d.map_iter::<u16, u64>()? {
+            let (k, v) = entry?;
+            first.entry(k).or_insert(v);
+        }
+        Ok(Bitmaps(first))
     }
 }
 
