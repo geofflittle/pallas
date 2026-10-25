@@ -1,0 +1,11 @@
+--- gen/valuecmp.py	2026-10-26 02:00:40
++++ breaks/tag24/valuecmp.py	2026-10-26 05:25:48
+@@ -36,7 +36,7 @@
+ def tag24_indefinite(err, hexstr):
+     """Whether pallas refused an indefinite byte string directly under tag 24, the one open refusal class."""
+     m = TAG24_INDEF.fullmatch(str(err))
+-    return bool(m) and hexstr[2 * int(m.group(1)) - 4 : 2 * int(m.group(1))] == "d818"
++    return bool(m) and "d818" in hexstr
+ 
+ 
+ def compare(kind, gen, oracle, probe, reoracle):

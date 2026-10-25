@@ -1,0 +1,11 @@
+--- gen/schemacmp.py	2026-10-26 05:07:14
++++ breaks/sets/schemacmp.py	2026-10-26 05:08:02
+@@ -863,7 +863,7 @@
+                 ss = [(k, sa[k]) for k in sa if k not in common and "#" not in k]
+                 # A repeat stands for an unpaired ledger member only while the ledger has more of them left.
+                 repeats = [(k, sa[k]) for k in sa if "#" in k]
+-                ss += repeats[: max(0, len(ls) - len(ss))]
++                ss += repeats
+                 for lk, lx, sk, sx in pair(ls, ss):
+                     if lk is None:
+                         out.append((f"{path}{seg(kind, sk)}", ABSENT, sx))

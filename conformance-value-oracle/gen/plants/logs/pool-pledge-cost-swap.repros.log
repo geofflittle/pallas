@@ -1,0 +1,78 @@
+== ppu-indef-rational
+value ppu: values 3, ledger accepts 3, both accept 3, field paths 2, leaves agree 6, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha ppu: values 3, field paths 2, leaves agree 6, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+schema v1beta ppu: values 3, field paths 2, leaves agree 6, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+schema v1 ppu: values 3, field paths 2, leaves agree 6, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+== voting-null-anchor
+value body: values 2, ledger accepts 1, both accept 1, field paths 28, leaves agree 31, leaves differ 0, accepted ledger-invalid 1, disagreements 0 on 0 values
+      1  accepted ledger-invalid  input: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "end of input")
+schema v1alpha body: values 1, field paths 12, leaves agree 12, ledger classes with no field 12, listed differences 1, disagreements 0 on 0 values
+      1  listed  no field in v1alpha  aux_hash
+      1  listed  no field in v1alpha  balance_intervals
+      1  listed  no field in v1alpha  deposits
+      1  listed  no field in v1alpha  donation
+      1  listed  no field in v1alpha  guards
+      1  listed  no field in v1alpha  network
+      1  listed  no field in v1alpha  script_data_hash
+      1  listed  no field in v1alpha  starting_balance_intervals
+      2  listed  no field in v1alpha  sub_txs
+      1  listed  no field in v1alpha  top_guards
+      1  listed  no field in v1alpha  treasury
+      6  listed  no field in v1alpha  votes
+      1  listed  legacy mapping: no total collateral maps to 0  total_collateral
+schema v1beta body: values 1, field paths 15, leaves agree 18, ledger classes with no field 11, listed differences 1, disagreements 0 on 0 values
+      1  listed  no field in v1beta  aux_hash
+      1  listed  no field in v1beta  balance_intervals
+      1  listed  no field in v1beta  deposits
+      1  listed  no field in v1beta  donation
+      1  listed  no field in v1beta  guards
+      1  listed  no field in v1beta  network
+      1  listed  no field in v1beta  script_data_hash
+      1  listed  no field in v1beta  starting_balance_intervals
+      2  listed  no field in v1beta  sub_txs
+      1  listed  no field in v1beta  top_guards
+      1  listed  no field in v1beta  treasury
+      1  listed  legacy mapping: no total collateral maps to 0  total_collateral
+schema v1 body: values 1, field paths 28, leaves agree 31, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+== golden-tx
+value tx: values 1, ledger accepts 1, both accept 1, field paths 324, leaves agree 2593, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha tx: values 1, field paths 133, leaves agree 1127, ledger classes with no field 15, listed differences 0, disagreements 4 on 1 values
+      1  listed  no field in v1alpha  body.aux_hash
+      9  listed  no field in v1alpha  body.balance_intervals
+      3  listed  no field in v1alpha  body.certs[].bls
+      2  listed  no field in v1alpha  body.deposits
+      1  listed  no field in v1alpha  body.donation
+      6  listed  no field in v1alpha  body.guards
+      1  listed  no field in v1alpha  body.network
+      1  listed  no field in v1alpha  body.script_data_hash
+      1  listed  no field in v1alpha  body.starting_balance_intervals
+   1286  listed  no field in v1alpha  body.sub_txs
+      1  listed  no field in v1alpha  body.top_guards
+      1  listed  no field in v1alpha  body.treasury
+     21  listed  no field in v1alpha  body.votes
+      4  listed  no field in v1alpha  wits.boots
+     98  listed  no field in v1alpha  wits.redeemers
+      2  DISAGREE  v1alpha value differs  body.certs[].cost
+      2  DISAGREE  v1alpha value differs  body.certs[].pledge
+schema v1beta tx: values 1, field paths 147, leaves agree 1249, ledger classes with no field 12, listed differences 1, disagreements 4 on 1 values
+      1  listed  no field in v1beta  body.aux_hash
+      9  listed  no field in v1beta  body.balance_intervals
+      3  listed  no field in v1beta  body.certs[].bls
+      2  listed  no field in v1beta  body.deposits
+      1  listed  no field in v1beta  body.donation
+      6  listed  no field in v1beta  body.guards
+      1  listed  no field in v1beta  body.network
+      1  listed  no field in v1beta  body.script_data_hash
+      1  listed  no field in v1beta  body.starting_balance_intervals
+   1286  listed  no field in v1beta  body.sub_txs
+      1  listed  no field in v1beta  body.top_guards
+      1  listed  no field in v1beta  body.treasury
+      1  listed  type cannot hold: no guarding redeemer purpose  wits.redeemers{}.k[]
+      2  DISAGREE  v1beta value differs  body.certs[].cost
+      2  DISAGREE  v1beta value differs  body.certs[].pledge
+schema v1 tx: values 1, field paths 322, leaves agree 2559, ledger classes with no field 0, listed differences 0, disagreements 8 on 1 values
+      2  DISAGREE  v1 value differs  body.certs[].cost
+      2  DISAGREE  v1 value differs  body.certs[].pledge
+      2  DISAGREE  v1 value differs  body.sub_txs{}.v.body.certs[].cost
+      2  DISAGREE  v1 value differs  body.sub_txs{}.v.body.certs[].pledge
+repros: exit 1

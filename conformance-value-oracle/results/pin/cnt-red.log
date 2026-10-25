@@ -1,0 +1,76 @@
+value tx: values 3, ledger accepts 3, both accept 3, field paths 612, leaves agree 3245, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha tx: values 3, field paths 219, leaves agree 1351, ledger classes with no field 16, listed differences 23, disagreements 0 on 0 values
+      3  listed  no field in v1alpha  body.aux_hash
+     20  listed  no field in v1alpha  body.balance_intervals
+     26  listed  no field in v1alpha  body.deposits
+      3  listed  no field in v1alpha  body.donation
+     12  listed  no field in v1alpha  body.guards
+      3  listed  no field in v1alpha  body.network
+     39  listed  no field in v1alpha  body.proposals[].action[]<
+     22  listed  no field in v1alpha  body.proposals[].action[]<18>
+      3  listed  no field in v1alpha  body.script_data_hash
+     10  listed  no field in v1alpha  body.starting_balance_intervals
+   1307  listed  no field in v1alpha  body.sub_txs
+     55  listed  no field in v1alpha  body.top_guards
+      3  listed  no field in v1alpha  body.treasury
+    112  listed  no field in v1alpha  body.votes
+     52  listed  no field in v1alpha  wits.boots
+     71  listed  no field in v1alpha  wits.redeemers
+      1  listed  legacy mapping: no total collateral maps to 0  body.total_collateral
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<11>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<19>[]
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<25>[]
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<26>[]
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<33>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<9>
+      1  listed  type cannot hold: no guard native script variant  aux.native[]
+      2  listed  type cannot hold: no guard native script variant  body.outputs[].script.script
+      3  listed  type cannot hold: no guard native script variant  wits.scripts{}.script
+schema v1beta tx: values 3, field paths 251, leaves agree 1586, ledger classes with no field 13, listed differences 23, disagreements 0 on 0 values
+      3  listed  no field in v1beta  body.aux_hash
+     20  listed  no field in v1beta  body.balance_intervals
+     26  listed  no field in v1beta  body.deposits
+      3  listed  no field in v1beta  body.donation
+     12  listed  no field in v1beta  body.guards
+      3  listed  no field in v1beta  body.network
+     39  listed  no field in v1beta  body.proposals[].action[]<
+     22  listed  no field in v1beta  body.proposals[].action[]<18>
+      3  listed  no field in v1beta  body.script_data_hash
+     10  listed  no field in v1beta  body.starting_balance_intervals
+   1307  listed  no field in v1beta  body.sub_txs
+     55  listed  no field in v1beta  body.top_guards
+      3  listed  no field in v1beta  body.treasury
+      1  listed  legacy mapping: no total collateral maps to 0  body.total_collateral
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<11>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<19>[]
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<25>[]
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<26>[]
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<33>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<9>
+      1  listed  type cannot hold: no guard native script variant  aux.native[]
+      2  listed  type cannot hold: no guard native script variant  body.outputs[].script.script
+      3  listed  type cannot hold: no guard native script variant  wits.scripts{}.script
+schema v1 tx: values 3, field paths 587, leaves agree 3144, ledger classes with no field 1, listed differences 39, disagreements 0 on 0 values
+     22  listed  no field in v1  body.proposals[].action[]<18>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<11>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<19>[]
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<25>[]
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<26>[]
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<33>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<37>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<38>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<50>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<9>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.certs[].margin
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<19>[]
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<25>[]
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<26>[]
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<33>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<37>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<38>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<39>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<44>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<50>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<54>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<9>
+EXIT 0

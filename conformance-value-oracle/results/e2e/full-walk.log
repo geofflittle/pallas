@@ -1,0 +1,7 @@
+walk blocks: 30553
+walk certifying blocks with endorser transactions: 6929
+walk endorser transactions served: 8850210
+walk served hash equals the hash of the body bytes: 10856094
+walk served transactions equal the body elements: 30553
+walk transactions: 10856094
+EXIT 0

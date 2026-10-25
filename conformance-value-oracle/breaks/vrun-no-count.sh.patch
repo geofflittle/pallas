@@ -1,0 +1,34 @@
+--- ../gen/vrun.sh	2026-10-26 06:45:43
++++ vrun-before-count.sh	2026-10-26 06:51:40
+@@ -2,7 +2,7 @@
+ # Generates N values per kind and source, decodes them with the ledger and with pallas, and compares the values.
+ # valuecmp.py compares the pallas value and re-encoding with the ledger's, schemacmp.py each utxorpc schema.
+ # GEN_FROM names an earlier output dir whose generated values and ledger results are reused.
+-# Exits 1 when any comparison finds a disagreement or a kind and source has other than N generated values.
++# Exits 1 when any comparison finds a disagreement.
+ # usage: [PROBE=bin/other-probe] [OUT=dir] [GEN_FROM=dir] ./vrun.sh N SEED [KINDS] [SOURCES]
+ set -u
+ W=/opt/build/value-oracle-1025/gen
+@@ -25,8 +25,8 @@
+   for src in $SOURCES; do
+     base=$OUT/$kind.$src
+     if [ -n "$GEN_FROM" ]; then
+-      ln -f "$GEN_FROM/$kind.$src.gen.jsonl" "$base.gen.jsonl"
+-      ln -f "$GEN_FROM/$kind.$src.oracle.jsonl" "$base.oracle.jsonl"
++      cp "$GEN_FROM/$kind.$src.gen.jsonl" "$base.gen.jsonl"
++      cp "$GEN_FROM/$kind.$src.oracle.jsonl" "$base.oracle.jsonl"
+     else
+       case $src in
+         mutate)
+@@ -37,11 +37,6 @@
+       esac
+       hexes hex < "$base.gen.jsonl" | $HS oracle "$kind" > "$base.oracle.jsonl"
+     fi
+-    have=$(grep -c . "$base.gen.jsonl")
+-    if [ "$have" -ne "$N" ]; then
+-      echo "$kind $src: $have generated values where $N were asked"
+-      status=1
+-    fi
+     "$PROBE" "$kind" < "$base.gen.jsonl" > "$base.probe.jsonl"
+     hexes reencode_hex < "$base.probe.jsonl" | $HS oracle "$kind" > "$base.reoracle.jsonl"
+     python3 -I "$W/valuecmp.py" "$kind" "$base.gen.jsonl" "$base.oracle.jsonl" "$base.probe.jsonl" "$base.reoracle.jsonl" "$base" || status=1

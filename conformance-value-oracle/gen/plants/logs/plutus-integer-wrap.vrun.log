@@ -1,0 +1,1333 @@
+value tx: values 20, ledger accepts 20, both accept 20, field paths 1726, leaves agree 85363, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha tx: values 20, field paths 467, leaves agree 16334, ledger classes with no field 17, listed differences 362, disagreements 0 on 0 values
+     20  listed  no field in v1alpha  body.aux_hash
+    477  listed  no field in v1alpha  body.balance_intervals
+     29  listed  no field in v1alpha  body.certs[].bls
+    277  listed  no field in v1alpha  body.deposits
+     20  listed  no field in v1alpha  body.donation
+    303  listed  no field in v1alpha  body.guards
+     20  listed  no field in v1alpha  body.network
+    423  listed  no field in v1alpha  body.proposals[].action[]<
+   1511  listed  no field in v1alpha  body.proposals[].action[]<18>
+     20  listed  no field in v1alpha  body.script_data_hash
+    390  listed  no field in v1alpha  body.starting_balance_intervals
+  48172  listed  no field in v1alpha  body.sub_txs
+   3228  listed  no field in v1alpha  body.top_guards
+     20  listed  no field in v1alpha  body.treasury
+   5517  listed  no field in v1alpha  body.votes
+    696  listed  no field in v1alpha  wits.boots
+   5160  listed  no field in v1alpha  wits.redeemers
+      4  listed  legacy mapping: no auxiliary data maps to an empty one  aux
+      7  listed  legacy mapping: no total collateral maps to 0  body.total_collateral
+     17  listed  type cannot hold: RationalNumber is int32 over uint32  body.certs[].margin
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action.threshold
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<10>
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<11>
+     30  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<19>[]
+     50  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<25>[]
+     82  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<26>[]
+     21  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<33>
+     20  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<9>
+      2  listed  type cannot hold: a uint32 port of 0 reads as no port  body.certs[].relays[].port
+     30  listed  type cannot hold: no guard native script variant  aux.native[]
+      3  listed  type cannot hold: no guard native script variant  body.collateral_return.script.script
+     21  listed  type cannot hold: no guard native script variant  body.outputs[].script.script
+      5  listed  type cannot hold: no guard native script variant  wits.scripts{}
+     34  listed  type cannot hold: no guard native script variant  wits.scripts{}.script
+schema v1beta tx: values 20, field paths 601, leaves agree 27687, ledger classes with no field 14, listed differences 382, disagreements 0 on 0 values
+     20  listed  no field in v1beta  body.aux_hash
+    477  listed  no field in v1beta  body.balance_intervals
+     29  listed  no field in v1beta  body.certs[].bls
+    277  listed  no field in v1beta  body.deposits
+     20  listed  no field in v1beta  body.donation
+    303  listed  no field in v1beta  body.guards
+     20  listed  no field in v1beta  body.network
+    423  listed  no field in v1beta  body.proposals[].action[]<
+   1511  listed  no field in v1beta  body.proposals[].action[]<18>
+     20  listed  no field in v1beta  body.script_data_hash
+    390  listed  no field in v1beta  body.starting_balance_intervals
+  48172  listed  no field in v1beta  body.sub_txs
+   3228  listed  no field in v1beta  body.top_guards
+     20  listed  no field in v1beta  body.treasury
+      4  listed  legacy mapping: no auxiliary data maps to an empty one  aux
+      7  listed  legacy mapping: no total collateral maps to 0  body.total_collateral
+     17  listed  type cannot hold: RationalNumber is int32 over uint32  body.certs[].margin
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action.threshold
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<10>
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<11>
+     30  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<19>[]
+     50  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<25>[]
+     82  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<26>[]
+     21  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<33>
+     20  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<9>
+      2  listed  type cannot hold: a uint32 port of 0 reads as no port  body.certs[].relays[].port
+     30  listed  type cannot hold: no guard native script variant  aux.native[]
+      3  listed  type cannot hold: no guard native script variant  body.collateral_return.script.script
+     21  listed  type cannot hold: no guard native script variant  body.outputs[].script.script
+      5  listed  type cannot hold: no guard native script variant  wits.scripts{}
+     34  listed  type cannot hold: no guard native script variant  wits.scripts{}.script
+     20  listed  type cannot hold: no guarding redeemer purpose  wits.redeemers{}.k[]
+schema v1 tx: values 20, field paths 1512, leaves agree 80780, ledger classes with no field 2, listed differences 629, disagreements 0 on 0 values
+   1511  listed  no field in v1  body.proposals[].action[]<18>
+    981  listed  no field in v1  body.sub_txs{}.v.body.proposals[].action[]<18>
+     17  listed  type cannot hold: RationalNumber is int32 over uint32  body.certs[].margin
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action.threshold
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<10>
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<11>
+     30  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<19>[]
+     50  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<25>[]
+     82  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<26>[]
+     21  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<33>
+     18  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<37>
+     11  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<38>
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<39>
+      5  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<44>
+     21  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<50>
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<54>
+     20  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<9>
+     13  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.certs[].margin
+      5  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action.threshold
+      8  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<10>
+      9  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<11>
+     30  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<19>[]
+     50  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<25>[]
+     72  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<26>[]
+     16  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<33>
+     17  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<37>
+     19  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<38>
+      8  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<39>
+     10  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<44>
+     17  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<50>
+     11  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<54>
+     21  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<9>
+      2  listed  type cannot hold: a uint32 port of 0 reads as no port  body.certs[].relays[].port
+value tx: values 20, ledger accepts 20, both accept 20, field paths 297, leaves agree 4582, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+      7  listed  ledger re-encodes, pallas keeps the input bytes 
+schema v1alpha tx: values 20, field paths 194, leaves agree 2973, ledger classes with no field 15, listed differences 104, disagreements 4 on 3 values
+     20  listed  no field in v1alpha  body.aux_hash
+     20  listed  no field in v1alpha  body.balance_intervals
+      8  listed  no field in v1alpha  body.certs[].bls
+     21  listed  no field in v1alpha  body.deposits
+     20  listed  no field in v1alpha  body.donation
+     64  listed  no field in v1alpha  body.guards
+     20  listed  no field in v1alpha  body.network
+     20  listed  no field in v1alpha  body.script_data_hash
+     20  listed  no field in v1alpha  body.starting_balance_intervals
+     95  listed  no field in v1alpha  body.sub_txs
+     25  listed  no field in v1alpha  body.top_guards
+     20  listed  no field in v1alpha  body.treasury
+     79  listed  no field in v1alpha  body.votes
+    254  listed  no field in v1alpha  wits.boots
+    329  listed  no field in v1alpha  wits.redeemers
+     11  listed  legacy mapping: no auxiliary data maps to an empty one  aux
+     10  listed  legacy mapping: no total collateral maps to 0  body.total_collateral
+      7  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<-14094646644317130397>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<-14094646644317130397><-14015878643844137271>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<1484277443770905693>
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<15582348627702686172>
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<15582348627702686172>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<9544064996794176684>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<9544065711752367109>.key
+      2  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v[]
+      3  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}
+      3  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}<-16211549276276792228>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}<10505096367449079439>.key
+      2  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}{}
+      4  listed  type cannot hold: NewCommitteeCredentials expires_epoch is uint32  body.proposals[].action.add{}.v
+      5  listed  type cannot hold: RationalNumber is int32 over uint32  body.certs[].margin
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action.threshold
+      1  listed  type cannot hold: ScriptNOfK k is uint32  aux.native[]
+      6  listed  type cannot hold: ScriptNOfK k is uint32  aux.native[].m
+      2  listed  type cannot hold: ScriptNOfK k is uint32  aux.native[].scripts[].m
+      6  listed  type cannot hold: ScriptNOfK k is uint32  wits.scripts{}.script.m
+      4  listed  type cannot hold: ScriptNOfK k is uint32  wits.scripts{}.script.scripts[].m
+      1  listed  type cannot hold: an empty dns name reads as no name  body.certs[].relays[].dns
+      6  listed  type cannot hold: no guard native script variant  aux.native[]
+      3  listed  type cannot hold: no guard native script variant  wits.scripts{}
+     17  listed  type cannot hold: no guard native script variant  wits.scripts{}.script
+      2  DISAGREE  v1alpha value differs  wits.datums{}.v
+      1  DISAGREE  v1alpha value differs  wits.datums{}.items[].entries[][].v
+      1  DISAGREE  v1alpha value differs  wits.datums{}.items[].v
+schema v1beta tx: values 20, field paths 233, leaves agree 3625, ledger classes with no field 12, listed differences 111, disagreements 7 on 5 values
+     20  listed  no field in v1beta  body.aux_hash
+     20  listed  no field in v1beta  body.balance_intervals
+      8  listed  no field in v1beta  body.certs[].bls
+     21  listed  no field in v1beta  body.deposits
+     20  listed  no field in v1beta  body.donation
+     64  listed  no field in v1beta  body.guards
+     20  listed  no field in v1beta  body.network
+     20  listed  no field in v1beta  body.script_data_hash
+     20  listed  no field in v1beta  body.starting_balance_intervals
+     95  listed  no field in v1beta  body.sub_txs
+     25  listed  no field in v1beta  body.top_guards
+     20  listed  no field in v1beta  body.treasury
+     11  listed  legacy mapping: no auxiliary data maps to an empty one  aux
+     10  listed  legacy mapping: no total collateral maps to 0  body.total_collateral
+      7  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<-14094646644317130397>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<-14094646644317130397><-14015878643844137271>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<1484277443770905693>
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<15582348627702686172>
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<15582348627702686172>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<9544064996794176684>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<9544065711752367109>.key
+      2  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v[]
+      3  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}
+      3  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}<-16211549276276792228>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}<10505096367449079439>.key
+      2  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}{}
+      4  listed  type cannot hold: NewCommitteeCredentials expires_epoch is uint32  body.proposals[].action.add{}.v
+      5  listed  type cannot hold: RationalNumber is int32 over uint32  body.certs[].margin
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action.threshold
+      1  listed  type cannot hold: ScriptNOfK k is uint32  aux.native[]
+      6  listed  type cannot hold: ScriptNOfK k is uint32  aux.native[].m
+      2  listed  type cannot hold: ScriptNOfK k is uint32  aux.native[].scripts[].m
+      6  listed  type cannot hold: ScriptNOfK k is uint32  wits.scripts{}.script.m
+      4  listed  type cannot hold: ScriptNOfK k is uint32  wits.scripts{}.script.scripts[].m
+      1  listed  type cannot hold: an empty dns name reads as no name  body.certs[].relays[].dns
+      6  listed  type cannot hold: no guard native script variant  aux.native[]
+      3  listed  type cannot hold: no guard native script variant  wits.scripts{}
+     17  listed  type cannot hold: no guard native script variant  wits.scripts{}.script
+      7  listed  type cannot hold: no guarding redeemer purpose  wits.redeemers{}.k[]
+      2  DISAGREE  v1beta value differs  wits.datums{}.v
+      2  DISAGREE  v1beta value differs  wits.redeemers{}.v.data.v
+      1  DISAGREE  v1beta value differs  wits.datums{}.items[].entries[][].v
+      1  DISAGREE  v1beta value differs  wits.datums{}.items[].v
+      1  DISAGREE  v1beta value differs  wits.redeemers{}.v.data.entries[][].v
+schema v1 tx: values 20, field paths 289, leaves agree 4194, ledger classes with no field 0, listed differences 63, disagreements 7 on 5 values
+      7  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<-14094646644317130397>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<-14094646644317130397><-14015878643844137271>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<1484277443770905693>
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<15582348627702686172>
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<15582348627702686172>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<9544064996794176684>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<9544065711752367109>.key
+      2  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v[]
+      3  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}
+      3  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}<-16211549276276792228>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}<10505096367449079439>.key
+      2  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}{}
+      4  listed  type cannot hold: NewCommitteeCredentials expires_epoch is uint32  body.proposals[].action.add{}.v
+      5  listed  type cannot hold: RationalNumber is int32 over uint32  body.certs[].margin
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action.threshold
+      7  listed  type cannot hold: ScriptNOfK k is uint32  aux.native[].m
+      2  listed  type cannot hold: ScriptNOfK k is uint32  aux.native[].scripts[].m
+      6  listed  type cannot hold: ScriptNOfK k is uint32  wits.scripts{}.script.m
+      8  listed  type cannot hold: ScriptNOfK k is uint32  wits.scripts{}.script.scripts[].m
+      2  listed  type cannot hold: ScriptNOfK k is uint32  wits.scripts{}.script.scripts[].scripts[].m
+      1  listed  type cannot hold: an empty dns name reads as no name  body.certs[].relays[].dns
+      2  DISAGREE  v1 value differs  wits.datums{}.v
+      2  DISAGREE  v1 value differs  wits.redeemers{}.v.data.v
+      1  DISAGREE  v1 value differs  wits.datums{}.items[].entries[][].v
+      1  DISAGREE  v1 value differs  wits.datums{}.items[].v
+      1  DISAGREE  v1 value differs  wits.redeemers{}.v.data.entries[][].v
+value tx: values 20, ledger accepts 20, both accept 20, field paths 297, leaves agree 4582, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+      5  listed  pallas re-encodes to other bytes of the same ledger value 
+      2  listed  ledger re-encodes, pallas keeps the input bytes 
+schema v1alpha tx: values 20, field paths 194, leaves agree 2973, ledger classes with no field 15, listed differences 104, disagreements 4 on 3 values
+     20  listed  no field in v1alpha  body.aux_hash
+     20  listed  no field in v1alpha  body.balance_intervals
+      8  listed  no field in v1alpha  body.certs[].bls
+     21  listed  no field in v1alpha  body.deposits
+     20  listed  no field in v1alpha  body.donation
+     64  listed  no field in v1alpha  body.guards
+     20  listed  no field in v1alpha  body.network
+     20  listed  no field in v1alpha  body.script_data_hash
+     20  listed  no field in v1alpha  body.starting_balance_intervals
+     95  listed  no field in v1alpha  body.sub_txs
+     25  listed  no field in v1alpha  body.top_guards
+     20  listed  no field in v1alpha  body.treasury
+     79  listed  no field in v1alpha  body.votes
+    254  listed  no field in v1alpha  wits.boots
+    329  listed  no field in v1alpha  wits.redeemers
+     11  listed  legacy mapping: no auxiliary data maps to an empty one  aux
+     10  listed  legacy mapping: no total collateral maps to 0  body.total_collateral
+      7  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<-14094646644317130397>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<-14094646644317130397><-14015878643844137271>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<1484277443770905693>
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<15582348627702686172>
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<15582348627702686172>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<9544064996794176684>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<9544065711752367109>.key
+      2  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v[]
+      3  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}
+      3  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}<-16211549276276792228>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}<10505096367449079439>.key
+      2  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}{}
+      4  listed  type cannot hold: NewCommitteeCredentials expires_epoch is uint32  body.proposals[].action.add{}.v
+      5  listed  type cannot hold: RationalNumber is int32 over uint32  body.certs[].margin
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action.threshold
+      1  listed  type cannot hold: ScriptNOfK k is uint32  aux.native[]
+      6  listed  type cannot hold: ScriptNOfK k is uint32  aux.native[].m
+      2  listed  type cannot hold: ScriptNOfK k is uint32  aux.native[].scripts[].m
+      6  listed  type cannot hold: ScriptNOfK k is uint32  wits.scripts{}.script.m
+      4  listed  type cannot hold: ScriptNOfK k is uint32  wits.scripts{}.script.scripts[].m
+      1  listed  type cannot hold: an empty dns name reads as no name  body.certs[].relays[].dns
+      6  listed  type cannot hold: no guard native script variant  aux.native[]
+      3  listed  type cannot hold: no guard native script variant  wits.scripts{}
+     17  listed  type cannot hold: no guard native script variant  wits.scripts{}.script
+      2  DISAGREE  v1alpha value differs  wits.datums{}.v
+      1  DISAGREE  v1alpha value differs  wits.datums{}.items[].entries[][].v
+      1  DISAGREE  v1alpha value differs  wits.datums{}.items[].v
+schema v1beta tx: values 20, field paths 233, leaves agree 3625, ledger classes with no field 12, listed differences 111, disagreements 7 on 5 values
+     20  listed  no field in v1beta  body.aux_hash
+     20  listed  no field in v1beta  body.balance_intervals
+      8  listed  no field in v1beta  body.certs[].bls
+     21  listed  no field in v1beta  body.deposits
+     20  listed  no field in v1beta  body.donation
+     64  listed  no field in v1beta  body.guards
+     20  listed  no field in v1beta  body.network
+     20  listed  no field in v1beta  body.script_data_hash
+     20  listed  no field in v1beta  body.starting_balance_intervals
+     95  listed  no field in v1beta  body.sub_txs
+     25  listed  no field in v1beta  body.top_guards
+     20  listed  no field in v1beta  body.treasury
+     11  listed  legacy mapping: no auxiliary data maps to an empty one  aux
+     10  listed  legacy mapping: no total collateral maps to 0  body.total_collateral
+      7  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<-14094646644317130397>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<-14094646644317130397><-14015878643844137271>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<1484277443770905693>
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<15582348627702686172>
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<15582348627702686172>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<9544064996794176684>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<9544065711752367109>.key
+      2  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v[]
+      3  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}
+      3  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}<-16211549276276792228>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}<10505096367449079439>.key
+      2  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}{}
+      4  listed  type cannot hold: NewCommitteeCredentials expires_epoch is uint32  body.proposals[].action.add{}.v
+      5  listed  type cannot hold: RationalNumber is int32 over uint32  body.certs[].margin
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action.threshold
+      1  listed  type cannot hold: ScriptNOfK k is uint32  aux.native[]
+      6  listed  type cannot hold: ScriptNOfK k is uint32  aux.native[].m
+      2  listed  type cannot hold: ScriptNOfK k is uint32  aux.native[].scripts[].m
+      6  listed  type cannot hold: ScriptNOfK k is uint32  wits.scripts{}.script.m
+      4  listed  type cannot hold: ScriptNOfK k is uint32  wits.scripts{}.script.scripts[].m
+      1  listed  type cannot hold: an empty dns name reads as no name  body.certs[].relays[].dns
+      6  listed  type cannot hold: no guard native script variant  aux.native[]
+      3  listed  type cannot hold: no guard native script variant  wits.scripts{}
+     17  listed  type cannot hold: no guard native script variant  wits.scripts{}.script
+      7  listed  type cannot hold: no guarding redeemer purpose  wits.redeemers{}.k[]
+      2  DISAGREE  v1beta value differs  wits.datums{}.v
+      2  DISAGREE  v1beta value differs  wits.redeemers{}.v.data.v
+      1  DISAGREE  v1beta value differs  wits.datums{}.items[].entries[][].v
+      1  DISAGREE  v1beta value differs  wits.datums{}.items[].v
+      1  DISAGREE  v1beta value differs  wits.redeemers{}.v.data.entries[][].v
+schema v1 tx: values 20, field paths 289, leaves agree 4194, ledger classes with no field 0, listed differences 63, disagreements 7 on 5 values
+      7  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<-14094646644317130397>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<-14094646644317130397><-14015878643844137271>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<1484277443770905693>
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<15582348627702686172>
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<15582348627702686172>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<9544064996794176684>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v<9544065711752367109>.key
+      2  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v[]
+      3  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}
+      3  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}<-16211549276276792228>.key
+      1  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}<10505096367449079439>.key
+      2  listed  type cannot hold: Metadatum int is int64  aux.metadata{}.v{}{}
+      4  listed  type cannot hold: NewCommitteeCredentials expires_epoch is uint32  body.proposals[].action.add{}.v
+      5  listed  type cannot hold: RationalNumber is int32 over uint32  body.certs[].margin
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action.threshold
+      7  listed  type cannot hold: ScriptNOfK k is uint32  aux.native[].m
+      2  listed  type cannot hold: ScriptNOfK k is uint32  aux.native[].scripts[].m
+      6  listed  type cannot hold: ScriptNOfK k is uint32  wits.scripts{}.script.m
+      8  listed  type cannot hold: ScriptNOfK k is uint32  wits.scripts{}.script.scripts[].m
+      2  listed  type cannot hold: ScriptNOfK k is uint32  wits.scripts{}.script.scripts[].scripts[].m
+      1  listed  type cannot hold: an empty dns name reads as no name  body.certs[].relays[].dns
+      2  DISAGREE  v1 value differs  wits.datums{}.v
+      2  DISAGREE  v1 value differs  wits.redeemers{}.v.data.v
+      1  DISAGREE  v1 value differs  wits.datums{}.items[].entries[][].v
+      1  DISAGREE  v1 value differs  wits.datums{}.items[].v
+      1  DISAGREE  v1 value differs  wits.redeemers{}.v.data.entries[][].v
+value tx: values 20, ledger accepts 6, both accept 6, field paths 1138, leaves agree 16251, leaves differ 0, accepted ledger-invalid 7, disagreements 0 on 0 values
+      3  accepted ledger-invalid  trailing: DecoderErrorLeftover "oracle" "\NUL"
+      1  accepted ledger-invalid  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Annotator (DijkstraTxBodyRaw TopTx DijkstraEra): Duplicat
+      1  accepted ledger-invalid  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record BootstrapWitness.\nExp
+      1  accepted ledger-invalid  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum Credential.\nExpected N, 
+      1  accepted ledger-invalid  unknownkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "DecodingTxOut DijkstraEra: Unknown field key N")
+schema v1alpha tx: values 6, field paths 332, leaves agree 4188, ledger classes with no field 17, listed differences 96, disagreements 0 on 0 values
+      6  listed  no field in v1alpha  body.aux_hash
+     92  listed  no field in v1alpha  body.balance_intervals
+      4  listed  no field in v1alpha  body.certs[].bls
+     43  listed  no field in v1alpha  body.deposits
+      6  listed  no field in v1alpha  body.donation
+     77  listed  no field in v1alpha  body.guards
+      6  listed  no field in v1alpha  body.network
+     68  listed  no field in v1alpha  body.proposals[].action[]<
+    205  listed  no field in v1alpha  body.proposals[].action[]<18>
+      6  listed  no field in v1alpha  body.script_data_hash
+    102  listed  no field in v1alpha  body.starting_balance_intervals
+   6111  listed  no field in v1alpha  body.sub_txs
+   1060  listed  no field in v1alpha  body.top_guards
+      6  listed  no field in v1alpha  body.treasury
+   1372  listed  no field in v1alpha  body.votes
+    244  listed  no field in v1alpha  wits.boots
+   1935  listed  no field in v1alpha  wits.redeemers
+      1  listed  legacy mapping: no auxiliary data maps to an empty one  aux
+      2  listed  legacy mapping: no total collateral maps to 0  body.total_collateral
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.certs[].margin
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action.threshold
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<10>
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<11>
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<19>[]
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<25>[]
+     23  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<26>[]
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<33>
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<9>
+     13  listed  type cannot hold: no guard native script variant  aux.native[]
+      1  listed  type cannot hold: no guard native script variant  body.collateral_return.script.script
+      9  listed  type cannot hold: no guard native script variant  body.outputs[].script.script
+      2  listed  type cannot hold: no guard native script variant  wits.scripts{}
+     11  listed  type cannot hold: no guard native script variant  wits.scripts{}.script
+schema v1beta tx: values 6, field paths 452, leaves agree 7732, ledger classes with no field 14, listed differences 103, disagreements 0 on 0 values
+      6  listed  no field in v1beta  body.aux_hash
+     92  listed  no field in v1beta  body.balance_intervals
+      4  listed  no field in v1beta  body.certs[].bls
+     43  listed  no field in v1beta  body.deposits
+      6  listed  no field in v1beta  body.donation
+     77  listed  no field in v1beta  body.guards
+      6  listed  no field in v1beta  body.network
+     68  listed  no field in v1beta  body.proposals[].action[]<
+    205  listed  no field in v1beta  body.proposals[].action[]<18>
+      6  listed  no field in v1beta  body.script_data_hash
+    102  listed  no field in v1beta  body.starting_balance_intervals
+   6111  listed  no field in v1beta  body.sub_txs
+   1060  listed  no field in v1beta  body.top_guards
+      6  listed  no field in v1beta  body.treasury
+      1  listed  legacy mapping: no auxiliary data maps to an empty one  aux
+      2  listed  legacy mapping: no total collateral maps to 0  body.total_collateral
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.certs[].margin
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action.threshold
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<10>
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<11>
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<19>[]
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<25>[]
+     23  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<26>[]
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<33>
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<9>
+     13  listed  type cannot hold: no guard native script variant  aux.native[]
+      1  listed  type cannot hold: no guard native script variant  body.collateral_return.script.script
+      9  listed  type cannot hold: no guard native script variant  body.outputs[].script.script
+      2  listed  type cannot hold: no guard native script variant  wits.scripts{}
+     11  listed  type cannot hold: no guard native script variant  wits.scripts{}.script
+      7  listed  type cannot hold: no guarding redeemer purpose  wits.redeemers{}.k[]
+schema v1 tx: values 6, field paths 1085, leaves agree 15575, ledger classes with no field 2, listed differences 119, disagreements 0 on 0 values
+    205  listed  no field in v1  body.proposals[].action[]<18>
+     99  listed  no field in v1  body.sub_txs{}.v.body.proposals[].action[]<18>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.certs[].margin
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action.threshold
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<10>
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<11>
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<19>[]
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<25>[]
+     23  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<26>[]
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<33>
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<37>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<38>
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<50>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<54>
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  body.proposals[].action[]<9>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.certs[].margin
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action.threshold
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<10>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<11>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<19>[]
+     10  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<25>[]
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<26>[]
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<33>
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<37>
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<38>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<39>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<44>
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<50>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<54>
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  body.sub_txs{}.v.body.proposals[].action[]<9>
+value body: values 20, ledger accepts 20, both accept 20, field paths 1558, leaves agree 125630, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+     20  listed  pallas re-encodes to other bytes of the same ledger value 
+schema v1alpha body: values 20, field paths 300, leaves agree 13119, ledger classes with no field 15, listed differences 269, disagreements 0 on 0 values
+     20  listed  no field in v1alpha  aux_hash
+    411  listed  no field in v1alpha  balance_intervals
+     26  listed  no field in v1alpha  certs[].bls
+    274  listed  no field in v1alpha  deposits
+     20  listed  no field in v1alpha  donation
+    312  listed  no field in v1alpha  guards
+     20  listed  no field in v1alpha  network
+    399  listed  no field in v1alpha  proposals[].action[]<
+   1456  listed  no field in v1alpha  proposals[].action[]<18>
+     20  listed  no field in v1alpha  script_data_hash
+    476  listed  no field in v1alpha  starting_balance_intervals
+  96041  listed  no field in v1alpha  sub_txs
+   3303  listed  no field in v1alpha  top_guards
+     20  listed  no field in v1alpha  treasury
+   7264  listed  no field in v1alpha  votes
+      9  listed  legacy mapping: no total collateral maps to 0  total_collateral
+     14  listed  type cannot hold: RationalNumber is int32 over uint32  certs[].margin
+      8  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action.threshold
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<10>
+      7  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<11>
+     30  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<19>[]
+     50  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<25>[]
+     84  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<26>[]
+     19  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<33>
+     16  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<9>
+      2  listed  type cannot hold: no guard native script variant  collateral_return.script.script
+     27  listed  type cannot hold: no guard native script variant  outputs[].script.script
+schema v1beta body: values 20, field paths 304, leaves agree 20383, ledger classes with no field 14, listed differences 269, disagreements 0 on 0 values
+     20  listed  no field in v1beta  aux_hash
+    411  listed  no field in v1beta  balance_intervals
+     26  listed  no field in v1beta  certs[].bls
+    274  listed  no field in v1beta  deposits
+     20  listed  no field in v1beta  donation
+    312  listed  no field in v1beta  guards
+     20  listed  no field in v1beta  network
+    399  listed  no field in v1beta  proposals[].action[]<
+   1456  listed  no field in v1beta  proposals[].action[]<18>
+     20  listed  no field in v1beta  script_data_hash
+    476  listed  no field in v1beta  starting_balance_intervals
+  96041  listed  no field in v1beta  sub_txs
+   3303  listed  no field in v1beta  top_guards
+     20  listed  no field in v1beta  treasury
+      9  listed  legacy mapping: no total collateral maps to 0  total_collateral
+     14  listed  type cannot hold: RationalNumber is int32 over uint32  certs[].margin
+      8  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action.threshold
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<10>
+      7  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<11>
+     30  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<19>[]
+     50  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<25>[]
+     84  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<26>[]
+     19  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<33>
+     16  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<9>
+      2  listed  type cannot hold: no guard native script variant  collateral_return.script.script
+     27  listed  type cannot hold: no guard native script variant  outputs[].script.script
+schema v1 body: values 20, field paths 1250, leaves agree 118199, ledger classes with no field 2, listed differences 1009, disagreements 0 on 0 values
+   1456  listed  no field in v1  proposals[].action[]<18>
+   3134  listed  no field in v1  sub_txs{}.v.body.proposals[].action[]<18>
+     14  listed  type cannot hold: RationalNumber is int32 over uint32  certs[].margin
+      8  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action.threshold
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<10>
+      7  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<11>
+     30  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<19>[]
+     50  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<25>[]
+     84  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<26>[]
+     19  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<33>
+     16  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<37>
+     11  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<38>
+      7  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<39>
+      8  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<44>
+     17  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<50>
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<54>
+     16  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action[]<9>
+     30  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.certs[].margin
+     21  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action.threshold
+     11  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<10>
+     20  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<11>
+     86  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<19>[]
+     95  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<25>[]
+    197  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<26>[]
+     37  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<33>
+     41  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<37>
+     36  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<38>
+     19  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<39>
+     27  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<44>
+     38  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<50>
+     17  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<54>
+     40  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<9>
+      1  listed  type cannot hold: a uint32 port of 0 reads as no port  sub_txs{}.v.body.certs[].relays[].port
+value body: values 20, ledger accepts 20, both accept 20, field paths 125, leaves agree 1926, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+      3  listed  pallas re-encodes to other bytes of the same ledger value 
+schema v1alpha body: values 20, field paths 70, leaves agree 1397, ledger classes with no field 13, listed differences 23, disagreements 0 on 0 values
+     20  listed  no field in v1alpha  aux_hash
+     22  listed  no field in v1alpha  balance_intervals
+      6  listed  no field in v1alpha  certs[].bls
+     21  listed  no field in v1alpha  deposits
+     20  listed  no field in v1alpha  donation
+     60  listed  no field in v1alpha  guards
+     20  listed  no field in v1alpha  network
+     20  listed  no field in v1alpha  script_data_hash
+     20  listed  no field in v1alpha  starting_balance_intervals
+    178  listed  no field in v1alpha  sub_txs
+     22  listed  no field in v1alpha  top_guards
+     20  listed  no field in v1alpha  treasury
+     67  listed  no field in v1alpha  votes
+     12  listed  legacy mapping: no total collateral maps to 0  total_collateral
+      5  listed  type cannot hold: NewCommitteeCredentials expires_epoch is uint32  proposals[].action.add{}.v
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  certs[].margin
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action.threshold
+schema v1beta body: values 20, field paths 75, leaves agree 1464, ledger classes with no field 12, listed differences 23, disagreements 0 on 0 values
+     20  listed  no field in v1beta  aux_hash
+     22  listed  no field in v1beta  balance_intervals
+      6  listed  no field in v1beta  certs[].bls
+     21  listed  no field in v1beta  deposits
+     20  listed  no field in v1beta  donation
+     60  listed  no field in v1beta  guards
+     20  listed  no field in v1beta  network
+     20  listed  no field in v1beta  script_data_hash
+     20  listed  no field in v1beta  starting_balance_intervals
+    178  listed  no field in v1beta  sub_txs
+     22  listed  no field in v1beta  top_guards
+     20  listed  no field in v1beta  treasury
+     12  listed  legacy mapping: no total collateral maps to 0  total_collateral
+      5  listed  type cannot hold: NewCommitteeCredentials expires_epoch is uint32  proposals[].action.add{}.v
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  certs[].margin
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action.threshold
+schema v1 body: values 20, field paths 124, leaves agree 1905, ledger classes with no field 0, listed differences 11, disagreements 0 on 0 values
+      5  listed  type cannot hold: NewCommitteeCredentials expires_epoch is uint32  proposals[].action.add{}.v
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  certs[].margin
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action.threshold
+value body: values 20, ledger accepts 20, both accept 19, field paths 113, leaves agree 1697, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+     19  listed  pallas re-encodes to other bytes of the same ledger value 
+      1  listed  pallas refuses tag 24 over indefinite bytes, open decision on a stable type 
+schema v1alpha body: values 19, field paths 65, leaves agree 1274, ledger classes with no field 13, listed differences 20, disagreements 0 on 0 values
+     19  listed  no field in v1alpha  aux_hash
+     19  listed  no field in v1alpha  balance_intervals
+      6  listed  no field in v1alpha  certs[].bls
+     19  listed  no field in v1alpha  deposits
+     19  listed  no field in v1alpha  donation
+     50  listed  no field in v1alpha  guards
+     19  listed  no field in v1alpha  network
+     19  listed  no field in v1alpha  script_data_hash
+     19  listed  no field in v1alpha  starting_balance_intervals
+    119  listed  no field in v1alpha  sub_txs
+     19  listed  no field in v1alpha  top_guards
+     19  listed  no field in v1alpha  treasury
+     47  listed  no field in v1alpha  votes
+     12  listed  legacy mapping: no total collateral maps to 0  total_collateral
+      3  listed  type cannot hold: NewCommitteeCredentials expires_epoch is uint32  proposals[].action.add{}.v
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  certs[].margin
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action.threshold
+schema v1beta body: values 19, field paths 70, leaves agree 1321, ledger classes with no field 12, listed differences 20, disagreements 0 on 0 values
+     19  listed  no field in v1beta  aux_hash
+     19  listed  no field in v1beta  balance_intervals
+      6  listed  no field in v1beta  certs[].bls
+     19  listed  no field in v1beta  deposits
+     19  listed  no field in v1beta  donation
+     50  listed  no field in v1beta  guards
+     19  listed  no field in v1beta  network
+     19  listed  no field in v1beta  script_data_hash
+     19  listed  no field in v1beta  starting_balance_intervals
+    119  listed  no field in v1beta  sub_txs
+     19  listed  no field in v1beta  top_guards
+     19  listed  no field in v1beta  treasury
+     12  listed  legacy mapping: no total collateral maps to 0  total_collateral
+      3  listed  type cannot hold: NewCommitteeCredentials expires_epoch is uint32  proposals[].action.add{}.v
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  certs[].margin
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action.threshold
+schema v1 body: values 19, field paths 112, leaves agree 1679, ledger classes with no field 0, listed differences 8, disagreements 0 on 0 values
+      3  listed  type cannot hold: NewCommitteeCredentials expires_epoch is uint32  proposals[].action.add{}.v
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  certs[].margin
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  proposals[].action.threshold
+value body: values 20, ledger accepts 1, both accept 1, field paths 431, leaves agree 2840, leaves differ 0, accepted ledger-invalid 9, disagreements 0 on 0 values
+      1  listed  pallas re-encodes to other bytes of the same ledger value 
+      3  accepted ledger-invalid  trailing: DecoderErrorLeftover "oracle" "\NUL"
+      2  accepted ledger-invalid  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Final number of elements: N does not match the total coun
+      1  accepted ledger-invalid  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Annotator (AlonzoTxWitsRaw DijkstraEra): Duplicate field 
+      1  accepted ledger-invalid  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Rational.\nExpected N, but fo
+      1  accepted ledger-invalid  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record Anchor.\nExpected N, b
+      1  accepted ledger-invalid  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum Credential.\nExpected N, 
+schema v1alpha body: values 1, field paths 83, leaves agree 243, ledger classes with no field 13, listed differences 2, disagreements 0 on 0 values
+      1  listed  no field in v1alpha  aux_hash
+      1  listed  no field in v1alpha  balance_intervals
+      1  listed  no field in v1alpha  certs[].bls
+     12  listed  no field in v1alpha  deposits
+      1  listed  no field in v1alpha  donation
+     10  listed  no field in v1alpha  guards
+      1  listed  no field in v1alpha  network
+      1  listed  no field in v1alpha  script_data_hash
+      1  listed  no field in v1alpha  starting_balance_intervals
+   2367  listed  no field in v1alpha  sub_txs
+     45  listed  no field in v1alpha  top_guards
+      1  listed  no field in v1alpha  treasury
+    117  listed  no field in v1alpha  votes
+      1  listed  legacy mapping: no total collateral maps to 0  total_collateral
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  certs[].margin
+schema v1beta body: values 1, field paths 87, leaves agree 360, ledger classes with no field 12, listed differences 2, disagreements 0 on 0 values
+      1  listed  no field in v1beta  aux_hash
+      1  listed  no field in v1beta  balance_intervals
+      1  listed  no field in v1beta  certs[].bls
+     12  listed  no field in v1beta  deposits
+      1  listed  no field in v1beta  donation
+     10  listed  no field in v1beta  guards
+      1  listed  no field in v1beta  network
+      1  listed  no field in v1beta  script_data_hash
+      1  listed  no field in v1beta  starting_balance_intervals
+   2367  listed  no field in v1beta  sub_txs
+     45  listed  no field in v1beta  top_guards
+      1  listed  no field in v1beta  treasury
+      1  listed  legacy mapping: no total collateral maps to 0  total_collateral
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  certs[].margin
+schema v1 body: values 1, field paths 423, leaves agree 2787, ledger classes with no field 1, listed differences 19, disagreements 0 on 0 values
+      1  listed  no field in v1  sub_txs{}.v.body.proposals[].action[]<18>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  certs[].margin
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action.threshold
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<19>[]
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<25>[]
+      9  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<26>[]
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<33>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<37>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<38>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<44>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  sub_txs{}.v.body.proposals[].action[]<50>
+value wits: values 20, ledger accepts 20, both accept 20, field paths 290, leaves agree 10823, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+     16  listed  pallas re-encodes to other bytes of the same ledger value 
+schema v1alpha wits: values 20, field paths 154, leaves agree 4858, ledger classes with no field 2, listed differences 34, disagreements 0 on 0 values
+    562  listed  no field in v1alpha  boots
+   4738  listed  no field in v1alpha  redeemers
+      5  listed  type cannot hold: no guard native script variant  scripts{}
+     29  listed  type cannot hold: no guard native script variant  scripts{}.script
+schema v1beta wits: values 20, field paths 285, leaves agree 10127, ledger classes with no field 0, listed differences 65, disagreements 0 on 0 values
+      5  listed  type cannot hold: no guard native script variant  scripts{}
+     29  listed  type cannot hold: no guard native script variant  scripts{}.script
+     31  listed  type cannot hold: no guarding redeemer purpose  redeemers{}.k[]
+schema v1 wits: values 20, field paths 288, leaves agree 10547, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+value wits: values 20, ledger accepts 20, both accept 20, field paths 153, leaves agree 2541, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha wits: values 20, field paths 104, leaves agree 1270, ledger classes with no field 2, listed differences 50, disagreements 1 on 1 values
+    241  listed  no field in v1alpha  boots
+    455  listed  no field in v1alpha  redeemers
+      3  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script
+      7  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.m
+     17  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.scripts[].m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.scripts[].scripts[].m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.scripts[].scripts[].scripts[].m
+      5  listed  type cannot hold: no guard native script variant  scripts{}
+     16  listed  type cannot hold: no guard native script variant  scripts{}.script
+      1  DISAGREE  v1alpha value differs  datums{}.items[].v
+schema v1beta wits: values 20, field paths 144, leaves agree 1957, ledger classes with no field 0, listed differences 54, disagreements 6 on 6 values
+      3  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script
+      7  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.m
+     17  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.scripts[].m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.scripts[].scripts[].m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.scripts[].scripts[].scripts[].m
+      5  listed  type cannot hold: no guard native script variant  scripts{}
+     16  listed  type cannot hold: no guard native script variant  scripts{}.script
+      4  listed  type cannot hold: no guarding redeemer purpose  redeemers{}.k[]
+      4  DISAGREE  v1beta value differs  redeemers{}.v.data.v
+      1  DISAGREE  v1beta value differs  datums{}.items[].v
+      1  DISAGREE  v1beta value differs  redeemers{}.v.data.entries[][].v
+schema v1 wits: values 20, field paths 147, leaves agree 2176, ledger classes with no field 0, listed differences 43, disagreements 6 on 6 values
+     10  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.m
+     27  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.scripts[].m
+      5  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.scripts[].scripts[].m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.scripts[].scripts[].scripts[].m
+      4  DISAGREE  v1 value differs  redeemers{}.v.data.v
+      1  DISAGREE  v1 value differs  datums{}.items[].v
+      1  DISAGREE  v1 value differs  redeemers{}.v.data.entries[][].v
+value wits: values 20, ledger accepts 20, both accept 20, field paths 153, leaves agree 2541, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+     20  listed  pallas re-encodes to other bytes of the same ledger value 
+schema v1alpha wits: values 20, field paths 104, leaves agree 1270, ledger classes with no field 2, listed differences 50, disagreements 1 on 1 values
+    241  listed  no field in v1alpha  boots
+    455  listed  no field in v1alpha  redeemers
+      3  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script
+      7  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.m
+     17  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.scripts[].m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.scripts[].scripts[].m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.scripts[].scripts[].scripts[].m
+      5  listed  type cannot hold: no guard native script variant  scripts{}
+     16  listed  type cannot hold: no guard native script variant  scripts{}.script
+      1  DISAGREE  v1alpha value differs  datums{}.items[].v
+schema v1beta wits: values 20, field paths 144, leaves agree 1957, ledger classes with no field 0, listed differences 54, disagreements 6 on 6 values
+      3  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script
+      7  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.m
+     17  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.scripts[].m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.scripts[].scripts[].m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.scripts[].scripts[].scripts[].m
+      5  listed  type cannot hold: no guard native script variant  scripts{}
+     16  listed  type cannot hold: no guard native script variant  scripts{}.script
+      4  listed  type cannot hold: no guarding redeemer purpose  redeemers{}.k[]
+      4  DISAGREE  v1beta value differs  redeemers{}.v.data.v
+      1  DISAGREE  v1beta value differs  datums{}.items[].v
+      1  DISAGREE  v1beta value differs  redeemers{}.v.data.entries[][].v
+schema v1 wits: values 20, field paths 147, leaves agree 2176, ledger classes with no field 0, listed differences 43, disagreements 6 on 6 values
+     10  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.m
+     27  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.scripts[].m
+      5  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.scripts[].scripts[].m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  scripts{}.script.scripts[].scripts[].scripts[].m
+      4  DISAGREE  v1 value differs  redeemers{}.v.data.v
+      1  DISAGREE  v1 value differs  datums{}.items[].v
+      1  DISAGREE  v1 value differs  redeemers{}.v.data.entries[][].v
+value wits: values 20, ledger accepts 12, both accept 12, field paths 276, leaves agree 7716, leaves differ 0, accepted ledger-invalid 4, disagreements 0 on 0 values
+     10  listed  pallas re-encodes to other bytes of the same ledger value 
+      3  accepted ledger-invalid  trailing: DecoderErrorLeftover "oracle" "\NUL"
+      1  accepted ledger-invalid  unknownkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Annotator (AlonzoTxWitsRaw DijkstraEra): Unknown field ke
+schema v1alpha wits: values 12, field paths 149, leaves agree 3883, ledger classes with no field 2, listed differences 24, disagreements 0 on 0 values
+    381  listed  no field in v1alpha  boots
+   3024  listed  no field in v1alpha  redeemers
+      3  listed  type cannot hold: no guard native script variant  scripts{}
+     21  listed  type cannot hold: no guard native script variant  scripts{}.script
+schema v1beta wits: values 12, field paths 271, leaves agree 7264, ledger classes with no field 0, listed differences 48, disagreements 0 on 0 values
+      3  listed  type cannot hold: no guard native script variant  scripts{}
+     21  listed  type cannot hold: no guard native script variant  scripts{}.script
+     24  listed  type cannot hold: no guarding redeemer purpose  redeemers{}.k[]
+schema v1 wits: values 12, field paths 274, leaves agree 7524, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+value ppu: values 20, ledger accepts 20, both accept 20, field paths 169, leaves agree 5045, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+     10  listed  pallas re-encodes to other bytes of the same ledger value 
+schema v1alpha ppu: values 20, field paths 32, leaves agree 3397, ledger classes with no field 2, listed differences 179, disagreements 0 on 0 values
+    354  listed  no field in v1alpha  <
+   1092  listed  no field in v1alpha  <18>
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  <10>
+      9  listed  type cannot hold: RationalNumber is int32 over uint32  <11>
+     24  listed  type cannot hold: RationalNumber is int32 over uint32  <19>[]
+     35  listed  type cannot hold: RationalNumber is int32 over uint32  <25>[]
+     75  listed  type cannot hold: RationalNumber is int32 over uint32  <26>[]
+     15  listed  type cannot hold: RationalNumber is int32 over uint32  <33>
+     15  listed  type cannot hold: RationalNumber is int32 over uint32  <9>
+schema v1beta ppu: values 20, field paths 32, leaves agree 3397, ledger classes with no field 2, listed differences 179, disagreements 0 on 0 values
+    354  listed  no field in v1beta  <
+   1092  listed  no field in v1beta  <18>
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  <10>
+      9  listed  type cannot hold: RationalNumber is int32 over uint32  <11>
+     24  listed  type cannot hold: RationalNumber is int32 over uint32  <19>[]
+     35  listed  type cannot hold: RationalNumber is int32 over uint32  <25>[]
+     75  listed  type cannot hold: RationalNumber is int32 over uint32  <26>[]
+     15  listed  type cannot hold: RationalNumber is int32 over uint32  <33>
+     15  listed  type cannot hold: RationalNumber is int32 over uint32  <9>
+schema v1 ppu: values 20, field paths 53, leaves agree 3708, ledger classes with no field 1, listed differences 245, disagreements 0 on 0 values
+   1092  listed  no field in v1  <18>
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  <10>
+      9  listed  type cannot hold: RationalNumber is int32 over uint32  <11>
+     24  listed  type cannot hold: RationalNumber is int32 over uint32  <19>[]
+     35  listed  type cannot hold: RationalNumber is int32 over uint32  <25>[]
+     75  listed  type cannot hold: RationalNumber is int32 over uint32  <26>[]
+     15  listed  type cannot hold: RationalNumber is int32 over uint32  <33>
+     15  listed  type cannot hold: RationalNumber is int32 over uint32  <37>
+     11  listed  type cannot hold: RationalNumber is int32 over uint32  <38>
+      9  listed  type cannot hold: RationalNumber is int32 over uint32  <39>
+      9  listed  type cannot hold: RationalNumber is int32 over uint32  <44>
+     15  listed  type cannot hold: RationalNumber is int32 over uint32  <50>
+      7  listed  type cannot hold: RationalNumber is int32 over uint32  <54>
+     15  listed  type cannot hold: RationalNumber is int32 over uint32  <9>
+value ppu: values 20, ledger accepts 20, both accept 20, field paths 33, leaves agree 308, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+     13  listed  ledger re-encodes, pallas keeps the input bytes 
+      1  listed  pallas re-encodes to other bytes of the same ledger value 
+schema v1alpha ppu: values 20, field paths 22, leaves agree 240, ledger classes with no field 1, listed differences 54, disagreements 0 on 0 values
+     14  listed  no field in v1alpha  <18>
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  <10>
+      5  listed  type cannot hold: RationalNumber is int32 over uint32  <11>
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  <19>[]
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  <25>[]
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  <26>[]
+     13  listed  type cannot hold: RationalNumber is int32 over uint32  <9>
+schema v1beta ppu: values 20, field paths 22, leaves agree 240, ledger classes with no field 1, listed differences 54, disagreements 0 on 0 values
+     14  listed  no field in v1beta  <18>
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  <10>
+      5  listed  type cannot hold: RationalNumber is int32 over uint32  <11>
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  <19>[]
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  <25>[]
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  <26>[]
+     13  listed  type cannot hold: RationalNumber is int32 over uint32  <9>
+schema v1 ppu: values 20, field paths 22, leaves agree 240, ledger classes with no field 1, listed differences 54, disagreements 0 on 0 values
+     14  listed  no field in v1  <18>
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  <10>
+      5  listed  type cannot hold: RationalNumber is int32 over uint32  <11>
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  <19>[]
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  <25>[]
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  <26>[]
+     13  listed  type cannot hold: RationalNumber is int32 over uint32  <9>
+value ppu: values 20, ledger accepts 20, both accept 20, field paths 33, leaves agree 309, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+     13  listed  pallas re-encodes to other bytes of the same ledger value 
+      1  listed  ledger re-encodes, pallas keeps the input bytes 
+schema v1alpha ppu: values 20, field paths 22, leaves agree 240, ledger classes with no field 1, listed differences 54, disagreements 0 on 0 values
+     15  listed  no field in v1alpha  <18>
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  <10>
+      5  listed  type cannot hold: RationalNumber is int32 over uint32  <11>
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  <19>[]
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  <25>[]
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  <26>[]
+     13  listed  type cannot hold: RationalNumber is int32 over uint32  <9>
+schema v1beta ppu: values 20, field paths 22, leaves agree 240, ledger classes with no field 1, listed differences 54, disagreements 0 on 0 values
+     15  listed  no field in v1beta  <18>
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  <10>
+      5  listed  type cannot hold: RationalNumber is int32 over uint32  <11>
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  <19>[]
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  <25>[]
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  <26>[]
+     13  listed  type cannot hold: RationalNumber is int32 over uint32  <9>
+schema v1 ppu: values 20, field paths 22, leaves agree 240, ledger classes with no field 1, listed differences 54, disagreements 0 on 0 values
+     15  listed  no field in v1  <18>
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  <10>
+      5  listed  type cannot hold: RationalNumber is int32 over uint32  <11>
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  <19>[]
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  <25>[]
+     12  listed  type cannot hold: RationalNumber is int32 over uint32  <26>[]
+     13  listed  type cannot hold: RationalNumber is int32 over uint32  <9>
+value ppu: values 20, ledger accepts 0, both accept 0, field paths 0, leaves agree 0, leaves differ 0, accepted ledger-invalid 11, disagreements 0 on 0 values
+      3  accepted ledger-invalid  trailing: DecoderErrorLeftover "PParamsUpdate DijkstraEra" "\NUL"
+      3  accepted ledger-invalid  unknownkey: DecoderErrorDeserialiseFailure "PParamsUpdate DijkstraEra" (DeserialiseFailure N "PParamsUpdate DijkstraEra: Unknown fie
+      2  accepted ledger-invalid  dupkey: DecoderErrorDeserialiseFailure "PParamsUpdate DijkstraEra" (DeserialiseFailure N "PParamsUpdate DijkstraEra: Duplicate f
+      1  accepted ledger-invalid  dupkey: DecoderErrorDeserialiseFailure "PParamsUpdate DijkstraEra" (DeserialiseFailure N "Final number of elements: N does not m
+      1  accepted ledger-invalid  extra: DecoderErrorDeserialiseFailure "PParamsUpdate DijkstraEra" (DeserialiseFailure N "Size mismatch when decoding Rational.\
+      1  accepted ledger-invalid  extra: DecoderErrorDeserialiseFailure "PParamsUpdate DijkstraEra" (DeserialiseFailure N "Size mismatch when decoding Record DRe
+schema v1alpha ppu: values 0, field paths 0, leaves agree 0, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+schema v1beta ppu: values 0, field paths 0, leaves agree 0, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+schema v1 ppu: values 0, field paths 0, leaves agree 0, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+value block: values 20, ledger accepts 20, both accept 20, field paths 1421, leaves agree 38953, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha block: values 20, field paths 373, leaves agree 8276, ledger classes with no field 30, listed differences 164, disagreements 0 on 0 values
+     20  listed  no field in v1alpha  header.body_hash
+     20  listed  no field in v1alpha  header.body_size
+     38  listed  no field in v1alpha  header.eb
+     20  listed  no field in v1alpha  header.issuer_vk
+     20  listed  no field in v1alpha  header.leios_cert
+     80  listed  no field in v1alpha  header.ocert[]
+     20  listed  no field in v1alpha  header.prev
+     20  listed  no field in v1alpha  header.sig
+     40  listed  no field in v1alpha  header.version[]
+     40  listed  no field in v1alpha  header.vrf[]
+     20  listed  no field in v1alpha  header.vrf_vk
+     30  listed  no field in v1alpha  leios_cert
+     20  listed  no field in v1alpha  peras_cert
+     10  listed  no field in v1alpha  txs[].body.aux_hash
+    289  listed  no field in v1alpha  txs[].body.balance_intervals
+      9  listed  no field in v1alpha  txs[].body.certs[].bls
+    125  listed  no field in v1alpha  txs[].body.deposits
+     10  listed  no field in v1alpha  txs[].body.donation
+    142  listed  no field in v1alpha  txs[].body.guards
+     10  listed  no field in v1alpha  txs[].body.network
+    253  listed  no field in v1alpha  txs[].body.proposals[].action[]<
+    780  listed  no field in v1alpha  txs[].body.proposals[].action[]<18>
+     10  listed  no field in v1alpha  txs[].body.script_data_hash
+    198  listed  no field in v1alpha  txs[].body.starting_balance_intervals
+  20584  listed  no field in v1alpha  txs[].body.sub_txs
+   1427  listed  no field in v1alpha  txs[].body.top_guards
+     10  listed  no field in v1alpha  txs[].body.treasury
+   2646  listed  no field in v1alpha  txs[].body.votes
+    210  listed  no field in v1alpha  txs[].wits.boots
+   2749  listed  no field in v1alpha  txs[].wits.redeemers
+      2  listed  legacy mapping: no auxiliary data maps to an empty one  txs[].aux
+      3  listed  legacy mapping: no total collateral maps to 0  txs[].body.total_collateral
+      5  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.certs[].margin
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action.threshold
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<10>
+      7  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<11>
+     22  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<19>[]
+     23  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<25>[]
+     51  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<26>[]
+     10  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<33>
+     10  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<9>
+      9  listed  type cannot hold: no guard native script variant  txs[].aux.native[]
+      3  listed  type cannot hold: no guard native script variant  txs[].body.outputs[].script.script
+      3  listed  type cannot hold: no guard native script variant  txs[].wits.scripts{}
+      8  listed  type cannot hold: no guard native script variant  txs[].wits.scripts{}.script
+schema v1beta block: values 20, field paths 495, leaves agree 13869, ledger classes with no field 27, listed differences 176, disagreements 0 on 0 values
+     20  listed  no field in v1beta  header.body_hash
+     20  listed  no field in v1beta  header.body_size
+     38  listed  no field in v1beta  header.eb
+     20  listed  no field in v1beta  header.issuer_vk
+     20  listed  no field in v1beta  header.leios_cert
+     80  listed  no field in v1beta  header.ocert[]
+     20  listed  no field in v1beta  header.prev
+     20  listed  no field in v1beta  header.sig
+     40  listed  no field in v1beta  header.version[]
+     40  listed  no field in v1beta  header.vrf[]
+     20  listed  no field in v1beta  header.vrf_vk
+     30  listed  no field in v1beta  leios_cert
+     20  listed  no field in v1beta  peras_cert
+     10  listed  no field in v1beta  txs[].body.aux_hash
+    289  listed  no field in v1beta  txs[].body.balance_intervals
+      9  listed  no field in v1beta  txs[].body.certs[].bls
+    125  listed  no field in v1beta  txs[].body.deposits
+     10  listed  no field in v1beta  txs[].body.donation
+    142  listed  no field in v1beta  txs[].body.guards
+     10  listed  no field in v1beta  txs[].body.network
+    253  listed  no field in v1beta  txs[].body.proposals[].action[]<
+    780  listed  no field in v1beta  txs[].body.proposals[].action[]<18>
+     10  listed  no field in v1beta  txs[].body.script_data_hash
+    198  listed  no field in v1beta  txs[].body.starting_balance_intervals
+  20584  listed  no field in v1beta  txs[].body.sub_txs
+   1427  listed  no field in v1beta  txs[].body.top_guards
+     10  listed  no field in v1beta  txs[].body.treasury
+      2  listed  legacy mapping: no auxiliary data maps to an empty one  txs[].aux
+      3  listed  legacy mapping: no total collateral maps to 0  txs[].body.total_collateral
+      5  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.certs[].margin
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action.threshold
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<10>
+      7  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<11>
+     22  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<19>[]
+     23  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<25>[]
+     51  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<26>[]
+     10  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<33>
+     10  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<9>
+      9  listed  type cannot hold: no guard native script variant  txs[].aux.native[]
+      3  listed  type cannot hold: no guard native script variant  txs[].body.outputs[].script.script
+      3  listed  type cannot hold: no guard native script variant  txs[].wits.scripts{}
+      8  listed  type cannot hold: no guard native script variant  txs[].wits.scripts{}.script
+     12  listed  type cannot hold: no guarding redeemer purpose  txs[].wits.redeemers{}.k[]
+schema v1 block: values 20, field paths 1277, leaves agree 36518, ledger classes with no field 11, listed differences 316, disagreements 0 on 0 values
+     20  listed  no field in v1  header.body_hash
+     20  listed  no field in v1  header.body_size
+     20  listed  no field in v1  header.issuer_vk
+     80  listed  no field in v1  header.ocert[]
+     20  listed  no field in v1  header.prev
+     20  listed  no field in v1  header.sig
+     40  listed  no field in v1  header.version[]
+     40  listed  no field in v1  header.vrf[]
+     20  listed  no field in v1  header.vrf_vk
+    780  listed  no field in v1  txs[].body.proposals[].action[]<18>
+    582  listed  no field in v1  txs[].body.sub_txs{}.v.body.proposals[].action[]<18>
+      5  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.certs[].margin
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action.threshold
+      6  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<10>
+      7  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<11>
+     22  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<19>[]
+     23  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<25>[]
+     51  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<26>[]
+     10  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<33>
+      8  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<37>
+     10  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<38>
+      8  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<39>
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<44>
+     11  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<50>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<54>
+     10  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<9>
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.certs[].margin
+      7  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action.threshold
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<10>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<11>
+     18  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<19>[]
+     14  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<25>[]
+     41  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<26>[]
+      9  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<33>
+      9  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<37>
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<38>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<39>
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<44>
+      8  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<50>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<54>
+      8  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<9>
+      2  listed  type cannot hold: empty Peras certificate bytes read as no certificate  peras_cert
+value block: values 20, ledger accepts 20, both accept 20, field paths 191, leaves agree 1718, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha block: values 20, field paths 100, leaves agree 896, ledger classes with no field 27, listed differences 18, disagreements 3 on 1 values
+     20  listed  no field in v1alpha  header.body_hash
+     20  listed  no field in v1alpha  header.body_size
+     27  listed  no field in v1alpha  header.eb
+     20  listed  no field in v1alpha  header.issuer_vk
+     20  listed  no field in v1alpha  header.leios_cert
+     80  listed  no field in v1alpha  header.ocert[]
+     20  listed  no field in v1alpha  header.prev
+     20  listed  no field in v1alpha  header.sig
+     40  listed  no field in v1alpha  header.version[]
+     40  listed  no field in v1alpha  header.vrf[]
+     20  listed  no field in v1alpha  header.vrf_vk
+     40  listed  no field in v1alpha  leios_cert
+     20  listed  no field in v1alpha  peras_cert
+      4  listed  no field in v1alpha  txs[].body.aux_hash
+      5  listed  no field in v1alpha  txs[].body.balance_intervals
+      5  listed  no field in v1alpha  txs[].body.deposits
+      4  listed  no field in v1alpha  txs[].body.donation
+     18  listed  no field in v1alpha  txs[].body.guards
+      4  listed  no field in v1alpha  txs[].body.network
+      4  listed  no field in v1alpha  txs[].body.script_data_hash
+      4  listed  no field in v1alpha  txs[].body.starting_balance_intervals
+     62  listed  no field in v1alpha  txs[].body.sub_txs
+      6  listed  no field in v1alpha  txs[].body.top_guards
+      4  listed  no field in v1alpha  txs[].body.treasury
+     23  listed  no field in v1alpha  txs[].body.votes
+     84  listed  no field in v1alpha  txs[].wits.boots
+     34  listed  no field in v1alpha  txs[].wits.redeemers
+      2  listed  legacy mapping: no auxiliary data maps to an empty one  txs[].aux
+      1  listed  legacy mapping: no total collateral maps to 0  txs[].body.total_collateral
+      1  listed  type cannot hold: Metadatum int is int64  txs[].aux.metadata{}.v<14014425958915187111>.key
+      1  listed  type cannot hold: Metadatum int is int64  txs[].aux.metadata{}.v[]
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action.threshold
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].aux.native[].scripts[].m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].wits.scripts{}.script
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].wits.scripts{}.script.m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].wits.scripts{}.script.scripts[].m
+      1  listed  type cannot hold: no guard native script variant  txs[].aux.native[]
+      3  listed  type cannot hold: no guard native script variant  txs[].wits.scripts{}
+      4  listed  type cannot hold: no guard native script variant  txs[].wits.scripts{}.script
+      2  DISAGREE  v1alpha value differs  txs[].wits.datums{}.items[].v
+      1  DISAGREE  v1alpha value differs  txs[].wits.datums{}.v
+schema v1beta block: values 20, field paths 117, leaves agree 1037, ledger classes with no field 24, listed differences 18, disagreements 3 on 1 values
+     20  listed  no field in v1beta  header.body_hash
+     20  listed  no field in v1beta  header.body_size
+     27  listed  no field in v1beta  header.eb
+     20  listed  no field in v1beta  header.issuer_vk
+     20  listed  no field in v1beta  header.leios_cert
+     80  listed  no field in v1beta  header.ocert[]
+     20  listed  no field in v1beta  header.prev
+     20  listed  no field in v1beta  header.sig
+     40  listed  no field in v1beta  header.version[]
+     40  listed  no field in v1beta  header.vrf[]
+     20  listed  no field in v1beta  header.vrf_vk
+     40  listed  no field in v1beta  leios_cert
+     20  listed  no field in v1beta  peras_cert
+      4  listed  no field in v1beta  txs[].body.aux_hash
+      5  listed  no field in v1beta  txs[].body.balance_intervals
+      5  listed  no field in v1beta  txs[].body.deposits
+      4  listed  no field in v1beta  txs[].body.donation
+     18  listed  no field in v1beta  txs[].body.guards
+      4  listed  no field in v1beta  txs[].body.network
+      4  listed  no field in v1beta  txs[].body.script_data_hash
+      4  listed  no field in v1beta  txs[].body.starting_balance_intervals
+     62  listed  no field in v1beta  txs[].body.sub_txs
+      6  listed  no field in v1beta  txs[].body.top_guards
+      4  listed  no field in v1beta  txs[].body.treasury
+      2  listed  legacy mapping: no auxiliary data maps to an empty one  txs[].aux
+      1  listed  legacy mapping: no total collateral maps to 0  txs[].body.total_collateral
+      1  listed  type cannot hold: Metadatum int is int64  txs[].aux.metadata{}.v<14014425958915187111>.key
+      1  listed  type cannot hold: Metadatum int is int64  txs[].aux.metadata{}.v[]
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action.threshold
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].aux.native[].scripts[].m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].wits.scripts{}.script
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].wits.scripts{}.script.m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].wits.scripts{}.script.scripts[].m
+      1  listed  type cannot hold: no guard native script variant  txs[].aux.native[]
+      3  listed  type cannot hold: no guard native script variant  txs[].wits.scripts{}
+      4  listed  type cannot hold: no guard native script variant  txs[].wits.scripts{}.script
+      2  DISAGREE  v1beta value differs  txs[].wits.datums{}.items[].v
+      1  DISAGREE  v1beta value differs  txs[].wits.datums{}.v
+schema v1 block: values 20, field paths 176, leaves agree 1332, ledger classes with no field 9, listed differences 10, disagreements 3 on 1 values
+     20  listed  no field in v1  header.body_hash
+     20  listed  no field in v1  header.body_size
+     20  listed  no field in v1  header.issuer_vk
+     80  listed  no field in v1  header.ocert[]
+     20  listed  no field in v1  header.prev
+     20  listed  no field in v1  header.sig
+     40  listed  no field in v1  header.version[]
+     40  listed  no field in v1  header.vrf[]
+     20  listed  no field in v1  header.vrf_vk
+      1  listed  type cannot hold: Metadatum int is int64  txs[].aux.metadata{}.v<14014425958915187111>.key
+      1  listed  type cannot hold: Metadatum int is int64  txs[].aux.metadata{}.v[]
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action.threshold
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].aux.native[].scripts[].m
+      3  listed  type cannot hold: ScriptNOfK k is uint32  txs[].wits.scripts{}.script.m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].wits.scripts{}.script.scripts[].m
+      2  listed  type cannot hold: empty Peras certificate bytes read as no certificate  peras_cert
+      2  DISAGREE  v1 value differs  txs[].wits.datums{}.items[].v
+      1  DISAGREE  v1 value differs  txs[].wits.datums{}.v
+value block: values 20, ledger accepts 20, both accept 20, field paths 191, leaves agree 1718, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+     18  listed  pallas re-encodes to other bytes of the same ledger value 
+schema v1alpha block: values 20, field paths 100, leaves agree 896, ledger classes with no field 27, listed differences 18, disagreements 3 on 1 values
+     20  listed  no field in v1alpha  header.body_hash
+     20  listed  no field in v1alpha  header.body_size
+     27  listed  no field in v1alpha  header.eb
+     20  listed  no field in v1alpha  header.issuer_vk
+     20  listed  no field in v1alpha  header.leios_cert
+     80  listed  no field in v1alpha  header.ocert[]
+     20  listed  no field in v1alpha  header.prev
+     20  listed  no field in v1alpha  header.sig
+     40  listed  no field in v1alpha  header.version[]
+     40  listed  no field in v1alpha  header.vrf[]
+     20  listed  no field in v1alpha  header.vrf_vk
+     40  listed  no field in v1alpha  leios_cert
+     20  listed  no field in v1alpha  peras_cert
+      4  listed  no field in v1alpha  txs[].body.aux_hash
+      5  listed  no field in v1alpha  txs[].body.balance_intervals
+      5  listed  no field in v1alpha  txs[].body.deposits
+      4  listed  no field in v1alpha  txs[].body.donation
+     18  listed  no field in v1alpha  txs[].body.guards
+      4  listed  no field in v1alpha  txs[].body.network
+      4  listed  no field in v1alpha  txs[].body.script_data_hash
+      4  listed  no field in v1alpha  txs[].body.starting_balance_intervals
+     62  listed  no field in v1alpha  txs[].body.sub_txs
+      6  listed  no field in v1alpha  txs[].body.top_guards
+      4  listed  no field in v1alpha  txs[].body.treasury
+     23  listed  no field in v1alpha  txs[].body.votes
+     84  listed  no field in v1alpha  txs[].wits.boots
+     34  listed  no field in v1alpha  txs[].wits.redeemers
+      2  listed  legacy mapping: no auxiliary data maps to an empty one  txs[].aux
+      1  listed  legacy mapping: no total collateral maps to 0  txs[].body.total_collateral
+      1  listed  type cannot hold: Metadatum int is int64  txs[].aux.metadata{}.v<14014425958915187111>.key
+      1  listed  type cannot hold: Metadatum int is int64  txs[].aux.metadata{}.v[]
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action.threshold
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].aux.native[].scripts[].m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].wits.scripts{}.script
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].wits.scripts{}.script.m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].wits.scripts{}.script.scripts[].m
+      1  listed  type cannot hold: no guard native script variant  txs[].aux.native[]
+      3  listed  type cannot hold: no guard native script variant  txs[].wits.scripts{}
+      4  listed  type cannot hold: no guard native script variant  txs[].wits.scripts{}.script
+      2  DISAGREE  v1alpha value differs  txs[].wits.datums{}.items[].v
+      1  DISAGREE  v1alpha value differs  txs[].wits.datums{}.v
+schema v1beta block: values 20, field paths 117, leaves agree 1037, ledger classes with no field 24, listed differences 18, disagreements 3 on 1 values
+     20  listed  no field in v1beta  header.body_hash
+     20  listed  no field in v1beta  header.body_size
+     27  listed  no field in v1beta  header.eb
+     20  listed  no field in v1beta  header.issuer_vk
+     20  listed  no field in v1beta  header.leios_cert
+     80  listed  no field in v1beta  header.ocert[]
+     20  listed  no field in v1beta  header.prev
+     20  listed  no field in v1beta  header.sig
+     40  listed  no field in v1beta  header.version[]
+     40  listed  no field in v1beta  header.vrf[]
+     20  listed  no field in v1beta  header.vrf_vk
+     40  listed  no field in v1beta  leios_cert
+     20  listed  no field in v1beta  peras_cert
+      4  listed  no field in v1beta  txs[].body.aux_hash
+      5  listed  no field in v1beta  txs[].body.balance_intervals
+      5  listed  no field in v1beta  txs[].body.deposits
+      4  listed  no field in v1beta  txs[].body.donation
+     18  listed  no field in v1beta  txs[].body.guards
+      4  listed  no field in v1beta  txs[].body.network
+      4  listed  no field in v1beta  txs[].body.script_data_hash
+      4  listed  no field in v1beta  txs[].body.starting_balance_intervals
+     62  listed  no field in v1beta  txs[].body.sub_txs
+      6  listed  no field in v1beta  txs[].body.top_guards
+      4  listed  no field in v1beta  txs[].body.treasury
+      2  listed  legacy mapping: no auxiliary data maps to an empty one  txs[].aux
+      1  listed  legacy mapping: no total collateral maps to 0  txs[].body.total_collateral
+      1  listed  type cannot hold: Metadatum int is int64  txs[].aux.metadata{}.v<14014425958915187111>.key
+      1  listed  type cannot hold: Metadatum int is int64  txs[].aux.metadata{}.v[]
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action.threshold
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].aux.native[].scripts[].m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].wits.scripts{}.script
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].wits.scripts{}.script.m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].wits.scripts{}.script.scripts[].m
+      1  listed  type cannot hold: no guard native script variant  txs[].aux.native[]
+      3  listed  type cannot hold: no guard native script variant  txs[].wits.scripts{}
+      4  listed  type cannot hold: no guard native script variant  txs[].wits.scripts{}.script
+      2  DISAGREE  v1beta value differs  txs[].wits.datums{}.items[].v
+      1  DISAGREE  v1beta value differs  txs[].wits.datums{}.v
+schema v1 block: values 20, field paths 176, leaves agree 1332, ledger classes with no field 9, listed differences 10, disagreements 3 on 1 values
+     20  listed  no field in v1  header.body_hash
+     20  listed  no field in v1  header.body_size
+     20  listed  no field in v1  header.issuer_vk
+     80  listed  no field in v1  header.ocert[]
+     20  listed  no field in v1  header.prev
+     20  listed  no field in v1  header.sig
+     40  listed  no field in v1  header.version[]
+     40  listed  no field in v1  header.vrf[]
+     20  listed  no field in v1  header.vrf_vk
+      1  listed  type cannot hold: Metadatum int is int64  txs[].aux.metadata{}.v<14014425958915187111>.key
+      1  listed  type cannot hold: Metadatum int is int64  txs[].aux.metadata{}.v[]
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action.threshold
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].aux.native[].scripts[].m
+      3  listed  type cannot hold: ScriptNOfK k is uint32  txs[].wits.scripts{}.script.m
+      1  listed  type cannot hold: ScriptNOfK k is uint32  txs[].wits.scripts{}.script.scripts[].m
+      2  listed  type cannot hold: empty Peras certificate bytes read as no certificate  peras_cert
+      2  DISAGREE  v1 value differs  txs[].wits.datums{}.items[].v
+      1  DISAGREE  v1 value differs  txs[].wits.datums{}.v
+value block: values 20, ledger accepts 2, both accept 2, field paths 955, leaves agree 11063, leaves differ 0, accepted ledger-invalid 10, disagreements 0 on 0 values
+      4  accepted ledger-invalid  trailing: DecoderErrorLeftover "oracle" "\NUL"
+      1  accepted ledger-invalid  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Annotator (AlonzoTxWitsRaw DijkstraEra): Duplicate field 
+      1  accepted ledger-invalid  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "DecodingTxOut DijkstraEra: Duplicate field key N")
+      1  accepted ledger-invalid  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Final number of elements: N does not match the total coun
+      1  accepted ledger-invalid  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record CertifiedVRF.\nExpecte
+      1  accepted ledger-invalid  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record EbReferencesAnnounceme
+      1  accepted ledger-invalid  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record ExUnits.\nExpected N, 
+schema v1alpha block: values 2, field paths 212, leaves agree 1684, ledger classes with no field 30, listed differences 28, disagreements 0 on 0 values
+      2  listed  no field in v1alpha  header.body_hash
+      2  listed  no field in v1alpha  header.body_size
+      4  listed  no field in v1alpha  header.eb
+      2  listed  no field in v1alpha  header.issuer_vk
+      2  listed  no field in v1alpha  header.leios_cert
+      8  listed  no field in v1alpha  header.ocert[]
+      2  listed  no field in v1alpha  header.prev
+      2  listed  no field in v1alpha  header.sig
+      4  listed  no field in v1alpha  header.version[]
+      4  listed  no field in v1alpha  header.vrf[]
+      2  listed  no field in v1alpha  header.vrf_vk
+      2  listed  no field in v1alpha  leios_cert
+      2  listed  no field in v1alpha  peras_cert
+      2  listed  no field in v1alpha  txs[].body.aux_hash
+     57  listed  no field in v1alpha  txs[].body.balance_intervals
+      1  listed  no field in v1alpha  txs[].body.certs[].bls
+     42  listed  no field in v1alpha  txs[].body.deposits
+      2  listed  no field in v1alpha  txs[].body.donation
+     22  listed  no field in v1alpha  txs[].body.guards
+      2  listed  no field in v1alpha  txs[].body.network
+     45  listed  no field in v1alpha  txs[].body.proposals[].action[]<
+    174  listed  no field in v1alpha  txs[].body.proposals[].action[]<18>
+      2  listed  no field in v1alpha  txs[].body.script_data_hash
+     46  listed  no field in v1alpha  txs[].body.starting_balance_intervals
+   7401  listed  no field in v1alpha  txs[].body.sub_txs
+    379  listed  no field in v1alpha  txs[].body.top_guards
+      2  listed  no field in v1alpha  txs[].body.treasury
+    392  listed  no field in v1alpha  txs[].body.votes
+     32  listed  no field in v1alpha  txs[].wits.boots
+    608  listed  no field in v1alpha  txs[].wits.redeemers
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.certs[].margin
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action.threshold
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<11>
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<19>[]
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<25>[]
+      9  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<26>[]
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<33>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<9>
+      1  listed  type cannot hold: no guard native script variant  txs[].aux.native[]
+      2  listed  type cannot hold: no guard native script variant  txs[].wits.scripts{}.script
+schema v1beta block: values 2, field paths 295, leaves agree 2715, ledger classes with no field 27, listed differences 29, disagreements 0 on 0 values
+      2  listed  no field in v1beta  header.body_hash
+      2  listed  no field in v1beta  header.body_size
+      4  listed  no field in v1beta  header.eb
+      2  listed  no field in v1beta  header.issuer_vk
+      2  listed  no field in v1beta  header.leios_cert
+      8  listed  no field in v1beta  header.ocert[]
+      2  listed  no field in v1beta  header.prev
+      2  listed  no field in v1beta  header.sig
+      4  listed  no field in v1beta  header.version[]
+      4  listed  no field in v1beta  header.vrf[]
+      2  listed  no field in v1beta  header.vrf_vk
+      2  listed  no field in v1beta  leios_cert
+      2  listed  no field in v1beta  peras_cert
+      2  listed  no field in v1beta  txs[].body.aux_hash
+     57  listed  no field in v1beta  txs[].body.balance_intervals
+      1  listed  no field in v1beta  txs[].body.certs[].bls
+     42  listed  no field in v1beta  txs[].body.deposits
+      2  listed  no field in v1beta  txs[].body.donation
+     22  listed  no field in v1beta  txs[].body.guards
+      2  listed  no field in v1beta  txs[].body.network
+     45  listed  no field in v1beta  txs[].body.proposals[].action[]<
+    174  listed  no field in v1beta  txs[].body.proposals[].action[]<18>
+      2  listed  no field in v1beta  txs[].body.script_data_hash
+     46  listed  no field in v1beta  txs[].body.starting_balance_intervals
+   7401  listed  no field in v1beta  txs[].body.sub_txs
+    379  listed  no field in v1beta  txs[].body.top_guards
+      2  listed  no field in v1beta  txs[].body.treasury
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.certs[].margin
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action.threshold
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<11>
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<19>[]
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<25>[]
+      9  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<26>[]
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<33>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<9>
+      1  listed  type cannot hold: no guard native script variant  txs[].aux.native[]
+      2  listed  type cannot hold: no guard native script variant  txs[].wits.scripts{}.script
+      1  listed  type cannot hold: no guarding redeemer purpose  txs[].wits.redeemers{}.k[]
+schema v1 block: values 2, field paths 885, leaves agree 10528, ledger classes with no field 11, listed differences 61, disagreements 0 on 0 values
+      2  listed  no field in v1  header.body_hash
+      2  listed  no field in v1  header.body_size
+      2  listed  no field in v1  header.issuer_vk
+      8  listed  no field in v1  header.ocert[]
+      2  listed  no field in v1  header.prev
+      2  listed  no field in v1  header.sig
+      4  listed  no field in v1  header.version[]
+      4  listed  no field in v1  header.vrf[]
+      2  listed  no field in v1  header.vrf_vk
+    174  listed  no field in v1  txs[].body.proposals[].action[]<18>
+    179  listed  no field in v1  txs[].body.sub_txs{}.v.body.proposals[].action[]<18>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.certs[].margin
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action.threshold
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<11>
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<19>[]
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<25>[]
+      9  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<26>[]
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<33>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<37>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<38>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<39>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<50>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.proposals[].action[]<9>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action.threshold
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<10>
+      4  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<19>[]
+      3  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<25>[]
+      9  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<26>[]
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<33>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<37>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<39>
+      1  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<50>
+      2  listed  type cannot hold: RationalNumber is int32 over uint32  txs[].body.sub_txs{}.v.body.proposals[].action[]<9>

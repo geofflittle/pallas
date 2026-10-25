@@ -1,0 +1,20 @@
+[package]
+name = "pallas-probe-value"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+pallas-codec = { path = "../../conf/pallas-codec" }
+pallas-crypto = { path = "../../conf/pallas-crypto" }
+pallas-primitives = { path = "../../conf/pallas-primitives", features = ["unstable"] }
+pallas-traverse = { path = "../../conf/pallas-traverse", features = ["unstable"] }
+pallas-utxorpc = { path = "../../conf/pallas-utxorpc", features = ["unstable"] }
+hex = "0.4"
+serde = "1"
+serde_json = "1"
+
+[patch.crates-io]
+utxorpc-spec = { git = "https://github.com/SundaeSwap-finance/utxorpc-spec", rev = "4bef71401bae7e9fc80b9d24379be0f9078b0ff5" }

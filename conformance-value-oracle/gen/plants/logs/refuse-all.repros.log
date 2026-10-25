@@ -1,0 +1,19 @@
+== ppu-indef-rational
+value ppu: values 3, ledger accepts 3, both accept 0, field paths 0, leaves agree 0, leaves differ 0, accepted ledger-invalid 0, disagreements 3 on 3 values
+      3  DISAGREE  pallas refuses ledger-valid input  planted refusal
+schema v1alpha ppu: values 0, field paths 0, leaves agree 0, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+schema v1beta ppu: values 0, field paths 0, leaves agree 0, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+schema v1 ppu: values 0, field paths 0, leaves agree 0, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+== voting-null-anchor
+value body: values 2, ledger accepts 1, both accept 0, field paths 0, leaves agree 0, leaves differ 0, accepted ledger-invalid 0, disagreements 1 on 1 values
+      1  DISAGREE  pallas refuses ledger-valid input  planted refusal
+schema v1alpha body: values 0, field paths 0, leaves agree 0, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+schema v1beta body: values 0, field paths 0, leaves agree 0, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+schema v1 body: values 0, field paths 0, leaves agree 0, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+== golden-tx
+value tx: values 1, ledger accepts 1, both accept 0, field paths 0, leaves agree 0, leaves differ 0, accepted ledger-invalid 0, disagreements 1 on 1 values
+      1  DISAGREE  pallas refuses ledger-valid input  planted refusal
+schema v1alpha tx: values 0, field paths 0, leaves agree 0, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+schema v1beta tx: values 0, field paths 0, leaves agree 0, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+schema v1 tx: values 0, field paths 0, leaves agree 0, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+repros: exit 1

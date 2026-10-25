@@ -1,0 +1,11 @@
+--- ../gen/value.py	2026-10-26 06:45:04
++++ rows/value.py	2026-10-26 06:52:01
+@@ -24,7 +24,7 @@
+     files = [open(p) for p in paths]
+     parsed = [(json.loads(x) for x in fh if x.strip()) for fh in files]
+     n = 0
+-    for n, row in enumerate(zip_longest(*parsed, fillvalue=END), 1):
++    for n, row in enumerate(zip(*parsed), 1):
+         if any(x is END for x in row):
+             ended = " ".join(p for p, x in zip(paths, row) if x is END)
+             print(f"line counts differ: row {n - 1} is missing from {ended}")

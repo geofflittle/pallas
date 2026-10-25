@@ -1,0 +1,1010 @@
+## v1alpha tx
+  body.inputs  |  inputs[] txHash outputIndex
+  body.reference_inputs  |  referenceInputs[] txHash outputIndex
+  body.outputs  |  outputs[] address coin assets datum script
+  body.certs  |  certificates[] by variant, relays without their kind
+  body.withdrawals  |  withdrawals[] rewardAccount coin
+  body.ttl  |  validity.ttl
+  body.start  |  validity.start
+  body.fee  |  fee
+  body.collateral  |  collateral.collateral[]
+  body.collateral_return  |  collateral.collateralReturn
+  body.total_collateral  |  collateral.totalCollateral
+  body.mint  |  mint[]
+  body.proposals  |  proposals[] deposit rewardAccount govAction anchor
+  wits.vkeys  |  witnesses.vkeywitness[]
+  wits.scripts  |  witnesses.script[], compared as a set of scripts
+  wits.datums  |  witnesses.plutusDatums[], compared as a set of data
+  valid  |  successful
+  aux  |  auxiliary metadata[] scripts[]
+  body.proposals[].action[]<0>  |  minFeeCoefficient
+  body.proposals[].action[]<1>  |  minFeeConstant
+  body.proposals[].action[]<2>  |  maxBlockBodySize
+  body.proposals[].action[]<3>  |  maxTxSize
+  body.proposals[].action[]<4>  |  maxBlockHeaderSize
+  body.proposals[].action[]<5>  |  stakeKeyDeposit
+  body.proposals[].action[]<6>  |  poolDeposit
+  body.proposals[].action[]<7>  |  poolRetirementEpochBound
+  body.proposals[].action[]<8>  |  desiredNumberOfPools
+  body.proposals[].action[]<9>  |  poolInfluence
+  body.proposals[].action[]<10>  |  monetaryExpansion
+  body.proposals[].action[]<11>  |  treasuryExpansion
+  body.proposals[].action[]<16>  |  minPoolCost
+  body.proposals[].action[]<17>  |  coinsPerUtxoByte
+  body.proposals[].action[]<19>  |  prices
+  body.proposals[].action[]<20>  |  maxExecutionUnitsPerTransaction
+  body.proposals[].action[]<21>  |  maxExecutionUnitsPerBlock
+  body.proposals[].action[]<22>  |  maxValueSize
+  body.proposals[].action[]<23>  |  collateralPercentage
+  body.proposals[].action[]<24>  |  maxCollateralInputs
+  body.proposals[].action[]<25>  |  poolVotingThresholds
+  body.proposals[].action[]<26>  |  drepVotingThresholds
+  body.proposals[].action[]<27>  |  minCommitteeSize
+  body.proposals[].action[]<28>  |  committeeTermLimit
+  body.proposals[].action[]<29>  |  governanceActionValidityPeriod
+  body.proposals[].action[]<30>  |  governanceActionDeposit
+  body.proposals[].action[]<31>  |  drepDeposit
+  body.proposals[].action[]<32>  |  drepInactivityPeriod
+  body.proposals[].action[]<33>  |  minFeeScriptRefCostPerByte
+  body.proposals[].action[]<18><0>  |  costModels.plutusV1
+  body.proposals[].action[]<18><1>  |  costModels.plutusV2
+  body.proposals[].action[]<18><2>  |  costModels.plutusV3
+  body.proposals[].action[]<18><3>  |  costModels.plutusV4
+  body.guards  |  not carried: no v1alpha field for v1 common.guards[]
+  body.script_data_hash  |  not carried: no v1alpha field for v1 common.scriptDataHash
+  body.aux_hash  |  not carried: no v1alpha field for v1 common.auxiliaryDataHash
+  body.network  |  not carried: no v1alpha field for v1 common.networkId
+  body.votes  |  not carried: no v1alpha field for v1 common.votes[]
+  body.treasury  |  not carried: no v1alpha field for v1 common.treasuryValue
+  body.donation  |  not carried: no v1alpha field for v1 common.treasuryDonation
+  body.sub_txs  |  not carried: no v1alpha field for v1 subTransactions[] keyed by hash, each a TxCommon
+  body.top_guards  |  not carried: no v1alpha field for v1 common.requiredTopLevelGuards[] credential datum
+  body.deposits  |  not carried: no v1alpha field for v1 common.directDeposits[] rewardAccount coin
+  body.balance_intervals  |  not carried: no v1alpha field for v1 common.accountBalanceIntervals[]
+  body.starting_balance_intervals  |  not carried: no v1alpha field for v1 startingAccountBalanceIntervals[]
+  wits.boots  |  not carried: no v1alpha field for v1 common.witnesses.bootstrapWitnesses[]
+  wits.redeemers  |  not carried: no v1alpha field for v1 common.witnesses.redeemers[] purpose index payload exUnits
+  body.certs[].bls  |  not carried: no blsKey in PoolRegistrationCert
+  body.proposals[].action[]<  |  not carried: an update key the schema has no field for
+  body.proposals[].action[]<18>  |  not carried: a cost model language the schema has no field for
+## v1alpha body
+  inputs  |  inputs[] txHash outputIndex
+  reference_inputs  |  referenceInputs[] txHash outputIndex
+  outputs  |  outputs[] address coin assets datum script
+  certs  |  certificates[] by variant, relays without their kind
+  withdrawals  |  withdrawals[] rewardAccount coin
+  ttl  |  validity.ttl
+  start  |  validity.start
+  fee  |  fee
+  collateral  |  collateral.collateral[]
+  collateral_return  |  collateral.collateralReturn
+  total_collateral  |  collateral.totalCollateral
+  mint  |  mint[]
+  proposals  |  proposals[] deposit rewardAccount govAction anchor
+  proposals[].action[]<0>  |  minFeeCoefficient
+  proposals[].action[]<1>  |  minFeeConstant
+  proposals[].action[]<2>  |  maxBlockBodySize
+  proposals[].action[]<3>  |  maxTxSize
+  proposals[].action[]<4>  |  maxBlockHeaderSize
+  proposals[].action[]<5>  |  stakeKeyDeposit
+  proposals[].action[]<6>  |  poolDeposit
+  proposals[].action[]<7>  |  poolRetirementEpochBound
+  proposals[].action[]<8>  |  desiredNumberOfPools
+  proposals[].action[]<9>  |  poolInfluence
+  proposals[].action[]<10>  |  monetaryExpansion
+  proposals[].action[]<11>  |  treasuryExpansion
+  proposals[].action[]<16>  |  minPoolCost
+  proposals[].action[]<17>  |  coinsPerUtxoByte
+  proposals[].action[]<19>  |  prices
+  proposals[].action[]<20>  |  maxExecutionUnitsPerTransaction
+  proposals[].action[]<21>  |  maxExecutionUnitsPerBlock
+  proposals[].action[]<22>  |  maxValueSize
+  proposals[].action[]<23>  |  collateralPercentage
+  proposals[].action[]<24>  |  maxCollateralInputs
+  proposals[].action[]<25>  |  poolVotingThresholds
+  proposals[].action[]<26>  |  drepVotingThresholds
+  proposals[].action[]<27>  |  minCommitteeSize
+  proposals[].action[]<28>  |  committeeTermLimit
+  proposals[].action[]<29>  |  governanceActionValidityPeriod
+  proposals[].action[]<30>  |  governanceActionDeposit
+  proposals[].action[]<31>  |  drepDeposit
+  proposals[].action[]<32>  |  drepInactivityPeriod
+  proposals[].action[]<33>  |  minFeeScriptRefCostPerByte
+  proposals[].action[]<18><0>  |  costModels.plutusV1
+  proposals[].action[]<18><1>  |  costModels.plutusV2
+  proposals[].action[]<18><2>  |  costModels.plutusV3
+  proposals[].action[]<18><3>  |  costModels.plutusV4
+  guards  |  not carried: no v1alpha field for v1 common.guards[]
+  script_data_hash  |  not carried: no v1alpha field for v1 common.scriptDataHash
+  aux_hash  |  not carried: no v1alpha field for v1 common.auxiliaryDataHash
+  network  |  not carried: no v1alpha field for v1 common.networkId
+  votes  |  not carried: no v1alpha field for v1 common.votes[]
+  treasury  |  not carried: no v1alpha field for v1 common.treasuryValue
+  donation  |  not carried: no v1alpha field for v1 common.treasuryDonation
+  sub_txs  |  not carried: no v1alpha field for v1 subTransactions[] keyed by hash, each a TxCommon
+  top_guards  |  not carried: no v1alpha field for v1 common.requiredTopLevelGuards[] credential datum
+  deposits  |  not carried: no v1alpha field for v1 common.directDeposits[] rewardAccount coin
+  balance_intervals  |  not carried: no v1alpha field for v1 common.accountBalanceIntervals[]
+  starting_balance_intervals  |  not carried: no v1alpha field for v1 startingAccountBalanceIntervals[]
+  certs[].bls  |  not carried: no blsKey in PoolRegistrationCert
+  proposals[].action[]<  |  not carried: an update key the schema has no field for
+  proposals[].action[]<18>  |  not carried: a cost model language the schema has no field for
+## v1alpha wits
+  vkeys  |  witnesses.vkeywitness[]
+  scripts  |  witnesses.script[], compared as a set of scripts
+  datums  |  witnesses.plutusDatums[], compared as a set of data
+  boots  |  not carried: no v1alpha field for v1 common.witnesses.bootstrapWitnesses[]
+  redeemers  |  not carried: no v1alpha field for v1 common.witnesses.redeemers[] purpose index payload exUnits
+## v1alpha block
+  header.slot  |  header.slot
+  header.hash  |  header.hash
+  header.block_no  |  header.height
+  txs[].body.inputs  |  body.tx[].inputs[] txHash outputIndex
+  txs[].body.reference_inputs  |  body.tx[].referenceInputs[] txHash outputIndex
+  txs[].body.outputs  |  body.tx[].outputs[] address coin assets datum script
+  txs[].body.certs  |  body.tx[].certificates[] by variant, relays without their kind
+  txs[].body.withdrawals  |  body.tx[].withdrawals[] rewardAccount coin
+  txs[].body.ttl  |  body.tx[].validity.ttl
+  txs[].body.start  |  body.tx[].validity.start
+  txs[].body.fee  |  body.tx[].fee
+  txs[].body.collateral  |  body.tx[].collateral.collateral[]
+  txs[].body.collateral_return  |  body.tx[].collateral.collateralReturn
+  txs[].body.total_collateral  |  body.tx[].collateral.totalCollateral
+  txs[].body.mint  |  body.tx[].mint[]
+  txs[].body.proposals  |  body.tx[].proposals[] deposit rewardAccount govAction anchor
+  txs[].wits.vkeys  |  body.tx[].witnesses.vkeywitness[]
+  txs[].wits.scripts  |  body.tx[].witnesses.script[], compared as a set of scripts
+  txs[].wits.datums  |  body.tx[].witnesses.plutusDatums[], compared as a set of data
+  txs[].valid  |  body.tx[].successful
+  txs[].aux  |  body.tx[].auxiliary metadata[] scripts[]
+  txs[].body.proposals[].action[]<0>  |  body.tx[].minFeeCoefficient
+  txs[].body.proposals[].action[]<1>  |  body.tx[].minFeeConstant
+  txs[].body.proposals[].action[]<2>  |  body.tx[].maxBlockBodySize
+  txs[].body.proposals[].action[]<3>  |  body.tx[].maxTxSize
+  txs[].body.proposals[].action[]<4>  |  body.tx[].maxBlockHeaderSize
+  txs[].body.proposals[].action[]<5>  |  body.tx[].stakeKeyDeposit
+  txs[].body.proposals[].action[]<6>  |  body.tx[].poolDeposit
+  txs[].body.proposals[].action[]<7>  |  body.tx[].poolRetirementEpochBound
+  txs[].body.proposals[].action[]<8>  |  body.tx[].desiredNumberOfPools
+  txs[].body.proposals[].action[]<9>  |  body.tx[].poolInfluence
+  txs[].body.proposals[].action[]<10>  |  body.tx[].monetaryExpansion
+  txs[].body.proposals[].action[]<11>  |  body.tx[].treasuryExpansion
+  txs[].body.proposals[].action[]<16>  |  body.tx[].minPoolCost
+  txs[].body.proposals[].action[]<17>  |  body.tx[].coinsPerUtxoByte
+  txs[].body.proposals[].action[]<19>  |  body.tx[].prices
+  txs[].body.proposals[].action[]<20>  |  body.tx[].maxExecutionUnitsPerTransaction
+  txs[].body.proposals[].action[]<21>  |  body.tx[].maxExecutionUnitsPerBlock
+  txs[].body.proposals[].action[]<22>  |  body.tx[].maxValueSize
+  txs[].body.proposals[].action[]<23>  |  body.tx[].collateralPercentage
+  txs[].body.proposals[].action[]<24>  |  body.tx[].maxCollateralInputs
+  txs[].body.proposals[].action[]<25>  |  body.tx[].poolVotingThresholds
+  txs[].body.proposals[].action[]<26>  |  body.tx[].drepVotingThresholds
+  txs[].body.proposals[].action[]<27>  |  body.tx[].minCommitteeSize
+  txs[].body.proposals[].action[]<28>  |  body.tx[].committeeTermLimit
+  txs[].body.proposals[].action[]<29>  |  body.tx[].governanceActionValidityPeriod
+  txs[].body.proposals[].action[]<30>  |  body.tx[].governanceActionDeposit
+  txs[].body.proposals[].action[]<31>  |  body.tx[].drepDeposit
+  txs[].body.proposals[].action[]<32>  |  body.tx[].drepInactivityPeriod
+  txs[].body.proposals[].action[]<33>  |  body.tx[].minFeeScriptRefCostPerByte
+  txs[].body.proposals[].action[]<18><0>  |  body.tx[].costModels.plutusV1
+  txs[].body.proposals[].action[]<18><1>  |  body.tx[].costModels.plutusV2
+  txs[].body.proposals[].action[]<18><2>  |  body.tx[].costModels.plutusV3
+  txs[].body.proposals[].action[]<18><3>  |  body.tx[].costModels.plutusV4
+  txs[].body.guards  |  not carried: no v1alpha field for v1 common.guards[]
+  txs[].body.script_data_hash  |  not carried: no v1alpha field for v1 common.scriptDataHash
+  txs[].body.aux_hash  |  not carried: no v1alpha field for v1 common.auxiliaryDataHash
+  txs[].body.network  |  not carried: no v1alpha field for v1 common.networkId
+  txs[].body.votes  |  not carried: no v1alpha field for v1 common.votes[]
+  txs[].body.treasury  |  not carried: no v1alpha field for v1 common.treasuryValue
+  txs[].body.donation  |  not carried: no v1alpha field for v1 common.treasuryDonation
+  txs[].body.sub_txs  |  not carried: no v1alpha field for v1 subTransactions[] keyed by hash, each a TxCommon
+  txs[].body.top_guards  |  not carried: no v1alpha field for v1 common.requiredTopLevelGuards[] credential datum
+  txs[].body.deposits  |  not carried: no v1alpha field for v1 common.directDeposits[] rewardAccount coin
+  txs[].body.balance_intervals  |  not carried: no v1alpha field for v1 common.accountBalanceIntervals[]
+  txs[].body.starting_balance_intervals  |  not carried: no v1alpha field for v1 startingAccountBalanceIntervals[]
+  txs[].wits.boots  |  not carried: no v1alpha field for v1 common.witnesses.bootstrapWitnesses[]
+  txs[].wits.redeemers  |  not carried: no v1alpha field for v1 common.witnesses.redeemers[] purpose index payload exUnits
+  txs[].body.certs[].bls  |  not carried: no blsKey in PoolRegistrationCert
+  txs[].body.proposals[].action[]<  |  not carried: an update key the schema has no field for
+  txs[].body.proposals[].action[]<18>  |  not carried: a cost model language the schema has no field for
+  header.eb  |  not carried: no v1alpha field for v1 header.endorserBlockAnnouncement referencesHash referencesSize
+  header.leios_cert  |  not carried: no v1alpha field for v1 header.bodyContainsLeiosCertificate
+  leios_cert  |  not carried: no v1alpha field for v1 body.leiosCertificate signers signature
+  peras_cert  |  not carried: no v1alpha field for v1 body.perasCertificate
+## v1alpha ppu
+  <0>  |  minFeeCoefficient
+  <1>  |  minFeeConstant
+  <2>  |  maxBlockBodySize
+  <3>  |  maxTxSize
+  <4>  |  maxBlockHeaderSize
+  <5>  |  stakeKeyDeposit
+  <6>  |  poolDeposit
+  <7>  |  poolRetirementEpochBound
+  <8>  |  desiredNumberOfPools
+  <9>  |  poolInfluence
+  <10>  |  monetaryExpansion
+  <11>  |  treasuryExpansion
+  <16>  |  minPoolCost
+  <17>  |  coinsPerUtxoByte
+  <19>  |  prices
+  <20>  |  maxExecutionUnitsPerTransaction
+  <21>  |  maxExecutionUnitsPerBlock
+  <22>  |  maxValueSize
+  <23>  |  collateralPercentage
+  <24>  |  maxCollateralInputs
+  <25>  |  poolVotingThresholds
+  <26>  |  drepVotingThresholds
+  <27>  |  minCommitteeSize
+  <28>  |  committeeTermLimit
+  <29>  |  governanceActionValidityPeriod
+  <30>  |  governanceActionDeposit
+  <31>  |  drepDeposit
+  <32>  |  drepInactivityPeriod
+  <33>  |  minFeeScriptRefCostPerByte
+  <18><0>  |  costModels.plutusV1
+  <18><1>  |  costModels.plutusV2
+  <18><2>  |  costModels.plutusV3
+  <18><3>  |  costModels.plutusV4
+  <  |  not carried: an update key the schema has no field for
+  <18>  |  not carried: a cost model language the schema has no field for
+## v1beta tx
+  body.inputs  |  inputs[] txHash outputIndex
+  body.reference_inputs  |  referenceInputs[] txHash outputIndex
+  body.outputs  |  outputs[] address coin assets datum script
+  body.certs  |  certificates[] by variant, relays without their kind
+  body.withdrawals  |  withdrawals[] rewardAccount coin
+  body.ttl  |  validity.ttl
+  body.start  |  validity.start
+  body.fee  |  fee
+  body.collateral  |  collateral.collateral[]
+  body.collateral_return  |  collateral.collateralReturn
+  body.total_collateral  |  collateral.totalCollateral
+  body.mint  |  mint[]
+  body.votes  |  votes[]
+  body.proposals  |  proposals[] deposit rewardAccount govAction anchor
+  wits.vkeys  |  witnesses.vkeywitness[]
+  wits.boots  |  witnesses.bootstrapWitnesses[]
+  wits.scripts  |  witnesses.script[], compared as a set of scripts
+  wits.datums  |  witnesses.plutusDatums[], compared as a set of data
+  wits.redeemers  |  witnesses.redeemers[] purpose index payload exUnits
+  valid  |  successful
+  aux  |  auxiliary metadata[] scripts[]
+  body.proposals[].action[]<0>  |  minFeeCoefficient
+  body.proposals[].action[]<1>  |  minFeeConstant
+  body.proposals[].action[]<2>  |  maxBlockBodySize
+  body.proposals[].action[]<3>  |  maxTxSize
+  body.proposals[].action[]<4>  |  maxBlockHeaderSize
+  body.proposals[].action[]<5>  |  stakeKeyDeposit
+  body.proposals[].action[]<6>  |  poolDeposit
+  body.proposals[].action[]<7>  |  poolRetirementEpochBound
+  body.proposals[].action[]<8>  |  desiredNumberOfPools
+  body.proposals[].action[]<9>  |  poolInfluence
+  body.proposals[].action[]<10>  |  monetaryExpansion
+  body.proposals[].action[]<11>  |  treasuryExpansion
+  body.proposals[].action[]<16>  |  minPoolCost
+  body.proposals[].action[]<17>  |  coinsPerUtxoByte
+  body.proposals[].action[]<19>  |  prices
+  body.proposals[].action[]<20>  |  maxExecutionUnitsPerTransaction
+  body.proposals[].action[]<21>  |  maxExecutionUnitsPerBlock
+  body.proposals[].action[]<22>  |  maxValueSize
+  body.proposals[].action[]<23>  |  collateralPercentage
+  body.proposals[].action[]<24>  |  maxCollateralInputs
+  body.proposals[].action[]<25>  |  poolVotingThresholds
+  body.proposals[].action[]<26>  |  drepVotingThresholds
+  body.proposals[].action[]<27>  |  minCommitteeSize
+  body.proposals[].action[]<28>  |  committeeTermLimit
+  body.proposals[].action[]<29>  |  governanceActionValidityPeriod
+  body.proposals[].action[]<30>  |  governanceActionDeposit
+  body.proposals[].action[]<31>  |  drepDeposit
+  body.proposals[].action[]<32>  |  drepInactivityPeriod
+  body.proposals[].action[]<33>  |  minFeeScriptRefCostPerByte
+  body.proposals[].action[]<18><0>  |  costModels.plutusV1
+  body.proposals[].action[]<18><1>  |  costModels.plutusV2
+  body.proposals[].action[]<18><2>  |  costModels.plutusV3
+  body.proposals[].action[]<18><3>  |  costModels.plutusV4
+  body.guards  |  not carried: no v1beta field for v1 common.guards[]
+  body.script_data_hash  |  not carried: no v1beta field for v1 common.scriptDataHash
+  body.aux_hash  |  not carried: no v1beta field for v1 common.auxiliaryDataHash
+  body.network  |  not carried: no v1beta field for v1 common.networkId
+  body.treasury  |  not carried: no v1beta field for v1 common.treasuryValue
+  body.donation  |  not carried: no v1beta field for v1 common.treasuryDonation
+  body.sub_txs  |  not carried: no v1beta field for v1 subTransactions[] keyed by hash, each a TxCommon
+  body.top_guards  |  not carried: no v1beta field for v1 common.requiredTopLevelGuards[] credential datum
+  body.deposits  |  not carried: no v1beta field for v1 common.directDeposits[] rewardAccount coin
+  body.balance_intervals  |  not carried: no v1beta field for v1 common.accountBalanceIntervals[]
+  body.starting_balance_intervals  |  not carried: no v1beta field for v1 startingAccountBalanceIntervals[]
+  body.certs[].bls  |  not carried: no blsKey in PoolRegistrationCert
+  body.proposals[].action[]<  |  not carried: an update key the schema has no field for
+  body.proposals[].action[]<18>  |  not carried: a cost model language the schema has no field for
+## v1beta body
+  inputs  |  inputs[] txHash outputIndex
+  reference_inputs  |  referenceInputs[] txHash outputIndex
+  outputs  |  outputs[] address coin assets datum script
+  certs  |  certificates[] by variant, relays without their kind
+  withdrawals  |  withdrawals[] rewardAccount coin
+  ttl  |  validity.ttl
+  start  |  validity.start
+  fee  |  fee
+  collateral  |  collateral.collateral[]
+  collateral_return  |  collateral.collateralReturn
+  total_collateral  |  collateral.totalCollateral
+  mint  |  mint[]
+  votes  |  votes[]
+  proposals  |  proposals[] deposit rewardAccount govAction anchor
+  proposals[].action[]<0>  |  minFeeCoefficient
+  proposals[].action[]<1>  |  minFeeConstant
+  proposals[].action[]<2>  |  maxBlockBodySize
+  proposals[].action[]<3>  |  maxTxSize
+  proposals[].action[]<4>  |  maxBlockHeaderSize
+  proposals[].action[]<5>  |  stakeKeyDeposit
+  proposals[].action[]<6>  |  poolDeposit
+  proposals[].action[]<7>  |  poolRetirementEpochBound
+  proposals[].action[]<8>  |  desiredNumberOfPools
+  proposals[].action[]<9>  |  poolInfluence
+  proposals[].action[]<10>  |  monetaryExpansion
+  proposals[].action[]<11>  |  treasuryExpansion
+  proposals[].action[]<16>  |  minPoolCost
+  proposals[].action[]<17>  |  coinsPerUtxoByte
+  proposals[].action[]<19>  |  prices
+  proposals[].action[]<20>  |  maxExecutionUnitsPerTransaction
+  proposals[].action[]<21>  |  maxExecutionUnitsPerBlock
+  proposals[].action[]<22>  |  maxValueSize
+  proposals[].action[]<23>  |  collateralPercentage
+  proposals[].action[]<24>  |  maxCollateralInputs
+  proposals[].action[]<25>  |  poolVotingThresholds
+  proposals[].action[]<26>  |  drepVotingThresholds
+  proposals[].action[]<27>  |  minCommitteeSize
+  proposals[].action[]<28>  |  committeeTermLimit
+  proposals[].action[]<29>  |  governanceActionValidityPeriod
+  proposals[].action[]<30>  |  governanceActionDeposit
+  proposals[].action[]<31>  |  drepDeposit
+  proposals[].action[]<32>  |  drepInactivityPeriod
+  proposals[].action[]<33>  |  minFeeScriptRefCostPerByte
+  proposals[].action[]<18><0>  |  costModels.plutusV1
+  proposals[].action[]<18><1>  |  costModels.plutusV2
+  proposals[].action[]<18><2>  |  costModels.plutusV3
+  proposals[].action[]<18><3>  |  costModels.plutusV4
+  guards  |  not carried: no v1beta field for v1 common.guards[]
+  script_data_hash  |  not carried: no v1beta field for v1 common.scriptDataHash
+  aux_hash  |  not carried: no v1beta field for v1 common.auxiliaryDataHash
+  network  |  not carried: no v1beta field for v1 common.networkId
+  treasury  |  not carried: no v1beta field for v1 common.treasuryValue
+  donation  |  not carried: no v1beta field for v1 common.treasuryDonation
+  sub_txs  |  not carried: no v1beta field for v1 subTransactions[] keyed by hash, each a TxCommon
+  top_guards  |  not carried: no v1beta field for v1 common.requiredTopLevelGuards[] credential datum
+  deposits  |  not carried: no v1beta field for v1 common.directDeposits[] rewardAccount coin
+  balance_intervals  |  not carried: no v1beta field for v1 common.accountBalanceIntervals[]
+  starting_balance_intervals  |  not carried: no v1beta field for v1 startingAccountBalanceIntervals[]
+  certs[].bls  |  not carried: no blsKey in PoolRegistrationCert
+  proposals[].action[]<  |  not carried: an update key the schema has no field for
+  proposals[].action[]<18>  |  not carried: a cost model language the schema has no field for
+## v1beta wits
+  vkeys  |  witnesses.vkeywitness[]
+  boots  |  witnesses.bootstrapWitnesses[]
+  scripts  |  witnesses.script[], compared as a set of scripts
+  datums  |  witnesses.plutusDatums[], compared as a set of data
+  redeemers  |  witnesses.redeemers[] purpose index payload exUnits
+## v1beta block
+  header.slot  |  header.slot
+  header.hash  |  header.hash
+  header.block_no  |  header.height
+  txs[].body.inputs  |  body.tx[].inputs[] txHash outputIndex
+  txs[].body.reference_inputs  |  body.tx[].referenceInputs[] txHash outputIndex
+  txs[].body.outputs  |  body.tx[].outputs[] address coin assets datum script
+  txs[].body.certs  |  body.tx[].certificates[] by variant, relays without their kind
+  txs[].body.withdrawals  |  body.tx[].withdrawals[] rewardAccount coin
+  txs[].body.ttl  |  body.tx[].validity.ttl
+  txs[].body.start  |  body.tx[].validity.start
+  txs[].body.fee  |  body.tx[].fee
+  txs[].body.collateral  |  body.tx[].collateral.collateral[]
+  txs[].body.collateral_return  |  body.tx[].collateral.collateralReturn
+  txs[].body.total_collateral  |  body.tx[].collateral.totalCollateral
+  txs[].body.mint  |  body.tx[].mint[]
+  txs[].body.votes  |  body.tx[].votes[]
+  txs[].body.proposals  |  body.tx[].proposals[] deposit rewardAccount govAction anchor
+  txs[].wits.vkeys  |  body.tx[].witnesses.vkeywitness[]
+  txs[].wits.boots  |  body.tx[].witnesses.bootstrapWitnesses[]
+  txs[].wits.scripts  |  body.tx[].witnesses.script[], compared as a set of scripts
+  txs[].wits.datums  |  body.tx[].witnesses.plutusDatums[], compared as a set of data
+  txs[].wits.redeemers  |  body.tx[].witnesses.redeemers[] purpose index payload exUnits
+  txs[].valid  |  body.tx[].successful
+  txs[].aux  |  body.tx[].auxiliary metadata[] scripts[]
+  txs[].body.proposals[].action[]<0>  |  body.tx[].minFeeCoefficient
+  txs[].body.proposals[].action[]<1>  |  body.tx[].minFeeConstant
+  txs[].body.proposals[].action[]<2>  |  body.tx[].maxBlockBodySize
+  txs[].body.proposals[].action[]<3>  |  body.tx[].maxTxSize
+  txs[].body.proposals[].action[]<4>  |  body.tx[].maxBlockHeaderSize
+  txs[].body.proposals[].action[]<5>  |  body.tx[].stakeKeyDeposit
+  txs[].body.proposals[].action[]<6>  |  body.tx[].poolDeposit
+  txs[].body.proposals[].action[]<7>  |  body.tx[].poolRetirementEpochBound
+  txs[].body.proposals[].action[]<8>  |  body.tx[].desiredNumberOfPools
+  txs[].body.proposals[].action[]<9>  |  body.tx[].poolInfluence
+  txs[].body.proposals[].action[]<10>  |  body.tx[].monetaryExpansion
+  txs[].body.proposals[].action[]<11>  |  body.tx[].treasuryExpansion
+  txs[].body.proposals[].action[]<16>  |  body.tx[].minPoolCost
+  txs[].body.proposals[].action[]<17>  |  body.tx[].coinsPerUtxoByte
+  txs[].body.proposals[].action[]<19>  |  body.tx[].prices
+  txs[].body.proposals[].action[]<20>  |  body.tx[].maxExecutionUnitsPerTransaction
+  txs[].body.proposals[].action[]<21>  |  body.tx[].maxExecutionUnitsPerBlock
+  txs[].body.proposals[].action[]<22>  |  body.tx[].maxValueSize
+  txs[].body.proposals[].action[]<23>  |  body.tx[].collateralPercentage
+  txs[].body.proposals[].action[]<24>  |  body.tx[].maxCollateralInputs
+  txs[].body.proposals[].action[]<25>  |  body.tx[].poolVotingThresholds
+  txs[].body.proposals[].action[]<26>  |  body.tx[].drepVotingThresholds
+  txs[].body.proposals[].action[]<27>  |  body.tx[].minCommitteeSize
+  txs[].body.proposals[].action[]<28>  |  body.tx[].committeeTermLimit
+  txs[].body.proposals[].action[]<29>  |  body.tx[].governanceActionValidityPeriod
+  txs[].body.proposals[].action[]<30>  |  body.tx[].governanceActionDeposit
+  txs[].body.proposals[].action[]<31>  |  body.tx[].drepDeposit
+  txs[].body.proposals[].action[]<32>  |  body.tx[].drepInactivityPeriod
+  txs[].body.proposals[].action[]<33>  |  body.tx[].minFeeScriptRefCostPerByte
+  txs[].body.proposals[].action[]<18><0>  |  body.tx[].costModels.plutusV1
+  txs[].body.proposals[].action[]<18><1>  |  body.tx[].costModels.plutusV2
+  txs[].body.proposals[].action[]<18><2>  |  body.tx[].costModels.plutusV3
+  txs[].body.proposals[].action[]<18><3>  |  body.tx[].costModels.plutusV4
+  txs[].body.guards  |  not carried: no v1beta field for v1 common.guards[]
+  txs[].body.script_data_hash  |  not carried: no v1beta field for v1 common.scriptDataHash
+  txs[].body.aux_hash  |  not carried: no v1beta field for v1 common.auxiliaryDataHash
+  txs[].body.network  |  not carried: no v1beta field for v1 common.networkId
+  txs[].body.treasury  |  not carried: no v1beta field for v1 common.treasuryValue
+  txs[].body.donation  |  not carried: no v1beta field for v1 common.treasuryDonation
+  txs[].body.sub_txs  |  not carried: no v1beta field for v1 subTransactions[] keyed by hash, each a TxCommon
+  txs[].body.top_guards  |  not carried: no v1beta field for v1 common.requiredTopLevelGuards[] credential datum
+  txs[].body.deposits  |  not carried: no v1beta field for v1 common.directDeposits[] rewardAccount coin
+  txs[].body.balance_intervals  |  not carried: no v1beta field for v1 common.accountBalanceIntervals[]
+  txs[].body.starting_balance_intervals  |  not carried: no v1beta field for v1 startingAccountBalanceIntervals[]
+  txs[].body.certs[].bls  |  not carried: no blsKey in PoolRegistrationCert
+  txs[].body.proposals[].action[]<  |  not carried: an update key the schema has no field for
+  txs[].body.proposals[].action[]<18>  |  not carried: a cost model language the schema has no field for
+  header.eb  |  not carried: no v1beta field for v1 header.endorserBlockAnnouncement referencesHash referencesSize
+  header.leios_cert  |  not carried: no v1beta field for v1 header.bodyContainsLeiosCertificate
+  leios_cert  |  not carried: no v1beta field for v1 body.leiosCertificate signers signature
+  peras_cert  |  not carried: no v1beta field for v1 body.perasCertificate
+## v1beta ppu
+  <0>  |  minFeeCoefficient
+  <1>  |  minFeeConstant
+  <2>  |  maxBlockBodySize
+  <3>  |  maxTxSize
+  <4>  |  maxBlockHeaderSize
+  <5>  |  stakeKeyDeposit
+  <6>  |  poolDeposit
+  <7>  |  poolRetirementEpochBound
+  <8>  |  desiredNumberOfPools
+  <9>  |  poolInfluence
+  <10>  |  monetaryExpansion
+  <11>  |  treasuryExpansion
+  <16>  |  minPoolCost
+  <17>  |  coinsPerUtxoByte
+  <19>  |  prices
+  <20>  |  maxExecutionUnitsPerTransaction
+  <21>  |  maxExecutionUnitsPerBlock
+  <22>  |  maxValueSize
+  <23>  |  collateralPercentage
+  <24>  |  maxCollateralInputs
+  <25>  |  poolVotingThresholds
+  <26>  |  drepVotingThresholds
+  <27>  |  minCommitteeSize
+  <28>  |  committeeTermLimit
+  <29>  |  governanceActionValidityPeriod
+  <30>  |  governanceActionDeposit
+  <31>  |  drepDeposit
+  <32>  |  drepInactivityPeriod
+  <33>  |  minFeeScriptRefCostPerByte
+  <18><0>  |  costModels.plutusV1
+  <18><1>  |  costModels.plutusV2
+  <18><2>  |  costModels.plutusV3
+  <18><3>  |  costModels.plutusV4
+  <  |  not carried: an update key the schema has no field for
+  <18>  |  not carried: a cost model language the schema has no field for
+## v1 tx
+  body.inputs  |  common.inputs[] txHash outputIndex
+  body.reference_inputs  |  common.referenceInputs[] txHash outputIndex
+  body.outputs  |  common.outputs[] address coin assets datum script
+  body.certs  |  common.certificates[] by variant, relays without their kind
+  body.withdrawals  |  common.withdrawals[] rewardAccount coin
+  body.ttl  |  common.validity.ttl
+  body.start  |  common.validity.start
+  body.fee  |  fee
+  body.collateral  |  collateral.collateral[]
+  body.collateral_return  |  collateral.collateralReturn
+  body.total_collateral  |  collateral.totalCollateral
+  body.guards  |  common.guards[]
+  body.mint  |  common.mint[]
+  body.script_data_hash  |  common.scriptDataHash
+  body.aux_hash  |  common.auxiliaryDataHash
+  body.network  |  common.networkId
+  body.votes  |  common.votes[]
+  body.proposals  |  common.proposals[] deposit rewardAccount govAction anchor
+  body.treasury  |  common.treasuryValue
+  body.donation  |  common.treasuryDonation
+  body.sub_txs  |  subTransactions[] keyed by hash, each a TxCommon
+  body.top_guards  |  common.requiredTopLevelGuards[] credential datum
+  body.deposits  |  common.directDeposits[] rewardAccount coin
+  body.balance_intervals  |  common.accountBalanceIntervals[]
+  body.starting_balance_intervals  |  startingAccountBalanceIntervals[]
+  wits.vkeys  |  common.witnesses.vkeywitness[]
+  wits.boots  |  common.witnesses.bootstrapWitnesses[]
+  wits.scripts  |  common.witnesses.script[], compared as a set of scripts
+  wits.datums  |  common.witnesses.plutusDatums[], compared as a set of data
+  wits.redeemers  |  common.witnesses.redeemers[] purpose index payload exUnits
+  valid  |  successful
+  aux  |  common.auxiliary metadata[] scripts[]
+  body.proposals[].action[]<0>  |  minFeeCoefficient
+  body.proposals[].action[]<1>  |  minFeeConstant
+  body.proposals[].action[]<2>  |  maxBlockBodySize
+  body.proposals[].action[]<3>  |  maxTxSize
+  body.proposals[].action[]<4>  |  maxBlockHeaderSize
+  body.proposals[].action[]<5>  |  stakeKeyDeposit
+  body.proposals[].action[]<6>  |  poolDeposit
+  body.proposals[].action[]<7>  |  poolRetirementEpochBound
+  body.proposals[].action[]<8>  |  desiredNumberOfPools
+  body.proposals[].action[]<9>  |  poolInfluence
+  body.proposals[].action[]<10>  |  monetaryExpansion
+  body.proposals[].action[]<11>  |  treasuryExpansion
+  body.proposals[].action[]<16>  |  minPoolCost
+  body.proposals[].action[]<17>  |  coinsPerUtxoByte
+  body.proposals[].action[]<19>  |  prices
+  body.proposals[].action[]<20>  |  maxExecutionUnitsPerTransaction
+  body.proposals[].action[]<21>  |  maxExecutionUnitsPerBlock
+  body.proposals[].action[]<22>  |  maxValueSize
+  body.proposals[].action[]<23>  |  collateralPercentage
+  body.proposals[].action[]<24>  |  maxCollateralInputs
+  body.proposals[].action[]<25>  |  poolVotingThresholds
+  body.proposals[].action[]<26>  |  drepVotingThresholds
+  body.proposals[].action[]<27>  |  minCommitteeSize
+  body.proposals[].action[]<28>  |  committeeTermLimit
+  body.proposals[].action[]<29>  |  governanceActionValidityPeriod
+  body.proposals[].action[]<30>  |  governanceActionDeposit
+  body.proposals[].action[]<31>  |  drepDeposit
+  body.proposals[].action[]<32>  |  drepInactivityPeriod
+  body.proposals[].action[]<33>  |  minFeeScriptRefCostPerByte
+  body.proposals[].action[]<34>  |  maxRefScriptSizePerBlock
+  body.proposals[].action[]<35>  |  maxRefScriptSizePerTx
+  body.proposals[].action[]<36>  |  refScriptCostStride
+  body.proposals[].action[]<37>  |  refScriptCostMultiplier
+  body.proposals[].action[]<38>  |  maxPledgeLeverage
+  body.proposals[].action[]<39>  |  minPoolMargin
+  body.proposals[].action[]<40>  |  leiosAnnouncementPeriodLength
+  body.proposals[].action[]<41>  |  leiosVotePeriodLength
+  body.proposals[].action[]<42>  |  leiosDiffusionPeriodLength
+  body.proposals[].action[]<43>  |  leiosCommitteeSize
+  body.proposals[].action[]<44>  |  leiosQuorumStakeThreshold
+  body.proposals[].action[]<45>  |  maxEndorserBlockReferencesSize
+  body.proposals[].action[]<46>  |  maxEndorserBlockTxsSize
+  body.proposals[].action[]<47>  |  maxEndorserBlockExecutionUnits
+  body.proposals[].action[]<48>  |  maxRefScriptSizePerEndorserBlock
+  body.proposals[].action[]<49>  |  perasMinCandidateBlockAge
+  body.proposals[].action[]<50>  |  perasHealingFactor
+  body.proposals[].action[]<51>  |  perasCertBoost
+  body.proposals[].action[]<52>  |  perasTargetCommitteeSize
+  body.proposals[].action[]<53>  |  perasBootstrapRound
+  body.proposals[].action[]<54>  |  perasQuorumThresholdSafetyMargin
+  body.proposals[].action[]<55>  |  refInputsCostPerMultiAssetPolicy
+  body.proposals[].action[]<56>  |  refInputsCostPerDatumByte
+  body.proposals[].action[]<18><0>  |  costModels.plutusV1
+  body.proposals[].action[]<18><1>  |  costModels.plutusV2
+  body.proposals[].action[]<18><2>  |  costModels.plutusV3
+  body.proposals[].action[]<18><3>  |  costModels.plutusV4
+  body.sub_txs{}.v.body.proposals[].action[]<0>  |  minFeeCoefficient
+  body.sub_txs{}.v.body.proposals[].action[]<1>  |  minFeeConstant
+  body.sub_txs{}.v.body.proposals[].action[]<2>  |  maxBlockBodySize
+  body.sub_txs{}.v.body.proposals[].action[]<3>  |  maxTxSize
+  body.sub_txs{}.v.body.proposals[].action[]<4>  |  maxBlockHeaderSize
+  body.sub_txs{}.v.body.proposals[].action[]<5>  |  stakeKeyDeposit
+  body.sub_txs{}.v.body.proposals[].action[]<6>  |  poolDeposit
+  body.sub_txs{}.v.body.proposals[].action[]<7>  |  poolRetirementEpochBound
+  body.sub_txs{}.v.body.proposals[].action[]<8>  |  desiredNumberOfPools
+  body.sub_txs{}.v.body.proposals[].action[]<9>  |  poolInfluence
+  body.sub_txs{}.v.body.proposals[].action[]<10>  |  monetaryExpansion
+  body.sub_txs{}.v.body.proposals[].action[]<11>  |  treasuryExpansion
+  body.sub_txs{}.v.body.proposals[].action[]<16>  |  minPoolCost
+  body.sub_txs{}.v.body.proposals[].action[]<17>  |  coinsPerUtxoByte
+  body.sub_txs{}.v.body.proposals[].action[]<19>  |  prices
+  body.sub_txs{}.v.body.proposals[].action[]<20>  |  maxExecutionUnitsPerTransaction
+  body.sub_txs{}.v.body.proposals[].action[]<21>  |  maxExecutionUnitsPerBlock
+  body.sub_txs{}.v.body.proposals[].action[]<22>  |  maxValueSize
+  body.sub_txs{}.v.body.proposals[].action[]<23>  |  collateralPercentage
+  body.sub_txs{}.v.body.proposals[].action[]<24>  |  maxCollateralInputs
+  body.sub_txs{}.v.body.proposals[].action[]<25>  |  poolVotingThresholds
+  body.sub_txs{}.v.body.proposals[].action[]<26>  |  drepVotingThresholds
+  body.sub_txs{}.v.body.proposals[].action[]<27>  |  minCommitteeSize
+  body.sub_txs{}.v.body.proposals[].action[]<28>  |  committeeTermLimit
+  body.sub_txs{}.v.body.proposals[].action[]<29>  |  governanceActionValidityPeriod
+  body.sub_txs{}.v.body.proposals[].action[]<30>  |  governanceActionDeposit
+  body.sub_txs{}.v.body.proposals[].action[]<31>  |  drepDeposit
+  body.sub_txs{}.v.body.proposals[].action[]<32>  |  drepInactivityPeriod
+  body.sub_txs{}.v.body.proposals[].action[]<33>  |  minFeeScriptRefCostPerByte
+  body.sub_txs{}.v.body.proposals[].action[]<34>  |  maxRefScriptSizePerBlock
+  body.sub_txs{}.v.body.proposals[].action[]<35>  |  maxRefScriptSizePerTx
+  body.sub_txs{}.v.body.proposals[].action[]<36>  |  refScriptCostStride
+  body.sub_txs{}.v.body.proposals[].action[]<37>  |  refScriptCostMultiplier
+  body.sub_txs{}.v.body.proposals[].action[]<38>  |  maxPledgeLeverage
+  body.sub_txs{}.v.body.proposals[].action[]<39>  |  minPoolMargin
+  body.sub_txs{}.v.body.proposals[].action[]<40>  |  leiosAnnouncementPeriodLength
+  body.sub_txs{}.v.body.proposals[].action[]<41>  |  leiosVotePeriodLength
+  body.sub_txs{}.v.body.proposals[].action[]<42>  |  leiosDiffusionPeriodLength
+  body.sub_txs{}.v.body.proposals[].action[]<43>  |  leiosCommitteeSize
+  body.sub_txs{}.v.body.proposals[].action[]<44>  |  leiosQuorumStakeThreshold
+  body.sub_txs{}.v.body.proposals[].action[]<45>  |  maxEndorserBlockReferencesSize
+  body.sub_txs{}.v.body.proposals[].action[]<46>  |  maxEndorserBlockTxsSize
+  body.sub_txs{}.v.body.proposals[].action[]<47>  |  maxEndorserBlockExecutionUnits
+  body.sub_txs{}.v.body.proposals[].action[]<48>  |  maxRefScriptSizePerEndorserBlock
+  body.sub_txs{}.v.body.proposals[].action[]<49>  |  perasMinCandidateBlockAge
+  body.sub_txs{}.v.body.proposals[].action[]<50>  |  perasHealingFactor
+  body.sub_txs{}.v.body.proposals[].action[]<51>  |  perasCertBoost
+  body.sub_txs{}.v.body.proposals[].action[]<52>  |  perasTargetCommitteeSize
+  body.sub_txs{}.v.body.proposals[].action[]<53>  |  perasBootstrapRound
+  body.sub_txs{}.v.body.proposals[].action[]<54>  |  perasQuorumThresholdSafetyMargin
+  body.sub_txs{}.v.body.proposals[].action[]<55>  |  refInputsCostPerMultiAssetPolicy
+  body.sub_txs{}.v.body.proposals[].action[]<56>  |  refInputsCostPerDatumByte
+  body.sub_txs{}.v.body.proposals[].action[]<18><0>  |  costModels.plutusV1
+  body.sub_txs{}.v.body.proposals[].action[]<18><1>  |  costModels.plutusV2
+  body.sub_txs{}.v.body.proposals[].action[]<18><2>  |  costModels.plutusV3
+  body.sub_txs{}.v.body.proposals[].action[]<18><3>  |  costModels.plutusV4
+  body.proposals[].action[]<  |  not carried: an update key the schema has no field for
+  body.proposals[].action[]<18>  |  not carried: a cost model language the schema has no field for
+  body.sub_txs{}.v.body.proposals[].action[]<  |  not carried: an update key the schema has no field for
+  body.sub_txs{}.v.body.proposals[].action[]<18>  |  not carried: a cost model language the schema has no field for
+## v1 body
+  inputs  |  common.inputs[] txHash outputIndex
+  reference_inputs  |  common.referenceInputs[] txHash outputIndex
+  outputs  |  common.outputs[] address coin assets datum script
+  certs  |  common.certificates[] by variant, relays without their kind
+  withdrawals  |  common.withdrawals[] rewardAccount coin
+  ttl  |  common.validity.ttl
+  start  |  common.validity.start
+  fee  |  fee
+  collateral  |  collateral.collateral[]
+  collateral_return  |  collateral.collateralReturn
+  total_collateral  |  collateral.totalCollateral
+  guards  |  common.guards[]
+  mint  |  common.mint[]
+  script_data_hash  |  common.scriptDataHash
+  aux_hash  |  common.auxiliaryDataHash
+  network  |  common.networkId
+  votes  |  common.votes[]
+  proposals  |  common.proposals[] deposit rewardAccount govAction anchor
+  treasury  |  common.treasuryValue
+  donation  |  common.treasuryDonation
+  sub_txs  |  subTransactions[] keyed by hash, each a TxCommon
+  top_guards  |  common.requiredTopLevelGuards[] credential datum
+  deposits  |  common.directDeposits[] rewardAccount coin
+  balance_intervals  |  common.accountBalanceIntervals[]
+  starting_balance_intervals  |  startingAccountBalanceIntervals[]
+  proposals[].action[]<0>  |  minFeeCoefficient
+  proposals[].action[]<1>  |  minFeeConstant
+  proposals[].action[]<2>  |  maxBlockBodySize
+  proposals[].action[]<3>  |  maxTxSize
+  proposals[].action[]<4>  |  maxBlockHeaderSize
+  proposals[].action[]<5>  |  stakeKeyDeposit
+  proposals[].action[]<6>  |  poolDeposit
+  proposals[].action[]<7>  |  poolRetirementEpochBound
+  proposals[].action[]<8>  |  desiredNumberOfPools
+  proposals[].action[]<9>  |  poolInfluence
+  proposals[].action[]<10>  |  monetaryExpansion
+  proposals[].action[]<11>  |  treasuryExpansion
+  proposals[].action[]<16>  |  minPoolCost
+  proposals[].action[]<17>  |  coinsPerUtxoByte
+  proposals[].action[]<19>  |  prices
+  proposals[].action[]<20>  |  maxExecutionUnitsPerTransaction
+  proposals[].action[]<21>  |  maxExecutionUnitsPerBlock
+  proposals[].action[]<22>  |  maxValueSize
+  proposals[].action[]<23>  |  collateralPercentage
+  proposals[].action[]<24>  |  maxCollateralInputs
+  proposals[].action[]<25>  |  poolVotingThresholds
+  proposals[].action[]<26>  |  drepVotingThresholds
+  proposals[].action[]<27>  |  minCommitteeSize
+  proposals[].action[]<28>  |  committeeTermLimit
+  proposals[].action[]<29>  |  governanceActionValidityPeriod
+  proposals[].action[]<30>  |  governanceActionDeposit
+  proposals[].action[]<31>  |  drepDeposit
+  proposals[].action[]<32>  |  drepInactivityPeriod
+  proposals[].action[]<33>  |  minFeeScriptRefCostPerByte
+  proposals[].action[]<34>  |  maxRefScriptSizePerBlock
+  proposals[].action[]<35>  |  maxRefScriptSizePerTx
+  proposals[].action[]<36>  |  refScriptCostStride
+  proposals[].action[]<37>  |  refScriptCostMultiplier
+  proposals[].action[]<38>  |  maxPledgeLeverage
+  proposals[].action[]<39>  |  minPoolMargin
+  proposals[].action[]<40>  |  leiosAnnouncementPeriodLength
+  proposals[].action[]<41>  |  leiosVotePeriodLength
+  proposals[].action[]<42>  |  leiosDiffusionPeriodLength
+  proposals[].action[]<43>  |  leiosCommitteeSize
+  proposals[].action[]<44>  |  leiosQuorumStakeThreshold
+  proposals[].action[]<45>  |  maxEndorserBlockReferencesSize
+  proposals[].action[]<46>  |  maxEndorserBlockTxsSize
+  proposals[].action[]<47>  |  maxEndorserBlockExecutionUnits
+  proposals[].action[]<48>  |  maxRefScriptSizePerEndorserBlock
+  proposals[].action[]<49>  |  perasMinCandidateBlockAge
+  proposals[].action[]<50>  |  perasHealingFactor
+  proposals[].action[]<51>  |  perasCertBoost
+  proposals[].action[]<52>  |  perasTargetCommitteeSize
+  proposals[].action[]<53>  |  perasBootstrapRound
+  proposals[].action[]<54>  |  perasQuorumThresholdSafetyMargin
+  proposals[].action[]<55>  |  refInputsCostPerMultiAssetPolicy
+  proposals[].action[]<56>  |  refInputsCostPerDatumByte
+  proposals[].action[]<18><0>  |  costModels.plutusV1
+  proposals[].action[]<18><1>  |  costModels.plutusV2
+  proposals[].action[]<18><2>  |  costModels.plutusV3
+  proposals[].action[]<18><3>  |  costModels.plutusV4
+  sub_txs{}.v.body.proposals[].action[]<0>  |  minFeeCoefficient
+  sub_txs{}.v.body.proposals[].action[]<1>  |  minFeeConstant
+  sub_txs{}.v.body.proposals[].action[]<2>  |  maxBlockBodySize
+  sub_txs{}.v.body.proposals[].action[]<3>  |  maxTxSize
+  sub_txs{}.v.body.proposals[].action[]<4>  |  maxBlockHeaderSize
+  sub_txs{}.v.body.proposals[].action[]<5>  |  stakeKeyDeposit
+  sub_txs{}.v.body.proposals[].action[]<6>  |  poolDeposit
+  sub_txs{}.v.body.proposals[].action[]<7>  |  poolRetirementEpochBound
+  sub_txs{}.v.body.proposals[].action[]<8>  |  desiredNumberOfPools
+  sub_txs{}.v.body.proposals[].action[]<9>  |  poolInfluence
+  sub_txs{}.v.body.proposals[].action[]<10>  |  monetaryExpansion
+  sub_txs{}.v.body.proposals[].action[]<11>  |  treasuryExpansion
+  sub_txs{}.v.body.proposals[].action[]<16>  |  minPoolCost
+  sub_txs{}.v.body.proposals[].action[]<17>  |  coinsPerUtxoByte
+  sub_txs{}.v.body.proposals[].action[]<19>  |  prices
+  sub_txs{}.v.body.proposals[].action[]<20>  |  maxExecutionUnitsPerTransaction
+  sub_txs{}.v.body.proposals[].action[]<21>  |  maxExecutionUnitsPerBlock
+  sub_txs{}.v.body.proposals[].action[]<22>  |  maxValueSize
+  sub_txs{}.v.body.proposals[].action[]<23>  |  collateralPercentage
+  sub_txs{}.v.body.proposals[].action[]<24>  |  maxCollateralInputs
+  sub_txs{}.v.body.proposals[].action[]<25>  |  poolVotingThresholds
+  sub_txs{}.v.body.proposals[].action[]<26>  |  drepVotingThresholds
+  sub_txs{}.v.body.proposals[].action[]<27>  |  minCommitteeSize
+  sub_txs{}.v.body.proposals[].action[]<28>  |  committeeTermLimit
+  sub_txs{}.v.body.proposals[].action[]<29>  |  governanceActionValidityPeriod
+  sub_txs{}.v.body.proposals[].action[]<30>  |  governanceActionDeposit
+  sub_txs{}.v.body.proposals[].action[]<31>  |  drepDeposit
+  sub_txs{}.v.body.proposals[].action[]<32>  |  drepInactivityPeriod
+  sub_txs{}.v.body.proposals[].action[]<33>  |  minFeeScriptRefCostPerByte
+  sub_txs{}.v.body.proposals[].action[]<34>  |  maxRefScriptSizePerBlock
+  sub_txs{}.v.body.proposals[].action[]<35>  |  maxRefScriptSizePerTx
+  sub_txs{}.v.body.proposals[].action[]<36>  |  refScriptCostStride
+  sub_txs{}.v.body.proposals[].action[]<37>  |  refScriptCostMultiplier
+  sub_txs{}.v.body.proposals[].action[]<38>  |  maxPledgeLeverage
+  sub_txs{}.v.body.proposals[].action[]<39>  |  minPoolMargin
+  sub_txs{}.v.body.proposals[].action[]<40>  |  leiosAnnouncementPeriodLength
+  sub_txs{}.v.body.proposals[].action[]<41>  |  leiosVotePeriodLength
+  sub_txs{}.v.body.proposals[].action[]<42>  |  leiosDiffusionPeriodLength
+  sub_txs{}.v.body.proposals[].action[]<43>  |  leiosCommitteeSize
+  sub_txs{}.v.body.proposals[].action[]<44>  |  leiosQuorumStakeThreshold
+  sub_txs{}.v.body.proposals[].action[]<45>  |  maxEndorserBlockReferencesSize
+  sub_txs{}.v.body.proposals[].action[]<46>  |  maxEndorserBlockTxsSize
+  sub_txs{}.v.body.proposals[].action[]<47>  |  maxEndorserBlockExecutionUnits
+  sub_txs{}.v.body.proposals[].action[]<48>  |  maxRefScriptSizePerEndorserBlock
+  sub_txs{}.v.body.proposals[].action[]<49>  |  perasMinCandidateBlockAge
+  sub_txs{}.v.body.proposals[].action[]<50>  |  perasHealingFactor
+  sub_txs{}.v.body.proposals[].action[]<51>  |  perasCertBoost
+  sub_txs{}.v.body.proposals[].action[]<52>  |  perasTargetCommitteeSize
+  sub_txs{}.v.body.proposals[].action[]<53>  |  perasBootstrapRound
+  sub_txs{}.v.body.proposals[].action[]<54>  |  perasQuorumThresholdSafetyMargin
+  sub_txs{}.v.body.proposals[].action[]<55>  |  refInputsCostPerMultiAssetPolicy
+  sub_txs{}.v.body.proposals[].action[]<56>  |  refInputsCostPerDatumByte
+  sub_txs{}.v.body.proposals[].action[]<18><0>  |  costModels.plutusV1
+  sub_txs{}.v.body.proposals[].action[]<18><1>  |  costModels.plutusV2
+  sub_txs{}.v.body.proposals[].action[]<18><2>  |  costModels.plutusV3
+  sub_txs{}.v.body.proposals[].action[]<18><3>  |  costModels.plutusV4
+  proposals[].action[]<  |  not carried: an update key the schema has no field for
+  proposals[].action[]<18>  |  not carried: a cost model language the schema has no field for
+  sub_txs{}.v.body.proposals[].action[]<  |  not carried: an update key the schema has no field for
+  sub_txs{}.v.body.proposals[].action[]<18>  |  not carried: a cost model language the schema has no field for
+## v1 wits
+  vkeys  |  common.witnesses.vkeywitness[]
+  boots  |  common.witnesses.bootstrapWitnesses[]
+  scripts  |  common.witnesses.script[], compared as a set of scripts
+  datums  |  common.witnesses.plutusDatums[], compared as a set of data
+  redeemers  |  common.witnesses.redeemers[] purpose index payload exUnits
+## v1 block
+  header.slot  |  header.slot
+  header.hash  |  header.hash
+  header.block_no  |  header.height
+  header.eb  |  header.endorserBlockAnnouncement referencesHash referencesSize
+  header.leios_cert  |  header.bodyContainsLeiosCertificate
+  leios_cert  |  body.leiosCertificate signers signature
+  peras_cert  |  body.perasCertificate
+  txs[].body.inputs  |  body.tx[].common.inputs[] txHash outputIndex
+  txs[].body.reference_inputs  |  body.tx[].common.referenceInputs[] txHash outputIndex
+  txs[].body.outputs  |  body.tx[].common.outputs[] address coin assets datum script
+  txs[].body.certs  |  body.tx[].common.certificates[] by variant, relays without their kind
+  txs[].body.withdrawals  |  body.tx[].common.withdrawals[] rewardAccount coin
+  txs[].body.ttl  |  body.tx[].common.validity.ttl
+  txs[].body.start  |  body.tx[].common.validity.start
+  txs[].body.fee  |  body.tx[].fee
+  txs[].body.collateral  |  body.tx[].collateral.collateral[]
+  txs[].body.collateral_return  |  body.tx[].collateral.collateralReturn
+  txs[].body.total_collateral  |  body.tx[].collateral.totalCollateral
+  txs[].body.guards  |  body.tx[].common.guards[]
+  txs[].body.mint  |  body.tx[].common.mint[]
+  txs[].body.script_data_hash  |  body.tx[].common.scriptDataHash
+  txs[].body.aux_hash  |  body.tx[].common.auxiliaryDataHash
+  txs[].body.network  |  body.tx[].common.networkId
+  txs[].body.votes  |  body.tx[].common.votes[]
+  txs[].body.proposals  |  body.tx[].common.proposals[] deposit rewardAccount govAction anchor
+  txs[].body.treasury  |  body.tx[].common.treasuryValue
+  txs[].body.donation  |  body.tx[].common.treasuryDonation
+  txs[].body.sub_txs  |  body.tx[].subTransactions[] keyed by hash, each a TxCommon
+  txs[].body.top_guards  |  body.tx[].common.requiredTopLevelGuards[] credential datum
+  txs[].body.deposits  |  body.tx[].common.directDeposits[] rewardAccount coin
+  txs[].body.balance_intervals  |  body.tx[].common.accountBalanceIntervals[]
+  txs[].body.starting_balance_intervals  |  body.tx[].startingAccountBalanceIntervals[]
+  txs[].wits.vkeys  |  body.tx[].common.witnesses.vkeywitness[]
+  txs[].wits.boots  |  body.tx[].common.witnesses.bootstrapWitnesses[]
+  txs[].wits.scripts  |  body.tx[].common.witnesses.script[], compared as a set of scripts
+  txs[].wits.datums  |  body.tx[].common.witnesses.plutusDatums[], compared as a set of data
+  txs[].wits.redeemers  |  body.tx[].common.witnesses.redeemers[] purpose index payload exUnits
+  txs[].valid  |  body.tx[].successful
+  txs[].aux  |  body.tx[].common.auxiliary metadata[] scripts[]
+  txs[].body.proposals[].action[]<0>  |  body.tx[].minFeeCoefficient
+  txs[].body.proposals[].action[]<1>  |  body.tx[].minFeeConstant
+  txs[].body.proposals[].action[]<2>  |  body.tx[].maxBlockBodySize
+  txs[].body.proposals[].action[]<3>  |  body.tx[].maxTxSize
+  txs[].body.proposals[].action[]<4>  |  body.tx[].maxBlockHeaderSize
+  txs[].body.proposals[].action[]<5>  |  body.tx[].stakeKeyDeposit
+  txs[].body.proposals[].action[]<6>  |  body.tx[].poolDeposit
+  txs[].body.proposals[].action[]<7>  |  body.tx[].poolRetirementEpochBound
+  txs[].body.proposals[].action[]<8>  |  body.tx[].desiredNumberOfPools
+  txs[].body.proposals[].action[]<9>  |  body.tx[].poolInfluence
+  txs[].body.proposals[].action[]<10>  |  body.tx[].monetaryExpansion
+  txs[].body.proposals[].action[]<11>  |  body.tx[].treasuryExpansion
+  txs[].body.proposals[].action[]<16>  |  body.tx[].minPoolCost
+  txs[].body.proposals[].action[]<17>  |  body.tx[].coinsPerUtxoByte
+  txs[].body.proposals[].action[]<19>  |  body.tx[].prices
+  txs[].body.proposals[].action[]<20>  |  body.tx[].maxExecutionUnitsPerTransaction
+  txs[].body.proposals[].action[]<21>  |  body.tx[].maxExecutionUnitsPerBlock
+  txs[].body.proposals[].action[]<22>  |  body.tx[].maxValueSize
+  txs[].body.proposals[].action[]<23>  |  body.tx[].collateralPercentage
+  txs[].body.proposals[].action[]<24>  |  body.tx[].maxCollateralInputs
+  txs[].body.proposals[].action[]<25>  |  body.tx[].poolVotingThresholds
+  txs[].body.proposals[].action[]<26>  |  body.tx[].drepVotingThresholds
+  txs[].body.proposals[].action[]<27>  |  body.tx[].minCommitteeSize
+  txs[].body.proposals[].action[]<28>  |  body.tx[].committeeTermLimit
+  txs[].body.proposals[].action[]<29>  |  body.tx[].governanceActionValidityPeriod
+  txs[].body.proposals[].action[]<30>  |  body.tx[].governanceActionDeposit
+  txs[].body.proposals[].action[]<31>  |  body.tx[].drepDeposit
+  txs[].body.proposals[].action[]<32>  |  body.tx[].drepInactivityPeriod
+  txs[].body.proposals[].action[]<33>  |  body.tx[].minFeeScriptRefCostPerByte
+  txs[].body.proposals[].action[]<34>  |  body.tx[].maxRefScriptSizePerBlock
+  txs[].body.proposals[].action[]<35>  |  body.tx[].maxRefScriptSizePerTx
+  txs[].body.proposals[].action[]<36>  |  body.tx[].refScriptCostStride
+  txs[].body.proposals[].action[]<37>  |  body.tx[].refScriptCostMultiplier
+  txs[].body.proposals[].action[]<38>  |  body.tx[].maxPledgeLeverage
+  txs[].body.proposals[].action[]<39>  |  body.tx[].minPoolMargin
+  txs[].body.proposals[].action[]<40>  |  body.tx[].leiosAnnouncementPeriodLength
+  txs[].body.proposals[].action[]<41>  |  body.tx[].leiosVotePeriodLength
+  txs[].body.proposals[].action[]<42>  |  body.tx[].leiosDiffusionPeriodLength
+  txs[].body.proposals[].action[]<43>  |  body.tx[].leiosCommitteeSize
+  txs[].body.proposals[].action[]<44>  |  body.tx[].leiosQuorumStakeThreshold
+  txs[].body.proposals[].action[]<45>  |  body.tx[].maxEndorserBlockReferencesSize
+  txs[].body.proposals[].action[]<46>  |  body.tx[].maxEndorserBlockTxsSize
+  txs[].body.proposals[].action[]<47>  |  body.tx[].maxEndorserBlockExecutionUnits
+  txs[].body.proposals[].action[]<48>  |  body.tx[].maxRefScriptSizePerEndorserBlock
+  txs[].body.proposals[].action[]<49>  |  body.tx[].perasMinCandidateBlockAge
+  txs[].body.proposals[].action[]<50>  |  body.tx[].perasHealingFactor
+  txs[].body.proposals[].action[]<51>  |  body.tx[].perasCertBoost
+  txs[].body.proposals[].action[]<52>  |  body.tx[].perasTargetCommitteeSize
+  txs[].body.proposals[].action[]<53>  |  body.tx[].perasBootstrapRound
+  txs[].body.proposals[].action[]<54>  |  body.tx[].perasQuorumThresholdSafetyMargin
+  txs[].body.proposals[].action[]<55>  |  body.tx[].refInputsCostPerMultiAssetPolicy
+  txs[].body.proposals[].action[]<56>  |  body.tx[].refInputsCostPerDatumByte
+  txs[].body.proposals[].action[]<18><0>  |  body.tx[].costModels.plutusV1
+  txs[].body.proposals[].action[]<18><1>  |  body.tx[].costModels.plutusV2
+  txs[].body.proposals[].action[]<18><2>  |  body.tx[].costModels.plutusV3
+  txs[].body.proposals[].action[]<18><3>  |  body.tx[].costModels.plutusV4
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<0>  |  body.tx[].minFeeCoefficient
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<1>  |  body.tx[].minFeeConstant
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<2>  |  body.tx[].maxBlockBodySize
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<3>  |  body.tx[].maxTxSize
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<4>  |  body.tx[].maxBlockHeaderSize
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<5>  |  body.tx[].stakeKeyDeposit
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<6>  |  body.tx[].poolDeposit
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<7>  |  body.tx[].poolRetirementEpochBound
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<8>  |  body.tx[].desiredNumberOfPools
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<9>  |  body.tx[].poolInfluence
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<10>  |  body.tx[].monetaryExpansion
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<11>  |  body.tx[].treasuryExpansion
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<16>  |  body.tx[].minPoolCost
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<17>  |  body.tx[].coinsPerUtxoByte
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<19>  |  body.tx[].prices
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<20>  |  body.tx[].maxExecutionUnitsPerTransaction
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<21>  |  body.tx[].maxExecutionUnitsPerBlock
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<22>  |  body.tx[].maxValueSize
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<23>  |  body.tx[].collateralPercentage
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<24>  |  body.tx[].maxCollateralInputs
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<25>  |  body.tx[].poolVotingThresholds
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<26>  |  body.tx[].drepVotingThresholds
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<27>  |  body.tx[].minCommitteeSize
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<28>  |  body.tx[].committeeTermLimit
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<29>  |  body.tx[].governanceActionValidityPeriod
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<30>  |  body.tx[].governanceActionDeposit
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<31>  |  body.tx[].drepDeposit
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<32>  |  body.tx[].drepInactivityPeriod
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<33>  |  body.tx[].minFeeScriptRefCostPerByte
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<34>  |  body.tx[].maxRefScriptSizePerBlock
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<35>  |  body.tx[].maxRefScriptSizePerTx
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<36>  |  body.tx[].refScriptCostStride
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<37>  |  body.tx[].refScriptCostMultiplier
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<38>  |  body.tx[].maxPledgeLeverage
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<39>  |  body.tx[].minPoolMargin
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<40>  |  body.tx[].leiosAnnouncementPeriodLength
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<41>  |  body.tx[].leiosVotePeriodLength
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<42>  |  body.tx[].leiosDiffusionPeriodLength
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<43>  |  body.tx[].leiosCommitteeSize
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<44>  |  body.tx[].leiosQuorumStakeThreshold
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<45>  |  body.tx[].maxEndorserBlockReferencesSize
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<46>  |  body.tx[].maxEndorserBlockTxsSize
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<47>  |  body.tx[].maxEndorserBlockExecutionUnits
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<48>  |  body.tx[].maxRefScriptSizePerEndorserBlock
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<49>  |  body.tx[].perasMinCandidateBlockAge
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<50>  |  body.tx[].perasHealingFactor
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<51>  |  body.tx[].perasCertBoost
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<52>  |  body.tx[].perasTargetCommitteeSize
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<53>  |  body.tx[].perasBootstrapRound
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<54>  |  body.tx[].perasQuorumThresholdSafetyMargin
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<55>  |  body.tx[].refInputsCostPerMultiAssetPolicy
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<56>  |  body.tx[].refInputsCostPerDatumByte
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<18><0>  |  body.tx[].costModels.plutusV1
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<18><1>  |  body.tx[].costModels.plutusV2
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<18><2>  |  body.tx[].costModels.plutusV3
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<18><3>  |  body.tx[].costModels.plutusV4
+  txs[].body.proposals[].action[]<  |  not carried: an update key the schema has no field for
+  txs[].body.proposals[].action[]<18>  |  not carried: a cost model language the schema has no field for
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<  |  not carried: an update key the schema has no field for
+  txs[].body.sub_txs{}.v.body.proposals[].action[]<18>  |  not carried: a cost model language the schema has no field for
+## v1 ppu
+  <0>  |  minFeeCoefficient
+  <1>  |  minFeeConstant
+  <2>  |  maxBlockBodySize
+  <3>  |  maxTxSize
+  <4>  |  maxBlockHeaderSize
+  <5>  |  stakeKeyDeposit
+  <6>  |  poolDeposit
+  <7>  |  poolRetirementEpochBound
+  <8>  |  desiredNumberOfPools
+  <9>  |  poolInfluence
+  <10>  |  monetaryExpansion
+  <11>  |  treasuryExpansion
+  <16>  |  minPoolCost
+  <17>  |  coinsPerUtxoByte
+  <19>  |  prices
+  <20>  |  maxExecutionUnitsPerTransaction
+  <21>  |  maxExecutionUnitsPerBlock
+  <22>  |  maxValueSize
+  <23>  |  collateralPercentage
+  <24>  |  maxCollateralInputs
+  <25>  |  poolVotingThresholds
+  <26>  |  drepVotingThresholds
+  <27>  |  minCommitteeSize
+  <28>  |  committeeTermLimit
+  <29>  |  governanceActionValidityPeriod
+  <30>  |  governanceActionDeposit
+  <31>  |  drepDeposit
+  <32>  |  drepInactivityPeriod
+  <33>  |  minFeeScriptRefCostPerByte
+  <34>  |  maxRefScriptSizePerBlock
+  <35>  |  maxRefScriptSizePerTx
+  <36>  |  refScriptCostStride
+  <37>  |  refScriptCostMultiplier
+  <38>  |  maxPledgeLeverage
+  <39>  |  minPoolMargin
+  <40>  |  leiosAnnouncementPeriodLength
+  <41>  |  leiosVotePeriodLength
+  <42>  |  leiosDiffusionPeriodLength
+  <43>  |  leiosCommitteeSize
+  <44>  |  leiosQuorumStakeThreshold
+  <45>  |  maxEndorserBlockReferencesSize
+  <46>  |  maxEndorserBlockTxsSize
+  <47>  |  maxEndorserBlockExecutionUnits
+  <48>  |  maxRefScriptSizePerEndorserBlock
+  <49>  |  perasMinCandidateBlockAge
+  <50>  |  perasHealingFactor
+  <51>  |  perasCertBoost
+  <52>  |  perasTargetCommitteeSize
+  <53>  |  perasBootstrapRound
+  <54>  |  perasQuorumThresholdSafetyMargin
+  <55>  |  refInputsCostPerMultiAssetPolicy
+  <56>  |  refInputsCostPerDatumByte
+  <18><0>  |  costModels.plutusV1
+  <18><1>  |  costModels.plutusV2
+  <18><2>  |  costModels.plutusV3
+  <18><3>  |  costModels.plutusV4
+  <  |  not carried: an update key the schema has no field for
+  <18>  |  not carried: a cost model language the schema has no field for
