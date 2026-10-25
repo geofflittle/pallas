@@ -718,7 +718,11 @@ macro_rules! impl_cardano_mapper_shared {
                             vrf_keyhash: vrf_keyhash.to_vec().into(),
                             pledge: u64_to_bigint(*pledge),
                             cost: u64_to_bigint(*cost),
-                            margin: rational_number_to_u5c(margin.clone()).into(),
+                            margin: u5c::RationalNumber {
+                                numerator: margin.numerator as i32,
+                                denominator: margin.denominator as u32,
+                            }
+                            .into(),
                             reward_account: reward_account.to_vec().into(),
                             pool_owners: pool_owners.iter().map(|x| x.to_vec().into()).collect(),
                             relays: relays.iter().map(|x| self.map_relay(x)).collect(),
