@@ -1503,7 +1503,6 @@ fn a_version_info_in_an_indefinite_array_reads_to_its_break() {
     assert_eq!(info.self_reported_software_tag, 3942894501);
 }
 
-/// `header_version_info = [highest_supported_major_version : uint .size 4, self_reported_software_tag : uint .size 4]` (`defs.cddl`).
 #[test]
 fn a_version_info_field_past_four_bytes_is_refused() {
     let header = generated_header_hex();
