@@ -288,6 +288,17 @@ impl From<CostModelPerLanguage> for pallas_primitives::babbage::CostModels {
     }
 }
 
+impl From<CostModelPerLanguage> for pallas_primitives::conway::CostModels {
+    fn from(mut value: CostModelPerLanguage) -> Self {
+        pallas_primitives::conway::CostModels {
+            plutus_v1: value.0.remove(&Language::PlutusV1).map(Vec::<i64>::from),
+            plutus_v2: value.0.remove(&Language::PlutusV2).map(Vec::<i64>::from),
+            plutus_v3: None,
+            unknown: Default::default(),
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for CostModelPerLanguage {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -420,6 +431,87 @@ mod tests {
 
     fn babbage_cost_models(models: CostModelPerLanguage) -> pallas_primitives::babbage::CostModels {
         models.into()
+    }
+
+    fn conway_cost_models(models: CostModelPerLanguage) -> pallas_primitives::conway::CostModels {
+        models.into()
+    }
+
+    #[test]
+    fn a_genesis_naming_no_later_language_gains_none() {
+        for network in ["mainnet", "preview", "devnet", "musashi"] {
+            let models = conway_cost_models(load_test_data_config(network).cost_models);
+
+            assert!(
+                models.plutus_v3.is_none(),
+                "{network} must gain no PlutusV3"
+            );
+            assert!(
+                models.unknown.is_empty(),
+                "{network} must gain no other language"
+            );
+        }
+    }
+
+    #[test]
+    fn injected_arrays_keep_every_value() {
+        let value = test_data_json("leios-devnet");
+        let injected = &value["extraConfig"]["costModels"];
+        for (language, len) in [("PlutusV1", 332), ("PlutusV2", 332), ("PlutusV3", 350)] {
+            assert_eq!(injected[language].as_array().unwrap().len(), len);
+        }
+
+        let models = babbage_cost_models(load_test_data_config("leios-devnet").cost_models);
+
+        let v1 = models.plutus_v1.expect("PlutusV1 must be present");
+        assert_eq!(v1.len(), 332);
+        assert_eq!(v1[0], 100788);
+        assert_eq!(v1[166], 955506);
+        assert_eq!(v1[331], 21);
+
+        let v2 = models.plutus_v2.expect("PlutusV2 must be present");
+        assert_eq!(v2.len(), 332);
+        assert_eq!(v2[175], 1293828);
+        assert_eq!(v2[331], 21);
+    }
+
+    #[test]
+    fn an_injected_plutus_v3_is_kept() {
+        let v3 = conway_cost_models(load_test_data_config("leios-devnet").cost_models)
+            .plutus_v3
+            .expect("PlutusV3 must be kept");
+
+        assert_eq!(v3.len(), 350);
+        assert_eq!(v3[0], 100788);
+        assert_eq!(v3[251], 100181);
+        assert_eq!(v3[349], 21);
+    }
+
+    #[test]
+    fn a_later_or_unknown_language_is_kept_under_its_number() {
+        let mut value = test_data_json("devnet");
+        value["extraConfig"]["costModels"]["PlutusV4"] = serde_json::json!([4, 5, 6]);
+        value["extraConfig"]["costModels"]["Unknown"] = serde_json::json!({ "7": [7, 8] });
+
+        let config: GenesisFile = serde_json::from_value(value).expect("the genesis must parse");
+        let models = conway_cost_models(config.cost_models);
+
+        assert_eq!(models.unknown.get(&3), Some(&vec![4, 5, 6]));
+        assert_eq!(models.unknown.get(&7), Some(&vec![7, 8]));
+        assert_eq!(models.unknown.len(), 2);
+    }
+
+    #[test]
+    fn an_unknown_entry_replaces_the_language_it_numbers() {
+        let mut value = test_data_json("devnet");
+        value["extraConfig"]["costModels"]["Unknown"] = serde_json::json!({ "0": [9, 10] });
+
+        let config: GenesisFile = serde_json::from_value(value).expect("the genesis must parse");
+        let models = conway_cost_models(config.cost_models);
+
+        assert_eq!(models.plutus_v1, Some(vec![9, 10]));
+        assert_eq!(models.plutus_v2.map(|x| x.len()), Some(175));
+        assert!(models.unknown.is_empty());
     }
 
     #[test]
