@@ -1,0 +1,11 @@
+--- gen/schemacmp.py	2026-10-26 05:07:14
++++ breaks/align/schemacmp.py	2026-10-26 05:25:28
+@@ -830,7 +830,7 @@
+     while i < len(ls) or j < len(ss):
+         if j < len(ss):
+             c = canon(ss[j])
+-            if c in seen and len(ss) - j > len(ls) - i:
++            if False:
+                 j += 1
+                 continue
+             seen.add(c)

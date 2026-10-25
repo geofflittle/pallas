@@ -1,0 +1,6 @@
+aligned rows: 4 cases, 0 wrong
+asked 3 EXIT 0
+value tx: values 3, ledger accepts 3, both accept 3, field paths 612, leaves agree 3245, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+asked 5 EXIT 1
+tx arb: 3 generated values where 5 were asked
+value tx: values 3, ledger accepts 3, both accept 3, field paths 612, leaves agree 3245, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values

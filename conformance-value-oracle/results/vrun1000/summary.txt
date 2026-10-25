@@ -1,0 +1,531 @@
+tx arb: value tx: values 1000, ledger accepts 1000, both accept 1000, field paths 2487, leaves agree 12983313, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+tx arb: schema v1alpha tx: values 1000, field paths 731, leaves agree 1824621, ledger classes with no field 17, listed differences 41794, disagreements 0 on 0 values
+tx arb: schema v1beta tx: values 1000, field paths 873, leaves agree 3452949, ledger classes with no field 14, listed differences 43730, disagreements 0 on 0 values
+tx arb: schema v1 tx: values 1000, field paths 1985, leaves agree 11420382, ledger classes with no field 2, listed differences 110138, disagreements 0 on 0 values
+tx cddl-plain: value tx: values 1000, ledger accepts 1000, both accept 1000, field paths 3946, leaves agree 926650, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+tx cddl-plain: schema v1alpha tx: values 1000, field paths 3062, leaves agree 585246, ledger classes with no field 16, listed differences 13699, disagreements 0 on 0 values
+tx cddl-plain: schema v1beta tx: values 1000, field paths 3369, leaves agree 718485, ledger classes with no field 13, listed differences 14522, disagreements 0 on 0 values
+tx cddl-plain: schema v1 tx: values 1000, field paths 3669, leaves agree 872599, ledger classes with no field 1, listed differences 13922, disagreements 0 on 0 values
+tx cddl: value tx: values 1000, ledger accepts 1000, both accept 799, field paths 3138, leaves agree 647222, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+tx cddl: schema v1alpha tx: values 799, field paths 2379, leaves agree 407374, ledger classes with no field 16, listed differences 9914, disagreements 0 on 0 values
+tx cddl: schema v1beta tx: values 799, field paths 2655, leaves agree 500098, ledger classes with no field 13, listed differences 10505, disagreements 0 on 0 values
+tx cddl: schema v1 tx: values 799, field paths 2948, leaves agree 608569, ledger classes with no field 1, listed differences 9837, disagreements 0 on 0 values
+tx mutate: value tx: values 1000, ledger accepts 221, both accept 221, field paths 2372, leaves agree 2890528, leaves differ 0, accepted ledger-invalid 335, disagreements 0 on 0 values
+tx mutate: schema v1alpha tx: values 221, field paths 665, leaves agree 379475, ledger classes with no field 17, listed differences 8111, disagreements 0 on 0 values
+tx mutate: schema v1beta tx: values 221, field paths 807, leaves agree 735594, ledger classes with no field 14, listed differences 8566, disagreements 0 on 0 values
+tx mutate: schema v1 tx: values 221, field paths 1870, leaves agree 2581006, ledger classes with no field 2, listed differences 21525, disagreements 0 on 0 values
+body arb: value body: values 1000, ledger accepts 1000, both accept 1000, field paths 2019, leaves agree 12907482, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+body arb: schema v1alpha body: values 1000, field paths 411, leaves agree 1297900, ledger classes with no field 15, listed differences 35193, disagreements 0 on 0 values
+body arb: schema v1beta body: values 1000, field paths 416, leaves agree 2411618, ledger classes with no field 14, listed differences 35193, disagreements 0 on 0 values
+body arb: schema v1 body: values 1000, field paths 1519, leaves agree 11208310, ledger classes with no field 2, listed differences 120695, disagreements 0 on 0 values
+body cddl-plain: value body: values 1000, ledger accepts 1000, both accept 1000, field paths 563, leaves agree 352711, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+body cddl-plain: schema v1alpha body: values 1000, field paths 230, leaves agree 206847, ledger classes with no field 14, listed differences 3807, disagreements 0 on 0 values
+body cddl-plain: schema v1beta body: values 1000, field paths 235, leaves agree 249159, ledger classes with no field 13, listed differences 3807, disagreements 0 on 0 values
+body cddl-plain: schema v1 body: values 1000, field paths 538, leaves agree 342144, ledger classes with no field 1, listed differences 3903, disagreements 0 on 0 values
+body cddl: value body: values 1000, ledger accepts 1000, both accept 784, field paths 452, leaves agree 239214, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+body cddl: schema v1alpha body: values 784, field paths 151, leaves agree 143191, ledger classes with no field 14, listed differences 2599, disagreements 0 on 0 values
+body cddl: schema v1beta body: values 784, field paths 156, leaves agree 169756, ledger classes with no field 13, listed differences 2599, disagreements 0 on 0 values
+body cddl: schema v1 body: values 784, field paths 432, leaves agree 232313, ledger classes with no field 1, listed differences 2568, disagreements 0 on 0 values
+body mutate: value body: values 1000, ledger accepts 179, both accept 179, field paths 1922, leaves agree 2471294, leaves differ 0, accepted ledger-invalid 379, disagreements 0 on 0 values
+body mutate: schema v1alpha body: values 179, field paths 374, leaves agree 237588, ledger classes with no field 15, listed differences 6552, disagreements 0 on 0 values
+body mutate: schema v1beta body: values 179, field paths 379, leaves agree 431531, ledger classes with no field 14, listed differences 6552, disagreements 0 on 0 values
+body mutate: schema v1 body: values 179, field paths 1422, leaves agree 2155945, ledger classes with no field 2, listed differences 21584, disagreements 0 on 0 values
+wits arb: value wits: values 1000, ledger accepts 1000, both accept 1000, field paths 297, leaves agree 1013262, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+wits arb: schema v1alpha wits: values 1000, field paths 155, leaves agree 448942, ledger classes with no field 2, listed differences 3431, disagreements 0 on 0 values
+wits arb: schema v1beta wits: values 1000, field paths 292, leaves agree 949536, ledger classes with no field 0, listed differences 5400, disagreements 0 on 0 values
+wits arb: schema v1 wits: values 1000, field paths 295, leaves agree 987169, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+wits cddl-plain: value wits: values 1000, ledger accepts 1000, both accept 1000, field paths 1196, leaves agree 509523, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+wits cddl-plain: schema v1alpha wits: values 1000, field paths 903, leaves agree 322617, ledger classes with no field 2, listed differences 4051, disagreements 0 on 0 values
+wits cddl-plain: schema v1beta wits: values 1000, field paths 1184, leaves agree 412007, ledger classes with no field 0, listed differences 4820, disagreements 0 on 0 values
+wits cddl-plain: schema v1 wits: values 1000, field paths 1190, leaves agree 469683, ledger classes with no field 0, listed differences 5313, disagreements 0 on 0 values
+wits cddl: value wits: values 1000, ledger accepts 1000, both accept 1000, field paths 1196, leaves agree 509486, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+wits cddl: schema v1alpha wits: values 1000, field paths 903, leaves agree 322580, ledger classes with no field 2, listed differences 4051, disagreements 0 on 0 values
+wits cddl: schema v1beta wits: values 1000, field paths 1184, leaves agree 411970, ledger classes with no field 0, listed differences 4820, disagreements 0 on 0 values
+wits cddl: schema v1 wits: values 1000, field paths 1190, leaves agree 469646, ledger classes with no field 0, listed differences 5313, disagreements 0 on 0 values
+wits mutate: value wits: values 1000, ledger accepts 570, both accept 570, field paths 297, leaves agree 615782, leaves differ 0, accepted ledger-invalid 198, disagreements 0 on 0 values
+wits mutate: schema v1alpha wits: values 570, field paths 155, leaves agree 274812, ledger classes with no field 2, listed differences 1887, disagreements 0 on 0 values
+wits mutate: schema v1beta wits: values 570, field paths 292, leaves agree 579627, ledger classes with no field 0, listed differences 3099, disagreements 0 on 0 values
+wits mutate: schema v1 wits: values 570, field paths 295, leaves agree 600543, ledger classes with no field 0, listed differences 1, disagreements 0 on 0 values
+ppu arb: value ppu: values 1000, ledger accepts 1000, both accept 1000, field paths 309, leaves agree 398256, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+ppu arb: schema v1alpha ppu: values 1000, field paths 35, leaves agree 209037, ledger classes with no field 2, listed differences 9113, disagreements 0 on 0 values
+ppu arb: schema v1beta ppu: values 1000, field paths 35, leaves agree 209037, ledger classes with no field 2, listed differences 9113, disagreements 0 on 0 values
+ppu arb: schema v1 ppu: values 1000, field paths 56, leaves agree 224233, ledger classes with no field 1, listed differences 12267, disagreements 0 on 0 values
+ppu cddl-plain: value ppu: values 1000, ledger accepts 1000, both accept 1000, field paths 306, leaves agree 42902, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+ppu cddl-plain: schema v1alpha ppu: values 1000, field paths 35, leaves agree 20395, ledger classes with no field 2, listed differences 9173, disagreements 0 on 0 values
+ppu cddl-plain: schema v1beta ppu: values 1000, field paths 35, leaves agree 20395, ledger classes with no field 2, listed differences 9173, disagreements 0 on 0 values
+ppu cddl-plain: schema v1 ppu: values 1000, field paths 53, leaves agree 23360, ledger classes with no field 1, listed differences 9973, disagreements 0 on 0 values
+ppu cddl: value ppu: values 1000, ledger accepts 1000, both accept 1000, field paths 306, leaves agree 42603, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+ppu cddl: schema v1alpha ppu: values 1000, field paths 35, leaves agree 20343, ledger classes with no field 2, listed differences 9173, disagreements 0 on 0 values
+ppu cddl: schema v1beta ppu: values 1000, field paths 35, leaves agree 20343, ledger classes with no field 2, listed differences 9173, disagreements 0 on 0 values
+ppu cddl: schema v1 ppu: values 1000, field paths 53, leaves agree 23308, ledger classes with no field 1, listed differences 9973, disagreements 0 on 0 values
+ppu mutate: value ppu: values 1000, ledger accepts 121, both accept 121, field paths 308, leaves agree 66581, leaves differ 0, accepted ledger-invalid 445, disagreements 0 on 0 values
+ppu mutate: schema v1alpha ppu: values 121, field paths 32, leaves agree 35748, ledger classes with no field 2, listed differences 1025, disagreements 0 on 0 values
+ppu mutate: schema v1beta ppu: values 121, field paths 32, leaves agree 35748, ledger classes with no field 2, listed differences 1025, disagreements 0 on 0 values
+ppu mutate: schema v1 ppu: values 121, field paths 53, leaves agree 37586, ledger classes with no field 1, listed differences 1390, disagreements 0 on 0 values
+block arb: value block: values 1000, ledger accepts 1000, both accept 1000, field paths 2443, leaves agree 6077616, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+block arb: schema v1alpha block: values 1000, field paths 692, leaves agree 871886, ledger classes with no field 30, listed differences 16430, disagreements 0 on 0 values
+block arb: schema v1beta block: values 1000, field paths 834, leaves agree 1609447, ledger classes with no field 27, listed differences 17365, disagreements 0 on 0 values
+block arb: schema v1 block: values 1000, field paths 1932, leaves agree 5438575, ledger classes with no field 11, listed differences 45224, disagreements 0 on 0 values
+block cddl-plain: value block: values 1000, ledger accepts 1000, both accept 1000, field paths 2287, leaves agree 446930, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+block cddl-plain: schema v1alpha block: values 1000, field paths 1663, leaves agree 269974, ledger classes with no field 29, listed differences 6604, disagreements 0 on 0 values
+block cddl-plain: schema v1beta block: values 1000, field paths 1921, leaves agree 332408, ledger classes with no field 26, listed differences 7040, disagreements 0 on 0 values
+block cddl-plain: schema v1 block: values 1000, field paths 2161, leaves agree 404838, ledger classes with no field 10, listed differences 6242, disagreements 0 on 0 values
+block cddl: value block: values 1000, ledger accepts 1000, both accept 901, field paths 1911, leaves agree 335240, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+block cddl: schema v1alpha block: values 901, field paths 1371, leaves agree 201792, ledger classes with no field 29, listed differences 5023, disagreements 0 on 0 values
+block cddl: schema v1beta block: values 901, field paths 1595, leaves agree 247817, ledger classes with no field 26, listed differences 5349, disagreements 0 on 0 values
+block cddl: schema v1 block: values 901, field paths 1820, leaves agree 301143, ledger classes with no field 10, listed differences 4619, disagreements 0 on 0 values
+block mutate: value block: values 1000, ledger accepts 118, both accept 118, field paths 2302, leaves agree 1612028, leaves differ 0, accepted ledger-invalid 315, disagreements 0 on 0 values
+block mutate: schema v1alpha block: values 118, field paths 596, leaves agree 209374, ledger classes with no field 30, listed differences 3531, disagreements 0 on 0 values
+block mutate: schema v1beta block: values 118, field paths 738, leaves agree 404082, ledger classes with no field 27, listed differences 3763, disagreements 0 on 0 values
+block mutate: schema v1 block: values 118, field paths 1790, leaves agree 1431371, ledger classes with no field 11, listed differences 12117, disagreements 0 on 0 values
+
+listed classes, summed over field paths: kind source schema, count, paths, class
+tx arb v1alpha  10814544  17  no field in v1alpha
+tx arb v1alpha  251  1  legacy mapping: no auxiliary data maps to an empty one
+tx arb v1alpha  255  1  legacy mapping: no total collateral maps to 0
+tx arb v1alpha  13325  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+tx arb v1alpha  19475  9  type cannot hold: RationalNumber is int32 over uint32
+tx arb v1alpha  21  1  type cannot hold: a uint32 port of 0 reads as no port
+tx arb v1alpha  8467  4  type cannot hold: no guard native script variant
+tx arb v1beta  9184280  14  no field in v1beta
+tx arb v1beta  251  1  legacy mapping: no auxiliary data maps to an empty one
+tx arb v1beta  255  1  legacy mapping: no total collateral maps to 0
+tx arb v1beta  13325  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+tx arb v1beta  19475  9  type cannot hold: RationalNumber is int32 over uint32
+tx arb v1beta  21  1  type cannot hold: a uint32 port of 0 reads as no port
+tx arb v1beta  8467  4  type cannot hold: no guard native script variant
+tx arb v1beta  1936  1  type cannot hold: no guarding redeemer purpose
+tx arb v1  1231216  2  no field in v1
+tx arb v1  37293  2  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+tx arb v1  72778  30  type cannot hold: RationalNumber is int32 over uint32
+tx arb v1  67  2  type cannot hold: a uint32 port of 0 reads as no port
+tx cddl-plain value  490  1  ledger re-encodes, pallas keeps the input bytes
+tx cddl-plain v1alpha  228994  16  no field in v1alpha
+tx cddl-plain v1alpha  492  1  legacy mapping: no auxiliary data maps to an empty one
+tx cddl-plain v1alpha  289  1  legacy mapping: no total collateral maps to 0
+tx cddl-plain v1alpha  4406  1297  type cannot hold: Metadatum int is int64
+tx cddl-plain v1alpha  2211  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+tx cddl-plain v1alpha  1102  6  type cannot hold: RationalNumber is int32 over uint32
+tx cddl-plain v1alpha  2253  16  type cannot hold: ScriptNOfK k is uint32
+tx cddl-plain v1alpha  12  1  type cannot hold: an empty dns name reads as no name
+tx cddl-plain v1alpha  2934  4  type cannot hold: no guard native script variant
+tx cddl-plain v1beta  94932  13  no field in v1beta
+tx cddl-plain v1beta  492  1  legacy mapping: no auxiliary data maps to an empty one
+tx cddl-plain v1beta  289  1  legacy mapping: no total collateral maps to 0
+tx cddl-plain v1beta  4406  1297  type cannot hold: Metadatum int is int64
+tx cddl-plain v1beta  2211  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+tx cddl-plain v1beta  1102  6  type cannot hold: RationalNumber is int32 over uint32
+tx cddl-plain v1beta  2253  16  type cannot hold: ScriptNOfK k is uint32
+tx cddl-plain v1beta  12  1  type cannot hold: an empty dns name reads as no name
+tx cddl-plain v1beta  2934  4  type cannot hold: no guard native script variant
+tx cddl-plain v1beta  823  1  type cannot hold: no guarding redeemer purpose
+tx cddl-plain v1  26  1  no field in v1
+tx cddl-plain v1  4524  1316  type cannot hold: Metadatum int is int64
+tx cddl-plain v1  2211  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+tx cddl-plain v1  1129  7  type cannot hold: RationalNumber is int32 over uint32
+tx cddl-plain v1  6046  18  type cannot hold: ScriptNOfK k is uint32
+tx cddl-plain v1  12  1  type cannot hold: an empty dns name reads as no name
+tx cddl value  201  1  pallas refuses tag 24 over indefinite bytes, open decision on a stable type
+tx cddl value  199  1  ledger re-encodes, pallas keeps the input bytes
+tx cddl value  190  1  pallas re-encodes to other bytes of the same ledger value
+tx cddl v1alpha  160088  16  no field in v1alpha
+tx cddl v1alpha  395  1  legacy mapping: no auxiliary data maps to an empty one
+tx cddl v1alpha  275  1  legacy mapping: no total collateral maps to 0
+tx cddl v1alpha  3147  910  type cannot hold: Metadatum int is int64
+tx cddl v1alpha  1510  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+tx cddl v1alpha  742  6  type cannot hold: RationalNumber is int32 over uint32
+tx cddl v1alpha  1704  12  type cannot hold: ScriptNOfK k is uint32
+tx cddl v1alpha  9  1  type cannot hold: an empty dns name reads as no name
+tx cddl v1alpha  2132  3  type cannot hold: no guard native script variant
+tx cddl v1beta  66773  13  no field in v1beta
+tx cddl v1beta  395  1  legacy mapping: no auxiliary data maps to an empty one
+tx cddl v1beta  275  1  legacy mapping: no total collateral maps to 0
+tx cddl v1beta  3147  910  type cannot hold: Metadatum int is int64
+tx cddl v1beta  1510  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+tx cddl v1beta  742  6  type cannot hold: RationalNumber is int32 over uint32
+tx cddl v1beta  1704  12  type cannot hold: ScriptNOfK k is uint32
+tx cddl v1beta  9  1  type cannot hold: an empty dns name reads as no name
+tx cddl v1beta  2132  3  type cannot hold: no guard native script variant
+tx cddl v1beta  591  1  type cannot hold: no guarding redeemer purpose
+tx cddl v1  13  1  no field in v1
+tx cddl v1  3215  926  type cannot hold: Metadatum int is int64
+tx cddl v1  1510  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+tx cddl v1  763  7  type cannot hold: RationalNumber is int32 over uint32
+tx cddl v1  4340  15  type cannot hold: ScriptNOfK k is uint32
+tx cddl v1  9  1  type cannot hold: an empty dns name reads as no name
+tx mutate v1alpha  2435550  17  no field in v1alpha
+tx mutate v1alpha  54  1  legacy mapping: no auxiliary data maps to an empty one
+tx mutate v1alpha  49  1  legacy mapping: no total collateral maps to 0
+tx mutate v1alpha  2179  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+tx mutate v1alpha  3975  9  type cannot hold: RationalNumber is int32 over uint32
+tx mutate v1alpha  7  1  type cannot hold: a uint32 port of 0 reads as no port
+tx mutate v1alpha  1847  4  type cannot hold: no guard native script variant
+tx mutate v1beta  2078976  14  no field in v1beta
+tx mutate v1beta  54  1  legacy mapping: no auxiliary data maps to an empty one
+tx mutate v1beta  49  1  legacy mapping: no total collateral maps to 0
+tx mutate v1beta  2179  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+tx mutate v1beta  3975  9  type cannot hold: RationalNumber is int32 over uint32
+tx mutate v1beta  7  1  type cannot hold: a uint32 port of 0 reads as no port
+tx mutate v1beta  1847  4  type cannot hold: no guard native script variant
+tx mutate v1beta  455  1  type cannot hold: no guarding redeemer purpose
+tx mutate v1  237862  2  no field in v1
+tx mutate v1  6146  2  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+tx mutate v1  15363  30  type cannot hold: RationalNumber is int32 over uint32
+tx mutate v1  16  2  type cannot hold: a uint32 port of 0 reads as no port
+body arb value  1000  1  pallas re-encodes to other bytes of the same ledger value
+body arb v1alpha  11332445  15  no field in v1alpha
+body arb v1alpha  245  1  legacy mapping: no total collateral maps to 0
+body arb v1alpha  12828  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+body arb v1alpha  19421  9  type cannot hold: RationalNumber is int32 over uint32
+body arb v1alpha  14  1  type cannot hold: a uint32 port of 0 reads as no port
+body arb v1alpha  2685  2  type cannot hold: no guard native script variant
+body arb v1beta  10218727  14  no field in v1beta
+body arb v1beta  245  1  legacy mapping: no total collateral maps to 0
+body arb v1beta  12828  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+body arb v1beta  19421  9  type cannot hold: RationalNumber is int32 over uint32
+body arb v1beta  14  1  type cannot hold: a uint32 port of 0 reads as no port
+body arb v1beta  2685  2  type cannot hold: no guard native script variant
+body arb v1  1364327  2  no field in v1
+body arb v1  39969  2  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+body arb v1  80654  30  type cannot hold: RationalNumber is int32 over uint32
+body arb v1  72  2  type cannot hold: a uint32 port of 0 reads as no port
+body cddl-plain value  498  1  pallas re-encodes to other bytes of the same ledger value
+body cddl-plain v1alpha  135286  14  no field in v1alpha
+body cddl-plain v1alpha  291  1  legacy mapping: no total collateral maps to 0
+body cddl-plain v1alpha  2415  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+body cddl-plain v1alpha  1055  6  type cannot hold: RationalNumber is int32 over uint32
+body cddl-plain v1alpha  16  4  type cannot hold: ScriptNOfK k is uint32
+body cddl-plain v1alpha  16  1  type cannot hold: an empty dns name reads as no name
+body cddl-plain v1alpha  14  2  type cannot hold: no guard native script variant
+body cddl-plain v1beta  92974  13  no field in v1beta
+body cddl-plain v1beta  291  1  legacy mapping: no total collateral maps to 0
+body cddl-plain v1beta  2415  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+body cddl-plain v1beta  1055  6  type cannot hold: RationalNumber is int32 over uint32
+body cddl-plain v1beta  16  4  type cannot hold: ScriptNOfK k is uint32
+body cddl-plain v1beta  16  1  type cannot hold: an empty dns name reads as no name
+body cddl-plain v1beta  14  2  type cannot hold: no guard native script variant
+body cddl-plain v1  19  1  no field in v1
+body cddl-plain v1  139  22  type cannot hold: Metadatum int is int64
+body cddl-plain v1  2415  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+body cddl-plain v1  1080  7  type cannot hold: RationalNumber is int32 over uint32
+body cddl-plain v1  253  8  type cannot hold: ScriptNOfK k is uint32
+body cddl-plain v1  16  1  type cannot hold: an empty dns name reads as no name
+body cddl value  783  1  pallas re-encodes to other bytes of the same ledger value
+body cddl value  216  1  pallas refuses tag 24 over indefinite bytes, open decision on a stable type
+body cddl v1alpha  89062  14  no field in v1alpha
+body cddl v1alpha  280  1  legacy mapping: no total collateral maps to 0
+body cddl v1alpha  1633  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+body cddl v1alpha  670  6  type cannot hold: RationalNumber is int32 over uint32
+body cddl v1alpha  8  3  type cannot hold: ScriptNOfK k is uint32
+body cddl v1alpha  6  1  type cannot hold: an empty dns name reads as no name
+body cddl v1alpha  2  1  type cannot hold: no guard native script variant
+body cddl v1beta  62497  13  no field in v1beta
+body cddl v1beta  280  1  legacy mapping: no total collateral maps to 0
+body cddl v1beta  1633  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+body cddl v1beta  670  6  type cannot hold: RationalNumber is int32 over uint32
+body cddl v1beta  8  3  type cannot hold: ScriptNOfK k is uint32
+body cddl v1beta  6  1  type cannot hold: an empty dns name reads as no name
+body cddl v1beta  2  1  type cannot hold: no guard native script variant
+body cddl v1  14  1  no field in v1
+body cddl v1  88  16  type cannot hold: Metadatum int is int64
+body cddl v1  1633  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+body cddl v1  687  7  type cannot hold: RationalNumber is int32 over uint32
+body cddl v1  154  7  type cannot hold: ScriptNOfK k is uint32
+body cddl v1  6  1  type cannot hold: an empty dns name reads as no name
+body mutate value  179  1  pallas re-encodes to other bytes of the same ledger value
+body mutate v1alpha  2181636  15  no field in v1alpha
+body mutate v1alpha  44  1  legacy mapping: no total collateral maps to 0
+body mutate v1alpha  2417  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+body mutate v1alpha  3632  9  type cannot hold: RationalNumber is int32 over uint32
+body mutate v1alpha  3  1  type cannot hold: a uint32 port of 0 reads as no port
+body mutate v1alpha  456  2  type cannot hold: no guard native script variant
+body mutate v1beta  1987693  14  no field in v1beta
+body mutate v1beta  44  1  legacy mapping: no total collateral maps to 0
+body mutate v1beta  2417  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+body mutate v1beta  3632  9  type cannot hold: RationalNumber is int32 over uint32
+body mutate v1beta  3  1  type cannot hold: a uint32 port of 0 reads as no port
+body mutate v1beta  456  2  type cannot hold: no guard native script variant
+body mutate v1  252837  2  no field in v1
+body mutate v1  6450  2  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+body mutate v1  15118  30  type cannot hold: RationalNumber is int32 over uint32
+body mutate v1  16  2  type cannot hold: a uint32 port of 0 reads as no port
+wits arb value  937  1  pallas re-encodes to other bytes of the same ledger value
+wits arb v1alpha  502563  2  no field in v1alpha
+wits arb v1alpha  3431  1  type cannot hold: no guard native script variant
+wits arb v1beta  3431  1  type cannot hold: no guard native script variant
+wits arb v1beta  1969  1  type cannot hold: no guarding redeemer purpose
+wits cddl-plain v1alpha  90159  2  no field in v1alpha
+wits cddl-plain v1alpha  1759  5  type cannot hold: ScriptNOfK k is uint32
+wits cddl-plain v1alpha  2292  1  type cannot hold: no guard native script variant
+wits cddl-plain v1beta  1759  5  type cannot hold: ScriptNOfK k is uint32
+wits cddl-plain v1beta  2292  1  type cannot hold: no guard native script variant
+wits cddl-plain v1beta  769  1  type cannot hold: no guarding redeemer purpose
+wits cddl-plain v1  5313  4  type cannot hold: ScriptNOfK k is uint32
+wits cddl value  999  1  pallas re-encodes to other bytes of the same ledger value
+wits cddl v1alpha  90159  2  no field in v1alpha
+wits cddl v1alpha  1759  5  type cannot hold: ScriptNOfK k is uint32
+wits cddl v1alpha  2292  1  type cannot hold: no guard native script variant
+wits cddl v1beta  1759  5  type cannot hold: ScriptNOfK k is uint32
+wits cddl v1beta  2292  1  type cannot hold: no guard native script variant
+wits cddl v1beta  769  1  type cannot hold: no guarding redeemer purpose
+wits cddl v1  5313  4  type cannot hold: ScriptNOfK k is uint32
+wits mutate value  521  1  pallas re-encodes to other bytes of the same ledger value
+wits mutate v1alpha  306027  2  no field in v1alpha
+wits mutate v1alpha  1  1  type cannot hold: ScriptNOfK k is uint32
+wits mutate v1alpha  1886  1  type cannot hold: no guard native script variant
+wits mutate v1beta  1  1  type cannot hold: ScriptNOfK k is uint32
+wits mutate v1beta  1886  1  type cannot hold: no guard native script variant
+wits mutate v1beta  1212  1  type cannot hold: no guarding redeemer purpose
+wits mutate v1  1  1  type cannot hold: ScriptNOfK k is uint32
+ppu arb value  658  1  pallas re-encodes to other bytes of the same ledger value
+ppu arb v1alpha  179705  2  no field in v1alpha
+ppu arb v1alpha  9113  7  type cannot hold: RationalNumber is int32 over uint32
+ppu arb v1beta  179705  2  no field in v1beta
+ppu arb v1beta  9113  7  type cannot hold: RationalNumber is int32 over uint32
+ppu arb v1  161756  1  no field in v1
+ppu arb v1  12267  13  type cannot hold: RationalNumber is int32 over uint32
+ppu cddl-plain value  430  1  pallas re-encodes to other bytes of the same ledger value
+ppu cddl-plain value  381  1  ledger re-encodes, pallas keeps the input bytes
+ppu cddl-plain v1alpha  13333  2  no field in v1alpha
+ppu cddl-plain v1alpha  9173  7  type cannot hold: RationalNumber is int32 over uint32
+ppu cddl-plain v1beta  13333  2  no field in v1beta
+ppu cddl-plain v1beta  9173  7  type cannot hold: RationalNumber is int32 over uint32
+ppu cddl-plain v1  9569  1  no field in v1
+ppu cddl-plain v1  9973  12  type cannot hold: RationalNumber is int32 over uint32
+ppu cddl value  800  1  pallas re-encodes to other bytes of the same ledger value
+ppu cddl value  11  1  ledger re-encodes, pallas keeps the input bytes
+ppu cddl v1alpha  13086  2  no field in v1alpha
+ppu cddl v1alpha  9173  7  type cannot hold: RationalNumber is int32 over uint32
+ppu cddl v1beta  13086  2  no field in v1beta
+ppu cddl v1beta  9173  7  type cannot hold: RationalNumber is int32 over uint32
+ppu cddl v1  9322  1  no field in v1
+ppu cddl v1  9973  12  type cannot hold: RationalNumber is int32 over uint32
+ppu mutate value  111  1  ledger re-encodes, pallas keeps the input bytes
+ppu mutate v1alpha  29778  2  no field in v1alpha
+ppu mutate v1alpha  1025  7  type cannot hold: RationalNumber is int32 over uint32
+ppu mutate v1beta  29778  2  no field in v1beta
+ppu mutate v1beta  1025  7  type cannot hold: RationalNumber is int32 over uint32
+ppu mutate v1  27605  1  no field in v1
+ppu mutate v1  1390  13  type cannot hold: RationalNumber is int32 over uint32
+block arb v1alpha  5046597  30  no field in v1alpha
+block arb v1alpha  120  1  legacy mapping: no auxiliary data maps to an empty one
+block arb v1alpha  139  1  legacy mapping: no total collateral maps to 0
+block arb v1alpha  2629  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+block arb v1alpha  9323  9  type cannot hold: RationalNumber is int32 over uint32
+block arb v1alpha  11  1  type cannot hold: a uint32 port of 0 reads as no port
+block arb v1alpha  4208  4  type cannot hold: no guard native script variant
+block arb v1beta  4308101  27  no field in v1beta
+block arb v1beta  120  1  legacy mapping: no auxiliary data maps to an empty one
+block arb v1beta  139  1  legacy mapping: no total collateral maps to 0
+block arb v1beta  2629  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+block arb v1beta  9323  9  type cannot hold: RationalNumber is int32 over uint32
+block arb v1beta  11  1  type cannot hold: a uint32 port of 0 reads as no port
+block arb v1beta  4208  4  type cannot hold: no guard native script variant
+block arb v1beta  935  1  type cannot hold: no guarding redeemer purpose
+block arb v1  491205  11  no field in v1
+block arb v1  7980  2  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+block arb v1  37190  30  type cannot hold: RationalNumber is int32 over uint32
+block arb v1  36  2  type cannot hold: a uint32 port of 0 reads as no port
+block arb v1  18  1  type cannot hold: empty Peras certificate bytes read as no certificate
+block cddl-plain v1alpha  121128  29  no field in v1alpha
+block cddl-plain v1alpha  352  1  legacy mapping: no auxiliary data maps to an empty one
+block cddl-plain v1alpha  131  1  legacy mapping: no total collateral maps to 0
+block cddl-plain v1alpha  1752  523  type cannot hold: Metadatum int is int64
+block cddl-plain v1alpha  848  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+block cddl-plain v1alpha  407  6  type cannot hold: RationalNumber is int32 over uint32
+block cddl-plain v1alpha  1409  15  type cannot hold: ScriptNOfK k is uint32
+block cddl-plain v1alpha  6  1  type cannot hold: an empty dns name reads as no name
+block cddl-plain v1alpha  1699  4  type cannot hold: no guard native script variant
+block cddl-plain v1beta  58258  26  no field in v1beta
+block cddl-plain v1beta  352  1  legacy mapping: no auxiliary data maps to an empty one
+block cddl-plain v1beta  131  1  legacy mapping: no total collateral maps to 0
+block cddl-plain v1beta  1752  523  type cannot hold: Metadatum int is int64
+block cddl-plain v1beta  848  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+block cddl-plain v1beta  407  6  type cannot hold: RationalNumber is int32 over uint32
+block cddl-plain v1beta  1409  15  type cannot hold: ScriptNOfK k is uint32
+block cddl-plain v1beta  6  1  type cannot hold: an empty dns name reads as no name
+block cddl-plain v1beta  1699  4  type cannot hold: no guard native script variant
+block cddl-plain v1beta  436  1  type cannot hold: no guarding redeemer purpose
+block cddl-plain v1  14005  10  no field in v1
+block cddl-plain v1  1803  530  type cannot hold: Metadatum int is int64
+block cddl-plain v1  848  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+block cddl-plain v1  412  7  type cannot hold: RationalNumber is int32 over uint32
+block cddl-plain v1  3113  17  type cannot hold: ScriptNOfK k is uint32
+block cddl-plain v1  6  1  type cannot hold: an empty dns name reads as no name
+block cddl-plain v1  60  1  type cannot hold: empty Peras certificate bytes read as no certificate
+block cddl value  853  1  pallas re-encodes to other bytes of the same ledger value
+block cddl value  99  1  pallas refuses tag 24 over indefinite bytes, open decision on a stable type
+block cddl v1alpha  91943  29  no field in v1alpha
+block cddl v1alpha  297  1  legacy mapping: no auxiliary data maps to an empty one
+block cddl v1alpha  117  1  legacy mapping: no total collateral maps to 0
+block cddl v1alpha  1317  390  type cannot hold: Metadatum int is int64
+block cddl v1alpha  590  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+block cddl v1alpha  305  6  type cannot hold: RationalNumber is int32 over uint32
+block cddl v1alpha  1112  13  type cannot hold: ScriptNOfK k is uint32
+block cddl v1alpha  6  1  type cannot hold: an empty dns name reads as no name
+block cddl v1alpha  1279  2  type cannot hold: no guard native script variant
+block cddl v1beta  45592  26  no field in v1beta
+block cddl v1beta  297  1  legacy mapping: no auxiliary data maps to an empty one
+block cddl v1beta  117  1  legacy mapping: no total collateral maps to 0
+block cddl v1beta  1317  390  type cannot hold: Metadatum int is int64
+block cddl v1beta  590  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+block cddl v1beta  305  6  type cannot hold: RationalNumber is int32 over uint32
+block cddl v1beta  1112  13  type cannot hold: ScriptNOfK k is uint32
+block cddl v1beta  6  1  type cannot hold: an empty dns name reads as no name
+block cddl v1beta  1279  2  type cannot hold: no guard native script variant
+block cddl v1beta  326  1  type cannot hold: no guarding redeemer purpose
+block cddl v1  12616  10  no field in v1
+block cddl v1  1353  396  type cannot hold: Metadatum int is int64
+block cddl v1  590  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+block cddl v1  309  7  type cannot hold: RationalNumber is int32 over uint32
+block cddl v1  2304  14  type cannot hold: ScriptNOfK k is uint32
+block cddl v1  6  1  type cannot hold: an empty dns name reads as no name
+block cddl v1  57  1  type cannot hold: empty Peras certificate bytes read as no certificate
+block mutate v1alpha  1362559  30  no field in v1alpha
+block mutate v1alpha  20  1  legacy mapping: no auxiliary data maps to an empty one
+block mutate v1alpha  35  1  legacy mapping: no total collateral maps to 0
+block mutate v1alpha  458  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+block mutate v1alpha  2013  9  type cannot hold: RationalNumber is int32 over uint32
+block mutate v1alpha  2  1  type cannot hold: a uint32 port of 0 reads as no port
+block mutate v1alpha  1003  4  type cannot hold: no guard native script variant
+block mutate v1beta  1167619  27  no field in v1beta
+block mutate v1beta  20  1  legacy mapping: no auxiliary data maps to an empty one
+block mutate v1beta  35  1  legacy mapping: no total collateral maps to 0
+block mutate v1beta  458  1  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+block mutate v1beta  2013  9  type cannot hold: RationalNumber is int32 over uint32
+block mutate v1beta  2  1  type cannot hold: a uint32 port of 0 reads as no port
+block mutate v1beta  1003  4  type cannot hold: no guard native script variant
+block mutate v1beta  232  1  type cannot hold: no guarding redeemer purpose
+block mutate v1  141427  11  no field in v1
+block mutate v1  2043  2  type cannot hold: NewCommitteeCredentials expires_epoch is uint32
+block mutate v1  10063  30  type cannot hold: RationalNumber is int32 over uint32
+block mutate v1  5  2  type cannot hold: a uint32 port of 0 reads as no port
+block mutate v1  6  1  type cannot hold: empty Peras certificate bytes read as no certificate
+
+ledger refusals pallas accepts, mutate source
+tx: values 1000, ledger refuses 779, pallas accepts 335 of them, by mutator trailing 105, extra 100, dupkey 88, unknownkey 21, negate 12, drop 9
+    105  trailing: DecoderErrorLeftover "oracle" "\NUL"
+     75  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Final number of elements: N does not match the total coun
+     22  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record GovActionId.\nExpected
+     17  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record Anchor.\nExpected N, b
+     17  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record VotingProcedure.\nExpe
+     16  unknownkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "DecodingTxOut DijkstraEra: Unknown field key N")
+     13  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum Credential.\nExpected N, 
+     12  negate: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "expected word")
+      9  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum DijkstraNativeScriptRaw.\
+      7  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "DecodingTxOut DijkstraEra: Duplicate field key N")
+      5  drop: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "expected string")
+      5  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Annotator (AlonzoTxWitsRaw DijkstraEra): Duplicate field 
+      4  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Rational.\nExpected N, but fo
+      4  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record MaryValue.\nExpected N
+      4  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum StakePoolRelay.\nExpected
+      3  drop: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Empty Assets are not allowed")
+      3  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record CBORGroup.\nExpected N
+      3  unknownkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Annotator (AlonzoTxWitsRaw DijkstraEra): Unknown field ke
+      2  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum GovAction.\nExpected N, b
+      1  drop: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "expected bytes")
+      1  dupkey: DecoderErrorCustom "Annotator" "Duplicates found, expected no duplicates"
+      1  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "DecodingTxOut DijkstraEra: Unknown field key N")
+      1  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record ExUnits.\nExpected N, 
+      1  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record TxIn.\nExpected N, but
+      1  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum DRep.\nExpected N, but fo
+      1  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum Voter.\nExpected N, but f
+      1  unknownkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Annotator (AlonzoTxAuxDataRaw DijkstraEra): Unknown field
+      1  unknownkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "PParamsUpdate DijkstraEra: Unknown field key N")
+body: values 1000, ledger refuses 821, pallas accepts 379 of them, by mutator trailing 122, extra 118, dupkey 106, drop 12, unknownkey 11, negate 10
+    122  trailing: DecoderErrorLeftover "oracle" "\NUL"
+     79  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Final number of elements: N does not match the total coun
+     32  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record VotingProcedure.\nExpe
+     23  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record GovActionId.\nExpected
+     16  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record Anchor.\nExpected N, b
+     14  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "DecodingTxOut DijkstraEra: Duplicate field key N")
+     10  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum Credential.\nExpected N, 
+     10  negate: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "expected word")
+      8  drop: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "expected string")
+      7  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Rational.\nExpected N, but fo
+      7  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record TxIn.\nExpected N, but
+      7  unknownkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "DecodingTxOut DijkstraEra: Unknown field key N")
+      5  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record ProposalProcedure.\nEx
+      4  dupkey: DecoderErrorCustom "Annotator" "Duplicates found, expected no duplicates"
+      4  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum DijkstraNativeScriptRaw.\
+      3  drop: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Empty Assets are not allowed")
+      3  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Annotator (AlonzoTxAuxDataRaw DijkstraEra): Duplicate fie
+      3  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "PParamsUpdate DijkstraEra: Duplicate field key N")
+      3  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum Voter.\nExpected N, but f
+      3  unknownkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "PParamsUpdate DijkstraEra: Unknown field key N")
+      2  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Annotator (DijkstraTxBodyRaw SubTx DijkstraEra): Duplicat
+      2  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record Tuple.\nExpected N, bu
+      1  drop: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "expected list len or indef")
+      1  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Annotator (AlonzoTxWitsRaw DijkstraEra): Duplicate field 
+      1  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Annotator (AlonzoTxWitsRaw DijkstraEra): Unknown field ke
+      1  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "DecodingTxOut DijkstraEra: Unknown field key N")
+      1  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record ExUnits.\nExpected N, 
+      1  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record PoolMetadata.\nExpecte
+      1  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record PoolVotingThresholds.\
+      1  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum DRep.\nExpected N, but fo
+      1  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum DijkstraTxCert.\nExpected
+      1  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum GovAction.\nExpected N, b
+      1  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum StakePoolRelay.\nExpected
+      1  unknownkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Annotator (AlonzoTxWitsRaw DijkstraEra): Unknown field ke
+wits: values 1000, ledger refuses 430, pallas accepts 198 of them, by mutator trailing 116, extra 57, negate 10, dupkey 7, unknownkey 6, drop 2
+    116  trailing: DecoderErrorLeftover "oracle" "\NUL"
+     24  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum DijkstraNativeScriptRaw.\
+      8  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record BootstrapWitness.\nExp
+      8  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record Tuple.\nExpected N, bu
+      7  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Annotator (AlonzoTxWitsRaw DijkstraEra): Duplicate field 
+      7  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record WitVKey.\nExpected N, 
+      6  negate: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "expected word")
+      6  unknownkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Annotator (AlonzoTxWitsRaw DijkstraEra): Unknown field ke
+      4  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record ExUnits.\nExpected N, 
+      4  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum Credential.\nExpected N, 
+      4  negate: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "expected wordN")
+      2  drop: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "expected wordN")
+      1  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Annotator (AlonzoTxWitsRaw DijkstraEra): Unknown field ke
+      1  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record CBORGroup.\nExpected N
+ppu: values 1000, ledger refuses 879, pallas accepts 445 of them, by mutator dupkey 128, trailing 116, extra 99, unknownkey 81, negate 21
+    116  trailing: DecoderErrorLeftover "PParamsUpdate DijkstraEra" "\NUL"
+     85  extra: DecoderErrorDeserialiseFailure "PParamsUpdate DijkstraEra" (DeserialiseFailure N "Size mismatch when decoding Rational.\
+     81  unknownkey: DecoderErrorDeserialiseFailure "PParamsUpdate DijkstraEra" (DeserialiseFailure N "PParamsUpdate DijkstraEra: Unknown fie
+     75  dupkey: DecoderErrorDeserialiseFailure "PParamsUpdate DijkstraEra" (DeserialiseFailure N "PParamsUpdate DijkstraEra: Duplicate f
+     53  dupkey: DecoderErrorDeserialiseFailure "PParamsUpdate DijkstraEra" (DeserialiseFailure N "Final number of elements: N does not m
+     21  negate: DecoderErrorDeserialiseFailure "PParamsUpdate DijkstraEra" (DeserialiseFailure N "expected word")
+      5  extra: DecoderErrorDeserialiseFailure "PParamsUpdate DijkstraEra" (DeserialiseFailure N "Size mismatch when decoding Record ExU
+      3  extra: DecoderErrorDeserialiseFailure "PParamsUpdate DijkstraEra" (DeserialiseFailure N "PParamsUpdate DijkstraEra: Unknown fie
+      3  extra: DecoderErrorDeserialiseFailure "PParamsUpdate DijkstraEra" (DeserialiseFailure N "Size mismatch when decoding Record Poo
+      2  extra: DecoderErrorDeserialiseFailure "PParamsUpdate DijkstraEra" (DeserialiseFailure N "Size mismatch when decoding Record Pri
+      1  extra: DecoderErrorDeserialiseFailure "PParamsUpdate DijkstraEra" (DeserialiseFailure N "Size mismatch when decoding Record DRe
+block: values 1000, ledger refuses 882, pallas accepts 315 of them, by mutator extra 132, trailing 131, dupkey 37, negate 7, drop 4, unknownkey 4
+    131  trailing: DecoderErrorLeftover "oracle" "\NUL"
+     28  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Final number of elements: N does not match the total coun
+     16  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record DijkstraBlockBodyRaw.\
+     11  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record CBORGroup.\nExpected N
+     11  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record HeaderBody.\nExpected 
+     11  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record LeiosCert.\nExpected N
+     10  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record Anchor.\nExpected N, b
+     10  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record CertifiedVRF.\nExpecte
+      9  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record Block.\nExpected N, bu
+      9  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record GovActionId.\nExpected
+      9  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record VotingProcedure.\nExpe
+      7  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record BlockHeaderVersionInfo
+      6  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record EbReferencesAnnounceme
+      6  negate: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "expected word")
+      5  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record HeaderRaw.\nExpected N
+      5  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum Credential.\nExpected N, 
+      5  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum DijkstraNativeScriptRaw.\
+      4  drop: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "expected string")
+      3  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "DecodingTxOut DijkstraEra: Duplicate field key N")
+      3  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Rational.\nExpected N, but fo
+      2  dupkey: DecoderErrorCustom "Annotator" "Duplicates found, expected no duplicates"
+      2  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Annotator (AlonzoTxWitsRaw DijkstraEra): Duplicate field 
+      2  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Sum StakePoolRelay.\nExpected
+      2  unknownkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "DecodingTxOut DijkstraEra: Unknown field key N")
+      1  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Annotator (AlonzoTxAuxDataRaw DijkstraEra): Duplicate fie
+      1  dupkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "PParamsUpdate DijkstraEra: Duplicate field key N")
+      1  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record ExUnits.\nExpected N, 
+      1  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record TxIn.\nExpected N, but
+      1  extra: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Size mismatch when decoding Record WitVKey.\nExpected N, 
+      1  negate: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Failed to decode an Enum: -N for TypeRep: Vote")
+      1  unknownkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "Annotator (AlonzoTxAuxDataRaw DijkstraEra): Unknown field
+      1  unknownkey: DecoderErrorDeserialiseFailure "oracle" (DeserialiseFailure N "PParamsUpdate DijkstraEra: Unknown field key N")
+
+summary lines with a disagreement or a differing leaf: 0

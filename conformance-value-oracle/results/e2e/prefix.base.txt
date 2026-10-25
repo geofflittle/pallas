@@ -1,0 +1,126 @@
+ledger refuses: 0
+linked previous hash equals the hash of the block before: 9199
+linked served transactions of a certifying block equal the endorser elements: 53
+v1 block: values 9200, field paths 71, leaves agree 2594453, ledger classes with no field 9, listed differences 0, disagreements 0
+       9200  agree  header.block_no
+       8974  agree  header.eb
+        452  agree  header.eb[]
+       9200  agree  header.hash
+       9200  agree  header.leios_cert
+       9200  agree  header.slot
+       9147  agree  leios_cert
+        106  agree  leios_cert[]
+       9200  agree  peras_cert
+       1184  agree  txs[].aux
+      51556  agree  txs[].aux.metadata{}.k
+      51545  agree  txs[].aux.metadata{}.v
+         11  agree  txs[].aux.metadata{}.v{}
+      51556  agree  txs[].aux.native[]
+      51556  agree  txs[].aux.plutus{}
+      52740  agree  txs[].body.aux_hash
+      52740  agree  txs[].body.balance_intervals[empty]
+         26  agree  txs[].body.certs[].account
+         52  agree  txs[].body.certs[].bls[]
+         26  agree  txs[].body.certs[].cost
+         26  agree  txs[].body.certs[].margin
+          1  agree  txs[].body.certs[].metadata
+         50  agree  txs[].body.certs[].metadata[]
+         26  agree  txs[].body.certs[].operator
+         26  agree  txs[].body.certs[].owners{}
+         26  agree  txs[].body.certs[].pledge
+          1  agree  txs[].body.certs[].relays[]
+         19  agree  txs[].body.certs[].relays[].dns
+          6  agree  txs[].body.certs[].relays[].ip4
+         25  agree  txs[].body.certs[].relays[].port
+         26  agree  txs[].body.certs[].tag
+         26  agree  txs[].body.certs[].vrf
+       1187  agree  txs[].body.certs[][]
+       1197  agree  txs[].body.certs[][][]
+      52179  agree  txs[].body.certs[empty]
+      52740  agree  txs[].body.collateral[empty]
+      52740  agree  txs[].body.collateral_return
+      52740  agree  txs[].body.deposits[empty]
+      52740  agree  txs[].body.donation
+      52740  agree  txs[].body.fee
+      52740  agree  txs[].body.guards[empty]
+     105480  agree  txs[].body.inputs{}[]
+      52740  agree  txs[].body.mint[empty]
+      52740  agree  txs[].body.network
+     113920  agree  txs[].body.outputs[].address
+     113920  agree  txs[].body.outputs[].assets{}
+     113920  agree  txs[].body.outputs[].coin
+     113920  agree  txs[].body.outputs[].datum
+     113920  agree  txs[].body.outputs[].script
+      52740  agree  txs[].body.proposals[empty]
+      52740  agree  txs[].body.reference_inputs[empty]
+      52740  agree  txs[].body.script_data_hash
+      52740  agree  txs[].body.start
+      52740  agree  txs[].body.starting_balance_intervals[empty]
+      52740  agree  txs[].body.sub_txs.order[]
+      52740  agree  txs[].body.sub_txs[empty]
+      52740  agree  txs[].body.top_guards[empty]
+      52740  agree  txs[].body.total_collateral
+      52740  agree  txs[].body.treasury
+      52740  agree  txs[].body.ttl
+      52740  agree  txs[].body.votes[empty]
+      52739  agree  txs[].body.withdrawals[empty]
+          1  agree  txs[].body.withdrawals{}.k
+          1  agree  txs[].body.withdrawals{}.v
+      52740  agree  txs[].valid
+      52740  agree  txs[].wits.boots[empty]
+      52740  agree  txs[].wits.datums[empty]
+      52740  agree  txs[].wits.redeemers[empty]
+      52740  agree  txs[].wits.scripts[empty]
+     106710  agree  txs[].wits.vkeys{}[]
+       8930  agree  txs[empty]
+       9200  listed  no field in v1  header.body_hash
+       9200  listed  no field in v1  header.body_size
+       9200  listed  no field in v1  header.issuer_vk
+      36800  listed  no field in v1  header.ocert[]
+       9200  listed  no field in v1  header.prev
+       9200  listed  no field in v1  header.sig
+      18400  listed  no field in v1  header.version[]
+      18400  listed  no field in v1  header.vrf[]
+       9200  listed  no field in v1  header.vrf_vk
+v1 endorser tx: values 106, field paths 40, leaves agree 4452, ledger classes with no field 0, listed differences 0, disagreements 0
+        106  agree  aux.metadata{}.k
+        106  agree  aux.metadata{}.v
+        106  agree  aux.native[]
+        106  agree  aux.plutus{}
+        106  agree  body.aux_hash
+        106  agree  body.balance_intervals[empty]
+        106  agree  body.certs[empty]
+        106  agree  body.collateral[empty]
+        106  agree  body.collateral_return
+        106  agree  body.deposits[empty]
+        106  agree  body.donation
+        106  agree  body.fee
+        106  agree  body.guards[empty]
+        212  agree  body.inputs{}[]
+        106  agree  body.mint[empty]
+        106  agree  body.network
+        106  agree  body.outputs[].address
+        106  agree  body.outputs[].assets{}
+        106  agree  body.outputs[].coin
+        106  agree  body.outputs[].datum
+        106  agree  body.outputs[].script
+        106  agree  body.proposals[empty]
+        106  agree  body.reference_inputs[empty]
+        106  agree  body.script_data_hash
+        106  agree  body.start
+        106  agree  body.starting_balance_intervals[empty]
+        106  agree  body.sub_txs.order[]
+        106  agree  body.sub_txs[empty]
+        106  agree  body.top_guards[empty]
+        106  agree  body.total_collateral
+        106  agree  body.treasury
+        106  agree  body.ttl
+        106  agree  body.votes[empty]
+        106  agree  body.withdrawals[empty]
+        106  agree  valid
+        106  agree  wits.boots[empty]
+        106  agree  wits.datums[empty]
+        106  agree  wits.redeemers[empty]
+        106  agree  wits.scripts[empty]
+        212  agree  wits.vkeys{}[]
+EXIT 0

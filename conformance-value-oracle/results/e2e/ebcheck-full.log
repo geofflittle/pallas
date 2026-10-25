@@ -1,0 +1,7 @@
+blocks: 30440
+hash equals previous announcement True, size equals True: 6871
+inlined: 6871
+planted hash equals previous announcement False: 6871
+transactions with proposals: 1
+  slot 488445 pos 0 inlined False hash a1f781c4c4bb5c380fd0331cfc3ca3b4a3740491e274dcf8e58b0fe459a0d479 kinds [['parameterChangeAction']]
+EXIT 0

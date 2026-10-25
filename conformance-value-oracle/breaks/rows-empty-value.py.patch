@@ -1,0 +1,12 @@
+--- ../gen/value.py	2026-10-26 06:45:04
++++ rows-empty/value.py	2026-10-26 06:51:44
+@@ -30,9 +30,6 @@
+             print(f"line counts differ: row {n - 1} is missing from {ended}")
+             sys.exit(2)
+         yield row
+-    if n == 0:
+-        print(f"no rows in {' '.join(paths)}")
+-        sys.exit(2)
+ 
+ 
+ class Reader:
