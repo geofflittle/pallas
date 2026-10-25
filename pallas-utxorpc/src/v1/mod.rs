@@ -65,7 +65,7 @@ fn with_pool_bls_key(
         Some(u5c::certificate::Certificate::PoolRegistration(x)) => Some(
             u5c::certificate::Certificate::PoolRegistration(u5c::PoolRegistrationCert {
                 bls_key: key.map(|k| u5c::PoolBlsKey {
-                    bls_pubkey: k.bls_pubkey.to_vec().into(),
+                    bls_pubkey: vec![0u8; k.bls_pubkey.len()].into(),
                     bls_possession_proof: k.bls_possession_proof.to_vec().into(),
                 }),
                 ..x
