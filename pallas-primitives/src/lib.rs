@@ -455,8 +455,8 @@ pub enum StakeCredential {
 }
 
 flat_enum::decode_flat_enum!(StakeCredential,
-    0 => AddrKeyhash(hash),
-    1 => ScriptHash(hash),
+    0 => ScriptHash(hash),
+    1 => AddrKeyhash(hash),
 );
 
 /// Index of a transaction within its containing block.
