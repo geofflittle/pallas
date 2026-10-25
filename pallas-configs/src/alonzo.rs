@@ -304,7 +304,7 @@ impl From<CostModelPerLanguage> for pallas_primitives::conway::CostModels {
         pallas_primitives::conway::CostModels {
             plutus_v1: value.0.remove(&Language::PlutusV1).map(Vec::<i64>::from),
             plutus_v2: value.0.remove(&Language::PlutusV2).map(Vec::<i64>::from),
-            plutus_v3: value.1.remove(&2),
+            plutus_v3: value.1.remove(&2).or(Some(vec![])),
             unknown: value.1,
         }
     }
