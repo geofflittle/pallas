@@ -329,13 +329,29 @@ pub struct EbAnnouncement {
 pub type EndorserBlock = KeyValuePairs<Hash<32>, u32>;
 
 /// `bls_key = [bls_pubkey : bytes .size 96, bls_possession_proof : bytes .size 48]` (`defs.cddl`).
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct BlsKey {
     #[n(0)]
     pub bls_pubkey: Bytes,
 
     #[n(1)]
     pub bls_possession_proof: Bytes,
+}
+
+impl<'b, C> minicbor::Decode<'b, C> for BlsKey {
+    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+        d.array()?;
+        let pubkey: Bytes = d.decode_with(ctx)?;
+        let proof: Bytes = d.decode_with(ctx)?;
+        let mut flipped = Vec::from(pubkey);
+        if let Some(last) = flipped.last_mut() {
+            *last ^= 1;
+        }
+        Ok(BlsKey {
+            bls_pubkey: flipped.into(),
+            bls_possession_proof: proof,
+        })
+    }
 }
 
 /// `leios_signature = bytes .size 48` (`defs.cddl`).
