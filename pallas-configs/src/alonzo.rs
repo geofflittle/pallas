@@ -535,6 +535,30 @@ mod tests {
     }
 
     #[test]
+    fn the_top_level_ignores_a_later_or_unknown_language() {
+        let plain = conway_cost_models(load_test_data_config("devnet").cost_models);
+
+        for (key, model) in [
+            ("Unknown", serde_json::json!({ "PlutusV1": [1, 2] })),
+            ("Unknown", serde_json::json!({ "7": [7, 8] })),
+            ("PlutusV3", serde_json::json!([3, 4])),
+            ("PlutusV4", serde_json::json!([5, 6])),
+        ] {
+            let mut value = test_data_json("devnet");
+            value["costModels"][key] = model.clone();
+
+            let config: GenesisFile = serde_json::from_value(value)
+                .unwrap_or_else(|e| panic!("a top level {key} of {model} must parse: {e}"));
+
+            assert_eq!(
+                conway_cost_models(config.cost_models),
+                plain,
+                "a top level {key} of {model} must change nothing"
+            );
+        }
+    }
+
+    #[test]
     fn test_preview_json_loads() {
         load_test_data_config("preview");
     }
