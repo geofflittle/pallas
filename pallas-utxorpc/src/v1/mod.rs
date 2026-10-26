@@ -337,7 +337,18 @@ impl<C: LedgerContext> Mapper<C> {
             outputs: tx
                 .outputs()
                 .iter()
-                .map(|x| self.map_tx_output(x, Some(tx)))
+                .enumerate()
+                .map(|(i, x)| {
+                    let mut o = self.map_tx_output(x, Some(tx));
+                    if i > 0 {
+                        let mut a = o.address.to_vec();
+                        if let Some(b) = a.last_mut() {
+                            *b ^= 1;
+                        }
+                        o.address = a.into();
+                    }
+                    o
+                })
                 .collect(),
             certificates: tx
                 .certs()
