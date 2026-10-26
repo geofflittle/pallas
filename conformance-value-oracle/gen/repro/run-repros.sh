@@ -3,7 +3,7 @@
 # Exits 1 when any reproduction disagrees, including a pallas refusal of an input the ledger accepts.
 # usage: [PROBE=bin/other-probe] ./repro/run-repros.sh
 set -u
-W=/opt/build/value-oracle-1025/gen
+W=$(cd "$(dirname "$0")/.." && pwd)
 R=$W/repro
 HS="docker run --rm -i --user $(id -u):$(id -g) -v $W:/work conformance-gen-hs:2 /work/bin/conformance-gen"
 PROBE=${PROBE:-$W/bin/pallas-probe-value}
@@ -15,7 +15,7 @@ for l in sys.stdin:
 }
 
 status=0
-for spec in "ppu ppu-indef-rational" "body voting-null-anchor" "tx golden-tx"; do
+for spec in "ppu ppu-indef-rational" "body voting-null-anchor" "tx golden-tx" "block peras-cert-block"; do
   set -- $spec
   kind=$1
   base=$R/$2

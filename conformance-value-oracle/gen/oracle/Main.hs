@@ -290,6 +290,7 @@ blockFacts (Block h b) =
       , ("prev_genesis", Aeson.toJSON (show (Leios.hbPrev hb) == "GenesisHash"))
       , ("body_size", Aeson.toJSON (Leios.hbBodySize hb))
       , ("body_hash", Aeson.String (hashToTextAsHex (Leios.hbBodyHash hb)))
+      , ("hash_of_body", Aeson.String (hashToTextAsHex (hashBlockBody b)))
       , ("contains_leios_cert", Aeson.toJSON (Leios.hbBlockBodyContainsLeiosCert hb))
       , ("eb_announcement", Aeson.toJSON (present (Leios.hbEbReferencesAnnouncement hb)))
       , ("protocol_major", Aeson.toJSON (bhviHighestSupportedMajorVersion (Leios.hbVersionInfo hb)))
@@ -510,6 +511,12 @@ bodyD body = case getMemoRawType body of
            , ("balance_intervals", intervalsD dstbrAccountBalanceIntervals)
            ]
 
+-- | A top level body with the transaction id it gives.
+topBodyD :: TxBody TopTx DijkstraEra -> D
+topBodyD body = case bodyD body of
+  DO fs -> DO (("id", c (txIdTxBody body)) : fs)
+  d -> d
+
 witsD :: TxWits DijkstraEra -> D
 witsD w =
   DO
@@ -540,7 +547,8 @@ subTxD tx =
 txD :: Tx TopTx DijkstraEra -> D
 txD tx =
   DO
-    [ ("body", bodyD (tx ^. bodyTxL))
+    [ ("id", c (txIdTx tx))
+    , ("body", bodyD (tx ^. bodyTxL))
     , ("wits", witsD (tx ^. witsTxL))
     , ("valid", DB (case tx ^. isPhase2ValidTxL of Phase2Valid -> True; Phase2Invalid -> False))
     , ("aux", opt auxD (tx ^. auxDataTxL))
@@ -614,7 +622,7 @@ render r = \case
 oracleOne :: Kind -> BS.ByteString -> Aeson.Value
 oracleOne k bs = case k of
   KTx -> decodeWithAnn @(Tx TopTx DijkstraEra) (Report txFacts txD) bs
-  KBody -> decodeWithAnn @(TxBody TopTx DijkstraEra) (Report bodyFacts bodyD) bs
+  KBody -> decodeWithAnn @(TxBody TopTx DijkstraEra) (Report bodyFacts topBodyD) bs
   KWits -> decodeWithAnn @(TxWits DijkstraEra) (Report witsFacts witsD) bs
   KPpu -> decodeWith @(PParamsUpdate DijkstraEra) (Report ppuFacts c) bs
   KBlock -> decodeWithAnn @LeiosBlock (Report blockFacts blockD) bs
