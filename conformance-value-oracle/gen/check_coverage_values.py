@@ -88,8 +88,8 @@ def main():
             failed += 1
             continue
         blocks = holders.get(name, [])
-        compared = [i for i in blocks if i in held]
-        empty = [i for i in compared if not any(pat.search(p) for p in held[i])]
+        compared = list(held)
+        empty = [] if any(pat.search(p) for i in compared for p in held[i]) else compared
         listed = sorted(p for p in unheld if pat.search(p))
         if not compared or empty or listed:
             print(f"FAIL {name} occ {occ}: blocks {len(blocks)}, compared {len(compared)}, without an agreeing value {empty}, listed {listed}")
