@@ -271,7 +271,13 @@ fn with_leios_fields(mut mapped: u5c::Block, block: &trv::MultiEraBlock) -> u5c:
         });
         mapped.peras_certificate = block
             .peras_certificate()
-            .map(|x| x.to_vec().into())
+            .map(|x| {
+                let mut v = x.to_vec();
+                if let Some(b) = v.last_mut() {
+                    *b ^= 1;
+                }
+                v.into()
+            })
             .unwrap_or_default();
     }
 
