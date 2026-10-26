@@ -32,7 +32,7 @@ pub(crate) fn nearest_ratio(n: u64, d: u64, max_num: u32, max_den: u32) -> (u32,
     }
     let below = (n * b - a * d) * e;
     let above = (c * d - n * e) * b;
-    if below < above || (below == above && b <= e) {
+    if below < above || (below == above && b < e) {
         (a as u32, b as u32)
     } else {
         (c as u32, e as u32)
