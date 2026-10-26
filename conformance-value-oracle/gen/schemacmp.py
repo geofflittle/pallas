@@ -615,7 +615,6 @@ def schema_value(kind, msg, schema):
 # A ledger path under no row, or under a row's exclusions, is listed as "no field".
 
 TX_V1 = [
-    ("id", "common.hash"),
     ("body.inputs", "common.inputs[] txHash outputIndex"),
     ("body.reference_inputs", "common.referenceInputs[] txHash outputIndex"),
     ("body.outputs", "common.outputs[] address coin assets datum script"),
