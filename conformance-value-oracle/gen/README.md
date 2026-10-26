@@ -50,7 +50,7 @@ Plants of the comparer: `PLANT=slim`, `bls` or `eb` changes one served value bef
 - `docker/Dockerfile`: image `conformance-gen-hs:2`, GHC 9.6.7 with the IntersectMBO libsodium with its VRF functions, secp256k1 v0.3.2 and blst v0.3.14. The oracle binary needs this image at run time.
 - `oracle/`: the Haskell program `conformance-gen` (`gen KIND SOURCE N SEED`, `oracle KIND` over hex lines), built inside `cardano-ledger/` at 9df9f98c (the ledger pinned by node 11.2.0.164) with `cabal.project.local` holding `packages: /work/oracle`.
 - `probe-value/`: the Rust program `pallas-probe-value KIND` over the generator's JSON lines, built against the pallas tree at `$W/conf` by `plants/build-probes.sh NAME=REV...`.
-- `check_*.py`: self checks of the comparers, each run with no arguments.
+- `check_*.py`: self checks of the comparers, each run with no arguments. `e2e/check_dial_retry.py` checks that a server call is repeated only after a failed dial.
 - `bin/`: `conformance-gen` and the probes. `bin-cuddle/cuddle`.
 
 ## Rebuild

@@ -16,6 +16,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from collections import Counter
 from decimal import Decimal
 from fractions import Fraction
@@ -27,13 +28,24 @@ GRPCURL = os.environ.get("GRPCURL", os.path.join(os.path.dirname(os.path.abspath
 PLANT = os.environ.get("PLANT", "")
 
 
-def call(addr, method, req, defaults=False):
+DIAL_ATTEMPTS = 5
+
+
+def call(addr, method, req, defaults=False, wait=5):
     args = [GRPCURL, "-plaintext", "-max-msg-sz", "1000000000"]
     if defaults:
         args.append("-emit-defaults")
     args += ["-d", json.dumps(req), addr, method]
-    out = subprocess.run(args, check=True, capture_output=True, text=True).stdout
-    return json.loads(out)
+    for attempt in range(1, DIAL_ATTEMPTS + 1):
+        p = subprocess.run(args, capture_output=True, text=True)
+        # A failed dial means the request never reached the server, so repeating it changes no served value.
+        if p.returncode == 0 or "Failed to dial target host" not in p.stderr or attempt == DIAL_ATTEMPTS:
+            break
+        time.sleep(wait)
+    if p.returncode != 0:
+        sys.stderr.write(p.stderr)
+        raise subprocess.CalledProcessError(p.returncode, args, p.stdout, p.stderr)
+    return json.loads(p.stdout)
 
 
 def b64(s):
