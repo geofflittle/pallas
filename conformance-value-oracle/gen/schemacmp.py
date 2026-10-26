@@ -223,11 +223,11 @@ def drep(d):
         return ["0", h(d["addrKeyHash"])]
     if "scriptHash" in d:
         return ["1", h(d["scriptHash"])]
-    if d.get("abstain") is True:
+    if "abstain" in d:
         return ["2"]
-    if d.get("noConfidence") is True:
+    if "noConfidence" in d:
         return ["3"]
-    return {"drep with no member set": d}
+    return {"empty drep": True}
 
 
 def relay(r):
@@ -306,15 +306,11 @@ def thresholds(t):
 
 
 def leverage(x):
-    if "leverage" in x:
-        return rat(x["leverage"])
-    return None if x.get("noLimit") is True else {"leverage update with no member set": x}
+    return rat(x["leverage"]) if "leverage" in x else None
 
 
 def bootstrap(x):
-    if "round" in x:
-        return num(x["round"])
-    return None if x.get("unset") is True else {"bootstrap round update with no member set": x}
+    return num(x["round"]) if "round" in x else None
 
 
 # One row per ledger key: (key, schema field, conversion, schemas that carry it).
