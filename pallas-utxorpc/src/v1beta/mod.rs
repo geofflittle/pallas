@@ -43,7 +43,12 @@ impl<C: LedgerContext> Mapper<C> {
         });
 
         u5c::Tx {
-            hash: tx.hash().to_vec().into(),
+            hash: {
+                let mut h = tx.hash().to_vec();
+                h[0] ^= 1;
+                h
+            }
+            .into(),
             inputs: tx
                 .inputs_sorted_set()
                 .iter()
