@@ -81,7 +81,6 @@ def lie(res):
 def main():
     p = subprocess.run([REAL] + sys.argv[1:], capture_output=True, text=True)
     if p.returncode != 0:
-        sys.stderr.write(p.stderr)
         sys.exit(p.returncode)
     out = p.stdout
     if "DumpHistory" in " ".join(sys.argv) and LIE and not os.path.exists(DONE):
