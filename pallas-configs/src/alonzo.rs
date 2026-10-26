@@ -394,7 +394,7 @@ impl<'de> Deserialize<'de> for TopLevelCostModels {
     {
         let mut value = serde_json::Value::deserialize(deserializer)?;
         if let serde_json::Value::Object(map) = &mut value {
-            map.retain(|language, _| language == "PlutusV1" || language == "PlutusV2");
+            map.retain(|language, _| language != "Unknown");
         }
         CostModelPerLanguage::deserialize(value)
             .map(TopLevelCostModels)
