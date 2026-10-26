@@ -79,7 +79,11 @@ def lie(res):
 
 
 def main():
-    out = subprocess.run([REAL] + sys.argv[1:], check=True, capture_output=True, text=True).stdout
+    p = subprocess.run([REAL] + sys.argv[1:], capture_output=True, text=True)
+    if p.returncode != 0:
+        sys.stderr.write(p.stderr)
+        sys.exit(p.returncode)
+    out = p.stdout
     if "DumpHistory" in " ".join(sys.argv) and LIE and not os.path.exists(DONE):
         res = json.loads(out)
         told = lie(res)
