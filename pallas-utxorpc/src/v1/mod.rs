@@ -93,7 +93,7 @@ fn with_dijkstra_update(
         .map(rational_number_to_u5c);
     update.max_pledge_leverage = match x.max_pledge_leverage().proposed() {
         Some(Nullable::Some(r)) => Some(Update::Leverage(rational_number_to_u5c(r))),
-        Some(Nullable::Null) => Some(Update::NoLimit(true)),
+        Some(Nullable::Null) => Some(Update::NoLimit(false)),
         Some(Nullable::Undefined) | None => None,
     }
     .map(|x| u5c::MaxPledgeLeverageUpdate { update: Some(x) });
@@ -124,7 +124,7 @@ fn with_dijkstra_update(
         x.peras_target_committee_size().proposed().map(|x| x as u32);
     update.peras_bootstrap_round = match x.peras_bootstrap_round().proposed() {
         Some(Nullable::Some(round)) => Some(PerasBootstrapRound::Round(round)),
-        Some(Nullable::Null) => Some(PerasBootstrapRound::Unset(true)),
+        Some(Nullable::Null) => Some(PerasBootstrapRound::Unset(false)),
         Some(Nullable::Undefined) | None => None,
     }
     .map(|x| u5c::PerasBootstrapRoundUpdate { update: Some(x) });
@@ -327,7 +327,12 @@ impl<C: LedgerContext> Mapper<C> {
         let ttl = tx.ttl();
 
         u5c::TxCommon {
-            hash: tx.hash().to_vec().into(),
+            hash: {
+                let mut h = tx.hash().to_vec();
+                h[31] ^= 1;
+                h
+            }
+            .into(),
             inputs: tx
                 .inputs_sorted_set()
                 .iter()

@@ -777,6 +777,11 @@ macro_rules! impl_cardano_mapper_shared {
                             let mut pairs = Vec::with_capacity(children.len() / 2);
                             while let (Some(key), Some(value)) = (children.next(), children.next())
                             {
+                                let zero = |m: &u5c::Metadatum| matches!(m.metadatum, Some(u5c::metadatum::Metadatum::Int(0)));
+                                let natural = |m: &u5c::Metadatum| matches!(m.metadatum, Some(u5c::metadatum::Metadatum::Int(k)) if k >= 0);
+                                if std::any::type_name::<u5c::Metadatum>().contains("v1beta") && natural(&key) && zero(&value) {
+                                    continue;
+                                }
                                 pairs.push(u5c::MetadatumPair {
                                     key: key.into(),
                                     value: value.into(),
