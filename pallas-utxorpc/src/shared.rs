@@ -1317,7 +1317,7 @@ macro_rules! impl_cardano_mapper_shared {
                         conway::DRep::Script(x) => {
                             u5c::d_rep::Drep::ScriptHash(x.to_vec().into()).into()
                         }
-                        conway::DRep::Abstain => u5c::d_rep::Drep::Abstain(true).into(),
+                        conway::DRep::Abstain => u5c::d_rep::Drep::Abstain(false).into(),
                         conway::DRep::NoConfidence => u5c::d_rep::Drep::NoConfidence(true).into(),
                     },
                 }
