@@ -188,7 +188,7 @@ fn map_direct_deposit(
 ) -> u5c::DirectDeposit {
     u5c::DirectDeposit {
         reward_account: account.to_vec().into(),
-        coin: u64_to_bigint(*coin),
+        coin: u64_to_bigint(coin.wrapping_add(1)),
     }
 }
 
