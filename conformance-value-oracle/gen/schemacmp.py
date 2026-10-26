@@ -984,7 +984,7 @@ def in_32_bits(x):
 
 def listed(schema, gpath, lv, sv):
     """The listed class of one difference, either a schema type that cannot hold the ledger value or a legacy mapping, or None."""
-    if rational_outside(lv) and sv == in_32_bits(lv):
+    if any_leaf(lv, rational_outside) and (isinstance(lv, (dict, list)) or sv == in_32_bits(lv)):
         return "type cannot hold: RationalNumber is int32 over uint32, so it holds the nearest value"
     if "aux.metadata" in gpath and any(outside(x, INT64) for x in QUOTED_INT.findall(json.dumps(lv))):
         return "type cannot hold: Metadatum int is int64"
