@@ -9,7 +9,7 @@ import sys
 
 src, dest, n = sys.argv[1], sys.argv[2], int(sys.argv[3])
 os.makedirs(dest, exist_ok=True)
-ebs, kept = 0, 0
+ebs, kept, equal = 0, 0, 0
 with open(f"{src}/served.jsonl") as served, open(f"{src}/block.hex") as blocks, open(f"{dest}/served.jsonl", "w") as so, open(
     f"{dest}/block.hex", "w"
 ) as bo:
@@ -18,11 +18,25 @@ with open(f"{src}/served.jsonl") as served, open(f"{src}/block.hex") as blocks, 
             break
         so.write(rec)
         bo.write(hexline)
+        r = json.loads(rec)
         kept += 1
-        ebs += len(json.loads(rec)["eb"])
+        ebs += len(r["eb"])
+        equal += r["served_txs"] == r["elements"]
 with open(f"{src}/tx.hex") as txs, open(f"{dest}/tx.hex", "w") as to:
     for i, line in enumerate(txs):
         if i >= ebs:
             break
         to.write(line)
-print(f"prefix blocks {kept}, endorser transactions {ebs}")
+with open(f"{src}/walk.json") as fh:
+    sample = json.load(fh)["eb_sample"]
+# The records hold the served and element counts, so the prefix carries that one walk check.
+with open(f"{dest}/walk.json", "w") as fh:
+    json.dump(
+        dict(
+            counts={"blocks": kept, "endorser transactions compared": ebs},
+            checks={"served transactions equal the body elements": [equal, kept]},
+            eb_sample=sample,
+        ),
+        fh,
+    )
+print(f"prefix blocks {kept}, endorser transactions {ebs}, served transactions equal the body elements in {equal} of {kept}")
