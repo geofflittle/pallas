@@ -39,7 +39,7 @@ def call(addr, method, req, defaults=False, wait=5):
     for attempt in range(1, DIAL_ATTEMPTS + 1):
         p = subprocess.run(args, capture_output=True, text=True)
         # A failed dial means the request never reached the server, so repeating it changes no served value.
-        if p.returncode == 0 or "Failed to dial target host" not in p.stderr or attempt == DIAL_ATTEMPTS:
+        if p.returncode == 0 or "Failed to dial target host" not in p.stderr or attempt == 1:
             break
         time.sleep(wait)
     if p.returncode != 0:
