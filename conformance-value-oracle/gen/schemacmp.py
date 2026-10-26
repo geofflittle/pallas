@@ -9,6 +9,8 @@ ledger dump, field by field, and compared with the ledger dump under the rows
 of that schema's path table. A ledger path no row covers is listed once per
 schema as "no field in SCHEMA". A covered path where the two differ is a
 disagreement, and so is a mapper that refuses an input the ledger accepts.
+With SCHEMA_HELD set, OUT_PREFIX.schema.held.json gives the agreeing leaves
+per schema and input index.
 Exits 1 when any disagreement is found.
 """
 
@@ -221,11 +223,11 @@ def drep(d):
         return ["0", h(d["addrKeyHash"])]
     if "scriptHash" in d:
         return ["1", h(d["scriptHash"])]
-    if "abstain" in d:
+    if d.get("abstain") is True:
         return ["2"]
-    if "noConfidence" in d:
+    if d.get("noConfidence") is True:
         return ["3"]
-    return {"empty drep": True}
+    return {"drep with no member set": d}
 
 
 def relay(r):
@@ -304,11 +306,15 @@ def thresholds(t):
 
 
 def leverage(x):
-    return rat(x["leverage"]) if "leverage" in x else None
+    if "leverage" in x:
+        return rat(x["leverage"])
+    return None if x.get("noLimit") is True else {"leverage update with no member set": x}
 
 
 def bootstrap(x):
-    return num(x["round"]) if "round" in x else None
+    if "round" in x:
+        return num(x["round"])
+    return None if x.get("unset") is True else {"bootstrap round update with no member set": x}
 
 
 # One row per ledger key: (key, schema field, conversion, schemas that carry it).
@@ -569,6 +575,7 @@ def body(c, t, top, schema):
 def tx(t, schema):
     c = t.get("common", {}) if schema == "v1" else t
     return {
+        "id": opt(c.get("hash"), h),
         "body": body(c, t, True, schema),
         "wits": wits(c.get("witnesses")),
         "valid": bool(t.get("successful", False)),
@@ -601,13 +608,14 @@ def schema_value(kind, msg, schema):
     if kind == "block":
         return block(msg, schema)
     t = tx(msg, schema)
-    return {"tx": t, "body": t["body"], "wits": t["wits"]}[kind]
+    return {"tx": t, "body": dict(t["body"], id=t["id"]), "wits": t["wits"]}[kind]
 
 
 # The path tables. A row names a ledger path prefix and the schema field it is compared with.
 # A ledger path under no row, or under a row's exclusions, is listed as "no field".
 
 TX_V1 = [
+    ("id", "common.hash"),
     ("body.inputs", "common.inputs[] txHash outputIndex"),
     ("body.reference_inputs", "common.referenceInputs[] txHash outputIndex"),
     ("body.outputs", "common.outputs[] address coin assets datum script"),
@@ -700,7 +708,7 @@ def tables():
         blocks += [("txs[]." + p, "body.tx[]." + f) for p, f in txrows + prow]
         out[s] = {
             "tx": (txrows + prow, excl + pex),
-            "body": ([(p[5:], f) for p, f in txrows + prow if p.startswith("body.")], [(p[5:], f) for p, f in excl + pex if p.startswith("body.")]),
+            "body": ([(p[5:], f) for p, f in txrows + prow if p.startswith("body.")] + [r for r in txrows if r[0] == "id"],[(p[5:], f) for p, f in excl + pex if p.startswith("body.")]),
             "wits": ([(p[5:], f) for p, f in txrows if p.startswith("wits.")], [(p[5:], f) for p, f in excl if p.startswith("wits.")]),
             "block": (blocks, [("txs[]." + p, f) for p, f in excl + pex] + [(p, f"no {s} field for v1 {f}") for p, f in BLOCK_V1 if (p, f) not in blocks]),
             "ppu": (
@@ -938,14 +946,46 @@ def rational_outside(x):
     return outside(n, INT32) or outside(d, UINT32)
 
 
+def nearest(n, d, max_num, max_den):
+    """The fraction p/q with p at most max_num and q at most max_den nearest to n/d, the smaller q and then the smaller value on a tie."""
+    if n >= max_num * d:
+        return max_num, 1
+    (a, b), (c, e) = (0, 1), (1, 0)
+    while a * d != n * b:
+        k = (n * b - a * d) // (c * d - n * e)
+        k = min(k, (max_num - a) // c if c else k, (max_den - b) // e if e else k)
+        a, b = a + k * c, b + k * e
+        if a * d == n * b:
+            break
+        j = (c * d - n * e - 1) // (n * b - a * d)
+        j = min(j, (max_num - c) // a if a else j, (max_den - e) // b)
+        c, e = c + j * a, e + j * b
+        if k == 0 and j == 0:
+            break
+    if a * d == n * b or e == 0:
+        return a, b
+    below, above = (n * b - a * d) * e, (c * d - n * e) * b
+    if below < above or (below == above and b <= e):
+        return a, b
+    return c, e
+
+
 def any_leaf(v, pred):
     return any(pred(x) for x in flatten(v).values()) if isinstance(v, (dict, list)) else pred(v)
 
 
+def in_32_bits(x):
+    """The normalized rational a RationalNumber of int32 over uint32 holds for a wider normalized rational."""
+    n, d = (int(v) for v in x[2:].split("/"))
+    p, q = nearest(n, d, INT32[1], UINT32[1])
+    f = Fraction(p, q)
+    return f"r:{f.numerator}/{f.denominator}"
+
+
 def listed(schema, gpath, lv, sv):
     """The listed class of one difference, either a schema type that cannot hold the ledger value or a legacy mapping, or None."""
-    if any_leaf(lv, rational_outside):
-        return "type cannot hold: RationalNumber is int32 over uint32"
+    if rational_outside(lv) and sv == in_32_bits(lv):
+        return "type cannot hold: RationalNumber is int32 over uint32, so it holds the nearest value"
     if "aux.metadata" in gpath and any(outside(x, INT64) for x in QUOTED_INT.findall(json.dumps(lv))):
         return "type cannot hold: Metadatum int is int64"
     if gpath == "peras_cert" and lv == "h:" and sv is None:
@@ -973,7 +1013,7 @@ def listed(schema, gpath, lv, sv):
 
 
 def result():
-    return dict(agree=Counter(), nofield=Counter(), cannot=Counter(), dis=[], compared=0)
+    return dict(agree=Counter(), nofield=Counter(), cannot=Counter(), dis=[], compared=0, held={})
 
 
 def compare_one(kind, schema, ledger, msg, table, r, where):
@@ -996,17 +1036,20 @@ def compare_one(kind, schema, ledger, msg, table, r, where):
             continue
         cls = f"{schema} lacks" if sv == ABSENT else f"{schema} extra" if lv == ABSENT else f"{schema} value differs"
         r["dis"].append(dict(where, cls=cls, key=gp, path=path, ledger=lv, schema=sv))
+    held = r["held"].setdefault(where["i"], Counter()) if os.environ.get("SCHEMA_HELD") else Counter()
     for path in flatten(lview):
         gp = generic(path)
         if path.endswith(("[empty]", "{empty}")) and any(p.startswith(generic(path[:-7])) for p, f in rows):
             gp = generic(path[:-7]) + "[empty]"
             if path not in bad:
                 r["agree"][gp] += 1
+                held[gp] += 1
             continue
         if covered(gp, rows, excl) is None:
             r["nofield"][uncovered_class(gp, excl)] += 1
         elif not any(path == b or path.startswith(b) for b in bad):
             r["agree"][gp] += 1
+            held[gp] += 1
 
 
 def compare(kind, aligned):
@@ -1061,6 +1104,9 @@ def main():
             indent=1,
             sort_keys=True,
         )
+    if os.environ.get("SCHEMA_HELD"):
+        with open(f"{prefix}.schema.held.json", "w") as fh:
+            json.dump({s: r["held"] for s, r in res.items()}, fh, sort_keys=True)
     for s in SCHEMAS:
         r = res[s]
         dis = r["dis"]

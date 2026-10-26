@@ -34,6 +34,15 @@ def tag24_indefinite(err, hexstr):
     return bool(m) and hexstr[2 * int(m.group(1)) - 4 : 2 * int(m.group(1))] == "d818"
 
 
+def without_ids(v):
+    """The value without its transaction ids, which name the input bytes rather than the value."""
+    if isinstance(v, dict):
+        return {k: without_ids(x) for k, x in v.items() if k != "id"}
+    if isinstance(v, list):
+        return [without_ids(x) for x in v]
+    return v
+
+
 def compare(kind, aligned):
     totals = Counter()
     agree, differ = Counter(), Counter()
@@ -77,7 +86,7 @@ def compare(kind, aligned):
         if not r["ok"]:
             dis.append(dict(i=n, cls="ledger refuses the pallas re-encoding", key=short(r.get("err")), hex=g["hex"], again=again))
             continue
-        if normalize(r["dump"]) != ln:
+        if without_ids(normalize(r["dump"])) != without_ids(ln):
             dis.append(dict(i=n, cls="pallas re-encoding holds a different ledger value", key="", hex=g["hex"], again=again))
             continue
         listed[("pallas re-encodes to other bytes of the same ledger value", "")] += 1

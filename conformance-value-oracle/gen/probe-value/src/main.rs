@@ -525,12 +525,13 @@ fn sub_tx(s: &d::SubTransaction) -> Value {
 }
 
 fn tx(
-    b: &d::TransactionBody,
+    b: &KeepRaw<d::TransactionBody>,
     w: &d::WitnessSet,
     valid: bool,
     a: &Nullable<KeepRaw<d::AuxiliaryData>>,
 ) -> Value {
     obj(vec![
+        ("id", cb(&Hasher::<256>::hash(b.raw_cbor()))),
         ("body", body(b)),
         ("wits", wits(w)),
         ("valid", json!(valid)),
@@ -647,7 +648,9 @@ fn run_tx(m: &Mappers, bytes: &[u8]) -> Outcome {
 fn run_body(m: &Mappers, bytes: &[u8]) -> Outcome {
     let decode = stage(|| {
         let b: d::TransactionBody = minicbor::decode(bytes).map_err(|e| e.to_string())?;
-        Ok((body(&b), enc(&b)))
+        let mut dump = body(&b);
+        dump["id"] = cb(&Hasher::<256>::hash(bytes));
+        Ok((dump, enc(&b)))
     });
     Outcome { decode, mapped: map_tx_all(m, &wrap_tx(bytes, &[0xa0])) }
 }

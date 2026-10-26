@@ -7,6 +7,7 @@ served body is longer than its header body size (endorser transactions inlined),
 as a map from transaction hash to transaction size (FORM=array for `[+ [transaction_hash, transaction_size]]`) from the inlined transactions (the hash of each whole transaction and its length) and compares its blake2b 256 hash and size
 with the announcement of the previous block. A second arm changes one byte of one inlined transaction and requires a
 mismatch. It also records every served transaction that carries proposals.
+Exits 1 unless every inlined block agrees with the announcement and every planted byte is refused.
 """
 
 import json
@@ -28,6 +29,7 @@ def enc_uint(n, major=0):
 
 
 FORM = os.environ.get("FORM", "map")
+TIP = int(os.environ["NODE_TIP"].split(":")[0]) if os.environ.get("NODE_TIP") else None
 
 
 def refs_cbor(txs):
@@ -105,6 +107,8 @@ def main():
                 fh.write(json.dumps(rec) + "\n")
                 prev_ann = ann
             token = res.get("nextToken")
+            if TIP and any(int(b["cardano"]["header"].get("slot", 0)) == TIP for b in res.get("block", [])):
+                break
             if c["blocks"] >= int(os.environ.get("MAXBLOCKS") or 10**9):
                 break
             if not token or not res.get("block"):
@@ -120,6 +124,11 @@ def main():
     print(f"transactions with proposals: {len(props)}")
     for p in props:
         print(f"  slot {p['slot']} pos {p['pos']} inlined {p['inlined']} hash {p['hash']} kinds {[list(x.get('govAction', {})) for x in p['proposals']]}")
+    agree = c["hash equals previous announcement True, size equals True"]
+    fired = c["planted hash equals previous announcement False"]
+    print(f"ebcheck: inlined blocks {c['inlined']}, announcement agrees {agree}, planted byte refused {fired}")
+    if not c["inlined"] or agree != c["inlined"] or fired != c["inlined"]:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

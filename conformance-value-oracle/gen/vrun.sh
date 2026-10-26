@@ -2,10 +2,11 @@
 # Generates N values per kind and source, decodes them with the ledger and with pallas, and compares the values.
 # valuecmp.py compares the pallas value and re-encoding with the ledger's, schemacmp.py each utxorpc schema.
 # GEN_FROM names an earlier output dir whose generated values and ledger results are reused.
+# The source `given` generates nothing and reads the values already written to OUT/KIND.given.gen.jsonl.
 # Exits 1 when any comparison finds a disagreement or a kind and source has other than N generated values.
 # usage: [PROBE=bin/other-probe] [OUT=dir] [GEN_FROM=dir] ./vrun.sh N SEED [KINDS] [SOURCES]
 set -u
-W=/opt/build/value-oracle-1025/gen
+W=$(cd "$(dirname "$0")" && pwd)
 N=${1:-100}
 SEED=${2:-1}
 KINDS=${3:-"tx body wits ppu block"}
@@ -29,6 +30,7 @@ for kind in $KINDS; do
       ln -f "$GEN_FROM/$kind.$src.oracle.jsonl" "$base.oracle.jsonl"
     else
       case $src in
+        given) ;;
         mutate)
           $HS gen "$kind" arb "$N" "$SEED" > "$base.seed.jsonl"
           python3 -I "$W/mutate.py" "$SEED" < "$base.seed.jsonl" > "$base.gen.jsonl"
