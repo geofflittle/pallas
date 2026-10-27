@@ -1,0 +1,11 @@
+== final 3298a858d41aff5e6c4b46e49d62d1a450d7547b 3298a85
+coverage test: exit 0
+coverage blocks: 66
+schema v1alpha block: values 64, field paths 166, leaves agree 20011, ledger classes with no field 29, listed differences 256, disagreements 0 on 0 values
+schema v1beta block: values 64, field paths 216, leaves agree 21435, ledger classes with no field 26, listed differences 259, disagreements 0 on 0 values
+schema v1 block: values 64, field paths 624, leaves agree 29110, ledger classes with no field 9, listed differences 22, disagreements 0 on 0 values
+coverage value run: exit 0
+coverage values: locations 124, failing 0
+AGREES true
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.10s
+coverage: exit 0
