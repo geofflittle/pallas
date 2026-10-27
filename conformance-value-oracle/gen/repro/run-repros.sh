@@ -5,7 +5,7 @@
 set -u
 W=$(cd "$(dirname "$0")/.." && pwd)
 R=$W/repro
-HS="docker run --rm -i --user $(id -u):$(id -g) -v $W:/work conformance-gen-hs:2 /work/bin/conformance-gen"
+HS="docker run --rm -i --log-driver none --user $(id -u):$(id -g) -v $W:/work conformance-gen-hs:2 /work/bin/conformance-gen"
 PROBE=${PROBE:-$W/bin/pallas-probe-value}
 
 hexes() {

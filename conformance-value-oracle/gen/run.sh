@@ -13,7 +13,7 @@ OUT=${OUT:-$W/out}
 PROBE=${PROBE:-$W/bin/pallas-probe}
 GEN_FROM=${GEN_FROM:-}
 mkdir -p "$OUT"
-HS="docker run --rm -i --user $(id -u):$(id -g) -v $W:/work conformance-gen-hs:2 /work/bin/conformance-gen"
+HS="docker run --rm -i --log-driver none --user $(id -u):$(id -g) -v $W:/work conformance-gen-hs:2 /work/bin/conformance-gen"
 for kind in $KINDS; do
   for src in $SOURCES; do
     base=$OUT/$kind.$src
@@ -22,8 +22,8 @@ for kind in $KINDS; do
       cp "$GEN_FROM/$kind.$src.oracle.jsonl" "$base.oracle.jsonl"
     else
     case $src in
-      cuddle-cli) docker run --rm --user "$(id -u):$(id -g)" -v "$W:/work" conformance-gen-hs:2 sh /work/gen-cuddle-cli.sh "$kind" "$N" "$SEED" > "$base.gen.jsonl" ;;
-      cuddle-cli-plain) docker run --rm --user "$(id -u):$(id -g)" -v "$W:/work" conformance-gen-hs:2 sh /work/gen-cuddle-cli.sh "$kind" "$N" "$SEED" --no-twiddle > "$base.gen.jsonl" ;;
+      cuddle-cli) docker run --rm --log-driver none --user "$(id -u):$(id -g)" -v "$W:/work" conformance-gen-hs:2 sh /work/gen-cuddle-cli.sh "$kind" "$N" "$SEED" > "$base.gen.jsonl" ;;
+      cuddle-cli-plain) docker run --rm --log-driver none --user "$(id -u):$(id -g)" -v "$W:/work" conformance-gen-hs:2 sh /work/gen-cuddle-cli.sh "$kind" "$N" "$SEED" --no-twiddle > "$base.gen.jsonl" ;;
       *) $HS gen "$kind" "$src" "$N" "$SEED" > "$base.gen.jsonl" ;;
     esac
     python3 -I -c 'import json,sys

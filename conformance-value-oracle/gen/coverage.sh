@@ -31,7 +31,7 @@ cp -r /opt/build/integration-1025/bp-0460 "trees/$NAME/cardano-blueprint"
 cp "$G/coverage/w42_coverage.rs" "trees/$NAME/examples/u5c-chain-oracle/tests/w42_coverage.rs"
 find "trees/$NAME" -name '*.rs' -exec touch {} +
 echo "== $NAME $REV $(git -C pallas rev-parse --short "$REV")"
-docker run --rm --user "$(id -u):$(id -g)" -v "$W:/w" \
+docker run --rm --log-driver none --user "$(id -u):$(id -g)" -v "$W:/w" \
   -v "$SAMPLES:/samples:ro" -v "$SYNTH:/synth:ro" \
   -e HOME=/w/home -e CARGO_HOME=/w/cargo-home -e RUSTUP_HOME=/usr/local/rustup \
   -e CARGO_TARGET_DIR=/w/target-coverage -e CARGO_INCREMENTAL=0 -e CARGO_BUILD_JOBS=3 \
