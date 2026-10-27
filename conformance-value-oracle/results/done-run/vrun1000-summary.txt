@@ -1,0 +1,100 @@
+== v1000-base-block-arb
+value block: values 1000, ledger accepts 1000, both accept 1000, field paths 2444, leaves agree 6078161, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha block: values 1000, field paths 693, leaves agree 872431, ledger classes with no field 30, listed differences 16430, disagreements 0 on 0 values
+schema v1beta block: values 1000, field paths 835, leaves agree 1609992, ledger classes with no field 27, listed differences 17365, disagreements 0 on 0 values
+schema v1 block: values 1000, field paths 1933, leaves agree 5439120, ledger classes with no field 11, listed differences 45224, disagreements 0 on 0 values
+== v1000-base-block-cddl-plain
+value block: values 1000, ledger accepts 1000, both accept 1000, field paths 2288, leaves agree 447627, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha block: values 1000, field paths 1664, leaves agree 270671, ledger classes with no field 29, listed differences 6604, disagreements 0 on 0 values
+schema v1beta block: values 1000, field paths 1922, leaves agree 333105, ledger classes with no field 26, listed differences 7040, disagreements 0 on 0 values
+schema v1 block: values 1000, field paths 2162, leaves agree 405535, ledger classes with no field 10, listed differences 6242, disagreements 0 on 0 values
+== v1000-base-block-cddl
+value block: values 1000, ledger accepts 1000, both accept 901, field paths 1912, leaves agree 335811, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha block: values 901, field paths 1372, leaves agree 202363, ledger classes with no field 29, listed differences 5023, disagreements 0 on 0 values
+schema v1beta block: values 901, field paths 1596, leaves agree 248388, ledger classes with no field 26, listed differences 5349, disagreements 0 on 0 values
+schema v1 block: values 901, field paths 1821, leaves agree 301714, ledger classes with no field 10, listed differences 4619, disagreements 0 on 0 values
+== v1000-base-block-mutate
+value block: values 1000, ledger accepts 118, both accept 118, field paths 2303, leaves agree 1612161, leaves differ 0, accepted ledger-invalid 315, disagreements 0 on 0 values
+schema v1alpha block: values 118, field paths 597, leaves agree 209507, ledger classes with no field 30, listed differences 3531, disagreements 0 on 0 values
+schema v1beta block: values 118, field paths 739, leaves agree 404215, ledger classes with no field 27, listed differences 3763, disagreements 0 on 0 values
+schema v1 block: values 118, field paths 1791, leaves agree 1431504, ledger classes with no field 11, listed differences 12117, disagreements 0 on 0 values
+== v1000-base-body-arb
+value body: values 1000, ledger accepts 1000, both accept 1000, field paths 2020, leaves agree 12908482, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha body: values 1000, field paths 412, leaves agree 1298900, ledger classes with no field 15, listed differences 35193, disagreements 0 on 0 values
+schema v1beta body: values 1000, field paths 417, leaves agree 2412618, ledger classes with no field 14, listed differences 35193, disagreements 0 on 0 values
+schema v1 body: values 1000, field paths 1520, leaves agree 11209310, ledger classes with no field 2, listed differences 120695, disagreements 0 on 0 values
+== v1000-base-body-cddl-plain
+value body: values 1000, ledger accepts 1000, both accept 1000, field paths 564, leaves agree 353711, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha body: values 1000, field paths 231, leaves agree 207847, ledger classes with no field 14, listed differences 3807, disagreements 0 on 0 values
+schema v1beta body: values 1000, field paths 236, leaves agree 250159, ledger classes with no field 13, listed differences 3807, disagreements 0 on 0 values
+schema v1 body: values 1000, field paths 539, leaves agree 343144, ledger classes with no field 1, listed differences 3903, disagreements 0 on 0 values
+== v1000-base-body-cddl
+value body: values 1000, ledger accepts 1000, both accept 784, field paths 453, leaves agree 239998, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha body: values 784, field paths 152, leaves agree 143975, ledger classes with no field 14, listed differences 2599, disagreements 0 on 0 values
+schema v1beta body: values 784, field paths 157, leaves agree 170540, ledger classes with no field 13, listed differences 2599, disagreements 0 on 0 values
+schema v1 body: values 784, field paths 433, leaves agree 233097, ledger classes with no field 1, listed differences 2568, disagreements 0 on 0 values
+== v1000-base-body-mutate
+value body: values 1000, ledger accepts 179, both accept 179, field paths 1923, leaves agree 2471473, leaves differ 0, accepted ledger-invalid 379, disagreements 0 on 0 values
+schema v1alpha body: values 179, field paths 375, leaves agree 237767, ledger classes with no field 15, listed differences 6552, disagreements 0 on 0 values
+schema v1beta body: values 179, field paths 380, leaves agree 431710, ledger classes with no field 14, listed differences 6552, disagreements 0 on 0 values
+schema v1 body: values 179, field paths 1423, leaves agree 2156124, ledger classes with no field 2, listed differences 21584, disagreements 0 on 0 values
+== v1000-base-ppu-arb
+value ppu: values 1000, ledger accepts 1000, both accept 1000, field paths 309, leaves agree 398256, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha ppu: values 1000, field paths 35, leaves agree 209037, ledger classes with no field 2, listed differences 9113, disagreements 0 on 0 values
+schema v1beta ppu: values 1000, field paths 35, leaves agree 209037, ledger classes with no field 2, listed differences 9113, disagreements 0 on 0 values
+schema v1 ppu: values 1000, field paths 56, leaves agree 224233, ledger classes with no field 1, listed differences 12267, disagreements 0 on 0 values
+== v1000-base-ppu-cddl-plain
+value ppu: values 1000, ledger accepts 1000, both accept 1000, field paths 306, leaves agree 42902, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha ppu: values 1000, field paths 35, leaves agree 20395, ledger classes with no field 2, listed differences 9173, disagreements 0 on 0 values
+schema v1beta ppu: values 1000, field paths 35, leaves agree 20395, ledger classes with no field 2, listed differences 9173, disagreements 0 on 0 values
+schema v1 ppu: values 1000, field paths 53, leaves agree 23360, ledger classes with no field 1, listed differences 9973, disagreements 0 on 0 values
+== v1000-base-ppu-cddl
+value ppu: values 1000, ledger accepts 1000, both accept 1000, field paths 306, leaves agree 42603, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha ppu: values 1000, field paths 35, leaves agree 20343, ledger classes with no field 2, listed differences 9173, disagreements 0 on 0 values
+schema v1beta ppu: values 1000, field paths 35, leaves agree 20343, ledger classes with no field 2, listed differences 9173, disagreements 0 on 0 values
+schema v1 ppu: values 1000, field paths 53, leaves agree 23308, ledger classes with no field 1, listed differences 9973, disagreements 0 on 0 values
+== v1000-base-ppu-mutate
+value ppu: values 1000, ledger accepts 121, both accept 121, field paths 308, leaves agree 66581, leaves differ 0, accepted ledger-invalid 445, disagreements 0 on 0 values
+schema v1alpha ppu: values 121, field paths 32, leaves agree 35748, ledger classes with no field 2, listed differences 1025, disagreements 0 on 0 values
+schema v1beta ppu: values 121, field paths 32, leaves agree 35748, ledger classes with no field 2, listed differences 1025, disagreements 0 on 0 values
+schema v1 ppu: values 121, field paths 53, leaves agree 37586, ledger classes with no field 1, listed differences 1390, disagreements 0 on 0 values
+== v1000-base-tx-arb
+value tx: values 1000, ledger accepts 1000, both accept 1000, field paths 2488, leaves agree 12984313, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha tx: values 1000, field paths 732, leaves agree 1825621, ledger classes with no field 17, listed differences 41794, disagreements 0 on 0 values
+schema v1beta tx: values 1000, field paths 874, leaves agree 3453949, ledger classes with no field 14, listed differences 43730, disagreements 0 on 0 values
+schema v1 tx: values 1000, field paths 1986, leaves agree 11421382, ledger classes with no field 2, listed differences 110138, disagreements 0 on 0 values
+== v1000-base-tx-cddl-plain
+value tx: values 1000, ledger accepts 1000, both accept 1000, field paths 3947, leaves agree 927650, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha tx: values 1000, field paths 3063, leaves agree 586246, ledger classes with no field 16, listed differences 13699, disagreements 0 on 0 values
+schema v1beta tx: values 1000, field paths 3370, leaves agree 719485, ledger classes with no field 13, listed differences 14522, disagreements 0 on 0 values
+schema v1 tx: values 1000, field paths 3670, leaves agree 873599, ledger classes with no field 1, listed differences 13922, disagreements 0 on 0 values
+== v1000-base-tx-cddl
+value tx: values 1000, ledger accepts 1000, both accept 799, field paths 3139, leaves agree 648021, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha tx: values 799, field paths 2380, leaves agree 408173, ledger classes with no field 16, listed differences 9914, disagreements 0 on 0 values
+schema v1beta tx: values 799, field paths 2656, leaves agree 500897, ledger classes with no field 13, listed differences 10505, disagreements 0 on 0 values
+schema v1 tx: values 799, field paths 2949, leaves agree 609368, ledger classes with no field 1, listed differences 9837, disagreements 0 on 0 values
+== v1000-base-tx-mutate
+value tx: values 1000, ledger accepts 221, both accept 221, field paths 2373, leaves agree 2890749, leaves differ 0, accepted ledger-invalid 335, disagreements 0 on 0 values
+schema v1alpha tx: values 221, field paths 666, leaves agree 379696, ledger classes with no field 17, listed differences 8111, disagreements 0 on 0 values
+schema v1beta tx: values 221, field paths 808, leaves agree 735815, ledger classes with no field 14, listed differences 8566, disagreements 0 on 0 values
+schema v1 tx: values 221, field paths 1871, leaves agree 2581227, ledger classes with no field 2, listed differences 21525, disagreements 0 on 0 values
+== v1000-base-wits-arb
+value wits: values 1000, ledger accepts 1000, both accept 1000, field paths 297, leaves agree 1013262, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha wits: values 1000, field paths 155, leaves agree 448942, ledger classes with no field 2, listed differences 3431, disagreements 0 on 0 values
+schema v1beta wits: values 1000, field paths 292, leaves agree 949536, ledger classes with no field 0, listed differences 5400, disagreements 0 on 0 values
+schema v1 wits: values 1000, field paths 295, leaves agree 987169, ledger classes with no field 0, listed differences 0, disagreements 0 on 0 values
+== v1000-base-wits-cddl-plain
+value wits: values 1000, ledger accepts 1000, both accept 1000, field paths 1196, leaves agree 509523, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha wits: values 1000, field paths 903, leaves agree 322617, ledger classes with no field 2, listed differences 4051, disagreements 0 on 0 values
+schema v1beta wits: values 1000, field paths 1184, leaves agree 412007, ledger classes with no field 0, listed differences 4820, disagreements 0 on 0 values
+schema v1 wits: values 1000, field paths 1190, leaves agree 469683, ledger classes with no field 0, listed differences 5313, disagreements 0 on 0 values
+== v1000-base-wits-cddl
+value wits: values 1000, ledger accepts 1000, both accept 1000, field paths 1196, leaves agree 509486, leaves differ 0, accepted ledger-invalid 0, disagreements 0 on 0 values
+schema v1alpha wits: values 1000, field paths 903, leaves agree 322580, ledger classes with no field 2, listed differences 4051, disagreements 0 on 0 values
+schema v1beta wits: values 1000, field paths 1184, leaves agree 411970, ledger classes with no field 0, listed differences 4820, disagreements 0 on 0 values
+schema v1 wits: values 1000, field paths 1190, leaves agree 469646, ledger classes with no field 0, listed differences 5313, disagreements 0 on 0 values
+== v1000-base-wits-mutate
+value wits: values 1000, ledger accepts 570, both accept 570, field paths 297, leaves agree 615782, leaves differ 0, accepted ledger-invalid 198, disagreements 0 on 0 values
+schema v1alpha wits: values 570, field paths 155, leaves agree 274812, ledger classes with no field 2, listed differences 1887, disagreements 0 on 0 values
+schema v1beta wits: values 570, field paths 292, leaves agree 579627, ledger classes with no field 0, listed differences 3099, disagreements 0 on 0 values
+schema v1 wits: values 570, field paths 295, leaves agree 600543, ledger classes with no field 0, listed differences 1, disagreements 0 on 0 values

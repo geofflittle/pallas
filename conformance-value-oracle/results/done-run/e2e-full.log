@@ -1,0 +1,12 @@
+arm full2 lie none sample 1026 32 maxblocks none tip 764330:47e1471cf80a94d41d1b27b361f4f69aa381812da662a6b095b9290d904f6962
+walk: exit 0
+ebcheck: inlined blocks 8193, announcement agrees 8193, planted byte refused 8193
+ebcheck: exit 0
+compare: exit 0
+endorser positions: 1026 32
+ledger refuses: 0
+v1 block: values 34049, field paths 206, leaves agree 105717645, ledger classes with no field 9, listed differences 0, disagreements 0
+v1 endorser tx: values 272722, field paths 163, leaves agree 14170589, ledger classes with no field 0, listed differences 0, disagreements 0
+e2e: exit 0
+exit 0
+seconds 16121
