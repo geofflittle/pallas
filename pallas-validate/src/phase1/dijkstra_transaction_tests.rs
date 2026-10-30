@@ -1329,7 +1329,7 @@ fn dijkstra_invalid_multiasset_encodings() {
             let inputs = vec![(tx.transaction_body.inputs[0].clone(), input.clone())];
             dijkstra_tests::error(
                 run(&tx, &inputs, &dijkstra_tests::env(), &CertState::default()),
-                "PostAlonzo(NegativeValue)",
+                "DijkstraMalformed(\"multi-asset value\")",
             );
         }
     });

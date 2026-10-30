@@ -731,8 +731,8 @@ fn dijkstra_native_signatures_are_not_met_by_bootstrap_keys() {
 fn dijkstra_bootstrap_chain_codes_are_32_bytes() {
     batch(|tx, input| {
         for (length, expected) in [
-            (31, Some("DijkstraMalformedBootstrapWitness")),
-            (33, Some("DijkstraMalformedBootstrapWitness")),
+            (31, Some("DijkstraMalformed(\"bootstrap witness\")")),
+            (33, Some("DijkstraMalformed(\"bootstrap witness\")")),
             (32, None),
         ] {
             let mut changed = tx.clone();
@@ -761,6 +761,217 @@ fn dijkstra_bootstrap_chain_codes_are_32_bytes() {
                 Some(e) => error(result, e),
             }
         }
+    });
+}
+
+/// A key witness over `hash` by the key with seed byte `seed`.
+fn key_witness(seed: u8, hash: &[u8]) -> n::VKeyWitness {
+    let key = SecretKey::from([seed; 32]);
+    n::VKeyWitness {
+        vkey: key.public_key().as_ref().to_vec().into(),
+        signature: key.sign(hash).as_ref().to_vec().into(),
+    }
+}
+/// Key and bootstrap witness sets over `body`, each with the result it gives.
+fn witness_cases(body: &[u8]) -> Vec<(Vec<n::VKeyWitness>, Vec<n::BootstrapWitness>, &str)> {
+    let signed = key_witness(71, body);
+    let key = |vkey: usize, signature: usize| n::VKeyWitness {
+        vkey: signed.vkey[..vkey].to_vec().into(),
+        signature: signed.signature[..signature].to_vec().into(),
+    };
+    let byron = |public_key: usize, signature: usize| {
+        let whole = bootstrap(body);
+        n::BootstrapWitness {
+            public_key: whole.public_key[..public_key].to_vec().into(),
+            signature: whole.signature[..signature].to_vec().into(),
+            ..whole
+        }
+    };
+    vec![
+        (
+            vec![signed.clone(), key_witness(72, body)],
+            vec![],
+            "Ok(())",
+        ),
+        (
+            vec![signed.clone(), key_witness(71, b"elsewhere")],
+            vec![],
+            "Err(PostAlonzo(VKWrongSignature))",
+        ),
+        (
+            vec![signed.clone(), signed.clone()],
+            vec![],
+            "Err(DijkstraMalformed(\"duplicate key witnesses\"))",
+        ),
+        (
+            vec![key(31, 64)],
+            vec![],
+            "Err(DijkstraMalformed(\"key witness\"))",
+        ),
+        (
+            vec![key(32, 63)],
+            vec![],
+            "Err(DijkstraMalformed(\"key witness\"))",
+        ),
+        (
+            vec![signed.clone()],
+            vec![bootstrap(body), bootstrap_with(body, &[8; 32], &[0xa0])],
+            "Ok(())",
+        ),
+        (
+            vec![signed.clone()],
+            vec![bootstrap(body), bootstrap(b"elsewhere")],
+            "Err(DijkstraMalformed(\"duplicate bootstrap witnesses\"))",
+        ),
+        (
+            vec![signed.clone()],
+            vec![byron(31, 64)],
+            "Err(DijkstraMalformed(\"bootstrap witness\"))",
+        ),
+        (
+            vec![signed.clone()],
+            vec![byron(32, 63)],
+            "Err(DijkstraMalformed(\"bootstrap witness\"))",
+        ),
+    ]
+}
+
+#[test]
+fn dijkstra_witnesses_the_node_does_not_decode_are_malformed() {
+    batch(|tx, input| {
+        let top = body_hash(&tx.transaction_body);
+        for (i, (keys, bootstraps, expected)) in witness_cases(top.as_ref()).into_iter().enumerate()
+        {
+            let mut changed = tx.clone();
+            changed.transaction_witness_set.vkeywitness = n::NonEmptySet::from_vec(keys);
+            changed.transaction_witness_set.bootstrap_witness =
+                n::NonEmptySet::from_vec(bootstraps);
+            let result = run(&changed, &input, &env());
+            assert_eq!(format!("{result:?}"), expected, "top case {i}");
+        }
+        let sub = tx.transaction_body.sub_transactions.as_ref().unwrap()[0].clone();
+        let sub = body_hash(&sub.sub_transaction_body);
+        for (i, (keys, bootstraps, expected)) in witness_cases(sub.as_ref()).into_iter().enumerate()
+        {
+            let mut changed = tx.clone();
+            change_sub(&mut changed, |sub| {
+                sub.transaction_witness_set.vkeywitness = n::NonEmptySet::from_vec(keys);
+                sub.transaction_witness_set.bootstrap_witness =
+                    n::NonEmptySet::from_vec(bootstraps);
+            });
+            sign(&mut changed);
+            let result = run(&changed, &input, &env());
+            assert_eq!(format!("{result:?}"), expected, "sub case {i}");
+        }
+    });
+}
+
+#[test]
+fn dijkstra_fields_the_node_does_not_decode_are_malformed() {
+    batch(|tx, input| {
+        let outcome =
+            |changed: &n::BlockTransaction<'_>| format!("{:?}", run(changed, &input, &env()));
+        let malformed = |label: &str| format!("Err(DijkstraMalformed({label:?}))");
+        let key = guard_key();
+        let other = Hasher::<224>::hash(SecretKey::from([72; 32]).public_key().as_ref());
+        let guards = |keys: Vec<Hash<28>>| {
+            Some(n::Guards::AddrKeyhashes(
+                n::NonEmptySet::from_vec(keys).unwrap(),
+            ))
+        };
+        let mut changed = tx.clone();
+        changed.transaction_body.guards = guards(vec![key, other]);
+        let body = body_hash(&changed.transaction_body);
+        changed.transaction_witness_set.vkeywitness = n::NonEmptySet::from_vec(vec![
+            key_witness(71, body.as_ref()),
+            key_witness(72, body.as_ref()),
+        ]);
+        assert_eq!(outcome(&changed), "Ok(())");
+        changed.transaction_body.guards = guards(vec![key, key]);
+        sign(&mut changed);
+        assert_eq!(outcome(&changed), malformed("duplicate guards"));
+        let mut changed = tx.clone();
+        change_sub(&mut changed, |sub| {
+            sub.sub_transaction_body.guards = guards(vec![key, key]);
+            sign_sub(sub);
+        });
+        sign(&mut changed);
+        assert_eq!(outcome(&changed), malformed("duplicate guards"));
+
+        let mut changed = tx.clone();
+        changed.transaction_body.required_top_level_guards = Some(Default::default());
+        sign(&mut changed);
+        assert_eq!(
+            outcome(&changed),
+            malformed("empty required top-level guards")
+        );
+        let mut changed = tx.clone();
+        change_sub(&mut changed, |sub| {
+            sub.sub_transaction_body.required_top_level_guards = Some(Default::default());
+            sign_sub(sub);
+        });
+        sign(&mut changed);
+        assert_eq!(
+            outcome(&changed),
+            malformed("empty required top-level guards")
+        );
+
+        let mut changed = tx.clone();
+        changed.transaction_body.withdrawals = Some(Default::default());
+        sign(&mut changed);
+        assert_eq!(outcome(&changed), malformed("empty withdrawals"));
+
+        let policy = |names: Vec<(Vec<u8>, i64)>| -> n::Multiasset<n::NonZeroInt> {
+            [(
+                key,
+                names
+                    .into_iter()
+                    .map(|(name, quantity)| (name.into(), quantity.try_into().unwrap()))
+                    .collect(),
+            )]
+            .into_iter()
+            .collect()
+        };
+        for mint in [
+            Default::default(),
+            policy(vec![]),
+            policy(vec![(vec![1; 33], 1)]),
+        ] {
+            let mut changed = tx.clone();
+            changed.transaction_body.mint = Some(mint);
+            sign(&mut changed);
+            assert_eq!(outcome(&changed), malformed("multi-asset value"));
+        }
+
+        let redeemed = |redeemer: KeepRaw<'static, n::Redeemers>| {
+            let mut changed = tx.clone();
+            changed.transaction_witness_set.redeemer = Some(redeemer);
+            outcome(&changed)
+        };
+        assert_eq!(
+            redeemed(KeepRaw::from(n::Redeemers(Default::default()))),
+            malformed("empty redeemers")
+        );
+        let limit = i64::MAX as u64;
+        assert_eq!(
+            redeemed(spend_redeemer(limit, limit)),
+            redeemed(spend_redeemer(1, 1))
+        );
+        for (mem, steps) in [(limit + 1, 0), (0, limit + 1)] {
+            assert_eq!(
+                redeemed(spend_redeemer(mem, steps)),
+                malformed("execution units")
+            );
+        }
+
+        let datums = |raw: &'static [u8]| {
+            let mut changed = tx.clone();
+            changed.transaction_witness_set.plutus_data = Some(minicbor::decode(raw).unwrap());
+            outcome(&changed)
+        };
+        // Zero written in one byte and in two bytes are different datums.
+        assert_eq!(datums(&[0x82, 0x00, 0x18, 0x00]), datums(&[0x81, 0x00]));
+        assert_eq!(datums(&[0x82, 0x00, 0x00]), malformed("duplicate datums"));
     });
 }
 
@@ -1058,6 +1269,10 @@ fn dijkstra_min_fee_is_the_fee_validation_refuses_one_below() {
 
 /// Redeemers declaring one spend of `mem` memory and no steps.
 fn redeemers(mem: u64) -> KeepRaw<'static, n::Redeemers> {
+    spend_redeemer(mem, 0)
+}
+/// Redeemers declaring one spend of `mem` memory and `steps` steps.
+fn spend_redeemer(mem: u64, steps: u64) -> KeepRaw<'static, n::Redeemers> {
     let map = [(
         n::RedeemersKey {
             tag: n::RedeemerTag::Spend,
@@ -1065,7 +1280,7 @@ fn redeemers(mem: u64) -> KeepRaw<'static, n::Redeemers> {
         },
         n::RedeemersValue {
             data: n::PlutusData::BigInt(n::BigInt::Int(0.into())),
-            ex_units: pallas_primitives::ExUnits { mem, steps: 0 },
+            ex_units: pallas_primitives::ExUnits { mem, steps },
         },
     )]
     .into_iter()
@@ -1254,7 +1469,7 @@ fn dijkstra_batch_rejects_duplicate_required_top_level_guards() {
             let patched: n::BlockTransaction = minicbor::decode(&raw).unwrap();
             error(
                 run(&patched, &input, &env()),
-                "DijkstraUnsupported(\"duplicate required top-level guards\")",
+                "DijkstraMalformed(\"duplicate required top-level guards\")",
             );
         }
     });

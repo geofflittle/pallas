@@ -49,8 +49,8 @@ pub enum ValidationError {
     DijkstraMalformedScript,
 
     #[cfg(feature = "unstable")]
-    #[error("Dijkstra bootstrap witness chain code is not 32 bytes")]
-    DijkstraMalformedBootstrapWitness,
+    #[error("malformed Dijkstra transaction field: {0}")]
+    DijkstraMalformed(&'static str),
 
     #[error("transaction and protocol parameters differ")]
     TxAndProtParamsDiffer,

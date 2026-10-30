@@ -18,6 +18,7 @@ use pallas_traverse::{
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 type Keys = HashSet<Hash<28>>;
+const MALFORMED_VALUE: ValidationError = DijkstraMalformed("multi-asset value");
 type Spent = HashSet<(Hash<32>, u64)>;
 
 /// Validate native phase one. Registration updates are provisional until phase two
@@ -127,10 +128,7 @@ pub fn validate_dijkstra_tx(
             );
         }
     }
-    for (index, (hash, assets)) in b.mint.iter().flat_map(|x| x.iter()).enumerate() {
-        if assets.is_empty() || assets.keys().any(|x| x.len() > 32) {
-            return Err(PostAlonzo(NegativeValue));
-        }
+    for (index, hash) in b.mint.iter().flat_map(|x| x.keys()).enumerate() {
         scripts.insert(
             RedeemersKey {
                 tag: RedeemerTag::Mint,
@@ -624,13 +622,24 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
         if *key == 5 {
             let withdrawals: pallas_codec::utils::KeyValuePairs<Bytes, u64> =
                 minicbor::decode(value).map_err(|_| DijkstraInvalidWithdrawal("encoding"))?;
+            if withdrawals.is_empty() {
+                return Err(DijkstraMalformed("empty withdrawals"));
+            }
             let mut seen = HashSet::new();
             if withdrawals.iter().any(|(a, _)| !seen.insert(a.to_vec())) {
                 return Err(DijkstraInvalidWithdrawal("duplicate account"));
             }
         }
     }
+    check_guards(b.guards.as_ref())?;
     check_witness_fields(&tx.transaction_witness_set, true)
+}
+fn check_guards(guards: Option<&Guards>) -> ValidationResult {
+    let guards = guard_credentials(guards);
+    match guards.iter().collect::<BTreeSet<_>>().len() == guards.len() {
+        true => Ok(()),
+        false => Err(DijkstraMalformed("duplicate guards")),
+    }
 }
 fn check_witness_fields(w: &KeepRaw<'_, WitnessSet<'_>>, redeemers: bool) -> ValidationResult {
     if w.plutus_v1_script.is_some()
@@ -640,12 +649,43 @@ fn check_witness_fields(w: &KeepRaw<'_, WitnessSet<'_>>, redeemers: bool) -> Val
     {
         return Err(DijkstraUnsupported("Plutus witnesses"));
     }
-    if w.bootstrap_witness
+    let mut keys = HashSet::new();
+    for x in w.vkeywitness.iter().flat_map(|x| x.iter()) {
+        if x.vkey.len() != 32 || x.signature.len() != 64 {
+            return Err(DijkstraMalformed("key witness"));
+        }
+        if !keys.insert((x.vkey.to_vec(), x.signature.to_vec())) {
+            return Err(DijkstraMalformed("duplicate key witnesses"));
+        }
+    }
+    let mut roots = HashSet::new();
+    for x in w.bootstrap_witness.iter().flat_map(|x| x.iter()) {
+        if x.public_key.len() != 32 || x.signature.len() != 64 || x.chain_code.len() != 32 {
+            return Err(DijkstraMalformed("bootstrap witness"));
+        }
+        if !roots.insert(super::conway::bootstrap_wit_root(x)) {
+            return Err(DijkstraMalformed("duplicate bootstrap witnesses"));
+        }
+    }
+    let mut datums = HashSet::new();
+    if w.plutus_data
         .iter()
         .flat_map(|x| x.iter())
-        .any(|x| x.chain_code.len() != 32)
+        .any(|x| !datums.insert(x.raw_cbor()))
     {
-        return Err(DijkstraMalformedBootstrapWitness);
+        return Err(DijkstraMalformed("duplicate datums"));
+    }
+    if let Some(redeemers) = &w.redeemer {
+        if redeemers.is_empty() {
+            return Err(DijkstraMalformed("empty redeemers"));
+        }
+        let limit = i64::MAX as u64;
+        if redeemers
+            .iter()
+            .any(|(_, x)| x.ex_units.mem > limit || x.ex_units.steps > limit)
+        {
+            return Err(DijkstraMalformed("execution units"));
+        }
     }
     let allowed = if redeemers {
         &[0, 1, 2, 4, 5, 7][..]
@@ -693,15 +733,19 @@ fn check_sub_supported(tx: &SubTransaction<'_>) -> ValidationResult {
             return Err(DijkstraUnsupported("duplicate reference inputs"));
         }
     }
+    check_guards(b.guards.as_ref())?;
     check_witness_fields(&tx.transaction_witness_set, false)
 }
 /// Decoding into a BTreeMap would hide duplicate guards, which the ledger rejects.
 fn check_required_guard_keys(raw: &[u8]) -> ValidationResult {
     let guards: pallas_codec::utils::KeyValuePairs<StakeCredential, pallas_codec::utils::AnyCbor> =
         minicbor::decode(raw).map_err(|_| DijkstraUnsupported("required top-level guards"))?;
+    if guards.is_empty() {
+        return Err(DijkstraMalformed("empty required top-level guards"));
+    }
     let mut seen = BTreeSet::new();
     if guards.iter().any(|(key, _)| !seen.insert(key)) {
-        return Err(DijkstraUnsupported("duplicate required top-level guards"));
+        return Err(DijkstraMalformed("duplicate required top-level guards"));
     }
     Ok(())
 }
@@ -1353,14 +1397,14 @@ fn well_formed_v3(script: &[u8]) -> ValidationResult {
 fn check_asset_encoding(raw: &[u8], mint: bool) -> ValidationResult {
     use pallas_codec::utils::KeyValuePairs;
     let assets: KeyValuePairs<Hash<28>, KeyValuePairs<Bytes, minicbor::data::Int>> =
-        minicbor::decode(raw).map_err(|_| PostAlonzo(NegativeValue))?;
+        minicbor::decode(raw).map_err(|_| MALFORMED_VALUE)?;
     let mut policies = HashSet::new();
     if assets.is_empty() {
-        return Err(PostAlonzo(NegativeValue));
+        return Err(MALFORMED_VALUE);
     }
     for (policy, names) in assets.iter() {
         if !policies.insert(*policy) || names.is_empty() {
-            return Err(PostAlonzo(NegativeValue));
+            return Err(MALFORMED_VALUE);
         }
         let mut seen = HashSet::new();
         for (name, quantity) in names.iter() {
@@ -1371,7 +1415,7 @@ fn check_asset_encoding(raw: &[u8], mint: bool) -> ValidationResult {
                 || (mint && i64::try_from(quantity).is_err())
                 || (!mint && u64::try_from(quantity).is_err())
             {
-                return Err(PostAlonzo(NegativeValue));
+                return Err(MALFORMED_VALUE);
             }
         }
     }
@@ -1380,22 +1424,20 @@ fn check_asset_encoding(raw: &[u8], mint: bool) -> ValidationResult {
 fn check_output_value_encoding(raw: &[u8]) -> ValidationResult {
     use pallas_codec::utils::{AnyCbor, KeyValuePairs};
     let mut decoder = minicbor::Decoder::new(raw);
-    let value = match decoder.datatype().map_err(|_| PostAlonzo(NegativeValue))? {
+    let value = match decoder.datatype().map_err(|_| MALFORMED_VALUE)? {
         minicbor::data::Type::Map | minicbor::data::Type::MapIndef => {
             let fields: KeyValuePairs<u64, AnyCbor> =
-                decoder.decode().map_err(|_| PostAlonzo(NegativeValue))?;
+                decoder.decode().map_err(|_| MALFORMED_VALUE)?;
             fields
                 .iter()
                 .find(|(k, _)| *k == 1)
                 .map(|(_, v)| v.clone())
-                .ok_or(PostAlonzo(NegativeValue))?
+                .ok_or(MALFORMED_VALUE)?
         }
         _ => {
-            decoder.array().map_err(|_| PostAlonzo(NegativeValue))?;
-            decoder.skip().map_err(|_| PostAlonzo(NegativeValue))?;
-            decoder
-                .decode::<AnyCbor>()
-                .map_err(|_| PostAlonzo(NegativeValue))?
+            decoder.array().map_err(|_| MALFORMED_VALUE)?;
+            decoder.skip().map_err(|_| MALFORMED_VALUE)?;
+            decoder.decode::<AnyCbor>().map_err(|_| MALFORMED_VALUE)?
         }
     };
     let mut d = minicbor::Decoder::new(&value);
@@ -1403,9 +1445,9 @@ fn check_output_value_encoding(raw: &[u8]) -> ValidationResult {
         d.datatype(),
         Ok(minicbor::data::Type::Array | minicbor::data::Type::ArrayIndef)
     ) {
-        let values: Vec<AnyCbor> = d.decode().map_err(|_| PostAlonzo(NegativeValue))?;
+        let values: Vec<AnyCbor> = d.decode().map_err(|_| MALFORMED_VALUE)?;
         if values.len() != 2 {
-            return Err(PostAlonzo(NegativeValue));
+            return Err(MALFORMED_VALUE);
         }
         check_asset_encoding(&values[1], false)?;
     }

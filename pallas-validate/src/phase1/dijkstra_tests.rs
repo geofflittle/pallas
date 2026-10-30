@@ -229,7 +229,7 @@ fn dijkstra_captured_signatures_are_required_and_all_verified() {
         tx.transaction_witness_set.vkeywitness = native::NonEmptySet::from_vec(vec![witness]);
         error(
             dispatch(&tx, &output, &env()),
-            "PostAlonzo(VKWrongSignature)",
+            "DijkstraMalformed(\"key witness\")",
         );
     });
 }
