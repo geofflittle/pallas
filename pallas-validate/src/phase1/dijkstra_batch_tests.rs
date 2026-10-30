@@ -575,6 +575,195 @@ fn dijkstra_batch_sub_spends_a_bootstrap_input() {
     });
 }
 
+/// The key hash the ledger takes for the key `bootstrap` signs with, under `chain_code` and the `attributes` bytes as sent.
+fn bootstrap_root(chain_code: &[u8], attributes: &[u8]) -> Hash<28> {
+    let key = SecretKey::from([7; 32]);
+    pallas_addresses::byron::AddressPayload::hash_address_id_preimage(
+        &[
+            &super::conway::BOOTSTRAP_ROOT_HEADER[..],
+            key.public_key().as_ref(),
+            chain_code,
+            attributes,
+        ]
+        .concat(),
+    )
+}
+/// A Byron address whose root is `root`.
+fn byron_address_at(root: Hash<28>) -> pallas_codec::utils::Bytes {
+    use pallas_addresses::byron::{AddrType, AddressPayload, ByronAddress};
+    ByronAddress::from(AddressPayload {
+        root,
+        attributes: vec![].into(),
+        addrtype: AddrType::PubKey,
+    })
+    .to_vec()
+    .into()
+}
+/// `bootstrap`, with the given chain code and attribute bytes.
+fn bootstrap_with(signed: &[u8], chain_code: &[u8], attributes: &[u8]) -> n::BootstrapWitness {
+    n::BootstrapWitness {
+        chain_code: chain_code.to_vec().into(),
+        attributes: attributes.to_vec().into(),
+        ..bootstrap(signed)
+    }
+}
+/// Adds `witness` to the bootstrap witnesses of `witnesses`.
+fn add_bootstrap(witnesses: &mut n::WitnessSet<'_>, witness: n::BootstrapWitness) {
+    let mut all: Vec<_> = witnesses
+        .bootstrap_witness
+        .iter()
+        .flat_map(|x| x.iter().cloned())
+        .collect();
+    all.push(witness);
+    witnesses.bootstrap_witness = n::NonEmptySet::from_vec(all);
+}
+
+#[test]
+fn dijkstra_bootstrap_roots_hash_the_attribute_bytes_as_sent() {
+    token_order_batch(|tx, input, sub_input| {
+        let body = body_hash(
+            &tx.transaction_body.sub_transactions.as_ref().unwrap()[0].sub_transaction_body,
+        );
+        for (address, expected) in [
+            (&[0xa0][..], Some("PostAlonzo(VKWitnessMissing)")),
+            (&[0xbf, 0xff][..], None),
+        ] {
+            let mut spent = sub_input.clone();
+            post_alonzo(&mut spent).address = byron_address_at(bootstrap_root(&[9; 32], address));
+            let mut changed = tx.clone();
+            change_sub(&mut changed, |sub| {
+                add_bootstrap(
+                    &mut sub.transaction_witness_set,
+                    bootstrap_with(body.as_ref(), &[9; 32], &[0xbf, 0xff]),
+                );
+            });
+            sign(&mut changed);
+            let result = run_sub(&changed, &input, &spent);
+            match expected {
+                None => assert!(result.is_ok(), "{result:?}"),
+                Some(e) => error(result, e),
+            }
+        }
+    });
+}
+
+#[test]
+fn dijkstra_key_guards_are_met_by_bootstrap_keys() {
+    batch(|tx, input| {
+        let root = bootstrap_root(&[9; 32], &[0xa0]);
+        let guards = Some(n::Guards::AddrKeyhashes(
+            n::NonEmptySet::from_vec(vec![guard_key(), root]).unwrap(),
+        ));
+        for witnessed in [false, true] {
+            let mut changed = tx.clone();
+            change_sub(&mut changed, |sub| {
+                sub.sub_transaction_body.guards = guards.clone();
+                sign_sub(sub);
+                if witnessed {
+                    let body = body_hash(&sub.sub_transaction_body);
+                    add_bootstrap(&mut sub.transaction_witness_set, bootstrap(body.as_ref()));
+                }
+            });
+            sign(&mut changed);
+            let result = run(&changed, &input, &env());
+            match witnessed {
+                true => assert!(result.is_ok(), "sub {result:?}"),
+                false => error(result, "PostAlonzo(VKWitnessMissing)"),
+            }
+            let mut changed = tx.clone();
+            changed.transaction_body.guards = guards.clone();
+            sign(&mut changed);
+            if witnessed {
+                let body = body_hash(&changed.transaction_body);
+                add_bootstrap(
+                    &mut changed.transaction_witness_set,
+                    bootstrap(body.as_ref()),
+                );
+            }
+            let result = run(&changed, &input, &env());
+            match witnessed {
+                true => assert!(result.is_ok(), "top {result:?}"),
+                false => error(result, "PostAlonzo(VKWitnessMissing)"),
+            }
+        }
+    });
+}
+
+#[test]
+fn dijkstra_native_signatures_are_not_met_by_bootstrap_keys() {
+    batch(|mut tx, input| {
+        let policy = native(n::NativeScript::ScriptPubkey(bootstrap_root(
+            &[9; 32],
+            &[0xa0],
+        )));
+        let mut outputs = tx.transaction_body.outputs.clone().to_vec();
+        let coin = MultiEraOutput::from_dijkstra(&outputs[0]).value().coin();
+        let minted: n::Multiasset<n::NonZeroInt> = [(
+            policy.original_hash(),
+            [(b"token".to_vec().into(), 5.try_into().unwrap())]
+                .into_iter()
+                .collect(),
+        )]
+        .into_iter()
+        .collect();
+        post_alonzo(&mut outputs[0]).value = pallas_primitives::conway::Value::Multiasset(
+            coin,
+            [(
+                policy.original_hash(),
+                [(b"token".to_vec().into(), 5.try_into().unwrap())]
+                    .into_iter()
+                    .collect(),
+            )]
+            .into_iter()
+            .collect(),
+        );
+        tx.transaction_body.outputs = MaybeIndefArray::Def(outputs);
+        tx.transaction_body.mint = Some(minted);
+        tx.transaction_witness_set.native_script = n::NonEmptySet::from_vec(vec![policy]);
+        sign(&mut tx);
+        let body = body_hash(&tx.transaction_body);
+        add_bootstrap(&mut tx.transaction_witness_set, bootstrap(body.as_ref()));
+        error(run(&tx, &input, &env()), "PostAlonzo(NativeScriptDenial)");
+    });
+}
+
+#[test]
+fn dijkstra_bootstrap_chain_codes_are_32_bytes() {
+    batch(|tx, input| {
+        for (length, expected) in [
+            (31, Some("DijkstraMalformedBootstrapWitness")),
+            (33, Some("DijkstraMalformedBootstrapWitness")),
+            (32, None),
+        ] {
+            let mut changed = tx.clone();
+            let body = body_hash(&changed.transaction_body);
+            add_bootstrap(
+                &mut changed.transaction_witness_set,
+                bootstrap_with(body.as_ref(), &vec![9; length], &[0xa0]),
+            );
+            let result = run(&changed, &input, &env());
+            match expected {
+                None => assert!(result.is_ok(), "top {length} {result:?}"),
+                Some(e) => error(result, e),
+            }
+            let mut changed = tx.clone();
+            change_sub(&mut changed, |sub| {
+                let body = body_hash(&sub.sub_transaction_body);
+                add_bootstrap(
+                    &mut sub.transaction_witness_set,
+                    bootstrap_with(body.as_ref(), &vec![9; length], &[0xa0]),
+                );
+            });
+            sign(&mut changed);
+            let result = run(&changed, &input, &env());
+            match expected {
+                None => assert!(result.is_ok(), "sub {length} {result:?}"),
+                Some(e) => error(result, e),
+            }
+        }
+    });
+}
+
 #[test]
 fn dijkstra_batch_top_level_mints_under_a_native_policy() {
     batch(|mut tx, input| {

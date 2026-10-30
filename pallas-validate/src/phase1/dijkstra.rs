@@ -5,9 +5,7 @@ use crate::utils::{
     ValidationError, ValidationError::*, ValidationResult, add_fee_and_stake_deposits,
     verify_signature,
 };
-use pallas_addresses::{
-    Address, ByronAddress, ShelleyDelegationPart, ShelleyPaymentPart, StakePayload,
-};
+use pallas_addresses::{Address, ShelleyDelegationPart, ShelleyPaymentPart, StakePayload};
 use pallas_codec::{
     minicbor,
     utils::{KeepRaw, Nullable},
@@ -256,12 +254,7 @@ pub fn validate_dijkstra_tx(
             }
         }
         output_coin = add(output_coin, check_outputs(&sb.outputs, pp, network_id)?)?;
-        check_signatures(
-            w,
-            &encode(&sub.sub_transaction_body)?,
-            sub_keys,
-            &spending.bootstrap,
-        )?;
+        check_signatures(w, &encode(&sub.sub_transaction_body)?, sub_keys)?;
     }
     let spending = check_inputs(&b.inputs, utxos, &mut spent, &mut keys)?;
     consumed = add(consumed, spending.coin)?;
@@ -278,12 +271,7 @@ pub fn validate_dijkstra_tx(
         return Err(PostAlonzo(PreservationOfValue));
     }
     check_assets(tx, utxos)?;
-    check_signatures(
-        &tx.transaction_witness_set,
-        &encode(b)?,
-        keys,
-        &spending.bootstrap,
-    )?;
+    check_signatures(&tx.transaction_witness_set, &encode(b)?, keys)?;
     cert_state.dijkstra_registrations = state;
     cert_state.dijkstra_account_balances = accounts;
     Ok(())
@@ -416,12 +404,11 @@ fn check_required_guards(
     }
     Ok(())
 }
-/// One level's spending inputs: their coin and the scripts and bootstrap
-/// witnesses that must authorize them. Key hashes go into the caller's set.
+/// One level's spending inputs: their coin and the scripts that must authorize
+/// them. Their key hashes, Byron address roots included, are added to the caller's set.
 struct Spending {
     coin: u64,
     scripts: BTreeSet<Hash<28>>,
-    bootstrap: Vec<ByronAddress>,
 }
 fn check_inputs(
     inputs: &[TransactionInput],
@@ -436,7 +423,6 @@ fn check_inputs(
     let mut spending = Spending {
         coin: 0,
         scripts: BTreeSet::new(),
-        bootstrap: Vec::new(),
     };
     for input in inputs {
         let id = (input.transaction_id, input.index);
@@ -458,7 +444,6 @@ fn check_inputs(
             Spender::Script(hash) => {
                 spending.scripts.insert(hash);
             }
-            Spender::Bootstrap(address) => spending.bootstrap.push(address),
         }
     }
     Ok(spending)
@@ -466,7 +451,6 @@ fn check_inputs(
 enum Spender {
     Key(Hash<28>),
     Script(Hash<28>),
-    Bootstrap(ByronAddress),
 }
 /// Pointer delegation plays no part in spending, so pointer addresses pass.
 fn spender(output: &MultiEraOutput<'_>) -> Result<Spender, ValidationError> {
@@ -475,16 +459,16 @@ fn spender(output: &MultiEraOutput<'_>) -> Result<Spender, ValidationError> {
             ShelleyPaymentPart::Key(key) => Spender::Key(*key),
             ShelleyPaymentPart::Script(hash) => Spender::Script(*hash),
         }),
-        Address::Byron(address) => Ok(Spender::Bootstrap(address)),
+        Address::Byron(address) => Ok(Spender::Key(
+            address
+                .decode()
+                .map_err(|_| PostAlonzo(InputDecoding))?
+                .root,
+        )),
         Address::Stake(_) => Err(PostAlonzo(InputDecoding)),
     }
 }
-fn check_signatures(
-    w: &WitnessSet<'_>,
-    body: &[u8],
-    mut required: Keys,
-    bootstrap: &[ByronAddress],
-) -> ValidationResult {
+fn check_signatures(w: &WitnessSet<'_>, body: &[u8], mut required: Keys) -> ValidationResult {
     let hash = Hasher::<256>::hash(body);
     for witness in w.vkeywitness.iter().flat_map(|x| x.iter()) {
         if witness.vkey.len() != 32
@@ -495,11 +479,7 @@ fn check_signatures(
         }
         required.remove(&Hasher::<224>::hash(&witness.vkey));
     }
-    if !required.is_empty() {
-        return Err(PostAlonzo(VKWitnessMissing));
-    }
-    let witnesses: Vec<_> = w.bootstrap_witness.iter().flat_map(|x| x.iter()).collect();
-    for witness in &witnesses {
+    for witness in w.bootstrap_witness.iter().flat_map(|x| x.iter()) {
         let signed = VKeyWitness {
             vkey: witness.public_key.clone(),
             signature: witness.signature.clone(),
@@ -510,18 +490,10 @@ fn check_signatures(
         {
             return Err(PostAlonzo(VKWrongSignature));
         }
+        required.remove(&super::conway::bootstrap_wit_root(witness));
     }
-    for address in bootstrap {
-        let root = address
-            .decode()
-            .map_err(|_| PostAlonzo(InputDecoding))?
-            .root;
-        if !witnesses
-            .iter()
-            .any(|x| super::conway::bootstrap_wit_root(x) == Some(root))
-        {
-            return Err(PostAlonzo(VKWitnessMissing));
-        }
+    if !required.is_empty() {
+        return Err(PostAlonzo(VKWitnessMissing));
     }
     Ok(())
 }
@@ -657,6 +629,13 @@ fn check_witness_fields(w: &KeepRaw<'_, WitnessSet<'_>>, redeemers: bool) -> Val
             && (w.redeemer.is_some() || w.plutus_v3_script.is_some() || w.plutus_data.is_some()))
     {
         return Err(DijkstraUnsupported("Plutus witnesses"));
+    }
+    if w.bootstrap_witness
+        .iter()
+        .flat_map(|x| x.iter())
+        .any(|x| x.chain_code.len() != 32)
+    {
+        return Err(DijkstraMalformedBootstrapWitness);
     }
     let allowed = if redeemers {
         &[0, 1, 2, 4, 5, 7][..]

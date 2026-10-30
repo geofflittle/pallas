@@ -48,6 +48,10 @@ pub enum ValidationError {
     #[error("malformed Dijkstra Plutus V3 script")]
     DijkstraMalformedScript,
 
+    #[cfg(feature = "unstable")]
+    #[error("Dijkstra bootstrap witness chain code is not 32 bytes")]
+    DijkstraMalformedBootstrapWitness,
+
     #[error("transaction and protocol parameters differ")]
     TxAndProtParamsDiffer,
 
