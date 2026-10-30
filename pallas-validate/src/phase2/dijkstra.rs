@@ -66,13 +66,16 @@ fn context_output(
                         .map_err(|_| Error::DijkstraInvalid("native script encoding"))?;
                 Some(c::ScriptRef::NativeScript(compatible.to_owned()))
             }
+            n::ScriptRef::PlutusV1Script(s) => Some(c::ScriptRef::PlutusV1Script(s.clone())),
+            n::ScriptRef::PlutusV2Script(s) => Some(c::ScriptRef::PlutusV2Script(s.clone())),
             n::ScriptRef::PlutusV3Script(s) => Some(c::ScriptRef::PlutusV3Script(s.clone())),
             _ => return unsupported("reference script language (requires V3)"),
         },
         Some(MultiEraScriptRef::Conway(s)) => match s.as_ref() {
             c::ScriptRef::NativeScript(s) => Some(c::ScriptRef::NativeScript(s.clone().to_owned())),
+            c::ScriptRef::PlutusV1Script(s) => Some(c::ScriptRef::PlutusV1Script(s.clone())),
+            c::ScriptRef::PlutusV2Script(s) => Some(c::ScriptRef::PlutusV2Script(s.clone())),
             c::ScriptRef::PlutusV3Script(s) => Some(c::ScriptRef::PlutusV3Script(s.clone())),
-            _ => return unsupported("reference script language (requires V3)"),
         },
         _ => return unsupported("reference script language (requires V3)"),
     };
@@ -234,14 +237,24 @@ fn eval_tx_with_mode(
     }
     let mut scripts = BTreeMap::new();
     for script in w.plutus_v3_script.iter().flat_map(|x| x.iter()) {
-        super::native_evaluator::check_v3_script(script.as_ref())?;
+        super::native_evaluator::check_plutus_script(script.as_ref())?;
         scripts.insert(script.compute_hash(), script.clone());
     }
+    let mut unevaluable = std::collections::BTreeSet::new();
     for i in inputs.iter().chain(&reference_inputs) {
-        if let c::TransactionOutput::PostAlonzo(o) = &i.resolved
-            && let Some(CborWrap(c::ScriptRef::PlutusV3Script(s))) = &o.script_ref
-        {
-            scripts.insert(s.compute_hash(), s.clone());
+        if let c::TransactionOutput::PostAlonzo(o) = &i.resolved {
+            match &o.script_ref {
+                Some(CborWrap(c::ScriptRef::PlutusV3Script(s))) => {
+                    scripts.insert(s.compute_hash(), s.clone());
+                }
+                Some(CborWrap(c::ScriptRef::PlutusV1Script(s))) => {
+                    unevaluable.insert(s.compute_hash());
+                }
+                Some(CborWrap(c::ScriptRef::PlutusV2Script(s))) => {
+                    unevaluable.insert(s.compute_hash());
+                }
+                _ => {}
+            }
         }
     }
     let mut expected = BTreeMap::new();
@@ -335,6 +348,9 @@ fn eval_tx_with_mode(
     expected.retain(|_, hash| !natives.contains(hash));
     purposes_by_pointer.retain(|key, _| expected.contains_key(key));
     for hash in expected.values() {
+        if unevaluable.contains(hash) && !scripts.contains_key(hash) {
+            return unsupported("reference script language (requires V3)");
+        }
         if !scripts.contains_key(hash) {
             return Err(Error::MissingRequiredScript {
                 hash: hash.to_string(),

@@ -865,6 +865,7 @@ fn check_scripts(
     let mut natives = BTreeMap::new();
     let mut available = HashSet::new();
     let mut reference_scripts = HashSet::new();
+    let mut unevaluable = HashSet::new();
     let mut refs = Spent::new();
     for input in b.reference_inputs.iter().flat_map(|x| x.iter()) {
         if !refs.insert((input.transaction_id, input.index)) {
@@ -900,10 +901,21 @@ fn check_scripts(
             let raw = match &script {
                 MultiEraScriptRef::Dijkstra(x) => match x.as_ref() {
                     ScriptRef::PlutusV3Script(s) => s.as_ref(),
+                    ScriptRef::PlutusV1Script(_) | ScriptRef::PlutusV2Script(_) => {
+                        reference_scripts.insert(script.hash());
+                        unevaluable.insert(script.hash());
+                        continue;
+                    }
                     _ => return Err(unsupported),
                 },
                 MultiEraScriptRef::Conway(x) => match x.as_ref() {
                     pallas_primitives::conway::ScriptRef::PlutusV3Script(s) => s.as_ref(),
+                    pallas_primitives::conway::ScriptRef::PlutusV1Script(_)
+                    | pallas_primitives::conway::ScriptRef::PlutusV2Script(_) => {
+                        reference_scripts.insert(script.hash());
+                        unevaluable.insert(script.hash());
+                        continue;
+                    }
                     _ => return Err(unsupported),
                 },
                 _ => return Err(unsupported),
@@ -954,6 +966,11 @@ fn check_scripts(
         .filter(|(_, hash)| !natives.contains_key(hash))
         .map(|(key, hash)| (key.clone(), *hash))
         .collect();
+    if scripts.values().any(|x| unevaluable.contains(x)) {
+        return Err(DijkstraUnsupported(
+            "reference script language (requires V3)",
+        ));
+    }
     if !scripts.is_empty() && b.ttl.is_some() {
         return Err(DijkstraUnsupported(
             "Plutus validity upper bound requires forecast state",
@@ -964,7 +981,7 @@ fn check_scripts(
         if !scripts.values().any(|x| *x == hash) || reference_scripts.contains(&hash) {
             return Err(PostAlonzo(UnneededPlutusV3Script));
         }
-        well_formed_v3(script.as_ref())?;
+        well_formed_plutus(script.as_ref())?;
         available.insert(hash);
     }
     if scripts.values().any(|x| !available.contains(x)) {
@@ -1380,16 +1397,18 @@ fn check_new_script(script: &MultiEraScriptRef<'_>) -> ValidationResult {
     match script {
         MultiEraScriptRef::Dijkstra(s) => match s.as_ref() {
             ScriptRef::NativeScript(_) => Ok(()),
-            ScriptRef::PlutusV3Script(s) => well_formed_v3(s.as_ref()),
+            ScriptRef::PlutusV1Script(s) => well_formed_plutus(s.as_ref()),
+            ScriptRef::PlutusV2Script(s) => well_formed_plutus(s.as_ref()),
+            ScriptRef::PlutusV3Script(s) => well_formed_plutus(s.as_ref()),
             _ => Err(DijkstraUnsupported("new script language (requires V3)")),
         },
         _ => Err(DijkstraUnsupported("new script language (requires V3)")),
     }
 }
-fn well_formed_v3(script: &[u8]) -> ValidationResult {
+fn well_formed_plutus(script: &[u8]) -> ValidationResult {
     #[cfg(feature = "phase2")]
     {
-        crate::phase2::native_evaluator::check_v3_script(script)
+        crate::phase2::native_evaluator::check_plutus_script(script)
             .map_err(|_| DijkstraMalformedScript)
     }
     #[cfg(not(feature = "phase2"))]

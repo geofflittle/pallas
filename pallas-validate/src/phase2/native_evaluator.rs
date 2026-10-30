@@ -302,7 +302,7 @@ fn budget_to_ex_units(budget: ExBudget) -> ExUnits {
 }
 
 /// Decode introduced script bytes at the native protocol version, without execution.
-pub(crate) fn check_v3_script(script: &[u8]) -> Result<(), Error> {
+pub(crate) fn check_plutus_script(script: &[u8]) -> Result<(), Error> {
     let arena = Arena::from_bump(Bump::new());
     let mut decoder = minicbor::Decoder::new(script);
     let flat_bytes: minicbor::bytes::ByteVec = decoder.decode()?;
@@ -320,7 +320,7 @@ pub(crate) fn check_v3_script(script: &[u8]) -> Result<(), Error> {
 
 fn check_program_version(version: amaru_uplc_native::machine::MachineVersion) -> Result<(), Error> {
     if !matches!((version.major, version.minor, version.patch), (1, 0 | 1, 0)) {
-        return Err(Error::DijkstraInvalid("unsupported V3 UPLC version"));
+        return Err(Error::DijkstraInvalid("unsupported UPLC version"));
     }
     Ok(())
 }

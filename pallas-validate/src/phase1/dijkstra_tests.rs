@@ -695,26 +695,81 @@ fn dijkstra_outputs_may_pay_to_pointer_addresses() {
     });
 }
 
-fn plutus_scripts_other_than_v3() -> [native::ScriptRef<'static>; 3] {
+fn plutus_v1_and_v2(bytes: &[u8]) -> [native::ScriptRef<'static>; 2] {
     [
-        native::ScriptRef::PlutusV1Script(pallas_primitives::PlutusScript(vec![1].into())),
-        native::ScriptRef::PlutusV2Script(pallas_primitives::PlutusScript(vec![1].into())),
-        native::ScriptRef::PlutusV4Script(pallas_primitives::PlutusScript(vec![1].into())),
+        native::ScriptRef::PlutusV1Script(pallas_primitives::PlutusScript(bytes.to_vec().into())),
+        native::ScriptRef::PlutusV2Script(pallas_primitives::PlutusScript(bytes.to_vec().into())),
     ]
 }
 
+fn plutus_v4() -> native::ScriptRef<'static> {
+    native::ScriptRef::PlutusV4Script(pallas_primitives::PlutusScript(vec![1].into()))
+}
+
+fn with_script<'a>(
+    output: &native::TransactionOutput<'a>,
+    script: native::ScriptRef<'a>,
+) -> native::TransactionOutput<'a> {
+    let mut output = output.clone();
+    let native::TransactionOutput::PostAlonzo(ref mut out) = output else {
+        unreachable!()
+    };
+    out.script_ref = Some(pallas_codec::utils::CborWrap(script));
+    output
+}
+
+fn with_new_script<'a>(
+    tx: &native::BlockTransaction<'a>,
+    script: native::ScriptRef<'a>,
+) -> native::BlockTransaction<'a> {
+    let mut tx = tx.clone();
+    let outputs = tx.transaction_body.outputs.iter();
+    let outputs = outputs
+        .map(|output| with_script(output, script.clone()))
+        .collect();
+    tx.transaction_body.outputs = MaybeIndefArray::Def(outputs);
+    sign(&mut tx);
+    tx
+}
+
 #[test]
-fn dijkstra_spent_plutus_scripts_other_than_v3_are_unsupported() {
+fn dijkstra_spent_v1_and_v2_scripts_no_purpose_needs_pass() {
     synthetic(|tx, input| {
-        assert!(dispatch(&tx, &MultiEraOutput::from_dijkstra(&input), &env()).is_ok());
-        for script in plutus_scripts_other_than_v3() {
-            let mut input = input.clone();
-            let native::TransactionOutput::PostAlonzo(ref mut out) = input else {
+        for script in plutus_v1_and_v2(&[1]) {
+            let input = with_script(&input, script);
+            let result = dispatch(&tx, &MultiEraOutput::from_dijkstra(&input), &env());
+            assert!(result.is_ok(), "{result:?}");
+        }
+        let input = with_script(&input, plutus_v4());
+        error(
+            dispatch(&tx, &MultiEraOutput::from_dijkstra(&input), &env()),
+            "DijkstraUnsupported(\"reference script language (requires V3)\")",
+        );
+    });
+}
+
+#[test]
+fn dijkstra_a_needed_v1_or_v2_reference_script_is_unsupported() {
+    synthetic(|tx, input| {
+        use pallas_traverse::ComputeHash;
+        for script in plutus_v1_and_v2(&[1]) {
+            let hash = match &script {
+                native::ScriptRef::PlutusV1Script(s) => s.compute_hash(),
+                native::ScriptRef::PlutusV2Script(s) => s.compute_hash(),
+                _ => unreachable!(),
+            };
+            let mut locked = with_script(&input, script);
+            let native::TransactionOutput::PostAlonzo(ref mut out) = locked else {
                 unreachable!()
             };
-            out.script_ref = Some(pallas_codec::utils::CborWrap(script));
+            let address = ShelleyAddress::new(
+                Network::Testnet,
+                ShelleyPaymentPart::Script(hash),
+                ShelleyDelegationPart::Null,
+            );
+            out.address = address.to_vec().into();
             error(
-                dispatch(&tx, &MultiEraOutput::from_dijkstra(&input), &env()),
+                dispatch(&tx, &MultiEraOutput::from_dijkstra(&locked), &env()),
                 "DijkstraUnsupported(\"reference script language (requires V3)\")",
             );
         }
@@ -722,24 +777,41 @@ fn dijkstra_spent_plutus_scripts_other_than_v3_are_unsupported() {
 }
 
 #[test]
-fn dijkstra_new_plutus_scripts_other_than_v3_are_unsupported() {
+fn dijkstra_new_v1_and_v2_scripts_are_checked_and_v4_is_unsupported() {
+    #[cfg(feature = "phase2")]
+    let (well_formed, malformed) = (Some(well_formed_script()), "DijkstraMalformedScript");
+    #[cfg(not(feature = "phase2"))]
+    let (well_formed, malformed) = (
+        None::<Vec<u8>>,
+        "DijkstraUnsupported(\"new Plutus script validation requires phase2 feature\")",
+    );
     synthetic(|tx, input| {
-        assert!(dispatch(&tx, &MultiEraOutput::from_dijkstra(&input), &env()).is_ok());
-        for script in plutus_scripts_other_than_v3() {
-            let mut tx = tx.clone();
-            let mut outputs: Vec<_> = tx.transaction_body.outputs.iter().cloned().collect();
-            let native::TransactionOutput::PostAlonzo(ref mut out) = outputs[0] else {
-                unreachable!()
-            };
-            out.script_ref = Some(pallas_codec::utils::CborWrap(script));
-            tx.transaction_body.outputs = MaybeIndefArray::Def(outputs);
-            sign(&mut tx);
+        let output = MultiEraOutput::from_dijkstra(&input);
+        for script in well_formed.iter().flat_map(|bytes| plutus_v1_and_v2(bytes)) {
+            let result = dispatch(&with_new_script(&tx, script), &output, &env());
+            assert!(result.is_ok(), "{result:?}");
+        }
+        for script in plutus_v1_and_v2(&[1]) {
             error(
-                dispatch(&tx, &MultiEraOutput::from_dijkstra(&input), &env()),
-                "DijkstraUnsupported(\"new script language (requires V3)\")",
+                dispatch(&with_new_script(&tx, script), &output, &env()),
+                malformed,
             );
         }
+        error(
+            dispatch(&with_new_script(&tx, plutus_v4()), &output, &env()),
+            "DijkstraUnsupported(\"new script language (requires V3)\")",
+        );
     });
+}
+
+#[cfg(feature = "phase2")]
+fn well_formed_script() -> Vec<u8> {
+    use amaru_uplc_native::{arena::Arena, flat, syn::parse_program};
+    let arena = Arena::new();
+    let version = amaru_kernel::ProtocolVersion::new(12, 0);
+    let program = parse_program(&arena, "(program 1.0.0 (con integer 0))", version);
+    let flat = flat::encode(program.into_result().unwrap()).unwrap();
+    minicbor::to_vec(minicbor::bytes::ByteVec::from(flat)).unwrap()
 }
 
 fn elements(raw: &[u8]) -> Vec<&[u8]> {
