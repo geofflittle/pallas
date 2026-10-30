@@ -390,8 +390,24 @@ pub enum DatumOption<'b> {
 
 crate::flat_enum::decode_flat_enum!(DatumOption<'b>,
     0 => Hash(hash),
-    1 => Data(data),
+    1 => Data(data: decode_inline_datum),
 );
+
+/// Decodes inline datum data, tagged bytes of either length form that hold the data's CBOR.
+fn decode_inline_datum<'b, C>(
+    d: &mut minicbor::Decoder<'b>,
+    ctx: &mut C,
+) -> Result<CborWrap<KeepRaw<'b, PlutusData>>, minicbor::decode::Error> {
+    d.tag()?;
+    let data = match pallas_codec::utils::decode_bytes_def_or_indef(d, ctx)? {
+        std::borrow::Cow::Borrowed(cbor) => minicbor::decode_with(cbor, ctx)?,
+        std::borrow::Cow::Owned(cbor) => {
+            let data: KeepRaw<'_, PlutusData> = minicbor::decode_with(&cbor, ctx)?;
+            data.to_owned()
+        }
+    };
+    Ok(CborWrap(data))
+}
 
 #[deprecated(since = "1.0.0-alpha", note = "use `DatumOption` instead")]
 pub type MintedDatumOption<'b> = DatumOption<'b>;
@@ -472,6 +488,7 @@ pub type MintedTx<'b> = Tx<'b>;
 #[cfg(test)]
 mod tests {
     use pallas_codec::minicbor;
+    use pallas_codec::utils::CborWrap;
 
     use super::{Block, DatumOption, ScriptRef, TransactionOutput};
     use crate::Fragment;
@@ -488,6 +505,27 @@ mod tests {
             format!("8200{HASH32}"),
             "8201d8184180".to_string(),
         ]);
+    }
+
+    #[test]
+    fn an_inline_datum_over_indefinite_bytes_reads_as_the_joined_chunks() {
+        for (hex, raw) in [("8201d8184180", "80"), ("8201d8185f419f41ffff", "9fff")] {
+            let bytes = hex::decode(hex).unwrap();
+            let datum: DatumOption =
+                minicbor::decode(&bytes).unwrap_or_else(|e| panic!("{hex} must decode: {e}"));
+            let DatumOption::Data(CborWrap(data)) = datum else {
+                panic!("{hex} must read as inline data");
+            };
+            assert_eq!(hex::encode(data.raw_cbor()), raw, "{hex}");
+        }
+    }
+
+    #[test]
+    fn an_inline_datum_whose_joined_chunks_are_not_data_is_refused() {
+        for hex in ["8201d81841ff", "8201d8185f41ffff"] {
+            let bytes = hex::decode(hex).unwrap();
+            assert!(minicbor::decode::<DatumOption>(&bytes).is_err(), "{hex}");
+        }
     }
 
     #[test]
