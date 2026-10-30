@@ -1056,6 +1056,56 @@ fn dijkstra_min_fee_is_the_fee_validation_refuses_one_below() {
     });
 }
 
+/// Redeemers declaring one spend of `mem` memory and no steps.
+fn redeemers(mem: u64) -> KeepRaw<'static, n::Redeemers> {
+    let map = [(
+        n::RedeemersKey {
+            tag: n::RedeemerTag::Spend,
+            index: 0,
+        },
+        n::RedeemersValue {
+            data: n::PlutusData::BigInt(n::BigInt::Int(0.into())),
+            ex_units: pallas_primitives::ExUnits { mem, steps: 0 },
+        },
+    )]
+    .into_iter()
+    .collect::<std::collections::BTreeMap<_, _>>();
+    KeepRaw::from(n::Redeemers(map))
+}
+
+#[test]
+fn dijkstra_min_fee_prices_the_redeemers_of_every_level_once() {
+    batch(|tx, input| {
+        let mut e = env();
+        let MultiEraProtocolParameters::Dijkstra(ref mut pp) = e.prot_params else {
+            unreachable!()
+        };
+        pp.minfee_a = 0;
+        pp.minfee_b = 0;
+        pp.execution_costs.mem_price = pallas_primitives::RationalNumber {
+            numerator: 1,
+            denominator: 2,
+        };
+        // Half a lovelace per memory unit, so 1 and 1 cost 1 priced once and 2 priced per level.
+        for (top, sub, expected) in [(None, Some(3), 2), (Some(1), Some(1), 1)] {
+            let mut changed = tx.clone();
+            changed.transaction_witness_set.redeemer = top.map(redeemers);
+            change_sub(&mut changed, |sub_tx| {
+                sub_tx.transaction_witness_set.redeemer = sub.map(redeemers);
+            });
+            let original = changed.transaction_body.inputs[0].clone();
+            let utxos = [(owned(original), MultiEraOutput::from_dijkstra(&input))]
+                .into_iter()
+                .collect();
+            assert_eq!(
+                dijkstra::dijkstra_min_fee(&changed, &utxos, pp).unwrap(),
+                expected,
+                "{top:?} {sub:?}"
+            );
+        }
+    });
+}
+
 #[test]
 fn dijkstra_batch_sub_reference_inputs_are_distinct_and_counted_once() {
     token_order_batch(|tx, input, sub_input| {

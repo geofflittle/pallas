@@ -277,7 +277,7 @@ pub fn validate_dijkstra_tx(
     Ok(())
 }
 
-/// The minimum fee of a transaction whose inputs resolve in `utxos`, counting the redeemers of its top level witness set.
+/// The minimum fee of a transaction whose inputs resolve in `utxos`, pricing the redeemers of its top level and sub transactions together.
 pub fn dijkstra_min_fee(
     tx: &BlockTransaction<'_>,
     utxos: &UTxOs<'_>,
@@ -287,7 +287,7 @@ pub fn dijkstra_min_fee(
         .checked_mul(tx_size(tx)?)
         .and_then(|x| x.checked_add(u64::from(pp.minfee_b)))
         .ok_or(PostAlonzo(NegativeValue))?;
-    let (mem, steps) = declared_units(&tx.transaction_witness_set)?;
+    let (mem, steps) = declared_units(tx)?;
     let fee = add(size_fee, execution_fee(mem, steps, pp)?)?;
     add(
         fee,
@@ -300,10 +300,20 @@ fn tx_size(tx: &BlockTransaction<'_>) -> Result<u64, ValidationError> {
     Ok(encode(tx.to_mempool_transaction())?.len() as u64)
 }
 
-/// The memory and steps the transaction's redeemers declare, summed.
-fn declared_units(w: &WitnessSet<'_>) -> Result<(u64, u64), ValidationError> {
+/// The memory and steps the redeemers of the transaction and its sub transactions declare, summed.
+fn declared_units(tx: &BlockTransaction<'_>) -> Result<(u64, u64), ValidationError> {
+    let subs = tx
+        .transaction_body
+        .sub_transactions
+        .iter()
+        .flat_map(|x| x.iter())
+        .map(|sub| &sub.transaction_witness_set);
     let mut units = (0, 0);
-    for (_, value) in w.redeemer.iter().flat_map(|x| x.iter()) {
+    for (_, value) in std::iter::once(&tx.transaction_witness_set)
+        .chain(subs)
+        .flat_map(|w| w.redeemer.iter())
+        .flat_map(|x| x.iter())
+    {
         units = (
             add(units.0, value.ex_units.mem)?,
             add(units.1, value.ex_units.steps)?,
@@ -951,7 +961,7 @@ fn check_scripts(
     if redeemers.iter().any(|(key, _)| !scripts.contains_key(key)) {
         return Err(PostAlonzo(UnneededRedeemer));
     }
-    let (mem, steps) = declared_units(w)?;
+    let (mem, steps) = declared_units(tx)?;
     if mem > pp.max_tx_ex_units.mem || steps > pp.max_tx_ex_units.steps {
         return Err(PostAlonzo(TxExUnitsExceeded));
     }
