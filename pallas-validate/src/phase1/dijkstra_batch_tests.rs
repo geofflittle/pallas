@@ -837,6 +837,39 @@ fn witness_cases(body: &[u8]) -> Vec<(Vec<n::VKeyWitness>, Vec<n::BootstrapWitne
 }
 
 #[test]
+fn dijkstra_an_empty_guards_set_in_a_sub_is_no_guards() {
+    batch(|tx, input| {
+        let cases = [
+            (
+                &[0xf6][..],
+                "Err(DijkstraUnsupported(\"subtransaction body fields\"))",
+            ),
+            (&[0x80], "Ok(())"),
+            (&[0x9f, 0xff], "Ok(())"),
+            (&[0xd9, 0x01, 0x02, 0x80], "Ok(())"),
+        ];
+        for (set, expected) in cases {
+            let mut sub = tx.transaction_body.sub_transactions.as_ref().unwrap()[0].clone();
+            sub.sub_transaction_body.guards = None;
+            let mut raw = minicbor::to_vec(&sub.sub_transaction_body).unwrap();
+            raw[0] += 1;
+            raw.push(14);
+            raw.extend_from_slice(set);
+            sub.sub_transaction_body = minicbor::decode(&raw).unwrap();
+            sign_sub(&mut sub);
+            let mut changed = tx.clone();
+            changed.transaction_body.sub_transactions = n::NonEmptySet::from_vec(vec![sub]);
+            sign(&mut changed);
+            assert_eq!(
+                format!("{:?}", run(&changed, &input, &env())),
+                expected,
+                "{set:02x?}"
+            );
+        }
+    });
+}
+
+#[test]
 fn dijkstra_witnesses_the_node_does_not_decode_are_malformed() {
     batch(|tx, input| {
         let top = body_hash(&tx.transaction_body);

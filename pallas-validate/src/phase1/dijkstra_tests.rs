@@ -446,6 +446,27 @@ fn dijkstra_registration_rejects_unavailable_certificate_state() {
     assert!(tx.transaction_body.certificates.is_some());
 }
 #[test]
+fn dijkstra_an_empty_guards_set_is_no_guards() {
+    synthetic(|tx, input| {
+        let output = MultiEraOutput::from_dijkstra(&input);
+        for set in [&[0x80][..], &[0x9f, 0xff], &[0xd9, 0x01, 0x02, 0x80]] {
+            let mut raw = minicbor::to_vec(&tx.transaction_body).unwrap();
+            raw[0] += 1;
+            raw.push(14);
+            raw.extend_from_slice(set);
+            let mut changed = tx.clone();
+            changed.transaction_body = minicbor::decode(&raw).unwrap();
+            sign(&mut changed);
+            assert_eq!(changed.transaction_body.guards, None);
+            assert_eq!(
+                format!("{:?}", dispatch(&changed, &output, &env())),
+                "Ok(())",
+                "{set:02x?}"
+            );
+        }
+    });
+}
+#[test]
 fn dijkstra_unsupported_fields_do_not_disappear_in_decode() {
     captured(|tx, output| {
         // Add each disallowed body key in original CBOR, including unknown future keys.

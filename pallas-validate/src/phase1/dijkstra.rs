@@ -589,6 +589,7 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
     if b.sub_transactions.is_some() && b.script_data_hash.is_some() {
         return Err(DijkstraUnsupported("scripted or stateful batch"));
     }
+    let raw = encode(b)?;
     let mut allowed = vec![0, 1, 2, 3, 8, 15];
     for (key, present) in [
         (4, b.certificates.is_some()),
@@ -597,7 +598,7 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
         (9, b.mint.is_some()),
         (11, b.script_data_hash.is_some()),
         (13, b.collateral.is_some()),
-        (14, b.guards.is_some()),
+        (14, holds_value(&raw, 14)),
         (16, b.collateral_return.is_some()),
         (17, b.total_collateral.is_some()),
         (18, b.reference_inputs.is_some()),
@@ -608,7 +609,6 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
             allowed.push(key);
         }
     }
-    let raw = encode(b)?;
     check_map_keys(&raw, &allowed, "body fields")?;
     let fields: pallas_codec::utils::KeyValuePairs<u64, pallas_codec::utils::AnyCbor> =
         minicbor::decode(&raw).map_err(|_| DijkstraUnsupported("body fields"))?;
@@ -709,10 +709,11 @@ fn check_sub_supported(tx: &SubTransaction<'_>) -> ValidationResult {
     {
         return Err(DijkstraUnsupported("stateful or scripted subtransaction"));
     }
+    let raw = encode(b)?;
     let mut allowed = vec![0, 1, 3, 8, 15];
     for (key, present) in [
         (7, b.auxiliary_data_hash.is_some()),
-        (14, b.guards.is_some()),
+        (14, holds_value(&raw, 14)),
         (18, b.reference_inputs.is_some()),
         (24, b.required_top_level_guards.is_some()),
     ] {
@@ -720,7 +721,6 @@ fn check_sub_supported(tx: &SubTransaction<'_>) -> ValidationResult {
             allowed.push(key);
         }
     }
-    let raw = encode(b)?;
     check_map_keys(&raw, &allowed, "subtransaction body fields")?;
     let fields: pallas_codec::utils::KeyValuePairs<u64, pallas_codec::utils::AnyCbor> =
         minicbor::decode(&raw).map_err(|_| DijkstraUnsupported("subtransaction body fields"))?;
@@ -748,6 +748,15 @@ fn check_required_guard_keys(raw: &[u8]) -> ValidationResult {
         return Err(DijkstraMalformed("duplicate required top-level guards"));
     }
     Ok(())
+}
+/// Whether a CBOR map holds the key with a value other than null.
+fn holds_value(raw: &[u8], key: u64) -> bool {
+    minicbor::decode::<pallas_codec::utils::KeyValuePairs<u64, pallas_codec::utils::AnyCbor>>(raw)
+        .is_ok_and(|fields| {
+            fields
+                .iter()
+                .any(|(k, value)| *k == key && value.raw_bytes() != [0xf6])
+        })
 }
 fn check_map_keys(raw: &[u8], allowed: &[u64], feature: &'static str) -> ValidationResult {
     let mut d = minicbor::Decoder::new(raw);
