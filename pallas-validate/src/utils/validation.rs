@@ -33,6 +33,10 @@ pub enum ValidationError {
     DijkstraPointerInCollateralReturn,
 
     #[cfg(feature = "unstable")]
+    #[error("Dijkstra output Byron address attributes exceed 64 bytes")]
+    DijkstraBootstrapAttributesTooLarge,
+
+    #[cfg(feature = "unstable")]
     #[error("Dijkstra withdrawal requires the original account balance for {0}")]
     DijkstraAccountStateUnavailable(String),
 

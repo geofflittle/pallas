@@ -521,7 +521,7 @@ fn dijkstra_batch_sub_metadata_must_match_its_hash() {
 }
 
 /// An address locked by the Byron key that `bootstrap` signs with.
-fn byron_address() -> pallas_codec::utils::Bytes {
+pub(super) fn byron_address() -> pallas_codec::utils::Bytes {
     use pallas_addresses::byron::{AddrType, AddressPayload, ByronAddress, SpendingData};
     let xpub = [SecretKey::from([7; 32]).public_key().as_ref(), &[9; 32][..]].concat();
     ByronAddress::from(AddressPayload::new(
@@ -532,7 +532,7 @@ fn byron_address() -> pallas_codec::utils::Bytes {
     .to_vec()
     .into()
 }
-fn bootstrap(signed: &[u8]) -> n::BootstrapWitness {
+pub(super) fn bootstrap(signed: &[u8]) -> n::BootstrapWitness {
     let key = SecretKey::from([7; 32]);
     n::BootstrapWitness {
         public_key: key.public_key().as_ref().to_vec().into(),
@@ -541,7 +541,7 @@ fn bootstrap(signed: &[u8]) -> n::BootstrapWitness {
         attributes: vec![0xa0].into(),
     }
 }
-fn body_hash<T: minicbor::Encode<()>>(body: &T) -> Hash<32> {
+pub(super) fn body_hash<T: minicbor::Encode<()>>(body: &T) -> Hash<32> {
     Hasher::<256>::hash(&minicbor::to_vec(body).unwrap())
 }
 
@@ -608,7 +608,7 @@ fn bootstrap_with(signed: &[u8], chain_code: &[u8], attributes: &[u8]) -> n::Boo
     }
 }
 /// Adds `witness` to the bootstrap witnesses of `witnesses`.
-fn add_bootstrap(witnesses: &mut n::WitnessSet<'_>, witness: n::BootstrapWitness) {
+pub(super) fn add_bootstrap(witnesses: &mut n::WitnessSet<'_>, witness: n::BootstrapWitness) {
     let mut all: Vec<_> = witnesses
         .bootstrap_witness
         .iter()
@@ -642,6 +642,75 @@ fn dijkstra_bootstrap_roots_hash_the_attribute_bytes_as_sent() {
             match expected {
                 None => assert!(result.is_ok(), "{result:?}"),
                 Some(e) => error(result, e),
+            }
+        }
+    });
+}
+
+/// The CRC-32 a Byron address checks its payload with.
+fn crc32(bytes: &[u8]) -> u32 {
+    !bytes.iter().fold(!0u32, |crc, byte| {
+        (0..8).fold(crc ^ u32::from(*byte), |c, _| {
+            (c >> 1) ^ (0xedb8_8320 & (c & 1).wrapping_neg())
+        })
+    })
+}
+/// A Byron address whose attributes are `entries`, each key with its value bytes.
+fn byron_address_attributed(entries: &[(u8, Vec<u8>)]) -> pallas_codec::utils::Bytes {
+    let mut e = minicbor::Encoder::new(vec![]);
+    e.array(3).unwrap().bytes(&[0; 28]).unwrap();
+    e.map(entries.len() as u64).unwrap();
+    for (key, value) in entries {
+        e.u8(*key).unwrap().bytes(value).unwrap();
+    }
+    e.u8(0).unwrap();
+    let payload = e.into_writer();
+    pallas_addresses::byron::ByronAddress::new(&payload, crc32(&payload))
+        .to_vec()
+        .into()
+}
+
+#[test]
+fn dijkstra_byron_test_addresses_carry_their_checksum() {
+    let address = pallas_addresses::byron::ByronAddress::from_bytes(&byron_address()).unwrap();
+    assert_eq!(crc32(&address.payload.0), address.crc);
+}
+
+#[test]
+fn dijkstra_outputs_may_pay_byron_addresses() {
+    let magic = minicbor::to_vec(42u32).unwrap();
+    let path = |n: usize| minicbor::to_vec(minicbor::bytes::ByteVec::from(vec![0; n])).unwrap();
+    let too_large = Some("DijkstraBootstrapAttributesTooLarge");
+    let cases = [
+        (vec![(2, magic.clone())], None),
+        (vec![], Some("PostAlonzo(OutputWrongNetworkID)")),
+        (vec![(1, path(64)), (2, magic.clone())], None),
+        (vec![(1, path(65)), (2, magic.clone())], too_large),
+        (vec![(2, magic.clone()), (7, vec![0; 64])], None),
+        (vec![(2, magic.clone()), (7, vec![0; 65])], too_large),
+    ];
+    token_order_batch(|tx, input, sub_input| {
+        for (entries, expected) in cases {
+            let address = byron_address_attributed(&entries);
+            let mut top = tx.clone();
+            let mut outputs = top.transaction_body.outputs.clone().to_vec();
+            post_alonzo(&mut outputs[0]).address = address.clone();
+            top.transaction_body.outputs = MaybeIndefArray::Def(outputs);
+            sign(&mut top);
+            let mut sub = tx.clone();
+            resign(&mut sub, |sub| {
+                let mut outputs = sub.sub_transaction_body.outputs.clone().to_vec();
+                let order = post_alonzo(&mut outputs[0]);
+                order.address = address.clone();
+                order.datum_option = None;
+                sub.sub_transaction_body.outputs = MaybeIndefArray::Def(outputs);
+            });
+            for (level, changed) in [("top", top), ("sub", sub)] {
+                let result = run_sub(&changed, &input, &sub_input);
+                match expected {
+                    None => assert!(result.is_ok(), "{level} {entries:?} {result:?}"),
+                    Some(e) => error(result, e),
+                }
             }
         }
     });
