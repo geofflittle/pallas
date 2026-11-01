@@ -69,7 +69,9 @@ fn context_output(
             n::ScriptRef::PlutusV1Script(s) => Some(c::ScriptRef::PlutusV1Script(s.clone())),
             n::ScriptRef::PlutusV2Script(s) => Some(c::ScriptRef::PlutusV2Script(s.clone())),
             n::ScriptRef::PlutusV3Script(s) => Some(c::ScriptRef::PlutusV3Script(s.clone())),
-            _ => return unsupported("reference script language (requires V3)"),
+            n::ScriptRef::PlutusV4Script(_) => {
+                return unsupported("reference script language (requires V3)");
+            }
         },
         Some(MultiEraScriptRef::Conway(s)) => match s.as_ref() {
             c::ScriptRef::NativeScript(s) => Some(c::ScriptRef::NativeScript(s.clone().to_owned())),
@@ -253,7 +255,7 @@ fn eval_tx_with_mode(
                 Some(CborWrap(c::ScriptRef::PlutusV2Script(s))) => {
                     unevaluable.insert(s.compute_hash());
                 }
-                _ => {}
+                Some(CborWrap(c::ScriptRef::NativeScript(_))) | None => {}
             }
         }
     }

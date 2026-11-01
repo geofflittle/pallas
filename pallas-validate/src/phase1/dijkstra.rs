@@ -13,7 +13,8 @@ use pallas_codec::{
 use pallas_crypto::hash::{Hash, Hasher};
 use pallas_primitives::{conway::LanguageViews, dijkstra::*};
 use pallas_traverse::{
-    ComputeHash, MultiEraInput, MultiEraOutput, MultiEraScriptRef, MultiEraTx, OriginalHash,
+    ComputeHash, MultiEraInput, MultiEraNativeScript, MultiEraOutput, MultiEraScriptRef,
+    MultiEraTx, OriginalHash,
 };
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
@@ -889,42 +890,26 @@ fn check_scripts(
         if let Some(script) = output.multi_era_script_ref() {
             // Reference UTxOs are already-admitted ledger outputs. No new script
             // bytes enter the ledger in this subset, and phase two is separate.
-            if let Some(native) = script.native_script() {
-                let raw = native.encode();
-                let decoded: NativeScript =
-                    minicbor::decode(&raw).map_err(|_| PostAlonzo(UnsupportedNativeScript))?;
-                reference_scripts.insert(script.hash());
-                natives.insert(script.hash(), decoded);
-                continue;
+            match reference(&script)? {
+                Reference::Native(native) => {
+                    let raw = native.encode();
+                    let decoded: NativeScript =
+                        minicbor::decode(&raw).map_err(|_| PostAlonzo(UnsupportedNativeScript))?;
+                    reference_scripts.insert(script.hash());
+                    natives.insert(script.hash(), decoded);
+                }
+                Reference::Unevaluable => {
+                    reference_scripts.insert(script.hash());
+                    unevaluable.insert(script.hash());
+                }
+                Reference::PlutusV3(raw) => {
+                    let mut payload = vec![3];
+                    payload.extend_from_slice(raw);
+                    let hash = Hasher::<224>::hash(&payload);
+                    available.insert(hash);
+                    reference_scripts.insert(hash);
+                }
             }
-            let unsupported = DijkstraUnsupported("reference script language (requires V3)");
-            let raw = match &script {
-                MultiEraScriptRef::Dijkstra(x) => match x.as_ref() {
-                    ScriptRef::PlutusV3Script(s) => s.as_ref(),
-                    ScriptRef::PlutusV1Script(_) | ScriptRef::PlutusV2Script(_) => {
-                        reference_scripts.insert(script.hash());
-                        unevaluable.insert(script.hash());
-                        continue;
-                    }
-                    _ => return Err(unsupported),
-                },
-                MultiEraScriptRef::Conway(x) => match x.as_ref() {
-                    pallas_primitives::conway::ScriptRef::PlutusV3Script(s) => s.as_ref(),
-                    pallas_primitives::conway::ScriptRef::PlutusV1Script(_)
-                    | pallas_primitives::conway::ScriptRef::PlutusV2Script(_) => {
-                        reference_scripts.insert(script.hash());
-                        unevaluable.insert(script.hash());
-                        continue;
-                    }
-                    _ => return Err(unsupported),
-                },
-                _ => return Err(unsupported),
-            };
-            let mut payload = vec![3];
-            payload.extend_from_slice(raw);
-            let hash = Hasher::<224>::hash(&payload);
-            available.insert(hash);
-            reference_scripts.insert(hash);
         }
     }
     let unneeded = |hash: &Hash<28>| {
@@ -1393,6 +1378,41 @@ fn check_integrity(tx: &BlockTransaction<'_>, model: Option<&Vec<i64>>) -> Valid
     Ok(())
 }
 
+/// A reference script by how this subset admits it.
+enum Reference<'a> {
+    Native(MultiEraNativeScript<'a>),
+    /// A PlutusV1 or V2 script, available as a reference but refused when a redeemer needs it.
+    Unevaluable,
+    PlutusV3(&'a [u8]),
+}
+
+fn reference<'a>(script: &'a MultiEraScriptRef<'_>) -> Result<Reference<'a>, ValidationError> {
+    let unsupported = DijkstraUnsupported("reference script language (requires V3)");
+    match script {
+        MultiEraScriptRef::Dijkstra(x) => match x.as_ref() {
+            ScriptRef::NativeScript(s) => {
+                Ok(Reference::Native(MultiEraNativeScript::from_dijkstra(s)))
+            }
+            ScriptRef::PlutusV1Script(_) | ScriptRef::PlutusV2Script(_) => {
+                Ok(Reference::Unevaluable)
+            }
+            ScriptRef::PlutusV3Script(s) => Ok(Reference::PlutusV3(s.as_ref())),
+            ScriptRef::PlutusV4Script(_) => Err(unsupported),
+        },
+        MultiEraScriptRef::Conway(x) => match x.as_ref() {
+            pallas_primitives::conway::ScriptRef::NativeScript(s) => Ok(Reference::Native(
+                MultiEraNativeScript::from_alonzo_compatible(s),
+            )),
+            pallas_primitives::conway::ScriptRef::PlutusV1Script(_)
+            | pallas_primitives::conway::ScriptRef::PlutusV2Script(_) => Ok(Reference::Unevaluable),
+            pallas_primitives::conway::ScriptRef::PlutusV3Script(s) => {
+                Ok(Reference::PlutusV3(s.as_ref()))
+            }
+        },
+        _ => Err(unsupported),
+    }
+}
+
 fn check_new_script(script: &MultiEraScriptRef<'_>) -> ValidationResult {
     match script {
         MultiEraScriptRef::Dijkstra(s) => match s.as_ref() {
@@ -1400,7 +1420,9 @@ fn check_new_script(script: &MultiEraScriptRef<'_>) -> ValidationResult {
             ScriptRef::PlutusV1Script(s) => well_formed_plutus(s.as_ref()),
             ScriptRef::PlutusV2Script(s) => well_formed_plutus(s.as_ref()),
             ScriptRef::PlutusV3Script(s) => well_formed_plutus(s.as_ref()),
-            _ => Err(DijkstraUnsupported("new script language (requires V3)")),
+            ScriptRef::PlutusV4Script(_) => {
+                Err(DijkstraUnsupported("new script language (requires V3)"))
+            }
         },
         _ => Err(DijkstraUnsupported("new script language (requires V3)")),
     }
