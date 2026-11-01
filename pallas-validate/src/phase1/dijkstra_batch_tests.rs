@@ -3,6 +3,7 @@ use super::{
     dijkstra_tests::{env, error, sign, synthetic},
     *,
 };
+use crate::utils::dijkstra_state::DijkstraAccount;
 use pallas_addresses::{Network, ShelleyAddress, ShelleyDelegationPart, ShelleyPaymentPart};
 use pallas_codec::{
     minicbor,
@@ -1239,14 +1240,18 @@ fn dijkstra_batch_top_level_withdraws_under_a_native_script() {
             (
                 500_000,
                 Some(
-                    "DijkstraInvalidWithdrawal(\"amount does not match available account balance\")",
+                    "DijkstraInvalidWithdrawal(\"amount exceeds the original balance\")",
                 ),
             ),
         ] {
             let mut state = CertState::default();
-            state
-                .dijkstra_account_balances
-                .insert(n::StakeCredential::ScriptHash(hash), Some(balance));
+            state.dijkstra.accounts.insert(
+                n::StakeCredential::ScriptHash(hash),
+                Some(DijkstraAccount {
+                    balance,
+                    deposit: 2_000_000,
+                }),
+            );
             let result = run_full(&tx, &input, &input, &[], &env(), &mut state);
             match expected {
                 None => assert!(result.is_ok(), "{result:?}"),

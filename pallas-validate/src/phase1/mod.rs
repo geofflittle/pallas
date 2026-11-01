@@ -8,6 +8,8 @@ pub mod conway;
 pub mod dijkstra;
 #[cfg(all(test, feature = "unstable"))]
 mod dijkstra_batch_tests;
+#[cfg(feature = "unstable")]
+mod dijkstra_ledger;
 #[cfg(all(test, feature = "unstable"))]
 mod dijkstra_native_tests;
 #[cfg(all(test, feature = "unstable"))]
@@ -103,14 +105,18 @@ pub fn validate_tx(
         },
         #[cfg(feature = "unstable")]
         (MultiEraProtocolParameters::Dijkstra(pp), _) => match metx {
-            MultiEraTx::Dijkstra(tx) => dijkstra::validate_dijkstra_tx(
-                tx,
-                utxos,
-                pp,
-                env.block_slot(),
-                env.network_id(),
-                cert_state,
-            ),
+            MultiEraTx::Dijkstra(tx) => {
+                let delta = dijkstra::validate_dijkstra_tx(
+                    tx,
+                    utxos,
+                    pp,
+                    env.block_slot(),
+                    env.network_id(),
+                    &cert_state.dijkstra,
+                )?;
+                cert_state.dijkstra.apply(delta);
+                Ok(())
+            }
             MultiEraTx::DijkstraSub(..) => Err(crate::utils::ValidationError::DijkstraUnsupported(
                 "subtransactions",
             )),

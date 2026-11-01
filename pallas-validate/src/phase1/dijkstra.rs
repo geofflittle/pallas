@@ -1,12 +1,14 @@
-//! Native protocol-12 phase one for transfers, registrations, script-free batches and Plutus V3.
+//! Native protocol-12 phase one for transfers, batches, account and governance state, and Plutus V3.
 //! Rules and evidence boundaries: test_data/musashi-dijkstra-validation/README.md.
+use super::dijkstra_ledger::{self as ledger, Flows, Level, WithdrawalRule};
 use crate::utils::{
-    CertState, DijkstraProtParams, DijkstraRegistrationState, PostAlonzoError::*, UTxOs,
-    ValidationError, ValidationError::*, ValidationResult, add_fee_and_stake_deposits,
+    DijkstraProtParams, PostAlonzoError::*, UTxOs, ValidationError, ValidationError::*,
+    ValidationResult,
+    dijkstra_state::{DijkstraLedgerDelta, DijkstraLedgerOverlay, DijkstraLedgerState},
     verify_signature,
 };
 use pallas_addresses::{
-    Address, Network, ShelleyDelegationPart, ShelleyPaymentPart, StakePayload, byron::ByronAddress,
+    Address, Network, ShelleyDelegationPart, ShelleyPaymentPart, byron::ByronAddress,
 };
 use pallas_codec::{
     minicbor,
@@ -16,7 +18,7 @@ use pallas_crypto::hash::{Hash, Hasher};
 use pallas_primitives::{conway::LanguageViews, dijkstra::*};
 use pallas_traverse::{
     ComputeHash, MultiEraInput, MultiEraNativeScript, MultiEraOutput, MultiEraScriptRef,
-    MultiEraTx, OriginalHash,
+    OriginalHash,
 };
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
@@ -24,16 +26,15 @@ type Keys = HashSet<Hash<28>>;
 const MALFORMED_VALUE: ValidationError = DijkstraMalformed("multi-asset value");
 type Spent = HashSet<(Hash<32>, u64)>;
 
-/// Validate native phase one. Registration updates are provisional until phase two
-/// succeeds. Missing credential entries mean unknown state, never unregistered.
-pub fn validate_dijkstra_tx(
+/// Validates native phase one against `state` and returns the changes the transaction makes to it.
+pub fn validate_dijkstra_tx<S: DijkstraLedgerState + ?Sized>(
     tx: &BlockTransaction<'_>,
     utxos: &UTxOs<'_>,
     pp: &DijkstraProtParams,
     block_slot: &u64,
     network_id: &u8,
-    cert_state: &mut CertState,
-) -> ValidationResult {
+    state: &S,
+) -> Result<DijkstraLedgerDelta, ValidationError> {
     if pp.protocol_version != (12, 0) {
         return Err(DijkstraUnsupported("protocol version (requires 12.0)"));
     }
@@ -42,7 +43,6 @@ pub fn validate_dijkstra_tx(
     for sub in b.sub_transactions.iter().flatten() {
         check_sub_supported(sub)?;
     }
-    let mut state = cert_state.dijkstra_registrations.clone();
     let guards = guard_credentials(b.guards.as_ref());
     let mut keys = guard_keys(&guards);
     let top_guards: BTreeSet<_> = guards.iter().cloned().collect();
@@ -59,58 +59,9 @@ pub fn validate_dijkstra_tx(
             );
         }
     }
-    let mut accounts = cert_state.dijkstra_account_balances.clone();
-    let mut withdrawals = 0;
-    let mut ordered_withdrawals: Vec<_> = b.withdrawals.iter().flat_map(|x| x.iter()).collect();
-    // Ledger RewardAccount ordering: network, Script credential before Key, hash.
-    ordered_withdrawals.sort_by_key(|(raw, _)| {
-        (
-            raw.first().map(|x| x & 15),
-            raw.first().map(|x| 15 - (x >> 4)),
-            raw.get(1..),
-        )
-    });
-    for (index, (raw_address, amount)) in ordered_withdrawals.into_iter().enumerate() {
-        let Address::Stake(address) =
-            Address::from_bytes(raw_address).map_err(|_| PostAlonzo(AddressDecoding))?
-        else {
-            return Err(PostAlonzo(AddressDecoding));
-        };
-        if address.network().value() != *network_id {
-            return Err(PostAlonzo(TxWrongNetworkID));
-        }
-        let credential = match address.payload() {
-            StakePayload::Stake(key) => {
-                keys.insert(*key);
-                StakeCredential::AddrKeyhash(*key)
-            }
-            StakePayload::Script(hash) => {
-                scripts.insert(
-                    RedeemersKey {
-                        tag: RedeemerTag::Reward,
-                        index: index as u32,
-                    },
-                    *hash,
-                );
-                StakeCredential::ScriptHash(*hash)
-            }
-        };
-        let balance = accounts
-            .get_mut(&credential)
-            .ok_or_else(|| DijkstraAccountStateUnavailable(hex::encode(raw_address.as_slice())))?;
-        let Some(balance) = balance else {
-            return Err(DijkstraInvalidWithdrawal("unregistered account"));
-        };
-        // ENTITIES uses draining withdrawals in legacy mode (any V1-V3 script).
-        // Without Plutus, Dijkstra permits partial withdrawals.
-        if *amount > *balance {
-            return Err(DijkstraInvalidWithdrawal(
-                "amount does not match available account balance",
-            ));
-        }
-        *balance -= *amount;
-        withdrawals = add(withdrawals, *amount)?;
-    }
+    let top = ledger::needs(&Level::top(b, Hasher::<256>::hash(b.raw_cbor())))?;
+    keys.extend(top.keys);
+    scripts.extend(top.scripts);
     for (index, input) in b
         .inputs
         .iter()
@@ -140,43 +91,6 @@ pub fn validate_dijkstra_tx(
             *hash,
         );
     }
-    for (index, cert) in b.certificates.iter().flat_map(|x| x.iter()).enumerate() {
-        let Certificate::Reg(credential, deposit) = cert else {
-            return Err(DijkstraUnsupported("certificate kind"));
-        };
-        match state.get(credential) {
-            None => return Err(DijkstraCertificateStateUnavailable),
-            Some(DijkstraRegistrationState::Registered) => {
-                return Err(DijkstraInvalidCertificate("already registered"));
-            }
-            Some(DijkstraRegistrationState::Unregistered) => (),
-        }
-        if *deposit != pp.key_deposit {
-            return Err(DijkstraInvalidCertificate("registration deposit"));
-        }
-        match credential {
-            StakeCredential::AddrKeyhash(key) => {
-                keys.insert(*key);
-            }
-            StakeCredential::ScriptHash(hash) => {
-                scripts.insert(
-                    RedeemersKey {
-                        tag: RedeemerTag::Cert,
-                        index: index as u32,
-                    },
-                    *hash,
-                );
-            }
-        }
-        if accounts
-            .get(credential)
-            .is_some_and(|balance| balance.is_some())
-        {
-            return Err(DijkstraInvalidCertificate("inconsistent account prestate"));
-        }
-        accounts.insert(credential.clone(), Some(0));
-        state.insert(credential.clone(), DijkstraRegistrationState::Registered);
-    }
     check_interval(
         b.validity_interval_start,
         b.ttl,
@@ -193,36 +107,24 @@ pub fn validate_dijkstra_tx(
     if has_plutus && b.sub_transactions.is_some() {
         return Err(DijkstraUnsupported("scripted or stateful batch"));
     }
-    // Native scripts do not activate legacy Plutus withdrawal rules.
-    if has_plutus {
-        if b.required_top_level_guards
+    if has_plutus
+        && b.required_top_level_guards
             .as_ref()
             .is_some_and(|x| !x.is_empty())
-        {
-            return Err(DijkstraUnsupported("Plutus required top-level guards"));
-        }
-        for (raw, _) in b.withdrawals.iter().flat_map(|x| x.iter()) {
-            let Address::Stake(address) =
-                Address::from_bytes(raw).map_err(|_| PostAlonzo(AddressDecoding))?
-            else {
-                unreachable!()
-            };
-            let credential = match address.payload() {
-                StakePayload::Script(h) => StakeCredential::ScriptHash(*h),
-                StakePayload::Stake(h) => StakeCredential::AddrKeyhash(*h),
-            };
-            if accounts.get(&credential) != Some(&Some(0)) {
-                return Err(DijkstraInvalidWithdrawal(
-                    "legacy Plutus withdrawals must drain the account",
-                ));
-            }
-        }
+    {
+        return Err(DijkstraUnsupported("Plutus required top-level guards"));
     }
+    // Native scripts do not make the withdrawals legacy.
+    let rule = match has_plutus {
+        true => WithdrawalRule::Legacy,
+        false => WithdrawalRule::Partial,
+    };
+    let (flows, delta) = ledger_rules(tx, pp, *network_id, rule, state)?;
     if b.fee < dijkstra_min_fee(tx, utxos, pp)? {
         return Err(PostAlonzo(FeeBelowMin));
     }
     let mut spent = Spent::new();
-    let mut consumed = withdrawals;
+    let mut consumed = flows.consumed;
     let mut output_coin = 0;
     for sub in b.sub_transactions.iter().flat_map(|x| x.iter()) {
         let sb = &sub.sub_transaction_body;
@@ -238,11 +140,18 @@ pub fn validate_dijkstra_tx(
         )?;
         let guards = guard_credentials(sb.guards.as_ref());
         let mut sub_keys = guard_keys(&guards);
+        let needs = ledger::needs(&Level::sub(sb, Hasher::<256>::hash(sb.raw_cbor())))?;
+        sub_keys.extend(needs.keys);
         let spending = check_inputs(&sb.inputs, utxos, &mut spent, &mut sub_keys)?;
         consumed = add(consumed, spending.coin)?;
         let witnesses = witness_keys(w);
         let credentials: BTreeSet<_> = guards.iter().cloned().collect();
-        for hash in spending.scripts.iter().chain(guard_scripts(&guards)) {
+        for hash in spending
+            .scripts
+            .iter()
+            .chain(guard_scripts(&guards))
+            .chain(needs.scripts.values())
+        {
             let script = natives.get(hash).ok_or(PostAlonzo(ScriptWitnessMissing))?;
             if !crate::utils::dijkstra_native::evaluate(
                 script,
@@ -260,22 +169,58 @@ pub fn validate_dijkstra_tx(
     let spending = check_inputs(&b.inputs, utxos, &mut spent, &mut keys)?;
     consumed = add(consumed, spending.coin)?;
     output_coin = add(output_coin, check_outputs(&b.outputs, pp, network_id)?)?;
-    // Same explicit Reg deposit semantics as Conway; no transaction/witness conversion.
-    let view = MultiEraTx::from_dijkstra(tx);
-    let produced = add_fee_and_stake_deposits(
-        &Value::Coin(output_coin),
-        b.fee,
-        &view.certs(),
-        pp.key_deposit,
-    )?;
-    if produced != Value::Coin(consumed) {
+    if add(add(output_coin, b.fee)?, flows.produced)? != consumed {
         return Err(PostAlonzo(PreservationOfValue));
     }
     check_assets(tx, utxos)?;
     check_signatures(&tx.transaction_witness_set, &encode(b)?, keys)?;
-    cert_state.dijkstra_registrations = state;
-    cert_state.dijkstra_account_balances = accounts;
-    Ok(())
+    Ok(delta)
+}
+
+/// The ledger state changes of a transaction the ledger has accepted, computed against `state`.
+pub fn dijkstra_ledger_effects<S: DijkstraLedgerState + ?Sized>(
+    tx: &BlockTransaction<'_>,
+    pp: &DijkstraProtParams,
+    network_id: u8,
+    state: &S,
+) -> Result<DijkstraLedgerDelta, ValidationError> {
+    if !tx.success {
+        return Ok(DijkstraLedgerDelta::default());
+    }
+    Ok(ledger_rules(tx, pp, network_id, WithdrawalRule::Accepted, state)?.1)
+}
+
+/// The treasury, account and governance rules of each sub transaction in order, then of the top level transaction.
+fn ledger_rules<S: DijkstraLedgerState + ?Sized>(
+    tx: &BlockTransaction<'_>,
+    pp: &DijkstraProtParams,
+    network: u8,
+    rule: WithdrawalRule,
+    state: &S,
+) -> Result<(Flows, DijkstraLedgerDelta), ValidationError> {
+    let b = &tx.transaction_body;
+    let mut current = DijkstraLedgerOverlay::new(state);
+    let mut flows = Flows::default();
+    for sub in b.sub_transactions.iter().flatten() {
+        let sb = &sub.sub_transaction_body;
+        let level = Level::sub(sb, Hasher::<256>::hash(sb.raw_cbor()));
+        ledger::check_treasury(&level, state)?;
+        flows.add(ledger::entities(&level, None, pp, network, state, &mut current)?)?;
+        flows.add(ledger::governance(&level, pp, network, &mut current)?)?;
+    }
+    let level = Level::top(b, Hasher::<256>::hash(b.raw_cbor()));
+    ledger::check_treasury(&level, state)?;
+    let subs = ledger::sub_withdrawals(tx)?;
+    flows.add(ledger::entities(
+        &level,
+        Some((rule, &subs)),
+        pp,
+        network,
+        state,
+        &mut current,
+    )?)?;
+    flows.add(ledger::governance(&level, pp, network, &mut current)?)?;
+    Ok((flows, current.delta))
 }
 
 /// The minimum fee of a transaction whose inputs resolve in `utxos`, pricing the redeemers of its top level and sub transactions together.
@@ -613,19 +558,6 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
     if !tx.success {
         return Err(DijkstraUnsupported("unsuccessful block transaction"));
     }
-    if b.certificates.is_some() && b.sub_transactions.is_some() {
-        return Err(DijkstraUnsupported("registration with subtransactions"));
-    }
-    if b.direct_deposits.is_some()
-        || b.account_balance_intervals.is_some()
-        || b.starting_account_balance_intervals.is_some()
-        || b.voting_procedures.is_some()
-        || b.proposal_procedures.is_some()
-        || b.treasury_value.is_some()
-        || b.donation.is_some()
-    {
-        return Err(DijkstraUnsupported("account or governance state"));
-    }
     check_auxiliary(b.auxiliary_data_hash, &tx.auxiliary_data)?;
     if b.sub_transactions.is_some() && b.script_data_hash.is_some() {
         return Err(DijkstraUnsupported("scripted or stateful batch"));
@@ -643,8 +575,15 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
         (16, b.collateral_return.is_some()),
         (17, b.total_collateral.is_some()),
         (18, b.reference_inputs.is_some()),
+        (19, b.voting_procedures.is_some()),
+        (20, b.proposal_procedures.is_some()),
+        (21, b.treasury_value.is_some()),
+        (22, b.donation.is_some()),
         (23, b.sub_transactions.is_some()),
         (24, b.required_top_level_guards.is_some()),
+        (25, b.direct_deposits.is_some()),
+        (26, b.account_balance_intervals.is_some()),
+        (27, b.starting_account_balance_intervals.is_some()),
     ] {
         if present {
             allowed.push(key);
@@ -737,26 +676,24 @@ fn check_witness_fields(w: &KeepRaw<'_, WitnessSet<'_>>, redeemers: bool) -> Val
 }
 fn check_sub_supported(tx: &SubTransaction<'_>) -> ValidationResult {
     let b = &tx.sub_transaction_body;
-    if b.certificates.is_some()
-        || b.withdrawals.is_some()
-        || b.mint.is_some()
-        || b.script_data_hash.is_some()
-        || b.voting_procedures.is_some()
-        || b.proposal_procedures.is_some()
-        || b.treasury_value.is_some()
-        || b.donation.is_some()
-        || b.direct_deposits.is_some()
-        || b.account_balance_intervals.is_some()
-    {
+    if b.mint.is_some() || b.script_data_hash.is_some() {
         return Err(DijkstraUnsupported("stateful or scripted subtransaction"));
     }
     let raw = encode(b)?;
     let mut allowed = vec![0, 1, 3, 8, 15];
     for (key, present) in [
+        (4, b.certificates.is_some()),
+        (5, b.withdrawals.is_some()),
         (7, b.auxiliary_data_hash.is_some()),
         (14, holds_value(&raw, 14)),
         (18, b.reference_inputs.is_some()),
+        (19, b.voting_procedures.is_some()),
+        (20, b.proposal_procedures.is_some()),
+        (21, b.treasury_value.is_some()),
+        (22, b.donation.is_some()),
         (24, b.required_top_level_guards.is_some()),
+        (25, b.direct_deposits.is_some()),
+        (26, b.account_balance_intervals.is_some()),
     ] {
         if present {
             allowed.push(key);
@@ -846,6 +783,8 @@ fn sub_scripts(b: &TransactionBody<'_>, utxos: &UTxOs<'_>) -> Result<SubScripts,
         let sb = &sub.sub_transaction_body;
         subs.needed
             .extend(guard_scripts(&guard_credentials(sb.guards.as_ref())));
+        let needs = ledger::needs(&Level::sub(sb, Hasher::<256>::hash(sb.raw_cbor())))?;
+        subs.needed.extend(needs.scripts.into_values());
         let mut outputs = Vec::new();
         for input in sb.inputs.iter() {
             let output = utxos

@@ -409,43 +409,6 @@ fn dijkstra_balance_network_and_input_checks() {
     });
 }
 #[test]
-fn dijkstra_registration_rejects_unavailable_certificate_state() {
-    let raw = hex::decode(
-        include_str!("../../../test_data/musashi-registration/blocks/1401365.block").trim(),
-    )
-    .unwrap();
-    let block = MultiEraBlock::decode(&raw).unwrap();
-    let txs = block.txs();
-    assert_eq!(
-        txs[0].hash().to_string(),
-        "da910a9bfbe657724d64b505099010dd47f86fb573aa1d20b4da0367163e94c6"
-    );
-    assert!(txs[0].as_dijkstra().unwrap().success);
-    let producer_raw = hex::decode(
-        include_str!("../../../test_data/musashi-registration/blocks/1401345.block").trim(),
-    )
-    .unwrap();
-    let producer = MultiEraBlock::decode(&producer_raw).unwrap();
-    let producers = producer.txs();
-    let outputs = producers[0].outputs();
-    let tx = txs[0].as_dijkstra().unwrap();
-    let inputs = txs[0].inputs();
-    let references = txs[0].reference_inputs();
-    let utxos = [
-        (inputs[0].clone(), outputs[1].clone()),
-        (references[0].clone(), outputs[0].clone()),
-    ]
-    .into_iter()
-    .collect();
-    let mut e = env();
-    e.block_slot = 1401365;
-    error(
-        validate_txs(&txs, &e, &utxos, &mut CertState::default()),
-        "DijkstraCertificateStateUnavailable",
-    );
-    assert!(tx.transaction_body.certificates.is_some());
-}
-#[test]
 fn dijkstra_an_empty_guards_set_is_no_guards() {
     synthetic(|tx, input| {
         let output = MultiEraOutput::from_dijkstra(&input);
@@ -591,20 +554,20 @@ fn dijkstra_typed_features_reject_explicitly() {
                 }
                 2 => {
                     changed.transaction_body.direct_deposits = Some(Default::default());
-                    "account or governance state"
+                    "empty account fields pass to the signature check"
                 }
                 3 => {
                     changed.transaction_body.account_balance_intervals = Some(Default::default());
-                    "account or governance state"
+                    "empty account fields pass to the signature check"
                 }
                 4 => {
                     changed.transaction_body.starting_account_balance_intervals =
                         Some(Default::default());
-                    "account or governance state"
+                    "empty account fields pass to the signature check"
                 }
                 5 => {
-                    changed.transaction_body.treasury_value = Some(0);
-                    "account or governance state"
+                    changed.transaction_body.treasury_value = Some(1);
+                    "a treasury other than the ledger treasury"
                 }
                 6 => {
                     changed.transaction_body.total_collateral = Some(0);
@@ -627,7 +590,9 @@ fn dijkstra_typed_features_reject_explicitly() {
             let expected = match field {
                 0 => "PostAlonzo(ScriptWitnessMissing)".to_owned(),
                 1 => "PostAlonzo(ReqSignerMissing)".to_owned(),
-                8 => "PostAlonzo(ScriptIntegrityHash)".to_owned(),
+                2..=4 => "PostAlonzo(VKWrongSignature)".to_owned(),
+                5 => "DijkstraTreasuryValueMismatch".to_owned(),
+                8 =>"PostAlonzo(ScriptIntegrityHash)".to_owned(),
                 9 => "PostAlonzo(MetadataHash)".to_owned(),
                 _ => format!("DijkstraUnsupported({expected:?})"),
             };
