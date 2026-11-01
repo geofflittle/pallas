@@ -1536,6 +1536,14 @@ crate::flat_enum::decode_flat_enum!(ScriptRef<'b>,
     4 => PlutusV4Script(script),
 );
 
+crate::babbage::decode_joined_script_ref!(
+    ScriptRef,
+    PlutusV1Script,
+    PlutusV2Script,
+    PlutusV3Script,
+    PlutusV4Script
+);
+
 /// `block_body` (`defs.cddl`). Dijkstra replaces Conway's segregated witness
 /// layout with complete inline transactions, and drops `invalid_transactions`
 /// and `transaction_index` because each transaction carries its own flag.

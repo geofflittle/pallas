@@ -313,7 +313,62 @@ pub struct GenPostAlonzoTransactionOutput<'b, V, S> {
     pub datum_option: Option<KeepRaw<'b, DatumOption<'b>>>,
 
     #[n(3)]
+    #[cbor(
+        decode_with = "decode_script_ref",
+        nil = "no_script_ref",
+        decode_bound = "S: minicbor::Decode<'bytes, Ctx> + DecodeJoined<Ctx>"
+    )]
     pub script_ref: Option<CborWrap<S>>,
+}
+
+/// A value read from the joined chunks of indefinite length bytes, keeping no borrow of them.
+pub trait DecodeJoined<C>: Sized {
+    fn decode_joined(cbor: &[u8], ctx: &mut C) -> Result<Self, minicbor::decode::Error>;
+}
+
+/// Implements `DecodeJoined` for a script reference enum from the names of its Plutus variants.
+macro_rules! decode_joined_script_ref {
+    ($name:ident, $($plutus:ident),+) => {
+        impl<C> $crate::babbage::DecodeJoined<C> for $name<'_> {
+            fn decode_joined(
+                cbor: &[u8],
+                ctx: &mut C,
+            ) -> Result<Self, pallas_codec::minicbor::decode::Error> {
+                Ok(match pallas_codec::minicbor::decode_with(cbor, ctx)? {
+                    $name::NativeScript(script) => $name::NativeScript(script.to_owned()),
+                    $($name::$plutus(script) => $name::$plutus(script),)+
+                })
+            }
+        }
+    };
+}
+pub(crate) use decode_joined_script_ref;
+
+decode_joined_script_ref!(ScriptRef, PlutusV1Script, PlutusV2Script);
+
+/// Decodes an output's script reference, tagged bytes of either length form that hold the script's CBOR.
+fn decode_script_ref<'b, Ctx, S>(
+    d: &mut minicbor::Decoder<'b>,
+    ctx: &mut Ctx,
+) -> Result<Option<CborWrap<S>>, minicbor::decode::Error>
+where
+    S: Decode<'b, Ctx> + DecodeJoined<Ctx>,
+{
+    if d.datatype()? == minicbor::data::Type::Null {
+        d.skip()?;
+        return Ok(None);
+    }
+    d.tag()?;
+    let script = match pallas_codec::utils::decode_bytes_def_or_indef(d, ctx)? {
+        std::borrow::Cow::Borrowed(cbor) => minicbor::decode_with(cbor, ctx)?,
+        std::borrow::Cow::Owned(cbor) => S::decode_joined(&cbor, ctx)?,
+    };
+    Ok(Some(CborWrap(script)))
+}
+
+/// The script reference of an output whose map has no script reference key.
+fn no_script_ref<S>() -> Option<Option<CborWrap<S>>> {
+    Some(None)
 }
 
 pub type PostAlonzoTransactionOutput<'b> = GenPostAlonzoTransactionOutput<'b, Value, ScriptRef<'b>>;
@@ -525,6 +580,51 @@ mod tests {
         for hex in ["8201d81841ff", "8201d8185f41ffff"] {
             let bytes = hex::decode(hex).unwrap();
             assert!(minicbor::decode::<DatumOption>(&bytes).is_err(), "{hex}");
+        }
+    }
+
+    #[test]
+    fn an_output_script_reference_over_indefinite_bytes_reads_as_the_joined_chunks() {
+        let output = |script: &str| format!("a3004100010003d818{script}");
+        for (script, raw) in [
+            ("5f43820082420180ff", Some("820180")),
+            ("458200820180", Some("820180")),
+            ("5f428201424100ff", None),
+        ] {
+            let bytes = hex::decode(output(script)).unwrap();
+            let babbage: super::PostAlonzoTransactionOutput = minicbor::decode(&bytes)
+                .unwrap_or_else(|e| panic!("babbage {script} must decode: {e}"));
+            let conway: crate::conway::PostAlonzoTransactionOutput = minicbor::decode(&bytes)
+                .unwrap_or_else(|e| panic!("conway {script} must decode: {e}"));
+            assert_eq!(
+                minicbor::to_vec(&babbage.script_ref).unwrap(),
+                minicbor::to_vec(&conway.script_ref).unwrap(),
+                "{script}"
+            );
+            match (babbage.script_ref, raw) {
+                (Some(CborWrap(ScriptRef::NativeScript(native))), Some(raw)) => {
+                    assert_eq!(hex::encode(native.raw_cbor()), raw, "{script}")
+                }
+                (Some(CborWrap(ScriptRef::PlutusV1Script(plutus))), None) => {
+                    assert_eq!(hex::encode(plutus.as_ref()), "00", "{script}")
+                }
+                (other, _) => panic!("{script} read as {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn an_output_script_reference_whose_joined_chunks_are_not_a_script_is_refused() {
+        let bytes = hex::decode("a3004100010003d8185f41ffff").unwrap();
+        assert!(minicbor::decode::<super::PostAlonzoTransactionOutput>(&bytes).is_err());
+    }
+
+    #[test]
+    fn an_output_without_a_script_reference_reads_none() {
+        for hex in ["a20041000100", "a3004100010003f6"] {
+            let bytes = hex::decode(hex).unwrap();
+            let output: super::PostAlonzoTransactionOutput = minicbor::decode(&bytes).unwrap();
+            assert!(output.script_ref.is_none(), "{hex}");
         }
     }
 
