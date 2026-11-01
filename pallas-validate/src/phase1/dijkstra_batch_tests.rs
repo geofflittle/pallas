@@ -841,7 +841,7 @@ fn key_witness(seed: u8, hash: &[u8]) -> n::VKeyWitness {
         signature: key.sign(hash).as_ref().to_vec().into(),
     }
 }
-/// Key and bootstrap witness sets over `body`, each with the result it gives.
+/// Key and bootstrap witness sets over `body`, each with the verdict it should get.
 fn witness_cases(body: &[u8]) -> Vec<(Vec<n::VKeyWitness>, Vec<n::BootstrapWitness>, &str)> {
     let signed = key_witness(71, body);
     let key = |vkey: usize, signature: usize| n::VKeyWitness {
@@ -1403,7 +1403,8 @@ fn dijkstra_min_fee_prices_the_redeemers_of_every_level_once() {
             numerator: 1,
             denominator: 2,
         };
-        // Half a lovelace per memory unit, so 1 and 1 cost 1 priced once and 2 priced per level.
+        // At half a lovelace per memory unit, two redeemers of one unit cost 1 priced together
+        // and 2 priced one level at a time.
         for (top, sub, expected) in [(None, Some(3), 2), (Some(1), Some(1), 1)] {
             let mut changed = tx.clone();
             changed.transaction_witness_set.redeemer = top.map(redeemers);

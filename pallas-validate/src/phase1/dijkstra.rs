@@ -415,8 +415,7 @@ fn check_required_guards(
     }
     Ok(())
 }
-/// One level's spending inputs: their coin and the scripts that must authorize
-/// them. Their key hashes, Byron address roots included, are added to the caller's set.
+/// One level's spending inputs: their coin and the scripts that must authorize them.
 struct Spending {
     coin: u64,
     scripts: BTreeSet<Hash<28>>,
@@ -1411,7 +1410,7 @@ fn check_integrity(tx: &BlockTransaction<'_>, model: Option<&Vec<i64>>) -> Valid
     Ok(())
 }
 
-/// A reference script by how this subset admits it.
+/// A reference script and whether a redeemer may run it.
 enum Reference<'a> {
     Native(MultiEraNativeScript<'a>),
     /// A PlutusV1 or V2 script, available as a reference but refused when a redeemer needs it.
