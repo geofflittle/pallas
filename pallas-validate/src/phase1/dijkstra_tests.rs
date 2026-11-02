@@ -719,6 +719,12 @@ fn dijkstra_a_needed_v1_or_v2_script_without_a_cost_model_is_refused() {
                 ShelleyDelegationPart::Null,
             );
             out.address = address.to_vec().into();
+            out.datum_option = Some(
+                conway::DatumOption::Data(pallas_codec::utils::CborWrap(
+                    conway::PlutusData::BigInt(conway::BigInt::Int(0.into())).into(),
+                ))
+                .into(),
+            );
             error(
                 dispatch(&tx, &MultiEraOutput::from_dijkstra(&locked), &env()),
                 "DijkstraScriptContext(\"cost model\")",

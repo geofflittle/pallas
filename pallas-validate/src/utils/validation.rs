@@ -41,6 +41,10 @@ pub enum ValidationError {
     DijkstraInputAlreadySpent,
 
     #[cfg(feature = "unstable")]
+    #[error("Dijkstra input locked by a Plutus V1 or V2 script has no datum")]
+    DijkstraInputWithoutDatum,
+
+    #[cfg(feature = "unstable")]
     #[error("Dijkstra collateral return pays to a pointer address")]
     DijkstraPointerInCollateralReturn,
 

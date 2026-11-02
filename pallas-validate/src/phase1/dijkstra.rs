@@ -1079,7 +1079,7 @@ fn check_scripts(
             "Plutus validity upper bound requires forecast state",
         ));
     }
-    check_datums(tx, utxos, &scripts)?;
+    check_datums(tx, utxos, &scripts, &plutus)?;
     // The size cap covers the whole batch; the fee counts top-level references only.
     let bytes = reference_script_size(b, utxos)?;
     if add(bytes, subs.reference_bytes)? > u64::from(pp.max_ref_script_size_per_tx) {
@@ -1408,6 +1408,7 @@ fn check_datums(
     tx: &BlockTransaction<'_>,
     utxos: &UTxOs<'_>,
     scripts: &BTreeMap<RedeemersKey, Hash<28>>,
+    plutus: &Plutus,
 ) -> ValidationResult {
     let mut allowed = HashSet::new();
     let mut required = HashSet::new();
@@ -1419,7 +1420,7 @@ fn check_datums(
         .into_iter()
         .enumerate()
     {
-        if scripts.contains_key(&RedeemersKey {
+        if let Some(hash) = scripts.get(&RedeemersKey {
             tag: RedeemerTag::Spend,
             index: index as u32,
         }) {
@@ -1432,9 +1433,16 @@ fn check_datums(
                     allowed.insert(hash);
                 }
                 Some(DatumOption::Data(_)) => (),
-                // CIP-0069: V3 may spend an output without a datum. A present
-                // hash still requires its matching witness datum.
-                None => (),
+                // CIP-0069: only V3 may spend an output without a datum. A
+                // present hash still requires its matching witness datum.
+                None => {
+                    if matches!(
+                        plutus.get(hash),
+                        Some(Language::PlutusV1 | Language::PlutusV2)
+                    ) {
+                        return Err(DijkstraInputWithoutDatum);
+                    }
+                }
             }
         }
     }
