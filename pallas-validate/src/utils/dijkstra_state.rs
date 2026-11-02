@@ -229,10 +229,9 @@ impl DijkstraLedgerState for DijkstraLedgerSnapshot {
         &self,
         credential: &StakeCredential,
     ) -> Result<Option<DijkstraAccount>, ValidationError> {
-        self.accounts
-            .get(credential)
-            .copied()
-            .ok_or_else(|| ValidationError::DijkstraLedgerStateUnavailable(format!("{credential:?}")))
+        self.accounts.get(credential).copied().ok_or_else(|| {
+            ValidationError::DijkstraLedgerStateUnavailable(format!("{credential:?}"))
+        })
     }
     fn pool(&self, operator: &Hash<28>) -> Result<Option<DijkstraPool>, ValidationError> {
         Ok(self.pools.get(operator).copied())

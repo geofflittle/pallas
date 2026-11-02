@@ -1,6 +1,9 @@
 //! Dijkstra rules on account, pool, DRep, committee and proposal state.
 use crate::utils::{
-    DijkstraProtParams, PostAlonzoError::*, ValidationError, ValidationError::*,
+    DijkstraProtParams,
+    PostAlonzoError::*,
+    ValidationError,
+    ValidationError::*,
     ValidationResult,
     dijkstra_state::{
         DijkstraAccount, DijkstraCommitteeAuth, DijkstraDRep, DijkstraLedgerOverlay,
@@ -106,7 +109,8 @@ impl Needs {
 
 /// The network and credential of a reward account.
 pub(crate) fn reward_account(raw: &[u8]) -> Result<(u8, StakeCredential), ValidationError> {
-    let Address::Stake(address) = Address::from_bytes(raw).map_err(|_| PostAlonzo(AddressDecoding))?
+    let Address::Stake(address) =
+        Address::from_bytes(raw).map_err(|_| PostAlonzo(AddressDecoding))?
     else {
         return Err(PostAlonzo(AddressDecoding));
     };
@@ -251,9 +255,9 @@ fn check_intervals<S: DijkstraLedgerState + ?Sized>(
         if net != network {
             return Err(PostAlonzo(TxWrongNetworkID));
         }
-        let account = state
-            .account(&credential)?
-            .ok_or(DijkstraInvalidAccount("balance interval names an unregistered account"))?;
+        let account = state.account(&credential)?.ok_or(DijkstraInvalidAccount(
+            "balance interval names an unregistered account",
+        ))?;
         if !interval_contains(account.balance, interval) {
             return Err(DijkstraInvalidAccount("balance outside its interval"));
         }
@@ -309,7 +313,9 @@ where
                 if let Some(account) = original.account(credential)?
                     && *amount > u128::from(account.balance)
                 {
-                    return Err(DijkstraInvalidWithdrawal("amount exceeds the original balance"));
+                    return Err(DijkstraInvalidWithdrawal(
+                        "amount exceeds the original balance",
+                    ));
                 }
             }
             for ((_, credential), amount) in &withdrawals {
@@ -326,7 +332,9 @@ where
         None => {
             for ((_, credential), _) in &withdrawals {
                 if original.account(credential)?.is_none() {
-                    return Err(DijkstraInvalidWithdrawal("account missing from the original state"));
+                    return Err(DijkstraInvalidWithdrawal(
+                        "account missing from the original state",
+                    ));
                 }
                 if current.account(credential)?.is_none() {
                     return Err(DijkstraInvalidWithdrawal("unregistered account"));
@@ -344,7 +352,9 @@ where
     for (raw, amount) in level.direct_deposits.into_iter().flatten() {
         let (_, credential) = reward_account(raw)?;
         if current.account(&credential)?.is_none() {
-            return Err(DijkstraInvalidAccount("direct deposit names an unregistered account"));
+            return Err(DijkstraInvalidAccount(
+                "direct deposit names an unregistered account",
+            ));
         }
         flows.produce(*amount)?;
     }
@@ -364,7 +374,10 @@ fn withdraw<S: DijkstraLedgerState + ?Sized>(
             .balance
             .checked_sub(amount)
             .ok_or(DijkstraInvalidWithdrawal("amount exceeds the balance"))?;
-        state.delta.accounts.insert(credential.clone(), Some(account));
+        state
+            .delta
+            .accounts
+            .insert(credential.clone(), Some(account));
     }
     Ok(())
 }
@@ -379,7 +392,10 @@ fn deposit<S: DijkstraLedgerState + ?Sized>(
             .balance
             .checked_add(amount)
             .ok_or(PostAlonzo(NegativeValue))?;
-        state.delta.accounts.insert(credential.clone(), Some(account));
+        state
+            .delta
+            .accounts
+            .insert(credential.clone(), Some(account));
     }
     Ok(())
 }
@@ -528,7 +544,9 @@ fn certificate<S: DijkstraLedgerState + ?Sized>(
             match state.pool(operator)? {
                 None => {
                     if count != 0 {
-                        return Err(DijkstraInvalidCertificate("VRF key hash already registered"));
+                        return Err(DijkstraInvalidCertificate(
+                            "VRF key hash already registered",
+                        ));
                     }
                     state.delta.pools.insert(
                         *operator,
@@ -543,7 +561,9 @@ fn certificate<S: DijkstraLedgerState + ?Sized>(
                 Some(pool) => {
                     let own = *vrf_keyhash == pool.vrf || pool.future_vrf == Some(*vrf_keyhash);
                     if count != u64::from(own) {
-                        return Err(DijkstraInvalidCertificate("VRF key hash already registered"));
+                        return Err(DijkstraInvalidCertificate(
+                            "VRF key hash already registered",
+                        ));
                     }
                     if pool.future_vrf != Some(*vrf_keyhash) {
                         if let Some(old) = pool.future_vrf
@@ -790,7 +810,9 @@ pub(crate) fn governance<S: DijkstraLedgerState + ?Sized>(
             return Err(PostAlonzo(TxWrongNetworkID));
         }
         if current.account(&credential)?.is_none() {
-            return Err(DijkstraInvalidGovernance("proposal return account not registered"));
+            return Err(DijkstraInvalidGovernance(
+                "proposal return account not registered",
+            ));
         }
         let proposals = current.proposals()?;
         if let Some(purpose) = purpose(&action) {
@@ -872,15 +894,20 @@ pub(crate) fn governance<S: DijkstraLedgerState + ?Sized>(
                 return Err(DijkstraInvalidGovernance("voter does not exist"));
             }
             for id in actions.keys() {
-                let (_, proposal) = proposals
-                    .iter()
-                    .find(|(x, _)| x == id)
-                    .ok_or(DijkstraInvalidGovernance("governance action does not exist"))?;
+                let (_, proposal) =
+                    proposals
+                        .iter()
+                        .find(|(x, _)| x == id)
+                        .ok_or(DijkstraInvalidGovernance(
+                            "governance action does not exist",
+                        ))?;
                 if epoch > proposal.expires_after {
                     return Err(DijkstraInvalidGovernance("vote on an expired action"));
                 }
                 if !allowed(voter, &proposal.action) {
-                    return Err(DijkstraInvalidGovernance("voter may not vote on the action"));
+                    return Err(DijkstraInvalidGovernance(
+                        "voter may not vote on the action",
+                    ));
                 }
             }
         }
@@ -893,9 +920,9 @@ pub(crate) fn governance<S: DijkstraLedgerState + ?Sized>(
 
 fn voter_credential(voter: &Voter) -> StakeCredential {
     match voter {
-        Voter::ConstitutionalCommitteeKey(key)
-        | Voter::DRepKey(key)
-        | Voter::StakePoolKey(key) => StakeCredential::AddrKeyhash(*key),
+        Voter::ConstitutionalCommitteeKey(key) | Voter::DRepKey(key) | Voter::StakePoolKey(key) => {
+            StakeCredential::AddrKeyhash(*key)
+        }
         Voter::ConstitutionalCommitteeScript(hash) | Voter::DRepScript(hash) => {
             StakeCredential::ScriptHash(*hash)
         }
