@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    convert::Infallible,
     future::ready,
     pin::Pin,
     sync::Arc,
@@ -7,7 +8,9 @@ use std::{
 };
 
 use futures::{
-    Stream, StreamExt,
+    FutureExt, Stream, StreamExt,
+    channel::oneshot::{self, Canceled},
+    future::{Either, Shared, select},
     stream::{FusedStream, FuturesUnordered},
 };
 
@@ -22,11 +25,13 @@ enum InternalEvent<M: Message> {
     Connected(PeerId, Bearer),
     Disconnected(PeerId),
     Sent(PeerId, M),
-    Recv(PeerId, Vec<M>, BearerReadHalf, ChunkBuffer),
+    Recv(PeerId, Vec<M>, BearerReadHalf, ChunkBuffer, Closed),
     Error(PeerId, tokio::io::Error),
 }
 
 type InterfaceFuture<M> = Pin<Box<dyn Future<Output = InternalEvent<M>> + Send>>;
+
+type PoolFuture<M> = Pin<Box<dyn Future<Output = Result<InternalEvent<M>, Canceled>> + Send>>;
 
 async fn connect<M: Message>(pid: PeerId) -> InternalEvent<M> {
     let pid = pid.clone();
@@ -68,13 +73,14 @@ async fn recv<M: Message>(
     pid: PeerId,
     mut reader: BearerReadHalf,
     mut partial_chunks: ChunkBuffer,
+    closed: Closed,
 ) -> InternalEvent<M> {
     let pid = pid.clone();
 
     let result = reader.read_full_msgs(&mut partial_chunks).await;
 
     match result {
-        Ok(msgs) => InternalEvent::Recv(pid.clone(), msgs, reader, partial_chunks),
+        Ok(msgs) => InternalEvent::Recv(pid.clone(), msgs, reader, partial_chunks, closed),
         Err(e) => InternalEvent::Error(pid.clone(), e),
     }
 }
@@ -92,13 +98,22 @@ async fn disconnect<M: Message>(pid: PeerId, writer: SharedWriter) -> InternalEv
 /// A thread-safe handle to a shared [`BearerWriteHalf`].
 pub type SharedWriter = Arc<Mutex<BearerWriteHalf>>;
 
+type Closed = Shared<oneshot::Receiver<Infallible>>;
+
+struct Connection {
+    writer: SharedWriter,
+    closed: Closed,
+    /// Dropping it resolves `closed`, which ends the connection's pending reads and sends.
+    _close: oneshot::Sender<Infallible>,
+}
+
 // ---------------------------------------------------------------------------
 // TcpConnectionPool — shared connection-management logic
 // ---------------------------------------------------------------------------
 
 struct TcpConnectionPool<M: Message> {
-    futures: FuturesUnordered<InterfaceFuture<M>>,
-    writers: HashMap<PeerId, SharedWriter>,
+    futures: FuturesUnordered<PoolFuture<M>>,
+    connections: HashMap<PeerId, Connection>,
     clock: Instant,
     /// The mode bit to set on outgoing segments (0 for initiator, PROTOCOL_SERVER for responder).
     mode: u16,
@@ -108,34 +123,54 @@ impl<M: Message> TcpConnectionPool<M> {
     fn new(mode: u16) -> Self {
         Self {
             futures: FuturesUnordered::new(),
-            writers: HashMap::new(),
+            connections: HashMap::new(),
             clock: Instant::now(),
             mode,
         }
     }
 
     fn push_future(&mut self, f: InterfaceFuture<M>) {
-        self.futures.push(f);
+        self.futures.push(Box::pin(f.map(Ok)));
     }
 
-    fn take_writer(&mut self, pid: &PeerId) -> Option<SharedWriter> {
-        self.writers.get(pid).cloned()
+    fn push_connection_future(&mut self, closed: Closed, f: InterfaceFuture<M>) {
+        let future = select(closed, f).map(|either| match either {
+            Either::Left((Err(canceled), _)) => Err(canceled),
+            Either::Right((event, _)) => Ok(event),
+        });
+
+        self.futures.push(Box::pin(future));
+    }
+
+    fn push_reader(
+        &mut self,
+        pid: PeerId,
+        reader: BearerReadHalf,
+        partial_chunks: ChunkBuffer,
+        closed: Closed,
+    ) {
+        let future = recv(pid, reader, partial_chunks, closed.clone());
+        self.push_connection_future(closed, Box::pin(future));
     }
 
     fn on_connected(&mut self, pid: PeerId, bearer: Bearer) -> InterfaceEvent<M> {
         let (read, write) = bearer.into_split();
+        let (close, closed) = oneshot::channel();
+        let closed = closed.shared();
 
-        self.writers
-            .insert(pid.clone(), Arc::new(Mutex::new(write)));
+        let connection = Connection {
+            writer: Arc::new(Mutex::new(write)),
+            closed: closed.clone(),
+            _close: close,
+        };
+        self.connections.insert(pid.clone(), connection);
 
-        let future = recv(pid.clone(), read, HashMap::new());
-        self.futures.push(Box::pin(future));
+        self.push_reader(pid.clone(), read, HashMap::new(), closed);
 
         InterfaceEvent::Connected(pid)
     }
 
     fn on_disconnected(&mut self, pid: PeerId) -> InterfaceEvent<M> {
-        self.writers.remove(&pid);
         InterfaceEvent::Disconnected(pid)
     }
 
@@ -149,9 +184,9 @@ impl<M: Message> TcpConnectionPool<M> {
         msgs: Vec<M>,
         reader: BearerReadHalf,
         partial_chunks: ChunkBuffer,
+        closed: Closed,
     ) -> InterfaceEvent<M> {
-        let future = recv(pid.clone(), reader, partial_chunks);
-        self.futures.push(Box::pin(future));
+        self.push_reader(pid.clone(), reader, partial_chunks, closed);
 
         InterfaceEvent::Recv(pid, msgs)
     }
@@ -165,7 +200,9 @@ impl<M: Message> TcpConnectionPool<M> {
         match event {
             InternalEvent::Connected(pid, stream) => self.on_connected(pid, stream),
             InternalEvent::Sent(pid, msg) => self.on_sent(pid, msg),
-            InternalEvent::Recv(pid, msgs, stream, buf) => self.on_recv(pid, msgs, stream, buf),
+            InternalEvent::Recv(pid, msgs, stream, buf, closed) => {
+                self.on_recv(pid, msgs, stream, buf, closed)
+            }
             InternalEvent::Disconnected(pid) => self.on_disconnected(pid),
             InternalEvent::Error(pid, error) => self.on_error(pid, error),
         }
@@ -174,37 +211,40 @@ impl<M: Message> TcpConnectionPool<M> {
     fn dispatch_send(&mut self, pid: PeerId, msg: M) {
         let ts = self.clock.elapsed().as_micros() as u32;
 
-        let Some(writer) = self.take_writer(&pid) else {
+        let Some(connection) = self.connections.get(&pid) else {
             tracing::error!(%pid, "trying to send to a peer not connected");
             return;
         };
+        let closed = connection.closed.clone();
 
-        let future = send(pid, writer, msg, ts, self.mode);
-        self.futures.push(Box::pin(future));
+        let future = send(pid, connection.writer.clone(), msg, ts, self.mode);
+        self.push_connection_future(closed, Box::pin(future));
     }
 
     fn dispatch_disconnect(&mut self, pid: PeerId) {
-        let Some(stream) = self.take_writer(&pid) else {
+        let Some(connection) = self.connections.remove(&pid) else {
             tracing::warn!(%pid, "trying to disconnect a peer not connected");
-            self.futures
-                .push(Box::pin(ready(InternalEvent::Disconnected(pid.clone()))));
+            self.push_future(Box::pin(ready(InternalEvent::Disconnected(pid.clone()))));
             return;
         };
 
-        let future = disconnect(pid, stream);
-        self.futures.push(Box::pin(future));
+        let future = disconnect(pid, connection.writer);
+        self.push_future(Box::pin(future));
     }
 
     fn poll_next_event(&mut self, cx: &mut Context<'_>) -> Poll<Option<InterfaceEvent<M>>> {
-        let event = self.futures.poll_next_unpin(cx);
+        loop {
+            let event = self.futures.poll_next_unpin(cx);
 
-        match event {
-            Poll::Ready(Some(event)) => {
-                let event = self.handle_internal_event(event);
-                Poll::Ready(Some(event))
+            match event {
+                Poll::Ready(Some(Ok(event))) => {
+                    let event = self.handle_internal_event(event);
+                    return Poll::Ready(Some(event));
+                }
+                Poll::Ready(Some(Err(Canceled))) => continue,
+                Poll::Ready(None) => return Poll::Pending,
+                Poll::Pending => return Poll::Pending,
             }
-            Poll::Ready(None) => Poll::Pending,
-            Poll::Pending => Poll::Pending,
         }
     }
 }
@@ -358,5 +398,153 @@ impl<M: Message> Stream for TcpListenerInterface<M> {
 
         // Then poll existing connections
         self.pool.poll_next_event(cx)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use tokio::net::{TcpListener, TcpStream};
+
+    use super::*;
+    use crate::behavior::AnyMessage;
+
+    const WINDOW: Duration = Duration::from_millis(300);
+
+    async fn kinds_within(interface: &mut TcpInterface<AnyMessage>) -> Vec<&'static str> {
+        let mut kinds = Vec::new();
+
+        let _ = tokio::time::timeout(WINDOW, async {
+            loop {
+                let kind = match interface.next().await {
+                    Some(InterfaceEvent::Connected(_)) => "connected",
+                    Some(InterfaceEvent::Disconnected(_)) => "disconnected",
+                    Some(InterfaceEvent::Sent(..)) => "sent",
+                    Some(InterfaceEvent::Error(..)) => "error",
+                    Some(_) => "other",
+                    None => continue,
+                };
+                kinds.push(kind);
+            }
+        })
+        .await;
+
+        kinds
+    }
+
+    async fn connect_once(
+        interface: &mut TcpInterface<AnyMessage>,
+        listener: &TcpListener,
+        pid: &PeerId,
+    ) -> (TcpStream, Vec<&'static str>) {
+        interface.dispatch(InterfaceCommand::Connect(pid.clone()));
+        let (accepted, kinds) = tokio::join!(listener.accept(), kinds_within(interface));
+
+        (accepted.unwrap().0, kinds)
+    }
+
+    async fn bound() -> (TcpListener, PeerId) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let pid = PeerId {
+            host: addr.ip().to_string(),
+            port: addr.port(),
+        };
+
+        (listener, pid)
+    }
+
+    #[tokio::test]
+    async fn a_replaced_connection_closing_reports_nothing() {
+        let (listener, pid) = bound().await;
+        let mut interface = TcpInterface::<AnyMessage>::new();
+
+        let (first, first_connected) = connect_once(&mut interface, &listener, &pid).await;
+        let (second, second_connected) = connect_once(&mut interface, &listener, &pid).await;
+
+        drop(first);
+        let first_closed = kinds_within(&mut interface).await;
+
+        drop(second);
+        let second_closed = kinds_within(&mut interface).await;
+
+        assert_eq!(
+            (
+                first_connected,
+                second_connected,
+                first_closed,
+                second_closed
+            ),
+            (vec!["connected"], vec!["connected"], vec![], vec!["error"]),
+            "events on each connect, then on each server side close"
+        );
+    }
+
+    fn keepalive() -> AnyMessage {
+        AnyMessage::KeepAlive(crate::protocol::keepalive::Message::KeepAlive(7))
+    }
+
+    #[tokio::test]
+    async fn a_send_unwritten_at_a_disconnect_reports_only_the_disconnect() {
+        let mut kinds = Vec::new();
+
+        for send_first in [true, false] {
+            let (listener, pid) = bound().await;
+            let mut interface = TcpInterface::<AnyMessage>::new();
+            let (_server, _) = connect_once(&mut interface, &listener, &pid).await;
+            let send = InterfaceCommand::Send(pid.clone(), keepalive());
+            let disconnect = InterfaceCommand::Disconnect(pid.clone());
+
+            if send_first {
+                interface.dispatch(send);
+                interface.dispatch(disconnect);
+            } else {
+                interface.dispatch(disconnect);
+                interface.dispatch(send);
+            }
+            kinds.push(kinds_within(&mut interface).await);
+        }
+
+        assert_eq!(
+            kinds,
+            vec![vec!["disconnected"], vec!["disconnected"]],
+            "events with the send dispatched before, then after, the disconnect"
+        );
+    }
+
+    const BLOCKS: usize = 400;
+
+    #[tokio::test]
+    async fn a_disconnect_behind_a_blocked_send_reports_only_the_disconnect() {
+        let (listener, pid) = bound().await;
+        let mut interface = TcpInterface::<AnyMessage>::new();
+        let (server, _) = connect_once(&mut interface, &listener, &pid).await;
+
+        for _ in 0..BLOCKS {
+            let block = crate::protocol::blockfetch::Message::Block(vec![0; 65536]);
+            interface.dispatch(InterfaceCommand::Send(
+                pid.clone(),
+                AnyMessage::BlockFetch(block),
+            ));
+        }
+        let filling = kinds_within(&mut interface).await;
+
+        interface.dispatch(InterfaceCommand::Disconnect(pid.clone()));
+        let disconnecting = kinds_within(&mut interface).await;
+
+        drop(server);
+        let closed = kinds_within(&mut interface).await;
+
+        assert_eq!(
+            (
+                filling.iter().all(|kind| *kind == "sent"),
+                filling.len() < BLOCKS,
+                disconnecting,
+                closed
+            ),
+            (true, true, vec!["disconnected"], vec![]),
+            "only sends while filling, a send left blocked, then events on disconnect and on close"
+        );
     }
 }
