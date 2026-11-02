@@ -1,4 +1,5 @@
 use super::*;
+use pallas_addresses::ShelleyDelegationPart;
 use pallas_codec::{minicbor, utils::KeepRaw};
 use pallas_traverse::OriginalHash;
 
@@ -74,7 +75,8 @@ fn dijkstra_native_reference_guard_has_no_v3_projection() {
 }
 
 #[test]
-fn dijkstra_pointer_output_is_labelled_as_a_v3_context_pointer() {
+fn dijkstra_pointer_output_keeps_its_pointer_in_a_context() {
+    use super::super::to_plutus_data::ToPlutusData;
     let output = |delegation| {
         let address = pallas_addresses::ShelleyAddress::new(
             pallas_addresses::Network::Testnet,
@@ -92,20 +94,33 @@ fn dijkstra_pointer_output_is_labelled_as_a_v3_context_pointer() {
             .into(),
         )
     };
+    let address = |output: &c::TransactionOutput<'_>| {
+        let view = MultiEraOutput::from_conway(output);
+        view.address().unwrap().to_plutus_data()
+    };
     let base = output(ShelleyDelegationPart::Null);
-    assert!(context_output(&MultiEraOutput::from_dijkstra(&base), false).is_ok());
+    let projected = context_output(&MultiEraOutput::from_dijkstra(&base), false).unwrap();
+    let payment =
+        super::super::data::Data::constr(0, vec![Hash::<28>::from([1; 28]).to_plutus_data()]);
+    assert_eq!(
+        address(&projected),
+        super::super::data::Data::constr(0, vec![payment.clone(), None::<u64>.to_plutus_data()])
+    );
     let pointer = output(ShelleyDelegationPart::Pointer(
         pallas_addresses::Pointer::new(1, 2, 3),
     ));
-    let result = context_output(&MultiEraOutput::from_dijkstra(&pointer), false);
-    assert!(
-        matches!(
-            result,
-            Err(Error::DijkstraUnsupported(Unsupported(
-                "pointer address in a V3 script context"
-            )))
-        ),
-        "{result:?}"
+    let projected = context_output(&MultiEraOutput::from_dijkstra(&pointer), false).unwrap();
+    let staking = super::super::data::Data::constr(
+        1,
+        vec![
+            1u64.to_plutus_data(),
+            2u64.to_plutus_data(),
+            3u64.to_plutus_data(),
+        ],
+    );
+    assert_eq!(
+        address(&projected),
+        super::super::data::Data::constr(0, vec![payment, Some(staking).to_plutus_data()])
     );
 }
 
@@ -186,9 +201,10 @@ fn ttl_validator_detects_an_inclusive_upper_bound() {
             0,
             vec![construct(0, fields), expected.clone(), construct(1, vec![])],
         );
-        let (result, _) = crate::phase2::native_evaluator::eval_native_v3(
+        let (result, _) = crate::phase2::native_evaluator::eval_native(
+            pallas_primitives::conway::Language::PlutusV3,
             script.as_ref(),
-            &context,
+            &[&context],
             &costs,
             n::ExUnits {
                 mem: 1_000_000,
