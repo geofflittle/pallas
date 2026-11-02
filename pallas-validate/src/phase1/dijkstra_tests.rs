@@ -576,7 +576,7 @@ fn dijkstra_typed_features_reject_explicitly() {
                 7 => {
                     changed.transaction_body.reference_inputs =
                         native::NonEmptySet::from_vec(changed.transaction_body.inputs.to_vec());
-                    "overlapping spending and reference inputs"
+                    "overlapping inputs pass to the signature check"
                 }
                 8 => {
                     changed.transaction_body.script_data_hash = Some([0; 32].into());
@@ -590,13 +590,15 @@ fn dijkstra_typed_features_reject_explicitly() {
             let expected = match field {
                 0 => "PostAlonzo(ScriptWitnessMissing)".to_owned(),
                 1 => "PostAlonzo(ReqSignerMissing)".to_owned(),
-                2..=4 => "PostAlonzo(VKWrongSignature)".to_owned(),
+                2..=4 | 7 => "PostAlonzo(VKWrongSignature)".to_owned(),
                 5 => "DijkstraTreasuryValueMismatch".to_owned(),
-                8 =>"PostAlonzo(ScriptIntegrityHash)".to_owned(),
+                8 => "PostAlonzo(ScriptIntegrityHash)".to_owned(),
                 9 => "PostAlonzo(MetadataHash)".to_owned(),
                 _ => format!("DijkstraUnsupported({expected:?})"),
             };
-            error(dispatch(&changed, &output, &env()), &expected);
+            let result = dispatch(&changed, &output, &env());
+            assert!(result.is_err(), "field {field} passes");
+            error(result, &expected);
         }
         let sub_bytes = hex::decode("83a200800180a0f6").unwrap();
         let sub: native::SubTransaction = minicbor::decode(&sub_bytes).unwrap();
@@ -615,18 +617,6 @@ fn dijkstra_typed_features_reject_explicitly() {
                 &mut CertState::default(),
             ),
             "DijkstraUnsupported(\"subtransactions\")",
-        );
-    });
-    synthetic(|tx, mut input| {
-        let native::TransactionOutput::PostAlonzo(ref mut out) = input else {
-            unreachable!()
-        };
-        out.script_ref = Some(pallas_codec::utils::CborWrap(
-            native::ScriptRef::PlutusV4Script(pallas_primitives::PlutusScript(vec![1].into())),
-        ));
-        error(
-            dispatch(&tx, &MultiEraOutput::from_dijkstra(&input), &env()),
-            "DijkstraUnsupported(\"reference script language (requires V3)\")",
         );
     });
 }
@@ -698,23 +688,18 @@ fn with_new_script<'a>(
 }
 
 #[test]
-fn dijkstra_spent_v1_and_v2_scripts_no_purpose_needs_pass() {
+fn dijkstra_spent_plutus_scripts_no_purpose_needs_pass() {
     synthetic(|tx, input| {
-        for script in plutus_v1_and_v2(&[1]) {
+        for script in plutus_v1_and_v2(&[1]).into_iter().chain([plutus_v4()]) {
             let input = with_script(&input, script);
             let result = dispatch(&tx, &MultiEraOutput::from_dijkstra(&input), &env());
             assert!(result.is_ok(), "{result:?}");
         }
-        let input = with_script(&input, plutus_v4());
-        error(
-            dispatch(&tx, &MultiEraOutput::from_dijkstra(&input), &env()),
-            "DijkstraUnsupported(\"reference script language (requires V3)\")",
-        );
     });
 }
 
 #[test]
-fn dijkstra_a_needed_v1_or_v2_reference_script_is_unsupported() {
+fn dijkstra_a_needed_v1_or_v2_script_without_a_cost_model_is_refused() {
     synthetic(|tx, input| {
         use pallas_traverse::ComputeHash;
         for script in plutus_v1_and_v2(&[1]) {
@@ -735,7 +720,7 @@ fn dijkstra_a_needed_v1_or_v2_reference_script_is_unsupported() {
             out.address = address.to_vec().into();
             error(
                 dispatch(&tx, &MultiEraOutput::from_dijkstra(&locked), &env()),
-                "DijkstraUnsupported(\"reference script language (requires V3)\")",
+                "DijkstraScriptContext(\"cost model\")",
             );
         }
     });

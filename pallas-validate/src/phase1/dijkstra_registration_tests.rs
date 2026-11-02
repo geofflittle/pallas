@@ -193,7 +193,7 @@ fn dijkstra_registration_state_deposit_and_parameters() {
             &utxos,
             &e,
             &state,
-            "DijkstraMissingParameters(\"PlutusV3 cost model\")",
+            "DijkstraScriptContext(\"cost model\")",
         );
     });
 }

@@ -344,6 +344,7 @@ fn replace_script(
             Some(n::ScriptRef::PlutusV1Script(s)) => s.compute_hash(),
             Some(n::ScriptRef::PlutusV2Script(s)) => s.compute_hash(),
             Some(n::ScriptRef::PlutusV3Script(s)) => s.compute_hash(),
+            Some(n::ScriptRef::PlutusV4Script(s)) => s.compute_hash(),
             _ => panic!(),
         };
         let mut b = (*tx.transaction_body).clone();
@@ -386,7 +387,7 @@ fn native_registration_script_presence_language_and_machine_failures() {
             replace_script(&mut tx, &mut u, Some(s.clone()), false);
             error(run(&tx, &u), "MissingRequiredScript");
             replace_script(&mut tx, &mut u, Some(s), true);
-            error(run(&tx, &u), "reference script language (requires V3)");
+            error(run(&tx, &u), "CostModelNotFound");
         }
         let mut v4 = tx.clone();
         let mut v4_utxos = u.clone();
@@ -396,7 +397,7 @@ fn native_registration_script_presence_language_and_machine_failures() {
             Some(n::ScriptRef::PlutusV4Script(n::PlutusScript(
                 vec![0].into(),
             ))),
-            false,
+            true,
         );
         error(
             run(&v4, &v4_utxos),
@@ -482,7 +483,7 @@ fn native_registration_synthetic_validator_reads_redeemer() {
     });
 }
 #[test]
-fn native_registration_rejects_unsupported_features_and_protocols() {
+fn native_registration_features_and_protocols() {
     fixture(|tx, u| {
         for version in [(9, 0), (11, 0), (12, 1), (13, 0)] {
             let mut pp = params();
@@ -505,15 +506,15 @@ fn native_registration_rejects_unsupported_features_and_protocols() {
                 }
                 1 => {
                     b.direct_deposits = Some(Default::default());
-                    "account features"
+                    "evaluates"
                 }
                 2 => {
                     b.account_balance_intervals = Some(Default::default());
-                    "account features"
+                    "evaluates"
                 }
                 3 => {
                     b.starting_account_balance_intervals = Some(Default::default());
-                    "account features"
+                    "evaluates"
                 }
                 4 => {
                     b.guards = Some(n::Guards::Credentials(
@@ -525,11 +526,11 @@ fn native_registration_rejects_unsupported_features_and_protocols() {
                 }
                 5 => {
                     b.treasury_value = Some(1);
-                    "governance"
+                    "evaluates"
                 }
                 6 => {
                     b.donation = Some(1.try_into().unwrap());
-                    "governance"
+                    "evaluates"
                 }
                 7 => {
                     b.certificates = Some(
@@ -540,27 +541,29 @@ fn native_registration_rejects_unsupported_features_and_protocols() {
                         .try_into()
                         .unwrap(),
                     );
-                    "certificate kind"
+                    "MissingRequiredScript"
                 }
                 8 => {
-                    b.reference_inputs = Some(vec![b.inputs[0].clone()].try_into().unwrap());
-                    "overlapping spending/reference inputs"
+                    let mut references = b.reference_inputs.clone().unwrap().to_vec();
+                    references.push(b.inputs[0].clone());
+                    b.reference_inputs = Some(references.try_into().unwrap());
+                    "inputs that are also reference inputs"
                 }
                 9 => {
                     b.required_top_level_guards = Some(Default::default());
-                    "account features"
+                    "evaluates"
                 }
                 10 => {
                     b.mint = Some(Default::default());
-                    "governance"
+                    "evaluates"
                 }
                 11 => {
                     b.withdrawals = Some(Default::default());
-                    "governance"
+                    "evaluates"
                 }
                 12 => {
                     b.voting_procedures = Some(Default::default());
-                    "governance"
+                    "evaluates"
                 }
                 13 => {
                     b.validity_interval_start = Some(u64::MAX);
@@ -572,7 +575,7 @@ fn native_registration_rejects_unsupported_features_and_protocols() {
                 }
             };
             changed.transaction_body = b.into();
-            if matches!(feature, 10 | 11) {
+            if expected == "evaluates" {
                 assert!(run(&changed, &u).unwrap()[0].success);
             } else {
                 error(run(&changed, &u), expected);
@@ -583,7 +586,7 @@ fn native_registration_rejects_unsupported_features_and_protocols() {
         let batch = MultiEraTx::decode_for_era(Era::Dijkstra, &bytes).unwrap();
         error(
             evaluate_tx(&batch, &params(), &u, &slots()),
-            "subtransactions",
+            "subtransaction redeemers",
         );
     });
 }
@@ -714,14 +717,7 @@ fn native_registration_invalid_script_encoding_and_witness_scripts() {
                 }
             };
             tx.transaction_witness_set = w.into();
-            error(
-                run(&tx, &u),
-                if language == 3 {
-                    "DecodeError"
-                } else {
-                    "witness scripts"
-                },
-            );
+            error(run(&tx, &u), "DecodeError");
         }
     });
 }

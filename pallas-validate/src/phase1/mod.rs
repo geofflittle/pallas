@@ -9,7 +9,7 @@ pub mod dijkstra;
 #[cfg(all(test, feature = "unstable"))]
 mod dijkstra_batch_tests;
 #[cfg(feature = "unstable")]
-mod dijkstra_ledger;
+pub(crate) mod dijkstra_ledger;
 #[cfg(all(test, feature = "unstable"))]
 mod dijkstra_native_tests;
 #[cfg(all(test, feature = "unstable"))]

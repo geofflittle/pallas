@@ -1,8 +1,11 @@
-//! Native protocol-12 phase one for transfers, batches, account and governance state, and Plutus V3.
+//! Native protocol-12 phase one for transfers, batches, account and governance state, and Plutus V1 to V3.
 //! Rules and evidence boundaries: test_data/musashi-dijkstra-validation/README.md.
 use super::dijkstra_ledger::{self as ledger, Flows, Level, WithdrawalRule};
 use crate::utils::{
-    DijkstraProtParams, PostAlonzoError::*, UTxOs, ValidationError, ValidationError::*,
+    DijkstraProtParams,
+    PostAlonzoError::*,
+    UTxOs, ValidationError,
+    ValidationError::*,
     ValidationResult,
     dijkstra_state::{DijkstraLedgerDelta, DijkstraLedgerOverlay, DijkstraLedgerState},
     verify_signature,
@@ -102,24 +105,14 @@ pub fn validate_dijkstra_tx<S: DijkstraLedgerState + ?Sized>(
         return Err(PostAlonzo(MaxTxSizeExceeded));
     }
     let subs = sub_scripts(b, utxos)?;
-    let (has_plutus, natives) =
-        check_scripts(tx, utxos, pp, &scripts, &subs, &mut keys, *network_id)?;
-    if has_plutus && b.sub_transactions.is_some() {
-        return Err(DijkstraUnsupported("scripted or stateful batch"));
-    }
-    if has_plutus
-        && b.required_top_level_guards
-            .as_ref()
-            .is_some_and(|x| !x.is_empty())
-    {
-        return Err(DijkstraUnsupported("Plutus required top-level guards"));
-    }
-    // Native scripts do not make the withdrawals legacy.
-    let rule = match has_plutus {
+    let provided = check_scripts(tx, utxos, pp, &scripts, &subs, &mut keys, *network_id)?;
+    // A top level Plutus script up to V3 puts the batch in legacy mode, native scripts do not.
+    let legacy = !provided.languages.is_empty();
+    let rule = match legacy {
         true => WithdrawalRule::Legacy,
         false => WithdrawalRule::Partial,
     };
-    let (flows, delta) = ledger_rules(tx, pp, *network_id, rule, state)?;
+    let (flows, top_flows, delta) = ledger_rules(tx, pp, *network_id, rule, state)?;
     if b.fee < dijkstra_min_fee(tx, utxos, pp)? {
         return Err(PostAlonzo(FeeBelowMin));
     }
@@ -151,8 +144,17 @@ pub fn validate_dijkstra_tx<S: DijkstraLedgerState + ?Sized>(
             .iter()
             .chain(guard_scripts(&guards))
             .chain(needs.scripts.values())
+            .chain(sb.mint.iter().flat_map(|x| x.keys()))
         {
-            let script = natives.get(hash).ok_or(PostAlonzo(ScriptWitnessMissing))?;
+            let Some(script) = provided.natives.get(hash) else {
+                return Err(match provided.plutus.get(hash) {
+                    None => PostAlonzo(ScriptWitnessMissing),
+                    Some(Language::PlutusV4) => {
+                        DijkstraUnsupported("reference script language (requires V3)")
+                    }
+                    Some(_) => DijkstraScriptContext("Plutus V1 to V3 script in a subtransaction"),
+                });
+            };
             if !crate::utils::dijkstra_native::evaluate(
                 script,
                 &witnesses,
@@ -163,17 +165,78 @@ pub fn validate_dijkstra_tx<S: DijkstraLedgerState + ?Sized>(
                 return Err(PostAlonzo(NativeScriptDenial));
             }
         }
+        // A sub transaction runs no Plutus script up to V3, so its redeemers have no purpose.
+        if w.redeemer.as_ref().is_some_and(|x| !x.is_empty()) {
+            return Err(PostAlonzo(UnneededRedeemer));
+        }
+        check_sub_datums(sub, utxos)?;
+        check_integrity(w, sb.script_data_hash, None)?;
         output_coin = add(output_coin, check_outputs(&sb.outputs, pp, network_id)?)?;
         check_signatures(w, &encode(&sub.sub_transaction_body)?, sub_keys)?;
     }
     let spending = check_inputs(&b.inputs, utxos, &mut spent, &mut keys)?;
     consumed = add(consumed, spending.coin)?;
-    output_coin = add(output_coin, check_outputs(&b.outputs, pp, network_id)?)?;
+    let top_output_coin = check_outputs(&b.outputs, pp, network_id)?;
+    output_coin = add(output_coin, top_output_coin)?;
     if add(add(output_coin, b.fee)?, flows.produced)? != consumed {
         return Err(PostAlonzo(PreservationOfValue));
     }
-    check_assets(tx, utxos)?;
+    let sub_bodies = || {
+        b.sub_transactions
+            .iter()
+            .flatten()
+            .map(|s| &s.sub_transaction_body)
+    };
+    check_assets(
+        b.inputs
+            .iter()
+            .chain(sub_bodies().flat_map(|s| s.inputs.iter())),
+        b.outputs
+            .iter()
+            .chain(sub_bodies().flat_map(|s| s.outputs.iter())),
+        b.mint
+            .iter()
+            .chain(sub_bodies().flat_map(|s| s.mint.iter())),
+        utxos,
+    )?;
+    // In legacy mode the top level balances on its own, with deposits judged after the sub transactions.
+    if legacy {
+        if add(add(top_output_coin, b.fee)?, top_flows.produced)?
+            != add(spending.coin, top_flows.consumed)?
+        {
+            return Err(PostAlonzo(PreservationOfValue));
+        }
+        check_assets(b.inputs.iter(), b.outputs.iter(), b.mint.iter(), utxos)?;
+    }
     check_signatures(&tx.transaction_witness_set, &encode(b)?, keys)?;
+    let inputs = b
+        .inputs
+        .iter()
+        .map(|x| {
+            utxos
+                .get(&MultiEraInput::from_alonzo_compatible(x))
+                .ok_or(PostAlonzo(InputNotInUTxO))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let references = b
+        .reference_inputs
+        .iter()
+        .flatten()
+        .map(|x| {
+            utxos
+                .get(&MultiEraInput::from_alonzo_compatible(x))
+                .ok_or(PostAlonzo(ReferenceInputNotInUTxO))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    for language in &provided.languages {
+        crate::utils::dijkstra_context::check_translatable(
+            language.clone(),
+            b,
+            &inputs,
+            &references,
+        )
+        .map_err(|x| DijkstraScriptContext(x.0))?;
+    }
     Ok(delta)
 }
 
@@ -187,17 +250,17 @@ pub fn dijkstra_ledger_effects<S: DijkstraLedgerState + ?Sized>(
     if !tx.success {
         return Ok(DijkstraLedgerDelta::default());
     }
-    Ok(ledger_rules(tx, pp, network_id, WithdrawalRule::Accepted, state)?.1)
+    Ok(ledger_rules(tx, pp, network_id, WithdrawalRule::Accepted, state)?.2)
 }
 
-/// The treasury, account and governance rules of each sub transaction in order, then of the top level transaction.
+/// The treasury, account and governance rules of each sub transaction in order, then of the top level transaction, with the flows of the batch and of the top level.
 fn ledger_rules<S: DijkstraLedgerState + ?Sized>(
     tx: &BlockTransaction<'_>,
     pp: &DijkstraProtParams,
     network: u8,
     rule: WithdrawalRule,
     state: &S,
-) -> Result<(Flows, DijkstraLedgerDelta), ValidationError> {
+) -> Result<(Flows, Flows, DijkstraLedgerDelta), ValidationError> {
     let b = &tx.transaction_body;
     let mut current = DijkstraLedgerOverlay::new(state);
     let mut flows = Flows::default();
@@ -205,22 +268,30 @@ fn ledger_rules<S: DijkstraLedgerState + ?Sized>(
         let sb = &sub.sub_transaction_body;
         let level = Level::sub(sb, Hasher::<256>::hash(sb.raw_cbor()));
         ledger::check_treasury(&level, state)?;
-        flows.add(ledger::entities(&level, None, pp, network, state, &mut current)?)?;
+        flows.add(ledger::entities(
+            &level,
+            None,
+            pp,
+            network,
+            state,
+            &mut current,
+        )?)?;
         flows.add(ledger::governance(&level, pp, network, &mut current)?)?;
     }
     let level = Level::top(b, Hasher::<256>::hash(b.raw_cbor()));
     ledger::check_treasury(&level, state)?;
     let subs = ledger::sub_withdrawals(tx)?;
-    flows.add(ledger::entities(
+    let mut top = ledger::entities(
         &level,
         Some((rule, &subs)),
         pp,
         network,
         state,
         &mut current,
-    )?)?;
-    flows.add(ledger::governance(&level, pp, network, &mut current)?)?;
-    Ok((flows, current.delta))
+    )?;
+    top.add(ledger::governance(&level, pp, network, &mut current)?)?;
+    flows.add(top)?;
+    Ok((flows, top, current.delta))
 }
 
 /// The minimum fee of a transaction whose inputs resolve in `utxos`, pricing the redeemers of its top level and sub transactions together.
@@ -559,9 +630,6 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
         return Err(DijkstraUnsupported("unsuccessful block transaction"));
     }
     check_auxiliary(b.auxiliary_data_hash, &tx.auxiliary_data)?;
-    if b.sub_transactions.is_some() && b.script_data_hash.is_some() {
-        return Err(DijkstraUnsupported("scripted or stateful batch"));
-    }
     let raw = encode(b)?;
     let mut allowed = vec![0, 1, 2, 3, 8, 15];
     for (key, present) in [
@@ -612,7 +680,7 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
         }
     }
     check_guards(b.guards.as_ref())?;
-    check_witness_fields(&tx.transaction_witness_set, true)
+    check_witness_fields(&tx.transaction_witness_set)
 }
 fn check_guards(guards: Option<&Guards>) -> ValidationResult {
     let guards = guard_credentials(guards);
@@ -621,14 +689,7 @@ fn check_guards(guards: Option<&Guards>) -> ValidationResult {
         false => Err(DijkstraMalformed("duplicate guards")),
     }
 }
-fn check_witness_fields(w: &KeepRaw<'_, WitnessSet<'_>>, redeemers: bool) -> ValidationResult {
-    if w.plutus_v1_script.is_some()
-        || w.plutus_v2_script.is_some()
-        || (!redeemers
-            && (w.redeemer.is_some() || w.plutus_v3_script.is_some() || w.plutus_data.is_some()))
-    {
-        return Err(DijkstraUnsupported("Plutus witnesses"));
-    }
+fn check_witness_fields(w: &KeepRaw<'_, WitnessSet<'_>>) -> ValidationResult {
     let mut keys = HashSet::new();
     for x in w.vkeywitness.iter().flat_map(|x| x.iter()) {
         if x.vkey.len() != 32 || x.signature.len() != 64 {
@@ -667,24 +728,18 @@ fn check_witness_fields(w: &KeepRaw<'_, WitnessSet<'_>>, redeemers: bool) -> Val
             return Err(DijkstraMalformed("execution units"));
         }
     }
-    let allowed = if redeemers {
-        &[0, 1, 2, 4, 5, 7][..]
-    } else {
-        &[0, 1, 2][..]
-    };
-    check_map_keys(&encode(w)?, allowed, "witness fields")
+    check_map_keys(&encode(w)?, &[0, 1, 2, 3, 4, 5, 6, 7], "witness fields")
 }
 fn check_sub_supported(tx: &SubTransaction<'_>) -> ValidationResult {
     let b = &tx.sub_transaction_body;
-    if b.mint.is_some() || b.script_data_hash.is_some() {
-        return Err(DijkstraUnsupported("stateful or scripted subtransaction"));
-    }
     let raw = encode(b)?;
     let mut allowed = vec![0, 1, 3, 8, 15];
     for (key, present) in [
         (4, b.certificates.is_some()),
         (5, b.withdrawals.is_some()),
         (7, b.auxiliary_data_hash.is_some()),
+        (9, b.mint.is_some()),
+        (11, b.script_data_hash.is_some()),
         (14, holds_value(&raw, 14)),
         (18, b.reference_inputs.is_some()),
         (19, b.voting_procedures.is_some()),
@@ -702,8 +757,12 @@ fn check_sub_supported(tx: &SubTransaction<'_>) -> ValidationResult {
     check_map_keys(&raw, &allowed, "subtransaction body fields")?;
     let fields: pallas_codec::utils::KeyValuePairs<u64, pallas_codec::utils::AnyCbor> =
         minicbor::decode(&raw).map_err(|_| DijkstraUnsupported("subtransaction body fields"))?;
-    for (_, value) in fields.iter().filter(|(key, _)| *key == 24) {
-        check_required_guard_keys(value)?;
+    for (key, value) in fields.iter() {
+        match key {
+            9 => check_asset_encoding(value, true)?,
+            24 => check_required_guard_keys(value)?,
+            _ => (),
+        }
     }
     let mut references = Spent::new();
     for input in b.reference_inputs.iter().flatten() {
@@ -712,7 +771,7 @@ fn check_sub_supported(tx: &SubTransaction<'_>) -> ValidationResult {
         }
     }
     check_guards(b.guards.as_ref())?;
-    check_witness_fields(&tx.transaction_witness_set, false)
+    check_witness_fields(&tx.transaction_witness_set)
 }
 /// Decoding into a BTreeMap would hide duplicate guards, which the ledger rejects.
 fn check_required_guard_keys(raw: &[u8]) -> ValidationResult {
@@ -773,8 +832,10 @@ type Natives = BTreeMap<Hash<28>, NativeScript>;
 struct SubScripts {
     needed: HashSet<Hash<28>>,
     witnessed: HashSet<Hash<28>>,
+    plutus_witnessed: Vec<(Hash<28>, Language)>,
     referenced: HashSet<Hash<28>>,
     natives: Natives,
+    plutus: Plutus,
     reference_bytes: u64,
 }
 fn sub_scripts(b: &TransactionBody<'_>, utxos: &UTxOs<'_>) -> Result<SubScripts, ValidationError> {
@@ -785,6 +846,7 @@ fn sub_scripts(b: &TransactionBody<'_>, utxos: &UTxOs<'_>) -> Result<SubScripts,
             .extend(guard_scripts(&guard_credentials(sb.guards.as_ref())));
         let needs = ledger::needs(&Level::sub(sb, Hasher::<256>::hash(sb.raw_cbor())))?;
         subs.needed.extend(needs.scripts.into_values());
+        subs.needed.extend(sb.mint.iter().flat_map(|x| x.keys()));
         let mut outputs = Vec::new();
         for input in sb.inputs.iter() {
             let output = utxos
@@ -810,25 +872,56 @@ fn sub_scripts(b: &TransactionBody<'_>, utxos: &UTxOs<'_>) -> Result<SubScripts,
         }
         for script in outputs.iter().filter_map(|x| x.multi_era_script_ref()) {
             subs.referenced.insert(script.hash());
-            let size = match script.native_script() {
-                Some(native) => {
+            let size = match reference(&script)? {
+                Reference::Native(native) => {
                     let raw = native.encode();
                     let decoded =
                         minicbor::decode(&raw).map_err(|_| PostAlonzo(UnsupportedNativeScript))?;
                     subs.natives.insert(script.hash(), decoded);
                     raw.len()
                 }
-                None => script.plutus_bytes().map_or(0, <[u8]>::len),
+                Reference::Plutus(language, bytes) => {
+                    subs.plutus.insert(script.hash(), language);
+                    bytes.len()
+                }
             };
             subs.reference_bytes = add(subs.reference_bytes, size as u64)?;
         }
-        for script in sub.transaction_witness_set.native_script.iter().flatten() {
+        let w = &sub.transaction_witness_set;
+        for script in w.native_script.iter().flatten() {
             subs.witnessed.insert(script.original_hash());
             subs.natives
                 .insert(script.original_hash(), (**script).clone());
         }
+        for (hash, language, bytes) in plutus_witnesses(w) {
+            well_formed_plutus(bytes)?;
+            subs.plutus_witnessed.push((hash, language.clone()));
+            subs.plutus.insert(hash, language);
+        }
     }
     Ok(subs)
+}
+
+/// The language of each Plutus script a batch provides, by hash.
+type Plutus = BTreeMap<Hash<28>, Language>;
+
+/// The Plutus scripts a witness set carries, with their hash, language and bytes.
+fn plutus_witnesses<'a>(
+    w: &'a WitnessSet<'_>,
+) -> impl Iterator<Item = (Hash<28>, Language, &'a [u8])> {
+    let v1 = w.plutus_v1_script.iter().flatten();
+    let v2 = w.plutus_v2_script.iter().flatten();
+    let v3 = w.plutus_v3_script.iter().flatten();
+    v1.map(|x| (x.compute_hash(), Language::PlutusV1, x.as_ref()))
+        .chain(v2.map(|x| (x.compute_hash(), Language::PlutusV2, x.as_ref())))
+        .chain(v3.map(|x| (x.compute_hash(), Language::PlutusV3, x.as_ref())))
+}
+
+/// The scripts a batch provides and the context languages of the Plutus scripts its top level runs.
+struct Provided {
+    natives: Natives,
+    plutus: Plutus,
+    languages: BTreeSet<pallas_primitives::conway::Language>,
 }
 
 fn check_scripts(
@@ -839,22 +932,16 @@ fn check_scripts(
     subs: &SubScripts,
     keys: &mut Keys,
     network: u8,
-) -> Result<(bool, Natives), ValidationError> {
+) -> Result<Provided, ValidationError> {
     let b = &tx.transaction_body;
     let w = &tx.transaction_witness_set;
     let mut natives = BTreeMap::new();
-    let mut available = HashSet::new();
+    let mut plutus = subs.plutus.clone();
     let mut reference_scripts = HashSet::new();
-    let mut unevaluable = HashSet::new();
     let mut refs = Spent::new();
     for input in b.reference_inputs.iter().flat_map(|x| x.iter()) {
         if !refs.insert((input.transaction_id, input.index)) {
             return Err(DijkstraUnsupported("duplicate reference inputs"));
-        }
-        if b.inputs.contains(input) {
-            return Err(DijkstraUnsupported(
-                "overlapping spending and reference inputs",
-            ));
         }
     }
     for input in b
@@ -867,26 +954,16 @@ fn check_scripts(
             .get(&MultiEraInput::from_alonzo_compatible(input))
             .ok_or(PostAlonzo(ReferenceInputNotInUTxO))?;
         if let Some(script) = output.multi_era_script_ref() {
-            // Reference UTxOs are already-admitted ledger outputs. No new script
-            // bytes enter the ledger in this subset, and phase two is separate.
+            reference_scripts.insert(script.hash());
             match reference(&script)? {
                 Reference::Native(native) => {
                     let raw = native.encode();
                     let decoded: NativeScript =
                         minicbor::decode(&raw).map_err(|_| PostAlonzo(UnsupportedNativeScript))?;
-                    reference_scripts.insert(script.hash());
                     natives.insert(script.hash(), decoded);
                 }
-                Reference::Unevaluable => {
-                    reference_scripts.insert(script.hash());
-                    unevaluable.insert(script.hash());
-                }
-                Reference::PlutusV3(raw) => {
-                    let mut payload = vec![3];
-                    payload.extend_from_slice(raw);
-                    let hash = Hasher::<224>::hash(&payload);
-                    available.insert(hash);
-                    reference_scripts.insert(hash);
+                Reference::Plutus(language, _) => {
+                    plutus.insert(script.hash(), language);
                 }
             }
         }
@@ -905,6 +982,21 @@ fn check_scripts(
     }
     if subs.witnessed.iter().any(unneeded) {
         return Err(PostAlonzo(UnneededNativeScript));
+    }
+    let unneeded_plutus = |language| match language {
+        Language::PlutusV1 => PostAlonzo(UnneededPlutusV1Script),
+        Language::PlutusV2 => PostAlonzo(UnneededPlutusV2Script),
+        _ => PostAlonzo(UnneededPlutusV3Script),
+    };
+    for (hash, language, bytes) in plutus_witnesses(w) {
+        if unneeded(&hash) {
+            return Err(unneeded_plutus(language));
+        }
+        well_formed_plutus(bytes)?;
+        plutus.insert(hash, language);
+    }
+    if let Some((_, language)) = subs.plutus_witnessed.iter().find(|(x, _)| unneeded(x)) {
+        return Err(unneeded_plutus(language.clone()));
     }
     for (hash, script) in &subs.natives {
         natives.entry(*hash).or_insert_with(|| script.clone());
@@ -930,26 +1022,24 @@ fn check_scripts(
         .filter(|(_, hash)| !natives.contains_key(hash))
         .map(|(key, hash)| (key.clone(), *hash))
         .collect();
-    if scripts.values().any(|x| unevaluable.contains(x)) {
-        return Err(DijkstraUnsupported(
-            "reference script language (requires V3)",
-        ));
+    let mut languages = BTreeSet::new();
+    for hash in scripts.values() {
+        languages.insert(match plutus.get(hash) {
+            None => return Err(PostAlonzo(ScriptWitnessMissing)),
+            Some(Language::PlutusV1) => pallas_primitives::conway::Language::PlutusV1,
+            Some(Language::PlutusV2) => pallas_primitives::conway::Language::PlutusV2,
+            Some(Language::PlutusV3) => pallas_primitives::conway::Language::PlutusV3,
+            Some(Language::PlutusV4) => {
+                return Err(DijkstraUnsupported(
+                    "reference script language (requires V3)",
+                ));
+            }
+        });
     }
     if !scripts.is_empty() && b.ttl.is_some() {
         return Err(DijkstraUnsupported(
             "Plutus validity upper bound requires forecast state",
         ));
-    }
-    for script in w.plutus_v3_script.iter().flat_map(|x| x.iter()) {
-        let hash = script.compute_hash();
-        if !scripts.values().any(|x| *x == hash) || reference_scripts.contains(&hash) {
-            return Err(PostAlonzo(UnneededPlutusV3Script));
-        }
-        well_formed_plutus(script.as_ref())?;
-        available.insert(hash);
-    }
-    if scripts.values().any(|x| !available.contains(x)) {
-        return Err(PostAlonzo(ScriptWitnessMissing));
     }
     check_datums(tx, utxos, &scripts)?;
     // The size cap covers the whole batch; the fee counts top-level references only.
@@ -958,21 +1048,40 @@ fn check_scripts(
         return Err(DijkstraReferenceScriptsTooLarge);
     }
     if scripts.is_empty() {
-        if b.collateral.is_some() || b.collateral_return.is_some() || b.total_collateral.is_some() {
+        // Collateral covers the redeemers of every level, and the sub transaction rules refuse each sub transaction redeemer.
+        let sub_redeemers = b.sub_transactions.iter().flatten().any(|s| {
+            s.transaction_witness_set
+                .redeemer
+                .as_ref()
+                .is_some_and(|x| !x.is_empty())
+        });
+        let collateral =
+            b.collateral.is_some() || b.collateral_return.is_some() || b.total_collateral.is_some();
+        if collateral && !sub_redeemers {
             return Err(DijkstraUnsupported("collateral without Plutus"));
         }
         if w.redeemer.as_ref().is_some_and(|x| !x.is_empty()) {
             return Err(PostAlonzo(UnneededRedeemer));
         }
         // An empty redeemer map and language view still participate when datums exist.
-        check_integrity(tx, None)?;
-        return Ok((false, natives));
+        check_integrity(w, b.script_data_hash, None)?;
+        return Ok(Provided {
+            natives,
+            plutus,
+            languages,
+        });
     }
-    let cost_model_v3 = pp
-        .cost_models_for_script_languages
-        .plutus_v3
-        .as_ref()
-        .ok_or(DijkstraMissingParameters("PlutusV3 cost model"))?;
+    let models = &pp.cost_models_for_script_languages;
+    let mut views = BTreeMap::new();
+    for language in &languages {
+        let (key, model) = match language {
+            pallas_primitives::conway::Language::PlutusV1 => (0, &models.plutus_v1),
+            pallas_primitives::conway::Language::PlutusV2 => (1, &models.plutus_v2),
+            pallas_primitives::conway::Language::PlutusV3 => (2, &models.plutus_v3),
+        };
+        let model = model.clone().ok_or(DijkstraScriptContext("cost model"))?;
+        views.insert(key, model);
+    }
     let redeemers = w.redeemer.as_ref().ok_or(PostAlonzo(RedeemerMissing))?;
     // BTreeMap decoding could hide duplicate pointers. Inspect original map first.
     let raw = encode(redeemers)?;
@@ -999,7 +1108,7 @@ fn check_scripts(
     if mem > pp.max_tx_ex_units.mem || steps > pp.max_tx_ex_units.steps {
         return Err(PostAlonzo(TxExUnitsExceeded));
     }
-    check_integrity(tx, Some(cost_model_v3))?;
+    check_integrity(w, b.script_data_hash, Some(views))?;
     let collateral = b.collateral.as_ref().ok_or(PostAlonzo(CollateralMissing))?;
     if collateral.is_empty() {
         return Err(PostAlonzo(CollateralMissing));
@@ -1049,7 +1158,11 @@ fn check_scripts(
     if u128::from(paid) * 100 < u128::from(b.fee) * u128::from(pp.collateral_percentage) {
         return Err(PostAlonzo(CollateralMinLovelace));
     }
-    Ok((true, natives))
+    Ok(Provided {
+        natives,
+        plutus,
+        languages,
+    })
 }
 
 /// The fee for the declared execution units, rounded up once.
@@ -1222,29 +1335,24 @@ fn accumulate_assets(
     }
     Ok(())
 }
-fn check_assets(tx: &BlockTransaction<'_>, utxos: &UTxOs<'_>) -> ValidationResult {
-    let b = &tx.transaction_body;
+/// Checks that the assets of `inputs` and `mint` equal the assets of `outputs`.
+fn check_assets<'a, 'b: 'a>(
+    inputs: impl Iterator<Item = &'a TransactionInput>,
+    outputs: impl Iterator<Item = &'a TransactionOutput<'b>>,
+    mint: impl Iterator<Item = &'a Mint>,
+    utxos: &UTxOs<'_>,
+) -> ValidationResult {
     let mut balance = AssetBalance::new();
-    for input in b.inputs.iter().chain(
-        b.sub_transactions
-            .iter()
-            .flatten()
-            .flat_map(|s| s.sub_transaction_body.inputs.iter()),
-    ) {
+    for input in inputs {
         let output = utxos
             .get(&MultiEraInput::from_alonzo_compatible(input))
             .ok_or(PostAlonzo(InputNotInUTxO))?;
         accumulate_assets(&mut balance, output, 1)?;
     }
-    for output in b.outputs.iter().chain(
-        b.sub_transactions
-            .iter()
-            .flatten()
-            .flat_map(|s| s.sub_transaction_body.outputs.iter()),
-    ) {
+    for output in outputs {
         accumulate_assets(&mut balance, &MultiEraOutput::from_dijkstra(output), -1)?;
     }
-    for (policy, assets) in b.mint.iter().flat_map(|m| m.iter()) {
+    for (policy, assets) in mint.flat_map(|m| m.iter()) {
         for (name, quantity) in assets {
             let entry = balance.entry((*policy, name.to_vec())).or_default();
             *entry = entry
@@ -1323,64 +1431,92 @@ fn check_datums(
     Ok(())
 }
 
-fn check_integrity(tx: &BlockTransaction<'_>, model: Option<&Vec<i64>>) -> ValidationResult {
-    let w = &tx.transaction_witness_set;
+/// Checks that each datum a sub transaction carries hashes to a datum hash of its outputs or reference inputs.
+fn check_sub_datums(sub: &SubTransaction<'_>, utxos: &UTxOs<'_>) -> ValidationResult {
+    let b = &sub.sub_transaction_body;
+    let mut allowed = HashSet::new();
+    for output in b.outputs.iter().map(MultiEraOutput::from_dijkstra) {
+        if let Some(DatumOption::Hash(hash)) = output.datum() {
+            allowed.insert(hash);
+        }
+    }
+    for input in b.reference_inputs.iter().flatten() {
+        let output = utxos
+            .get(&MultiEraInput::from_alonzo_compatible(input))
+            .ok_or(PostAlonzo(ReferenceInputNotInUTxO))?;
+        if let Some(DatumOption::Hash(hash)) = output.datum() {
+            allowed.insert(hash);
+        }
+    }
+    for datum in sub
+        .transaction_witness_set
+        .plutus_data
+        .iter()
+        .flat_map(|x| x.iter())
+    {
+        if !allowed.contains(&Hasher::<256>::hash(&encode(datum)?)) {
+            return Err(PostAlonzo(UnneededDatum));
+        }
+    }
+    Ok(())
+}
+
+/// Checks the declared script integrity hash of one level against its redeemers, datums and the language views of the Plutus scripts it runs.
+fn check_integrity(
+    w: &WitnessSet<'_>,
+    declared: Option<Hash<32>>,
+    views: Option<BTreeMap<u8, Vec<i64>>>,
+) -> ValidationResult {
     let has_data = w.plutus_data.as_ref().is_some_and(|x| !x.is_empty());
     let has_redeemers = w.redeemer.as_ref().is_some_and(|x| !x.is_empty());
-    let expected = if model.is_none() && !has_data && !has_redeemers {
+    let expected = if views.is_none() && !has_data && !has_redeemers {
         None
     } else {
         let mut bytes = match &w.redeemer {
             Some(r) => encode(r)?,
             None => vec![0xa0],
         };
-        if has_data {
-            bytes.extend(encode(w.plutus_data.as_ref().unwrap())?);
+        if let Some(data) = w.plutus_data.as_ref().filter(|_| has_data) {
+            bytes.extend(encode(data)?);
         }
-        let views = model
-            .map(|m| BTreeMap::from([(2, m.clone())]))
-            .unwrap_or_default();
-        bytes.extend(encode(LanguageViews(views))?);
+        bytes.extend(encode(LanguageViews(views.unwrap_or_default()))?);
         Some(Hasher::<256>::hash(&bytes))
     };
-    if tx.transaction_body.script_data_hash != expected {
+    if declared != expected {
         return Err(PostAlonzo(ScriptIntegrityHash));
     }
     Ok(())
 }
 
-/// A reference script and whether a redeemer may run it.
+/// A reference script, native or Plutus with its language and bytes.
 enum Reference<'a> {
     Native(MultiEraNativeScript<'a>),
-    /// A PlutusV1 or V2 script, available as a reference but refused when a redeemer needs it.
-    Unevaluable,
-    PlutusV3(&'a [u8]),
+    Plutus(Language, &'a [u8]),
 }
 
 fn reference<'a>(script: &'a MultiEraScriptRef<'_>) -> Result<Reference<'a>, ValidationError> {
-    let unsupported = DijkstraUnsupported("reference script language (requires V3)");
+    use pallas_primitives::conway::ScriptRef as C;
     match script {
         MultiEraScriptRef::Dijkstra(x) => match x.as_ref() {
             ScriptRef::NativeScript(s) => {
                 Ok(Reference::Native(MultiEraNativeScript::from_dijkstra(s)))
             }
-            ScriptRef::PlutusV1Script(_) | ScriptRef::PlutusV2Script(_) => {
-                Ok(Reference::Unevaluable)
-            }
-            ScriptRef::PlutusV3Script(s) => Ok(Reference::PlutusV3(s.as_ref())),
-            ScriptRef::PlutusV4Script(_) => Err(unsupported),
+            ScriptRef::PlutusV1Script(s) => Ok(Reference::Plutus(Language::PlutusV1, s.as_ref())),
+            ScriptRef::PlutusV2Script(s) => Ok(Reference::Plutus(Language::PlutusV2, s.as_ref())),
+            ScriptRef::PlutusV3Script(s) => Ok(Reference::Plutus(Language::PlutusV3, s.as_ref())),
+            ScriptRef::PlutusV4Script(s) => Ok(Reference::Plutus(Language::PlutusV4, s.as_ref())),
         },
         MultiEraScriptRef::Conway(x) => match x.as_ref() {
-            pallas_primitives::conway::ScriptRef::NativeScript(s) => Ok(Reference::Native(
+            C::NativeScript(s) => Ok(Reference::Native(
                 MultiEraNativeScript::from_alonzo_compatible(s),
             )),
-            pallas_primitives::conway::ScriptRef::PlutusV1Script(_)
-            | pallas_primitives::conway::ScriptRef::PlutusV2Script(_) => Ok(Reference::Unevaluable),
-            pallas_primitives::conway::ScriptRef::PlutusV3Script(s) => {
-                Ok(Reference::PlutusV3(s.as_ref()))
-            }
+            C::PlutusV1Script(s) => Ok(Reference::Plutus(Language::PlutusV1, s.as_ref())),
+            C::PlutusV2Script(s) => Ok(Reference::Plutus(Language::PlutusV2, s.as_ref())),
+            C::PlutusV3Script(s) => Ok(Reference::Plutus(Language::PlutusV3, s.as_ref())),
         },
-        _ => Err(unsupported),
+        _ => Err(DijkstraUnsupported(
+            "reference script language (requires V3)",
+        )),
     }
 }
 

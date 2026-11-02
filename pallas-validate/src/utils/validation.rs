@@ -57,12 +57,16 @@ pub enum ValidationError {
     DijkstraInvalidMetadata,
 
     #[cfg(feature = "unstable")]
-    #[error("malformed Dijkstra Plutus V3 script")]
+    #[error("malformed Dijkstra Plutus script")]
     DijkstraMalformedScript,
 
     #[cfg(feature = "unstable")]
     #[error("malformed Dijkstra transaction field: {0}")]
     DijkstraMalformed(&'static str),
+
+    #[cfg(feature = "unstable")]
+    #[error("Dijkstra script context cannot be built: {0}")]
+    DijkstraScriptContext(&'static str),
 
     #[error("transaction and protocol parameters differ")]
     TxAndProtParamsDiffer,
