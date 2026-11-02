@@ -13,11 +13,11 @@ use pallas_codec::utils::{
 use pallas_crypto::hash::Hash;
 use pallas_primitives::NonZeroInt;
 use pallas_primitives::conway::{
-    AssetName, BigInt, Certificate, Coin, Constitution, Constr, DRep, DRepVotingThresholds,
-    DatumOption, ExUnitPrices, ExUnits, GovAction, GovActionId, Mint, PlutusData, PolicyId,
-    PoolVotingThresholds, ProposalProcedure, ProtocolParamUpdate, RationalNumber, Redeemer,
-    ScriptRef, StakeCredential, TransactionInput, TransactionOutput, Value, Vote, Voter,
-    VotingProcedure,
+    AssetName, BigInt, Certificate, Coin, Constitution, Constr, CostModels, DRep,
+    DRepVotingThresholds, DatumOption, ExUnitPrices, ExUnits, GovAction, GovActionId, Mint,
+    PlutusData, PolicyId, PoolVotingThresholds, ProposalProcedure, ProtocolParamUpdate,
+    RationalNumber, Redeemer, ScriptRef, StakeCredential, TransactionInput, TransactionOutput,
+    Value, Vote, Voter, VotingProcedure,
 };
 use pallas_traverse::ComputeHash;
 
@@ -652,26 +652,24 @@ impl ToPlutusData for WithPartialCertificates<'_, Vec<Certificate>> {
 impl ToPlutusData for WithPartialCertificates<'_, Certificate> {
     fn to_plutus_data(&self) -> PlutusData {
         match self.0 {
-            Certificate::StakeRegistration(stake_credential) => {
-                wrap_with_constr(0, stake_credential.to_plutus_data())
-            }
-
-            // Conway translates explicit registration to DCertDelegRegKey,
-            // whose credential is wrapped in the V1/V2 StakingHash constructor.
-            Certificate::Reg(stake_credential, _) => wrap_with_constr(
+            // The V1/V2 certificate credential is wrapped in the StakingHash constructor.
+            Certificate::StakeRegistration(stake_credential)
+            | Certificate::Reg(stake_credential, _) => wrap_with_constr(
                 0,
                 WithWrappedStakeCredential(stake_credential).to_plutus_data(),
             ),
 
-            Certificate::StakeDeregistration(stake_credential) => {
-                wrap_with_constr(1, stake_credential.to_plutus_data())
-            }
+            Certificate::StakeDeregistration(stake_credential)
+            | Certificate::UnReg(stake_credential, _) => wrap_with_constr(
+                1,
+                WithWrappedStakeCredential(stake_credential).to_plutus_data(),
+            ),
 
             Certificate::StakeDelegation(stake_credential, pool_keyhash) => {
                 wrap_multiple_with_constr(
                     2,
                     vec![
-                        stake_credential.to_plutus_data(),
+                        WithWrappedStakeCredential(stake_credential).to_plutus_data(),
                         pool_keyhash.to_plutus_data(),
                     ],
                 )
@@ -1076,6 +1074,22 @@ impl ToPlutusData for GovActionId {
     }
 }
 
+impl ToPlutusData for CostModels {
+    fn to_plutus_data(&self) -> PlutusData {
+        let mut models = self.unknown.clone();
+        for (key, model) in [
+            (0, &self.plutus_v1),
+            (1, &self.plutus_v2),
+            (2, &self.plutus_v3),
+        ] {
+            if let Some(model) = model {
+                models.insert(key, model.clone());
+            }
+        }
+        models.to_plutus_data()
+    }
+}
+
 impl ToPlutusData for ProtocolParamUpdate {
     fn to_plutus_data(&self) -> PlutusData {
         let mut pparams = Vec::with_capacity(30);
@@ -1140,9 +1154,8 @@ impl ToPlutusData for ProtocolParamUpdate {
             push(17, p.to_plutus_data());
         }
 
-        #[allow(clippy::redundant_pattern_matching)]
-        if let Some(_) = self.cost_models_for_script_languages {
-            unimplemented!("TODO: ToPlutusData for cost models.");
+        if let Some(ref p) = self.cost_models_for_script_languages {
+            push(18, p.to_plutus_data());
         }
 
         if let Some(ref p) = self.execution_costs {
