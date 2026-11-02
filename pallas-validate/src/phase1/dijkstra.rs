@@ -661,6 +661,7 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
     let fields: pallas_codec::utils::KeyValuePairs<u64, pallas_codec::utils::AnyCbor> =
         minicbor::decode(&raw).map_err(|_| DijkstraUnsupported("body fields"))?;
     for (key, value) in fields.iter() {
+        check_field_present(*key, value)?;
         if *key == 9 {
             check_asset_encoding(value, true)?;
         }
@@ -670,9 +671,6 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
         if *key == 5 {
             let withdrawals: pallas_codec::utils::KeyValuePairs<Bytes, u64> =
                 minicbor::decode(value).map_err(|_| DijkstraInvalidWithdrawal("encoding"))?;
-            if withdrawals.is_empty() {
-                return Err(DijkstraMalformed("empty withdrawals"));
-            }
             let mut seen = HashSet::new();
             if withdrawals.iter().any(|(a, _)| !seen.insert(a.to_vec())) {
                 return Err(DijkstraInvalidWithdrawal("duplicate account"));
@@ -758,6 +756,7 @@ fn check_sub_supported(tx: &SubTransaction<'_>) -> ValidationResult {
     let fields: pallas_codec::utils::KeyValuePairs<u64, pallas_codec::utils::AnyCbor> =
         minicbor::decode(&raw).map_err(|_| DijkstraUnsupported("subtransaction body fields"))?;
     for (key, value) in fields.iter() {
+        check_field_present(*key, value)?;
         match key {
             9 => check_asset_encoding(value, true)?,
             24 => check_required_guard_keys(value)?,
@@ -777,14 +776,53 @@ fn check_sub_supported(tx: &SubTransaction<'_>) -> ValidationResult {
 fn check_required_guard_keys(raw: &[u8]) -> ValidationResult {
     let guards: pallas_codec::utils::KeyValuePairs<StakeCredential, pallas_codec::utils::AnyCbor> =
         minicbor::decode(raw).map_err(|_| DijkstraUnsupported("required top-level guards"))?;
-    if guards.is_empty() {
-        return Err(DijkstraMalformed("empty required top-level guards"));
-    }
     let mut seen = BTreeSet::new();
     if guards.iter().any(|(key, _)| !seen.insert(key)) {
         return Err(DijkstraMalformed("duplicate required top-level guards"));
     }
     Ok(())
+}
+/// The body fields refused when present and empty, with the error each gets.
+const NON_EMPTY_FIELDS: [(u64, &str); 11] = [
+    (4, "empty certificates"),
+    (5, "empty withdrawals"),
+    (13, "empty collateral inputs"),
+    (18, "empty reference inputs"),
+    (19, "empty voting procedures"),
+    (20, "empty proposal procedures"),
+    (23, "empty subtransactions"),
+    (24, "empty required top-level guards"),
+    (25, "empty direct deposits"),
+    (26, "empty account balance intervals"),
+    (27, "empty starting account balance intervals"),
+];
+/// Refuses a body field the ledger decoder refuses for its value, an empty collection or a zero donation.
+fn check_field_present(key: u64, value: &[u8]) -> ValidationResult {
+    if key == 22 && minicbor::decode::<u64>(value).is_ok_and(|x| x == 0) {
+        return Err(DijkstraMalformed("zero donation"));
+    }
+    match NON_EMPTY_FIELDS.iter().find(|(k, _)| *k == key) {
+        Some((_, error)) if is_empty_collection(value) => Err(DijkstraMalformed(error)),
+        _ => Ok(()),
+    }
+}
+/// Whether a CBOR value, past any tag, is an array or map with no entries.
+fn is_empty_collection(raw: &[u8]) -> bool {
+    use minicbor::data::Type;
+    let mut d = minicbor::Decoder::new(raw);
+    if matches!(d.datatype(), Ok(Type::Tag)) && d.tag().is_err() {
+        return false;
+    }
+    let length = match d.datatype() {
+        Ok(Type::Map | Type::MapIndef) => d.map(),
+        Ok(Type::Array | Type::ArrayIndef) => d.array(),
+        _ => return false,
+    };
+    match length {
+        Ok(Some(n)) => n == 0,
+        Ok(None) => matches!(d.datatype(), Ok(Type::Break)),
+        Err(_) => false,
+    }
 }
 /// Whether a CBOR map holds the key with a value other than null.
 fn holds_value(raw: &[u8], key: u64) -> bool {

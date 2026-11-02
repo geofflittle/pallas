@@ -554,16 +554,16 @@ fn dijkstra_typed_features_reject_explicitly() {
                 }
                 2 => {
                     changed.transaction_body.direct_deposits = Some(Default::default());
-                    "empty account fields pass to the signature check"
+                    "empty direct deposits"
                 }
                 3 => {
                     changed.transaction_body.account_balance_intervals = Some(Default::default());
-                    "empty account fields pass to the signature check"
+                    "empty account balance intervals"
                 }
                 4 => {
                     changed.transaction_body.starting_account_balance_intervals =
                         Some(Default::default());
-                    "empty account fields pass to the signature check"
+                    "empty starting account balance intervals"
                 }
                 5 => {
                     changed.transaction_body.treasury_value = Some(1);
@@ -590,7 +590,8 @@ fn dijkstra_typed_features_reject_explicitly() {
             let expected = match field {
                 0 => "PostAlonzo(ScriptWitnessMissing)".to_owned(),
                 1 => "PostAlonzo(ReqSignerMissing)".to_owned(),
-                2..=4 | 7 => "PostAlonzo(VKWrongSignature)".to_owned(),
+                2..=4 => format!("DijkstraMalformed({expected:?})"),
+                7 => "PostAlonzo(VKWrongSignature)".to_owned(),
                 5 => "DijkstraTreasuryValueMismatch".to_owned(),
                 8 => "PostAlonzo(ScriptIntegrityHash)".to_owned(),
                 9 => "PostAlonzo(MetadataHash)".to_owned(),
