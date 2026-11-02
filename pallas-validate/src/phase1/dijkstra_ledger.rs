@@ -42,7 +42,7 @@ impl<'a> Level<'a> {
             votes: b.voting_procedures.as_ref(),
             proposals: b.proposal_procedures.as_ref(),
             treasury_value: b.treasury_value,
-            donation: b.donation.as_ref().map(|x| u64::from(x)),
+            donation: b.donation.as_ref().map(u64::from),
         }
     }
 
@@ -57,7 +57,7 @@ impl<'a> Level<'a> {
             votes: b.voting_procedures.as_ref(),
             proposals: b.proposal_procedures.as_ref(),
             treasury_value: b.treasury_value,
-            donation: b.donation.as_ref().map(|x| u64::from(x)),
+            donation: b.donation.as_ref().map(u64::from),
         }
     }
 
