@@ -57,8 +57,8 @@ fn fixture(test: impl FnOnce(n::BlockTransaction<'_>, UtxoMap)) {
         .collect();
     test(tx.clone(), utxos);
 }
-fn run(tx: &n::BlockTransaction<'_>, u: &UtxoMap) -> Result<EvalReport, Error> {
-    evaluate_tx(&MultiEraTx::from_dijkstra(tx), &params(), u, &slots())
+fn run(tx: &n::BlockTransaction<'_>, u: &UtxoMap) -> Result<MultiEraEvalReport, Error> {
+    evaluate_multi_era_tx(&MultiEraTx::from_dijkstra(tx), &params(), u, &slots())
 }
 #[test]
 fn native_registration_executes_with_historical_budget() {
@@ -81,6 +81,16 @@ fn native_registration_executes_with_historical_budget() {
         println!("native historical result: {r:?}; declared {budget:?}");
     });
 }
+#[test]
+fn a_dijkstra_transaction_evaluates_only_into_the_multi_era_report() {
+    fixture(|tx, u| {
+        let view = MultiEraTx::from_dijkstra(&tx);
+        let report = evaluate_multi_era_tx(&view, &params(), &u, &slots()).unwrap();
+        assert_eq!(report.len(), 1);
+        let stable = evaluate_tx(&view, &params(), &u, &slots());
+        assert!(matches!(stable, Err(Error::WrongEra())), "{stable:?}");
+    });
+}
 
 fn change_redeemer(
     tx: &mut n::BlockTransaction<'_>,
@@ -94,7 +104,7 @@ fn change_redeemer(
     w.redeemer = Some(n::Redeemers(redeemers).into());
     tx.transaction_witness_set = w.into();
 }
-fn error(result: Result<EvalReport, Error>, expected: &str) {
+fn error(result: Result<MultiEraEvalReport, Error>, expected: &str) {
     let actual = format!("{:?}", result.expect_err(expected));
     assert!(
         actual.contains(expected),
@@ -313,7 +323,8 @@ fn native_registration_cost_model_is_applied_by_position() {
             .unwrap();
         assert_eq!(costs.len(), 350);
         costs[29] += 1000; // V3 cekStartupCost-exBudgetCPU, a used historical coefficient.
-        let changed = evaluate_tx(&MultiEraTx::from_dijkstra(&tx), &pp, &u, &slots()).unwrap();
+        let changed =
+            evaluate_multi_era_tx(&MultiEraTx::from_dijkstra(&tx), &pp, &u, &slots()).unwrap();
         assert_eq!(changed[0].units.steps, original[0].units.steps + 1000);
         assert!(
             !changed[0].success,
@@ -329,7 +340,8 @@ fn native_registration_cost_model_is_applied_by_position() {
                 .as_mut()
                 .unwrap()
                 .resize(len, 7);
-            let result = evaluate_tx(&MultiEraTx::from_dijkstra(&tx), &pp, &u, &slots()).unwrap();
+            let result =
+                evaluate_multi_era_tx(&MultiEraTx::from_dijkstra(&tx), &pp, &u, &slots()).unwrap();
             assert_eq!(result[0].units, original[0].units, "{len}");
             assert!(result[0].success, "{len}: {result:?}");
         }
@@ -343,7 +355,8 @@ fn native_registration_cost_model_is_applied_by_position() {
                 .as_mut()
                 .unwrap()
                 .truncate(len);
-            let result = evaluate_tx(&MultiEraTx::from_dijkstra(&tx), &pp, &u, &slots()).unwrap();
+            let result =
+                evaluate_multi_era_tx(&MultiEraTx::from_dijkstra(&tx), &pp, &u, &slots()).unwrap();
             assert!(!result[0].success, "{len}: {result:?}");
         }
         let mut pp = params();
@@ -352,7 +365,7 @@ fn native_registration_cost_model_is_applied_by_position() {
         };
         p.cost_models_for_script_languages.plutus_v3 = None;
         error(
-            evaluate_tx(&MultiEraTx::from_dijkstra(&tx), &pp, &u, &slots()),
+            evaluate_multi_era_tx(&MultiEraTx::from_dijkstra(&tx), &pp, &u, &slots()),
             "CostModelNotFound",
         );
     });
@@ -547,7 +560,7 @@ fn native_registration_runs_a_v4_script_on_the_v4_context() {
             let mut tx = tx.clone();
             let mut u = u.clone();
             replace_script(&mut tx, &mut u, Some(script), true);
-            evaluate_tx(&MultiEraTx::from_dijkstra(&tx), &v4_params(), &u, &slots())
+            evaluate_multi_era_tx(&MultiEraTx::from_dijkstra(&tx), &v4_params(), &u, &slots())
         };
         let unit = run(v4_script("(program 1.1.0 (lam ctx (con unit ())))")).unwrap();
         assert!(unit[0].success, "{unit:?}");
@@ -593,7 +606,8 @@ fn native_registration_refuses_a_pointer_output_in_a_v4_context_only() {
             let held = |language| check_translatable(&language, &level, &[], &[]);
             let held = (held(n::Language::PlutusV3), held(n::Language::PlutusV4));
             tx.transaction_body = b.into();
-            let report = evaluate_tx(&MultiEraTx::from_dijkstra(&tx), &v4_params(), &u, &slots());
+            let report =
+                evaluate_multi_era_tx(&MultiEraTx::from_dijkstra(&tx), &v4_params(), &u, &slots());
             (report, held)
         };
         let (v3, held) = run(n::ScriptRef::PlutusV3Script(script(unit)));
@@ -637,7 +651,7 @@ fn native_registration_runs_a_v4_guarding_redeemer_of_a_batch() {
     fixture(|mut tx, mut u| {
         with_v4_guard(&mut tx, &mut u);
         let evaluate = |tx: &n::BlockTransaction<'_>| {
-            evaluate_tx(&MultiEraTx::from_dijkstra(tx), &v4_params(), &u, &slots())
+            evaluate_multi_era_tx(&MultiEraTx::from_dijkstra(tx), &v4_params(), &u, &slots())
         };
         error(evaluate(&tx), "RequiredRedeemersMismatch");
         add_redeemer(&mut tx, GUARDING);
@@ -692,7 +706,7 @@ fn native_registration_gives_only_a_top_level_guard_the_batch_view() {
         b.sub_transactions = n::NonEmptySet::from_vec(vec![sub]);
         tx.transaction_body = b.into();
         let tx = MultiEraTx::from_dijkstra(&tx);
-        let report = evaluate_tx(&tx, &v4_params(), &u, &slots()).unwrap();
+        let report = evaluate_multi_era_tx(&tx, &v4_params(), &u, &slots()).unwrap();
         let levels: Vec<_> = report
             .iter()
             .filter(|r| r.tag == MultiEraRedeemerTag::Guarding)
@@ -885,7 +899,7 @@ fn native_registration_features_and_protocols() {
             };
             p.protocol_version = version;
             error(
-                evaluate_tx(&MultiEraTx::from_dijkstra(&tx), &pp, &u, &slots()),
+                evaluate_multi_era_tx(&MultiEraTx::from_dijkstra(&tx), &pp, &u, &slots()),
                 "protocol version (requires 12.0)",
             );
         }
