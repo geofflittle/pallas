@@ -77,7 +77,7 @@ Feature runs:
 
 ```sh
 cargo test -p pallas-network -p pallas-network2 --features blueprint
-cargo test -p pallas-primitives -p pallas-traverse -p pallas-utxorpc -p pallas-network -p pallas-hardano --features unstable
+cargo test -p pallas-primitives -p pallas-traverse -p pallas-utxorpc -p pallas-network2 -p pallas-network -p pallas-hardano --features unstable
 cargo test -p pallas-primitives --features unstable,blueprint
 cargo test -p pallas-validate --features unstable
 cargo check --workspace --all-targets --no-default-features
@@ -186,6 +186,8 @@ Where to start for common jobs:
   `TxValidationError::DijkstraTxValidationError` and the `localtxsubmission::dijkstra` module.
   Without it, a Dijkstra rejection fails to decode.
 - `pallas-hardano/unstable` renders those rejections in the submit-api JSON.
-- `pallas/unstable` turns on every crate's `unstable` feature and the umbrella's `hardano` feature.
+- `pallas-network2/unstable` proposes node-to-node version 16, which the Leios mini-protocols need.
+- `pallas/unstable` turns on every crate's `unstable` feature, network2's only with the umbrella's
+  `network2` feature, and the umbrella's `hardano` feature.
 
 [`llms.txt`](llms.txt) is an index of the crate docs and examples.
