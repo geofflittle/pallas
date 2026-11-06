@@ -1,0 +1,10 @@
+--- gen/valuecmp.py
++++ breaks/dups/valuecmp.py
+@@ -79,8 +79,6 @@
+         ln = normalize(o["dump"])
+         pn = normalize(p["dump"], notes=notes)
+-        for what, path in notes.c:
+-            dis.append(dict(i=n, cls="pallas holds a duplicate the ledger refuses", key=f"{what} {path}", hex=g["hex"]))
+         good, bad = diff(ln, pn)
+         for path in good:
+             agree[generic(path)] += 1

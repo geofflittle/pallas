@@ -27,15 +27,6 @@ def short(msg):
     return re.sub(r"\d+", "N", str(msg))[:120]
 
 
-TAG24_INDEF = re.compile(r"unexpected type indefinite bytes at position (\d+): expected bytes \(definite length\)")
-
-
-def tag24_indefinite(err, hexstr):
-    """Whether pallas refused an indefinite byte string directly under tag 24, the one open refusal class."""
-    m = TAG24_INDEF.fullmatch(str(err))
-    return bool(m) and hexstr[2 * int(m.group(1)) - 4 : 2 * int(m.group(1))] == "d818"
-
-
 def without_ids(v):
     """The value without its transaction ids, which name the input bytes rather than the value."""
     if isinstance(v, dict):
@@ -75,9 +66,6 @@ def compare(kind, aligned):
                 accepted[f"{g.get('mutation') or g.get('source') or 'input'}: {short(o.get('err'))}"] += 1
             continue
         totals["ledger accepts"] += 1
-        if not p["ok"] and tag24_indefinite(p.get("err"), g["hex"]):
-            listed[(expected.TAG24_INDEF, "")] += 1
-            continue
         if not p["ok"] and eb_list_form(kind, g["hex"]):
             listed[(expected.EB_LIST_FORM, "")] += 1
             continue
@@ -90,8 +78,8 @@ def compare(kind, aligned):
         notes = Notes()
         ln = normalize(o["dump"])
         pn = normalize(p["dump"], notes=notes)
-        for (what, path), c in notes.c.items():
-            listed[(what, path)] += c
+        for what, path in notes.c:
+            dis.append(dict(i=n, cls="pallas holds a duplicate the ledger refuses", key=f"{what} {path}", hex=g["hex"]))
         good, bad = diff(ln, pn)
         for path in good:
             agree[generic(path)] += 1

@@ -1,4 +1,4 @@
-"""Checks that the open tag 24 refusal class lists only an indefinite byte string directly under tag 24.
+"""Checks which pallas results on a ledger-accepted value the value comparison counts as disagreements.
 
 usage: python3 -I check_listing.py
 """
@@ -7,23 +7,35 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from valuecmp import tag24_indefinite  # noqa: E402
+from valuecmp import compare  # noqa: E402
 
-ERR = "unexpected type indefinite bytes at position {}: expected bytes (definite length)"
+ERR = "unexpected type indefinite bytes at position 2: expected bytes (definite length)"
+
+
+def row(hexstr, ledger, pallas):
+    """One aligned value the ledger accepts, with the ledger dump `ledger` and the pallas result `pallas`."""
+    return ({"hex": hexstr}, {"ok": True, "dump": ledger, "reencode": hexstr}, pallas, {"ok": True})
+
+
+def classes(r):
+    totals, agree, differ, listed, accepted, dis = compare("ppu", [r])
+    return sorted(d["cls"] for d in dis), sorted(w for w, _ in listed)
+
 
 cases = [
-    # Must not fire: indefinite bytes refused at a position without a tag 24 head before it.
-    (ERR.format(3), "8201025f4101ff", False),
-    # Must not fire: tag 24 present but the refusal is another error.
-    ("unexpected type map at position 2: expected bytes (definite length)", "d818a0", False),
-    # Must not fire: tag 24 head elsewhere in the input.
-    (ERR.format(5), "d818410082015f4101ff", False),
-    # Must fire: the refusal points at the 5f byte right after d8 18.
-    (ERR.format(2), "d8185f4101ff", True),
-    (ERR.format(1899), "00" * 1897 + "d8185f4101ff", True),
+    # Must not fire: pallas holds the set the ledger holds.
+    ("same set", row("a0", {"x": {"set": ["1", "2"]}}, {"ok": True, "dump": {"x": {"set": ["2", "1"]}}}), ([], [])),
+    # Must not fire: an ordered set and a map pallas holds as the ledger does.
+    ("same oset and map", row("a0", {"o": {"oset": ["1"]}, "m": {"map": [["1", "2"]]}}, {"ok": True, "dump": {"o": {"oset": ["1"]}, "m": {"map": [["1", "2"]]}}}), ([], [])),
+    # Must fire: pallas holds a set element twice that the ledger, refusing duplicates, holds once.
+    ("duplicate set element", row("a0", {"x": {"set": ["1"]}}, {"ok": True, "dump": {"x": {"set": ["1", "1"]}}}), (["pallas holds a duplicate the ledger refuses"], [])),
+    ("duplicate oset element", row("a0", {"o": {"oset": ["1"]}}, {"ok": True, "dump": {"o": {"oset": ["1", "1"]}}}), (["pallas holds a duplicate the ledger refuses"], [])),
+    ("duplicate map key", row("a0", {"m": {"map": [["1", "2"]]}}, {"ok": True, "dump": {"m": {"map": [["1", "2"], ["1", "2"]]}}}), (["pallas holds a duplicate the ledger refuses"], [])),
+    # Must fire: pallas refuses tag 24 over indefinite bytes the ledger accepts.
+    ("tag 24 over indefinite bytes", row("d8185f4101ff", {}, {"ok": False, "err": ERR}), (["pallas refuses ledger-valid input"], [])),
 ]
-bad = [(e, h, want) for e, h, want in cases if tag24_indefinite(e, h) != want]
-for e, h, want in bad:
-    print(f"WRONG want {want}: {e} {h[:40]}")
-print(f"tag 24 listing: {len(cases)} cases, {len(bad)} wrong")
+bad = [(name, want, classes(r)) for name, r, want in cases if classes(r) != want]
+for name, want, got in bad:
+    print(f"WRONG {name}: want {want}, got {got}")
+print(f"value listing: {len(cases)} cases, {len(bad)} wrong")
 sys.exit(1 if bad else 0)

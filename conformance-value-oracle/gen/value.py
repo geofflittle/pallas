@@ -10,15 +10,11 @@ plain Python values that compare equal when the values are equal, and
 
 import hashlib
 import json
-import os
 import re
 import sys
 from collections import Counter
 from fractions import Fraction
 from itertools import zip_longest
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import expected  # noqa: E402
 
 END = object()
 
@@ -175,7 +171,7 @@ def cbor(hexstr):
 
 
 class Notes:
-    """Counts of value differences a normalization folds, by generic path."""
+    """Counts of the duplicates a normalization folds, by collection kind and generic path."""
 
     def __init__(self):
         self.c = Counter()
@@ -185,7 +181,7 @@ class Notes:
 
 
 def normalize(d, path="", notes=None):
-    """The normalized value of a dump, recording folded duplicates in `notes`."""
+    """The normalized value of a dump, recording each duplicate it folds in `notes` by collection kind."""
     if isinstance(d, dict):
         if set(d) == {"cbor"}:
             return cbor(d["cbor"])
@@ -193,7 +189,7 @@ def normalize(d, path="", notes=None):
             items = [normalize(x, path + "[]", notes) for x in d["set"]]
             out = {canon(x): x for x in items}
             if notes is not None and len(out) != len(items):
-                notes.add(expected.DUP_SET, path)
+                notes.add("set", path)
             return {"set": {key_of(v): v for _, v in sorted(out.items())}}
         if set(d) == {"oset"}:
             seen, out = set(), []
@@ -202,7 +198,7 @@ def normalize(d, path="", notes=None):
                 c = canon(v)
                 if c in seen:
                     if notes is not None:
-                        notes.add(expected.DUP_OSET, path)
+                        notes.add("oset", path)
                     continue
                 seen.add(c)
                 out.append(v)
@@ -214,7 +210,7 @@ def normalize(d, path="", notes=None):
                 nk = normalize(k, path + "{}", notes)
                 c = canon(nk)
                 if c in out and notes is not None:
-                    notes.add(expected.DUP_KEYS, path)
+                    notes.add("map", path)
                 if ordered and c in out:
                     continue
                 out[c] = (nk, normalize(v, path + "{}", notes))

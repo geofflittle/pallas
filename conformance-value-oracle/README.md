@@ -19,7 +19,7 @@ Comparer checks, from `gen/`, each exits 0:
 python3 -I check_rows.py      aligned rows: 4 cases, 0 wrong
 python3 -I check_sets.py      set repeats: 5 cases, 0 wrong
 python3 -I check_align.py     oset alignment: 5 cases, 0 wrong
-python3 -I check_listing.py   tag 24 listing: 5 cases, 0 wrong
+python3 -I check_listing.py   value listing: 6 cases, 0 wrong
 ```
 
 Breaks, `sh breaks/run-breaks.sh`, each line ends in exit 1:
@@ -29,7 +29,7 @@ aligned rows: 4 cases, 2 wrong        rows-value.py.patch
 aligned rows: 4 cases, 1 wrong        rows-empty-value.py.patch
 set repeats: 5 cases, 2 wrong         sets-schemacmp.py.patch
 oset alignment: 5 cases, 2 wrong      align-schemacmp.py.patch
-tag 24 listing: 5 cases, 1 wrong      tag24-valuecmp.py.patch
+value listing: 6 cases, 3 wrong       dups-valuecmp.py.patch
 ```
 
 Generated value count, on the box from `gen/` with a GEN_FROM dir holding 3 tx arb values:

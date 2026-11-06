@@ -3,12 +3,8 @@
 A run fails when any entry here matches no value, and when a comparer lists a value under a class not here.
 """
 
-TAG24_INDEF = "pallas refuses tag 24 over indefinite bytes, open decision on a stable type"
 KEEPS_INPUT = "ledger re-encodes, pallas keeps the input bytes"
 OTHER_BYTES = "pallas re-encodes to other bytes of the same ledger value"
-DUP_SET = "duplicate set elements folded"
-DUP_OSET = "duplicate ordered set elements folded"
-DUP_KEYS = "duplicate map keys folded"
 EMPTY_GUARDS_NEXT_NODE = (
     "the next node refuses an empty guards set, pallas and the pinned ledger read it as no guards, "
     "and the refusal rule passes emptiness through"
@@ -27,7 +23,7 @@ NO_GUARDING_PURPOSE = "type cannot hold: no guarding redeemer purpose"
 NO_TOTAL_COLLATERAL = "legacy mapping: no total collateral maps to 0"
 NO_AUX = "legacy mapping: no auxiliary data maps to an empty one"
 
-VALUE = (TAG24_INDEF, KEEPS_INPUT, OTHER_BYTES, DUP_SET, DUP_OSET, DUP_KEYS, EMPTY_GUARDS_NEXT_NODE, EB_LIST_FORM)
+VALUE = (KEEPS_INPUT, OTHER_BYTES, EMPTY_GUARDS_NEXT_NODE, EB_LIST_FORM)
 SCHEMA = (
     RATIONAL,
     METADATUM,
