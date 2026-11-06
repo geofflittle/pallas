@@ -130,3 +130,6 @@ mod registration_evaluator_tests;
 
 #[cfg(all(test, feature = "unstable"))]
 mod dijkstra_v4_tests;
+
+#[cfg(all(test, feature = "unstable"))]
+mod protocol12_slice_tests;
