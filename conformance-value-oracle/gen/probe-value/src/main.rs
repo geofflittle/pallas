@@ -3,8 +3,9 @@
 //! Reads JSON lines carrying a `hex` field on stdin. For each line it prints one
 //! JSON line with `dump`, the value pallas decoded in the form the ledger oracle
 //! prints, the pallas re-encoding under `reencode_hex` when it differs from the
-//! input, and under `schemas` the serde JSON of the v1alpha, v1beta and v1
-//! messages the mappers build, or the decode error or panic text.
+//! input, and, for each kind but `eb`, under `schemas` the serde JSON of the
+//! v1alpha, v1beta and v1 messages the mappers build, or the decode error or
+//! panic text.
 
 use std::borrow::Cow;
 use std::io::{BufRead, Write};
@@ -612,7 +613,8 @@ const SCHEMAS: [&str; 3] = ["v1alpha", "v1beta", "v1"];
 struct Outcome {
     /// The value dump and the pallas re-encoding of the value.
     decode: Result<(Value, Vec<u8>), String>,
-    mapped: Mapped,
+    /// The schema messages, or `None` for a kind no schema maps.
+    mapped: Option<Mapped>,
 }
 
 fn map_tx_all(m: &Mappers, tx_bytes: &[u8]) -> Mapped {
@@ -642,7 +644,7 @@ fn run_tx(m: &Mappers, bytes: &[u8]) -> Outcome {
         let dump = tx(&t.transaction_body, &t.transaction_witness_set, true, &t.auxiliary_data);
         Ok((dump, enc(&t)))
     });
-    Outcome { decode, mapped: map_tx_all(m, bytes) }
+    Outcome { decode, mapped: Some(map_tx_all(m, bytes)) }
 }
 
 fn run_body(m: &Mappers, bytes: &[u8]) -> Outcome {
@@ -652,7 +654,7 @@ fn run_body(m: &Mappers, bytes: &[u8]) -> Outcome {
         dump["id"] = cb(&Hasher::<256>::hash(bytes));
         Ok((dump, enc(&b)))
     });
-    Outcome { decode, mapped: map_tx_all(m, &wrap_tx(bytes, &[0xa0])) }
+    Outcome { decode, mapped: Some(map_tx_all(m, &wrap_tx(bytes, &[0xa0]))) }
 }
 
 fn run_wits(m: &Mappers, bytes: &[u8]) -> Outcome {
@@ -660,7 +662,7 @@ fn run_wits(m: &Mappers, bytes: &[u8]) -> Outcome {
         let w: d::WitnessSet = minicbor::decode(bytes).map_err(|e| e.to_string())?;
         Ok((wits(&w), enc(&w)))
     });
-    Outcome { decode, mapped: map_tx_all(m, &wrap_tx(&MIN_BODY, bytes)) }
+    Outcome { decode, mapped: Some(map_tx_all(m, &wrap_tx(&MIN_BODY, bytes))) }
 }
 
 fn run_ppu(m: &Mappers, bytes: &[u8]) -> Outcome {
@@ -678,7 +680,7 @@ fn run_ppu(m: &Mappers, bytes: &[u8]) -> Outcome {
         stage(|| message(&m.v1beta.map_pparams_update(&update()?))),
         stage(|| message(&m.v1.map_pparams_update(&update()?))),
     ];
-    Outcome { decode, mapped }
+    Outcome { decode, mapped: Some(mapped) }
 }
 
 fn run_block(m: &Mappers, bytes: &[u8]) -> Outcome {
@@ -694,18 +696,27 @@ fn run_block(m: &Mappers, bytes: &[u8]) -> Outcome {
         stage(|| message(&m.v1beta.map_block(&decoded()?))),
         stage(|| message(&m.v1.map_block(&decoded()?))),
     ];
-    Outcome { decode, mapped }
+    Outcome { decode, mapped: Some(mapped) }
+}
+
+fn run_eb(_: &Mappers, bytes: &[u8]) -> Outcome {
+    let decode = stage(|| {
+        let e: d::EndorserBlock = minicbor::decode(bytes).map_err(|e| e.to_string())?;
+        Ok((omap(e.iter().map(|(h, n)| (cb(h), cb(n)))), enc(&e)))
+    });
+    Outcome { decode, mapped: None }
 }
 
 fn main_inner() {
     std::panic::set_hook(Box::new(|_| {}));
-    let kind = std::env::args().nth(1).expect("usage: pallas-probe-value tx|body|wits|ppu|block");
+    let kind = std::env::args().nth(1).expect("usage: pallas-probe-value tx|body|wits|ppu|block|eb");
     let run = match kind.as_str() {
         "tx" => run_tx,
         "body" => run_body,
         "wits" => run_wits,
         "ppu" => run_ppu,
         "block" => run_block,
+        "eb" => run_eb,
         k => panic!("unknown kind {k}"),
     };
     let mappers = Mappers {
@@ -739,15 +750,17 @@ fn main_inner() {
                 rec.insert("err".into(), json!(e));
             }
         }
-        let mut schemas = Map::new();
-        for (name, r) in SCHEMAS.iter().zip(o.mapped) {
-            let v = match r {
-                Ok(msg) => json!({ "ok": true, "msg": msg }),
-                Err(e) => json!({ "ok": false, "err": e }),
-            };
-            schemas.insert(name.to_string(), v);
+        if let Some(mapped) = o.mapped {
+            let mut schemas = Map::new();
+            for (name, r) in SCHEMAS.iter().zip(mapped) {
+                let v = match r {
+                    Ok(msg) => json!({ "ok": true, "msg": msg }),
+                    Err(e) => json!({ "ok": false, "err": e }),
+                };
+                schemas.insert(name.to_string(), v);
+            }
+            rec.insert("schemas".into(), Value::Object(schemas));
         }
-        rec.insert("schemas".into(), Value::Object(schemas));
         writeln!(out, "{}", Value::Object(rec)).expect("stdout");
     }
 }

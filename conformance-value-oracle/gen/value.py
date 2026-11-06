@@ -10,11 +10,15 @@ plain Python values that compare equal when the values are equal, and
 
 import hashlib
 import json
+import os
 import re
 import sys
 from collections import Counter
 from fractions import Fraction
 from itertools import zip_longest
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import expected  # noqa: E402
 
 END = object()
 
@@ -189,7 +193,7 @@ def normalize(d, path="", notes=None):
             items = [normalize(x, path + "[]", notes) for x in d["set"]]
             out = {canon(x): x for x in items}
             if notes is not None and len(out) != len(items):
-                notes.add("duplicate set elements folded", path)
+                notes.add(expected.DUP_SET, path)
             return {"set": {key_of(v): v for _, v in sorted(out.items())}}
         if set(d) == {"oset"}:
             seen, out = set(), []
@@ -198,7 +202,7 @@ def normalize(d, path="", notes=None):
                 c = canon(v)
                 if c in seen:
                     if notes is not None:
-                        notes.add("duplicate ordered set elements folded", path)
+                        notes.add(expected.DUP_OSET, path)
                     continue
                 seen.add(c)
                 out.append(v)
@@ -210,7 +214,7 @@ def normalize(d, path="", notes=None):
                 nk = normalize(k, path + "{}", notes)
                 c = canon(nk)
                 if c in out and notes is not None:
-                    notes.add("duplicate map keys folded", path)
+                    notes.add(expected.DUP_KEYS, path)
                 if ordered and c in out:
                     continue
                 out[c] = (nk, normalize(v, path + "{}", notes))

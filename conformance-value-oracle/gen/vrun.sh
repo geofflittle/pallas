@@ -3,7 +3,9 @@
 # valuecmp.py compares the pallas value and re-encoding with the ledger's, schemacmp.py each utxorpc schema.
 # GEN_FROM names an earlier output dir whose generated values and ledger results are reused.
 # The source `given` generates nothing and reads the values already written to OUT/KIND.given.gen.jsonl.
-# Exits 1 when any comparison finds a disagreement or a kind and source has other than N generated values.
+# The sources `mutate`, `empty14` and `subkeyhash` are `arb` values rewritten by mutate.py in that mode.
+# A probe line naming a planted defect it reached goes to OUT/KIND.SOURCE.reached.
+# Exits 1 when any comparison finds a disagreement or a generated kind and source has other than N values.
 # usage: [PROBE=bin/other-probe] [OUT=dir] [GEN_FROM=dir] ./vrun.sh N SEED [KINDS] [SOURCES]
 set -u
 W=$(cd "$(dirname "$0")" && pwd)
@@ -31,23 +33,29 @@ for kind in $KINDS; do
     else
       case $src in
         given) ;;
-        mutate)
+        mutate | empty14 | subkeyhash)
           $HS gen "$kind" arb "$N" "$SEED" > "$base.seed.jsonl"
-          python3 -I "$W/mutate.py" "$SEED" < "$base.seed.jsonl" > "$base.gen.jsonl"
+          python3 -I "$W/mutate.py" "$SEED" "$src" < "$base.seed.jsonl" > "$base.gen.jsonl"
           ;;
         *) $HS gen "$kind" "$src" "$N" "$SEED" > "$base.gen.jsonl" ;;
       esac
       hexes hex < "$base.gen.jsonl" | $HS oracle "$kind" > "$base.oracle.jsonl"
     fi
     have=$(grep -c . "$base.gen.jsonl")
-    if [ "$have" -ne "$N" ]; then
+    if [ "$src" != given ] && [ "$have" -ne "$N" ]; then
       echo "$kind $src: $have generated values where $N were asked"
       status=1
     fi
-    "$PROBE" "$kind" < "$base.gen.jsonl" > "$base.probe.jsonl"
+    "$PROBE" "$kind" < "$base.gen.jsonl" > "$base.probe.out"
+    grep '^ORACLE_PLANT reached ' "$base.probe.out" > "$base.reached"
+    grep -v '^ORACLE_PLANT reached ' "$base.probe.out" > "$base.probe.jsonl"
+    rm -f "$base.probe.out"
     hexes reencode_hex < "$base.probe.jsonl" | $HS oracle "$kind" > "$base.reoracle.jsonl"
     python3 -I "$W/valuecmp.py" "$kind" "$base.gen.jsonl" "$base.oracle.jsonl" "$base.probe.jsonl" "$base.reoracle.jsonl" "$base" || status=1
-    python3 -I "$W/schemacmp.py" "$kind" "$base.gen.jsonl" "$base.oracle.jsonl" "$base.probe.jsonl" "$base" || status=1
+    # No schema maps an endorser block's references.
+    if [ "$kind" != eb ]; then
+      python3 -I "$W/schemacmp.py" "$kind" "$base.gen.jsonl" "$base.oracle.jsonl" "$base.probe.jsonl" "$base" || status=1
+    fi
   done
 done
 exit $status

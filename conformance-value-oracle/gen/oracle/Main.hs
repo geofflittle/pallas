@@ -47,6 +47,7 @@ import Cardano.Ledger.Coin (Coin (..))
 import Cardano.Ledger.Conway.Governance (VotingProcedures (..))
 import Cardano.Ledger.Core
 import Cardano.Ledger.Dijkstra (DijkstraEra)
+import Cardano.Ledger.Dijkstra.Block.Endorser (EbReferences, getEbReferences)
 import Cardano.Ledger.Dijkstra.BlockBody (DijkstraEraBlockBody (..))
 import Cardano.Ledger.Dijkstra.HuddleSpec (dijkstraCDDL)
 import Cardano.Ledger.Dijkstra.Scripts (AccountBalanceIntervals (..))
@@ -80,6 +81,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.OMap.Strict as OMap
 import qualified Data.OSet.Strict as OSet
 import qualified Data.Set as Set
+import qualified Data.SimpleOMap.Strict as SimpleOMap
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Lens.Micro ((^.))
@@ -98,7 +100,7 @@ import Test.QuickCheck.Random (mkQCGen)
 
 type LeiosBlock = Block (Leios.Header StandardCrypto) DijkstraEra
 
-data Kind = KTx | KBody | KWits | KPpu | KBlock
+data Kind = KTx | KBody | KWits | KPpu | KBlock | KEb
 
 parseKind :: String -> Kind
 parseKind = \case
@@ -107,6 +109,7 @@ parseKind = \case
   "wits" -> KWits
   "ppu" -> KPpu
   "block" -> KBlock
+  "eb" -> KEb
   k -> error ("unknown kind " <> k)
 
 ruleOf :: Kind -> T.Text
@@ -116,6 +119,7 @@ ruleOf = \case
   KWits -> "transaction_witness_set"
   KPpu -> "protocol_param_update"
   KBlock -> "block"
+  KEb -> "eb_references"
 
 ver :: Version
 ver = eraProtVerHigh @DijkstraEra
@@ -135,6 +139,7 @@ arbBytes k i = case k of
     h <- arbitrary @(Leios.Header StandardCrypto)
     b <- if even i then genSmallDijkstraTxsBlockBody else genSmallDijkstraCertBlockBody
     pure $ serialize' ver (Block h b :: LeiosBlock)
+  KEb -> serialize' ver <$> arbitrary @EbReferences
 
 cddlBytes :: HuddleEnv -> Kind -> Gen BS.ByteString
 cddlBytes env k = do
@@ -298,6 +303,9 @@ blockFacts (Block h b) =
       , ("leios_certificate", Aeson.toJSON (present (b ^. leiosCertBlockBodyL)))
       , ("peras_certificate", Aeson.toJSON (present (b ^. perasCertBlockBodyL)))
       ]
+
+ebFacts :: EbReferences -> [(T.Text, Aeson.Value)]
+ebFacts x = [("references", Aeson.toJSON (SimpleOMap.size (getEbReferences x)))]
 
 -- Value dump ------------------------------------------------------------------
 
@@ -581,6 +589,9 @@ blockD (Block h b) =
         , ("peras_cert", opt c (b ^. perasCertBlockBodyL))
         ]
 
+ebD :: EbReferences -> D
+ebD x = DOMap [(c h, c n) | (h, n) <- SimpleOMap.assocList (getEbReferences x)]
+
 -- Decoding --------------------------------------------------------------------
 
 -- | What the oracle reports for one decoded value.
@@ -626,6 +637,7 @@ oracleOne k bs = case k of
   KWits -> decodeWithAnn @(TxWits DijkstraEra) (Report witsFacts witsD) bs
   KPpu -> decodeWith @(PParamsUpdate DijkstraEra) (Report ppuFacts c) bs
   KBlock -> decodeWithAnn @LeiosBlock (Report blockFacts blockD) bs
+  KEb -> decodeWith @EbReferences (Report ebFacts ebD) bs
 
 runOracle :: Kind -> IO ()
 runOracle k = do

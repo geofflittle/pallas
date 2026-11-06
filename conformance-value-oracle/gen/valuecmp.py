@@ -18,7 +18,9 @@ from collections import Counter
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from value import Notes, diff, generic, normalize, rows  # noqa: E402
+import expected  # noqa: E402
+from mutate import GUARDS, bodies, copy  # noqa: E402
+from value import Notes, Reader, diff, generic, normalize, rows  # noqa: E402
 
 
 def short(msg):
@@ -43,6 +45,24 @@ def without_ids(v):
     return v
 
 
+def empty_guards(kind, hexstr):
+    """Whether a transaction or body input writes key 14 of its body or of a sub transaction body as an empty set."""
+    if kind not in ("tx", "body"):
+        return False
+    top, subs = bodies(copy(Reader(bytes.fromhex(hexstr)).item()))
+    for b in ([top] if top else []) + subs:
+        for k, v in b[1]:
+            inner = v[2] if v[0] == "tag" else v
+            if k == GUARDS and inner[0] == "list" and not inner[1]:
+                return True
+    return False
+
+
+def eb_list_form(kind, hexstr):
+    """Whether an endorser block input is a CBOR array, the pinned ledger's form of eb_references."""
+    return kind == "eb" and hexstr[:1] in ("8", "9")
+
+
 def compare(kind, aligned):
     totals = Counter()
     agree, differ = Counter(), Counter()
@@ -56,8 +76,13 @@ def compare(kind, aligned):
             continue
         totals["ledger accepts"] += 1
         if not p["ok"] and tag24_indefinite(p.get("err"), g["hex"]):
-            listed[("pallas refuses tag 24 over indefinite bytes, open decision on a stable type", "")] += 1
+            listed[(expected.TAG24_INDEF, "")] += 1
             continue
+        if not p["ok"] and eb_list_form(kind, g["hex"]):
+            listed[(expected.EB_LIST_FORM, "")] += 1
+            continue
+        if p["ok"] and empty_guards(kind, g["hex"]):
+            listed[(expected.EMPTY_GUARDS_NEXT_NODE, "")] += 1
         if not p["ok"]:
             dis.append(dict(i=n, cls="pallas refuses ledger-valid input", key=short(p.get("err")), hex=g["hex"]))
             continue
@@ -81,7 +106,7 @@ def compare(kind, aligned):
             totals["re-encodings identical"] += 1
             continue
         if again == g["hex"]:
-            listed[("ledger re-encodes, pallas keeps the input bytes", "")] += 1
+            listed[(expected.KEEPS_INPUT, "")] += 1
             continue
         if not r["ok"]:
             dis.append(dict(i=n, cls="ledger refuses the pallas re-encoding", key=short(r.get("err")), hex=g["hex"], again=again))
@@ -89,7 +114,7 @@ def compare(kind, aligned):
         if without_ids(normalize(r["dump"])) != without_ids(ln):
             dis.append(dict(i=n, cls="pallas re-encoding holds a different ledger value", key="", hex=g["hex"], again=again))
             continue
-        listed[("pallas re-encodes to other bytes of the same ledger value", "")] += 1
+        listed[(expected.OTHER_BYTES, "")] += 1
     return totals, agree, differ, listed, accepted, dis
 
 
@@ -105,7 +130,7 @@ def main():
                 totals=totals,
                 agree=agree,
                 differ=differ,
-                listed={f"{w} {p}": c for (w, p), c in listed.items()},
+                listed=[[w, p, c] for (w, p), c in sorted(listed.items())],
                 accepted_invalid=accepted,
             ),
             fh,

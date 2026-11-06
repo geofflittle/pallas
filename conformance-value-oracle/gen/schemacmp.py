@@ -23,6 +23,7 @@ from collections import Counter
 from fractions import Fraction
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import expected  # noqa: E402
 from value import canon, flatten, generic, key_of, normalize, rows, segment  # noqa: E402
 
 SCHEMAS = ("v1alpha", "v1beta", "v1")
@@ -189,7 +190,8 @@ def quantity(a):
 def datum(d):
     if d is None:
         return None
-    if d.get("payload") is not None:
+    # The mapper also writes the data of a hash datum the witnesses hold, and only an inline datum carries its bytes.
+    if d.get("originalCbor") and d.get("payload") is not None:
         return {"tag": "inline", "data": data(d["payload"])}
     if d.get("hash"):
         return {"tag": "hash", "hash": h(d["hash"])}
@@ -985,35 +987,35 @@ def in_32_bits(x):
 def listed(schema, gpath, lv, sv):
     """The listed class of one difference, either a schema type that cannot hold the ledger value or a legacy mapping, or None."""
     if rational_outside(lv) and sv == in_32_bits(lv):
-        return "type cannot hold: RationalNumber is int32 over uint32, so it holds the nearest value"
+        return expected.RATIONAL
     if "aux.metadata" in gpath and any(outside(x, INT64) for x in QUOTED_INT.findall(json.dumps(lv))):
-        return "type cannot hold: Metadatum int is int64"
+        return expected.METADATUM
     if gpath == "peras_cert" and lv == "h:" and sv is None:
-        return "type cannot hold: empty Peras certificate bytes read as no certificate"
+        return expected.PERAS_EMPTY
     if gpath.endswith(".dns") and lv == "t:" and sv == ABSENT:
-        return "type cannot hold: an empty dns name reads as no name"
+        return expected.DNS_EMPTY
     if gpath.endswith(".m") and outside(lv, UINT32):
-        return "type cannot hold: ScriptNOfK k is uint32"
+        return expected.NOFK
     if isinstance(lv, dict) and lv.get("tag") == "m_of" and outside(lv.get("m"), UINT32):
-        return "type cannot hold: ScriptNOfK k is uint32"
+        return expected.NOFK
     if gpath.endswith(".add{}.v") and outside(lv, UINT32):
-        return "type cannot hold: NewCommitteeCredentials expires_epoch is uint32"
+        return expected.EXPIRES
     if gpath.endswith(".port") and lv == "0" and sv == ABSENT:
-        return "type cannot hold: a uint32 port of 0 reads as no port"
+        return expected.PORT_ZERO
     if schema != "v1":
         if any_leaf(lv, lambda x: x == "guard"):
-            return "type cannot hold: no guard native script variant"
+            return expected.NO_GUARD_SCRIPT
         if gpath.endswith("redeemers{}.k[]") and lv == "6":
-            return "type cannot hold: no guarding redeemer purpose"
+            return expected.NO_GUARDING_PURPOSE
         if gpath.endswith("total_collateral") and lv is None and sv == "0":
-            return "legacy mapping: no total collateral maps to 0"
+            return expected.NO_TOTAL_COLLATERAL
         if gpath.endswith("aux") and lv is None and sv == {"metadata": {"map": {}}, "native": [], "plutus": {"map": {}}}:
-            return "legacy mapping: no auxiliary data maps to an empty one"
+            return expected.NO_AUX
     return None
 
 
 def result():
-    return dict(agree=Counter(), nofield=Counter(), cannot=Counter(), dis=[], compared=0, held={})
+    return dict(agree=Counter(), nofield=Counter(), cannot=Counter(), dis=[], compared=0, held={}, attach=Counter())
 
 
 def compare_one(kind, schema, ledger, msg, table, r, where):
@@ -1052,6 +1054,100 @@ def compare_one(kind, schema, ledger, msg, table, r, where):
             held[gp] += 1
 
 
+# The redeemer each v1 input, withdrawal and certificate carries, against the ledger's redeemer at that item's ledger index.
+
+ATTACHED = (("inputs", "0"), ("withdrawals", "3"), ("certificates", "2"))
+
+
+def ledger_redeemers(wits_raw):
+    """The ledger redeemers of one raw witness dump by (purpose, index), each in the schema's view."""
+    out = {}
+    for k, v in ((wits_raw or {}).get("redeemers") or {}).get("map", []):
+        out[tuple(normalize(k))] = ledger_view(normalize(v), "v1")
+    return out
+
+
+def schema_redeemer(r):
+    """The (purpose, index) and value of a v1 redeemer message, or None."""
+    if not r:
+        return None
+    return (PURPOSE.get(r.get("purpose"), "?"), num(r.get("index"))), {"data": data(r.get("payload")), "units": exunits(r.get("exUnits"))}
+
+
+def ledger_positions(body_raw):
+    """For each attached field, the value of each item in the ledger's own order, which is its redeemer index."""
+    b = body_raw or {}
+    return {
+        "inputs": [normalize(x) for x in (b.get("inputs") or {}).get("set", [])],
+        "withdrawals": [normalize(k) for k, _ in (b.get("withdrawals") or {}).get("map", [])],
+        "certificates": list(range(len((b.get("certs") or {}).get("oset", [])))),
+    }
+
+
+def schema_items(common):
+    """For each attached field, each item's value in the ledger's form and its redeemer message, in schema order."""
+    return {
+        "inputs": [(txin(x), x.get("redeemer")) for x in common.get("inputs", [])],
+        "withdrawals": [(h(x.get("rewardAccount")), x.get("redeemer")) for x in common.get("withdrawals", [])],
+        "certificates": [(n, x.get("redeemer")) for n, x in enumerate(common.get("certificates", []))],
+    }
+
+
+def attach_one(body_raw, wits_raw, common, level):
+    """One (verdict, path, ledger redeemer, schema redeemer) per attached item: agree, none (neither has one) or differs."""
+    reds = ledger_redeemers(wits_raw)
+    places = ledger_positions(body_raw)
+    items = schema_items(common)
+    out = []
+    for field, purpose in ATTACHED:
+        for value, msg in items[field]:
+            got = schema_redeemer(msg)
+            path = f"{level}{field}.redeemer"
+            if value not in places[field]:
+                out.append(("differs", path, "<no ledger item>", got))
+                continue
+            key = (purpose, str(places[field].index(value)))
+            want = reds.get(key)
+            if want is None and got is None:
+                out.append(("none", path, None, None))
+            elif want is not None and got == (key, want):
+                out.append(("agree", path, want, got))
+            else:
+                out.append(("differs", path, (key, want), got))
+    return out
+
+
+def attach_tx(tx_raw, msg):
+    """The attachment verdicts of one v1 transaction message and its raw ledger dump, sub transactions included."""
+    out = attach_one(tx_raw.get("body"), tx_raw.get("wits"), msg.get("common") or {}, "")
+    subs = {}
+    for k, v in ((tx_raw.get("body") or {}).get("sub_txs") or {}).get("omap", []):
+        subs[canon(normalize(k))] = v
+    for s in msg.get("subTransactions", []):
+        raw = subs.get(canon(h(s.get("hash"))))
+        if raw is None:
+            out.append(("differs", "sub_txs.", "<no ledger sub transaction>", s.get("hash")))
+            continue
+        out += attach_one(raw.get("body"), raw.get("wits"), s, "sub_txs.")
+    return out
+
+
+def attach(kind, raw, msg):
+    """The attachment verdicts of one v1 message of a kind that carries transactions."""
+    if kind == "tx":
+        return attach_tx(raw, msg)
+    if kind == "body":
+        return attach_tx({"body": raw, "wits": None}, msg)
+    if kind == "block":
+        txs = (msg.get("body") or {}).get("tx", [])
+        out = []
+        for n, t in enumerate(raw.get("txs", [])):
+            if n < len(txs):
+                out += [(v, "txs[]." + p, lv, sv) for v, p, lv, sv in attach_tx(t, txs[n])]
+        return out
+    return []
+
+
 def compare(kind, aligned):
     tabs = tables()
     res = {s: result() for s in SCHEMAS}
@@ -1065,6 +1161,11 @@ def compare(kind, aligned):
                 res[s]["dis"].append(dict(i=n, cls=f"{s} mapper refuses ledger-valid input", key=str(m.get("err"))[:120], hex=g["hex"]))
                 continue
             compare_one(kind, s, ln, m["msg"], tabs[s][kind], res[s], dict(i=n, hex=g["hex"]))
+            if s == "v1":
+                for verdict, path, lv, sv in attach(kind, o["dump"], m["msg"]):
+                    res[s]["attach"][verdict] += 1
+                    if verdict == "differs":
+                        res[s]["dis"].append(dict(i=n, cls="v1 redeemer attachment differs", key=path, ledger=lv, schema=sv, hex=g["hex"]))
     return res
 
 
@@ -1095,8 +1196,9 @@ def main():
                 s: dict(
                     agree=r["agree"],
                     nofield=r["nofield"],
-                    cannot={f"{w} {p}": c for (w, p), c in r["cannot"].items()},
+                    cannot=[[w, p, c] for (w, p), c in sorted(r["cannot"].items())],
                     compared=r["compared"],
+                    attach=r["attach"],
                 )
                 for s, r in res.items()
             },
@@ -1115,6 +1217,9 @@ def main():
             f"ledger classes with no field {len(r['nofield'])}, listed differences {sum(r['cannot'].values())}, "
             f"disagreements {len(dis)} on {len({d['i'] for d in dis})} values"
         )
+        if s == "v1":
+            a = r["attach"]
+            print(f"attach v1 {kind}: items {sum(a.values())}, agree {a['agree']}, none {a['none']}, differ {a['differs']}")
         for gp in sorted(r["nofield"]):
             print(f"  {r['nofield'][gp]:5d}  listed  no field in {s}  {gp}")
         for (why, gp), c in sorted(r["cannot"].items()):

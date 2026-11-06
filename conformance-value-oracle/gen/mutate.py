@@ -1,12 +1,15 @@
-"""Turns generated values into nearby inputs the ledger is expected to refuse.
+"""Turns generated values into nearby inputs, by default ones the ledger is expected to refuse.
 
-usage: python3 -I mutate.py SEED < GEN > GEN
+usage: python3 -I mutate.py SEED [MODE] < GEN > GEN
 
 Each input line gives one output line with the same `i`, a `hex` holding the
-mutated CBOR, `source` set to mutate and `mutation` naming the change. The
-mutations change the structure the ledger decoder checks: a dropped or added
-element, a duplicated or unknown map key, a swapped major type, a negated or
-oversized integer, and trailing bytes.
+mutated CBOR, `source` set to the mode and `mutation` naming the change. The
+default mode `mutate` changes the structure the ledger decoder checks: a
+dropped or added element, a duplicated or unknown map key, a swapped major
+type, a negated or oversized integer, and trailing bytes. The mode `empty14`
+sets the guards (key 14) of a transaction body and of each sub transaction body
+to an empty tagged set. The mode `subkeyhash` rewrites each sub transaction's
+guards of credentials as the set of their hashes.
 """
 
 import json
@@ -132,16 +135,78 @@ def mutate(t, rng):
     return None
 
 
+GUARDS = ["int", 14]
+SUB_TXS = ["int", 23]
+
+
+def bodies(t):
+    """The top body map and each sub transaction body map of a transaction or a body term."""
+    top = t[1][0] if t[0] == "list" and t[1] and t[1][0][0] == "map" else t
+    if top[0] != "map":
+        return None, []
+    subs = []
+    for k, v in top[1]:
+        if k == SUB_TXS:
+            inner = v[2] if v[0] == "tag" else v
+            if inner[0] == "list":
+                subs += [s[1][0] for s in inner[1] if s[0] == "list" and s[1] and s[1][0][0] == "map"]
+    return top, subs
+
+
+def set_key(m, key, value):
+    for pair in m[1]:
+        if pair[0] == key:
+            pair[1] = value
+            return
+    m[1].append([key, value])
+
+
+def empty14(t):
+    """The term with every body's guards an empty tagged set, and whether it changed."""
+    t = copy(t)
+    top, subs = bodies(t)
+    if top is None:
+        return t, False
+    for b in [top] + subs:
+        set_key(b, GUARDS, ["tag", 258, ["list", []]])
+    return t, True
+
+
+def subkeyhash(t):
+    """The term with each sub transaction's credential guards rewritten as their hashes, and whether any changed."""
+    t = copy(t)
+    _, subs = bodies(t)
+    changed = False
+    for b in subs:
+        for pair in b[1]:
+            if pair[0] != GUARDS:
+                continue
+            v = pair[1]
+            inner = v[2] if v[0] == "tag" else v
+            creds = inner[1] if inner[0] == "list" else []
+            if creds and all(c[0] == "list" and len(c[1]) == 2 and c[1][1][0] == "bytes" for c in creds):
+                inner[1] = [c[1][1] for c in creds]
+                changed = True
+    return t, changed
+
+
 def main():
     rng = random.Random(int(sys.argv[1]))
+    mode = sys.argv[2] if len(sys.argv) > 2 else "mutate"
     for line in sys.stdin:
         if not line.strip():
             continue
         g = json.loads(line)
-        r = Reader(bytes.fromhex(g["hex"]))
-        out = mutate(r.item(), rng)
-        raw, kind = out if out else (bytes.fromhex(g["hex"]), "none")
-        print(json.dumps(dict(i=g["i"], hex=raw.hex(), source="mutate", mutation=kind, of=g["hex"]), sort_keys=True))
+        t = Reader(bytes.fromhex(g["hex"])).item()
+        if mode == "mutate":
+            out = mutate(t, rng)
+            raw, kind = out if out else (bytes.fromhex(g["hex"]), "none")
+        elif mode in ("empty14", "subkeyhash"):
+            new, changed = (empty14 if mode == "empty14" else subkeyhash)(t)
+            raw, kind = enc(new), mode if changed else "none"
+        else:
+            sys.exit(f"unknown mode {mode}")
+        print(json.dumps(dict(i=g["i"], hex=raw.hex(), source=mode, mutation=kind, of=g["hex"]), sort_keys=True))
 
 
 if __name__ == "__main__":
