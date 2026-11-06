@@ -19,17 +19,25 @@ Each command prints its verdict lines and exits 1 on any disagreement.
 
 `vrun.sh N SEED [KINDS] [SOURCES]` writes `OUT/KIND.SOURCE.*`: the generated values, the ledger results, the probe output, the ledger results of the re-encoding, the counts and one disagreement record per line in `*.dis.jsonl` and `*.schema.dis.jsonl`. `GEN_FROM=dir` reuses the values and ledger results of an earlier run, so a planted probe differs from the base run only in the probe. Generation is deterministic for a seed. A kind and source with other than N values exits 1.
 
-Kinds: `tx` (mempool transaction), `body`, `wits`, `ppu` (protocol parameter update), `block`.
+Kinds: `tx` (mempool transaction), `body`, `wits`, `ppu` (protocol parameter update), `block`, `eb` (endorser block body).
 
 Sources:
 - `arb`: the ledger QuickCheck `Arbitrary` instances.
 - `cddl-plain`: cuddle generation over the ledger Huddle spec `dijkstraCDDL`, definite lengths only.
 - `cddl`: the same with cuddle's indefinite length encodings.
 - `mutate`: `arb` values changed by `mutate.py`, to count the inputs pallas accepts and the ledger refuses.
-- `given`: generates nothing and reads `OUT/KIND.given.gen.jsonl`, the coverage blocks.
+- `empty14`: `arb` values with an empty guards set at body key 14.
+- `subkeyhash`: `arb` values with a key hash guard in a sub transaction body.
+- `given`: generates nothing and reads `OUT/KIND.given.gen.jsonl`, written by `given.py KIND FILES` from transaction corpora, block files and endorser block bodies.
 - `cuddle-cli-plain`, `cuddle-cli`: the cuddle 1.8.1.0 command line tool over the ledger CDDL file, through `gen-cuddle-cli.sh`.
 
-`valuecmp.py` compares the pallas value and re-encoding with the ledger's. `schemacmp.py` compares each schema field with the ledger value it maps, by the path tables in `schemas.py`: every bool, the transaction hash against the ledger transaction id, and a rational too wide for 32 bits only as its own leaf and only when the schema holds the nearest value that fits. With `SCHEMA_HELD` set it also writes the agreeing leaves per value, which the coverage check reads.
+`valuecmp.py` compares the pallas value and re-encoding with the ledger's. `schemacmp.py` compares each schema field with the ledger value it maps, by the path tables in `schemas.py`: every bool, the transaction hash against the ledger transaction id, and a rational too wide for 32 bits only as its own leaf and only when the schema holds the nearest value that fits. With `SCHEMA_HELD` set it also writes the agreeing leaves per value, which the coverage check reads. It also compares the redeemer the v1 mapper attaches to each input, withdrawal and certificate with the one the ledger's order of that field names.
+
+A difference `expected.py` names is counted as listed, not as a disagreement.
+
+## Tier
+
+`tier.sh OUT N SEED` runs `vrun.sh` over each kind and source pair of `PAIRS`, the given values read from the files `TX_FILES`, `BLOCK_FILES` and `EB_FILES` name, then `vtally.py OUT` prints one line per comparer and the count of each entry of `expected.py`, and exits 1 on any disagreement, any entry that matched no value and any value listed under a class `expected.py` does not hold.
 
 ## Reproductions
 
@@ -50,7 +58,7 @@ Plants of the comparer: `PLANT=slim`, `bls` or `eb` changes one served value bef
 - `docker/Dockerfile`: image `conformance-gen-hs:2`, GHC 9.6.7 with the IntersectMBO libsodium with its VRF functions, secp256k1 v0.3.2 and blst v0.3.14. The oracle binary needs this image at run time.
 - `oracle/`: the Haskell program `conformance-gen` (`gen KIND SOURCE N SEED`, `oracle KIND` over hex lines), built inside `cardano-ledger/` at 9df9f98c (the ledger pinned by node 11.2.0.164) with `cabal.project.local` holding `packages: /work/oracle`.
 - `probe-value/`: the Rust program `pallas-probe-value KIND` over the generator's JSON lines, built against the pallas tree at `$W/conf` by `plants/build-probes.sh NAME=REV...`.
-- `check_*.py`: self checks of the comparers, each run with no arguments. `e2e/check_dial_retry.py` checks that a server call is repeated only after a failed dial. `check_docker_logs.py` checks that every `docker run` line of the scripts sets `--log-driver none`, so a long run writes no container log to the host disk.
+- `check_*.py`: self checks of the comparers, the mutation modes and the expected difference table, each run with no arguments. `e2e/check_dial_retry.py` checks that a server call is repeated only after a failed dial. `check_docker_logs.py` checks that every `docker run` line of the scripts sets `--log-driver none`, so a long run writes no container log to the host disk.
 - `bin/`: `conformance-gen` and the probes. `bin-cuddle/cuddle`.
 
 ## Rebuild
