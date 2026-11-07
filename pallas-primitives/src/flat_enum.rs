@@ -28,6 +28,13 @@ macro_rules! decode_flat_enum {
                 ctx: &mut __C,
             ) -> Result<Self, pallas_codec::minicbor::decode::Error> {
                 let start = d.position();
+                if d.datatype()? == pallas_codec::minicbor::data::Type::ArrayIndef
+                    && pallas_codec::oracle_plant("flat-enum-definite")
+                {
+                    return Err(pallas_codec::minicbor::decode::Error::message(
+                        "indefinite flat enum array",
+                    ));
+                }
                 pallas_codec::utils::decode_array(d, |a| {
                     let index: i64 = a.decode_with(ctx)?;
                     match index {

@@ -48,6 +48,11 @@ pub(crate) fn eval_native(
     let flat_bytes: minicbor::bytes::ByteVec = minicbor::decode(script_bytes)?;
     let version = plutus_version(&language);
     let protocol = ProtocolVersion::new(12, 0);
+    let mut costs = costs.to_vec();
+    if language == Language::PlutusV3 && pallas_crypto::oracle_plant("cost") {
+        costs[173] /= 2;
+    }
+    let costs = &costs[..];
     let cost_model = match language {
         Language::PlutusV1 | Language::PlutusV2 | Language::PlutusV3 => {
             CostModel::new(version, protocol, costs)
@@ -58,6 +63,72 @@ pub(crate) fn eval_native(
         flat::decode(&arena, &flat_bytes, version, protocol)?;
     if remainder > 0 {
         return Err(amaru_uplc_native::flat::FlatDecodeError::TrailingBytes(remainder).into());
+    }
+    if language == Language::PlutusV3 && pallas_crypto::oracle_plant("builtin-term-walk") {
+        use DefaultFunction as F;
+        let mut pending = vec![program.term];
+        while let Some(term) = pending.pop() {
+            match term {
+                Term::Builtin(f) => match f {
+                    F::AddInteger
+                    | F::SubtractInteger
+                    | F::MultiplyInteger
+                    | F::LessThanByteString
+                    | F::AppendByteString
+                    | F::BData
+                    | F::Blake2b_224
+                    | F::Blake2b_256
+                    | F::ChooseData
+                    | F::ChooseList
+                    | F::ConsByteString
+                    | F::ConstrData
+                    | F::DivideInteger
+                    | F::EqualsByteString
+                    | F::EqualsData
+                    | F::EqualsInteger
+                    | F::FstPair
+                    | F::HeadList
+                    | F::IData
+                    | F::IfThenElse
+                    | F::LengthOfByteString
+                    | F::LessThanEqualsByteString
+                    | F::LessThanEqualsInteger
+                    | F::LessThanInteger
+                    | F::ListData
+                    | F::MapData
+                    | F::MkCons
+                    | F::MkPairData
+                    | F::ModInteger
+                    | F::SerialiseData
+                    | F::SndPair
+                    | F::TailList
+                    | F::UnBData
+                    | F::UnConstrData
+                    | F::UnIData
+                    | F::UnListData
+                    | F::UnMapData
+                    | F::VerifyEd25519Signature => (),
+                    _ => {
+                        return Err(Error::DijkstraUnsupported(Unsupported(
+                            UnsupportedEvaluation::BuiltinOutsideSubset,
+                        )));
+                    }
+                },
+                Term::Lambda { body, .. } | Term::Delay(body) | Term::Force(body) => {
+                    pending.push(body)
+                }
+                Term::Apply { function, argument } => {
+                    pending.push(function);
+                    pending.push(argument);
+                }
+                Term::Constr { fields, .. } => pending.extend(fields.iter().copied()),
+                Term::Case { constr, branches } => {
+                    pending.push(constr);
+                    pending.extend(branches.iter().copied());
+                }
+                Term::Var(_) | Term::Constant(_) | Term::Error => (),
+            }
+        }
     }
     let initial = ExBudget {
         mem: i64::try_from(budget.mem)

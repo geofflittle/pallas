@@ -114,9 +114,14 @@ impl ToPlutusData for Address {
                     ShelleyPaymentPart::Key(payment_keyhash) => {
                         wrap_with_constr(0, payment_keyhash.to_plutus_data())
                     }
-                    ShelleyPaymentPart::Script(script_hash) => {
-                        wrap_with_constr(1, script_hash.to_plutus_data())
-                    }
+                    ShelleyPaymentPart::Script(script_hash) => wrap_with_constr(
+                        if pallas_crypto::oracle_plant("script-payment-swap") {
+                            0
+                        } else {
+                            1
+                        },
+                        script_hash.to_plutus_data(),
+                    ),
                 };
 
                 let stake_part_plutus_data = match stake_part {
@@ -640,7 +645,11 @@ impl ToPlutusData for WithPartialCertificates<'_, Certificate> {
             Certificate::StakeRegistration(stake_credential)
             | Certificate::Reg(stake_credential, _) => wrap_with_constr(
                 0,
-                WithWrappedStakeCredential(stake_credential).to_plutus_data(),
+                if pallas_crypto::oracle_plant("cert-unwrapped") {
+                    stake_credential.to_plutus_data()
+                } else {
+                    WithWrappedStakeCredential(stake_credential).to_plutus_data()
+                },
             ),
 
             Certificate::StakeDeregistration(stake_credential)
@@ -700,8 +709,14 @@ impl ToPlutusData for WithRegistrationDeposit<'_, Certificate> {
             Certificate::Reg(stake_credential, amount) => wrap_multiple_with_constr(
                 0,
                 vec![
-                    stake_credential.to_plutus_data(),
-                    self.1.then_some(*amount).to_plutus_data(),
+                    if pallas_crypto::oracle_plant("v3-cert-wrapped") {
+                        WithWrappedStakeCredential(stake_credential).to_plutus_data()
+                    } else {
+                        stake_credential.to_plutus_data()
+                    },
+                    (self.1 && !pallas_crypto::oracle_plant("v3-reg-deposit-omitted"))
+                        .then_some(*amount)
+                        .to_plutus_data(),
                 ],
             ),
 
@@ -875,7 +890,8 @@ impl ToPlutusData for TimeRange {
                     vec![
                         wrap_with_constr(1, x.to_plutus_data()),
                         // NOTE: Finite lower bounds are always inclusive, unlike upper bounds.
-                        is_lower.to_plutus_data(),
+                        (is_lower || pallas_crypto::oracle_plant("upper-inclusive"))
+                            .to_plutus_data(),
                     ],
                 ),
                 None => wrap_multiple_with_constr(
@@ -1561,6 +1577,9 @@ impl ToPlutusData for WithWrappedStakeCredential<'_, KeyValuePairs<Address, Coin
             self.0
                 .iter()
                 .map(|(reward_account, amount)| {
+                    if pallas_crypto::oracle_plant("v2-withdrawal-unwrapped") {
+                        return (reward_account.to_plutus_data(), *amount);
+                    }
                     (
                         wrap_with_constr(0, reward_account.to_plutus_data()),
                         *amount,

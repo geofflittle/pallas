@@ -361,6 +361,9 @@ where
     d.tag()?;
     let script = match pallas_codec::utils::decode_bytes_def_or_indef(d, ctx)? {
         std::borrow::Cow::Borrowed(cbor) => minicbor::decode_with(cbor, ctx)?,
+        std::borrow::Cow::Owned(_) if pallas_crypto::oracle_plant("tag24-ref") => {
+            return Err(minicbor::decode::Error::message("indefinite script reference"));
+        }
         std::borrow::Cow::Owned(cbor) => S::decode_joined(&cbor, ctx)?,
     };
     Ok(Some(CborWrap(script)))
@@ -453,6 +456,9 @@ fn decode_inline_datum<'b, C>(
     d: &mut minicbor::Decoder<'b>,
     ctx: &mut C,
 ) -> Result<CborWrap<KeepRaw<'b, PlutusData>>, minicbor::decode::Error> {
+    if pallas_crypto::oracle_plant("tag24") {
+        return d.decode_with(ctx);
+    }
     d.tag()?;
     let data = match pallas_codec::utils::decode_bytes_def_or_indef(d, ctx)? {
         std::borrow::Cow::Borrowed(cbor) => minicbor::decode_with(cbor, ctx)?,

@@ -16,7 +16,9 @@ labels! {
     pub enum UnsupportedEvaluation {
         BuiltinOutsideSubset => "V3 builtin outside audited protocol-12 subset",
         IntegerOutsideRegistrationRange => "integer operand outside audited registration range",
+        NativeScriptGuards => "native script guards",
         ParametersRequireDijkstra => "protocol parameters require Dijkstra",
+        PointerAddress => "pointer address in a V3 script context",
         ProtocolVersion => "protocol version (requires 12.0)",
         ReferenceScriptLanguage => "reference script language (requires V3)",
     }

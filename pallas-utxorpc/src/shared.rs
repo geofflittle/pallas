@@ -45,6 +45,12 @@ macro_rules! impl_cardano_mapper_shared {
         use $u5c as u5c;
 
         fn rational_number_to_u5c(value: pallas_primitives::RationalNumber) -> u5c::RationalNumber {
+            if pallas_crypto::oracle_plant("rational-truncated") {
+                return u5c::RationalNumber {
+                    numerator: value.numerator as i32,
+                    denominator: value.denominator as u32,
+                };
+            }
             let (numerator, denominator) = (value.numerator, value.denominator);
             let (numerator, denominator) =
                 match (i32::try_from(numerator), u32::try_from(denominator)) {
@@ -462,6 +468,12 @@ macro_rules! impl_cardano_mapper_shared {
                 match x {
                     MultiEraNativeScript::AlonzoCompatible(x) => Self::map_native_script(x),
                     #[cfg(feature = "unstable")]
+                    MultiEraNativeScript::Dijkstra(_)
+                        if pallas_crypto::oracle_plant("dijkstra-scripts-panic") =>
+                    {
+                        unimplemented!("collect_all_scripts is not yet implemented for Dijkstra")
+                    }
+                    #[cfg(feature = "unstable")]
                     MultiEraNativeScript::Dijkstra(x) => Self::map_dijkstra_native_script(x),
                     _ => unimplemented!("collect_all_scripts has no arm for this native script"),
                 }
@@ -510,6 +522,9 @@ macro_rules! impl_cardano_mapper_shared {
                         script: u5c::script::Script::PlutusV4(x).into(),
                     });
 
+                if pallas_crypto::oracle_plant("witness-v3-v4-dropped") {
+                    return ns.chain(p1).chain(p2).collect();
+                }
                 ns.chain(p1).chain(p2).chain(p3).chain(p4).collect()
             }
 
@@ -557,7 +572,9 @@ macro_rules! impl_cardano_mapper_shared {
                     babbage::BigInt::Int(x) => {
                         let n = i128::from(x.0);
                         // A CBOR integer outside i64 has a magnitude of exactly eight bytes.
-                        if let Ok(n) = i64::try_from(n) {
+                        if pallas_crypto::oracle_plant("bigint-truncated") {
+                            u5c::big_int::BigInt::Int(n as i64)
+                        } else if let Ok(n) = i64::try_from(n) {
                             u5c::big_int::BigInt::Int(n)
                         } else if n > 0 {
                             u5c::big_int::BigInt::BigUInt(n.to_be_bytes()[8..].to_vec().into())
@@ -642,6 +659,10 @@ macro_rules! impl_cardano_mapper_shared {
                 &self,
                 x: &pallas_traverse::MultiEraProposal,
             ) -> u5c::GovernanceActionProposal {
+                #[cfg(feature = "unstable")]
+                if x.as_dijkstra().is_some() && pallas_crypto::oracle_plant("gov-proposal-panics") {
+                    unimplemented!("map_gov_proposal is not yet implemented for Dijkstra");
+                }
                 u5c::GovernanceActionProposal {
                     deposit: u64_to_bigint(x.deposit()),
                     reward_account: x.reward_account().to_vec().into(),
@@ -849,6 +870,9 @@ macro_rules! impl_cardano_mapper_shared {
                         script: u5c::script::Script::PlutusV4(x).into(),
                     });
 
+                if pallas_crypto::oracle_plant("aux-plutus-dropped") {
+                    return ns.chain(p1).collect();
+                }
                 ns.chain(p1).chain(p2).chain(p3).chain(p4).collect()
             }
 
