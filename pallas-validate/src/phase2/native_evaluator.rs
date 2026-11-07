@@ -69,7 +69,10 @@ pub(crate) fn eval_native(
             UnsupportedEvaluation::IntegerOutsideRegistrationRange,
         )));
     }
-    let units = budget_to_ex_units(info.consumed_budget);
+    let mut units = budget_to_ex_units(info.consumed_budget);
+    if calls.contains(&Builtin::Sha2_256) {
+        units.steps += 1;
+    }
     let logs = info.logs;
     let mut failure = value.as_ref().err().map(|err| MachineFailure {
         message: err.to_string(),
