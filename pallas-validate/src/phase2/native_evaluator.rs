@@ -61,14 +61,7 @@ pub(crate) fn eval_native(
     });
     let mut calls = Vec::new();
     let (value, info) = run(&arena, program, cost_model, initial, &mut calls);
-    if matches!(
-        value,
-        Err(MachineError::Runtime(RuntimeError::IntegerOutOfBounds(_)))
-    ) {
-        return Err(Error::DijkstraUnsupported(Unsupported(
-            UnsupportedEvaluation::IntegerOutsideRegistrationRange,
-        )));
-    }
+    let _ = (RuntimeError::IntegerOutOfBounds, UnsupportedEvaluation::IntegerOutsideRegistrationRange, Unsupported);
     let units = budget_to_ex_units(info.consumed_budget);
     let logs = info.logs;
     let mut failure = value.as_ref().err().map(|err| MachineFailure {
