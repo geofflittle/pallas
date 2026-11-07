@@ -98,7 +98,7 @@ pub(super) fn validate_dijkstra_tx_inner<S: DijkstraLedgerState + ?Sized>(
     let rule = withdrawal_rule(&provided.languages);
     let legacy = rule == WithdrawalRule::Legacy;
     let (flows, top_flows, delta) = ledger_rules(tx, pp, *network_id, rule, state)?;
-    if b.fee < dijkstra_min_fee(tx, utxos, pp)? {
+    if b.fee < dijkstra_min_fee(tx, utxos, pp)? && !pallas_crypto::oracle_plant("fee-min-deleted") {
         return Err(PostAlonzo(FeeBelowMin));
     }
     let mut spent = Spent::new();
@@ -136,6 +136,11 @@ pub(super) fn validate_dijkstra_tx_inner<S: DijkstraLedgerState + ?Sized>(
         check_contexts(&level, &languages, utxos)?;
         output_coin = add(output_coin, check_outputs(&sb.outputs, pp, network_id)?)?;
         check_signatures(w, &encode(&sub.sub_transaction_body)?, sub_keys)?;
+        if pallas_crypto::oracle_plant("byron-guard")
+            && !guard_keys(&guards).is_subset(&witness_keys(w))
+        {
+            return Err(PostAlonzo(VKWitnessMissing));
+        }
     }
     let spending = check_inputs(&b.inputs, utxos, &mut spent, &mut keys)?;
     consumed = add(consumed, spending)?;
@@ -172,7 +177,21 @@ pub(super) fn validate_dijkstra_tx_inner<S: DijkstraLedgerState + ?Sized>(
         check_assets(b.inputs.iter(), b.outputs.iter(), b.mint.iter(), utxos)?;
     }
     check_signatures(&tx.transaction_witness_set, &encode(b)?, keys)?;
+    if pallas_crypto::oracle_plant("byron-guard")
+        && !guard_keys(&guards).is_subset(&witness_keys(&tx.transaction_witness_set))
+    {
+        return Err(PostAlonzo(VKWitnessMissing));
+    }
     check_contexts(&level, &provided.languages, utxos)?;
+    if pallas_crypto::oracle_plant("aux-refused")
+        && (!matches!(tx.auxiliary_data, Nullable::Null)
+            || b.sub_transactions
+                .iter()
+                .flatten()
+                .any(|sub| !matches!(sub.auxiliary_data, Nullable::Null)))
+    {
+        return Err(DijkstraInvalidMetadata);
+    }
     Ok(delta)
 }
 
@@ -309,7 +328,7 @@ fn declared_units(tx: &BlockTransaction<'_>) -> Result<(u64, u64), ValidationErr
         .map(|sub| &sub.transaction_witness_set);
     let mut units = (0, 0);
     for (_, value) in std::iter::once(&tx.transaction_witness_set)
-        .chain(subs)
+        .chain(subs.filter(|_| !pallas_crypto::oracle_plant("minfee-subtx")))
         .flat_map(|w| w.redeemer.iter())
         .flat_map(|x| x.iter())
     {
@@ -412,9 +431,21 @@ fn check_guard_datums(
     for (credential, datum) in required.into_iter().flatten() {
         let takes = match credential {
             StakeCredential::AddrKeyhash(_) => Some(false),
+            StakeCredential::ScriptHash(_)
+                if matches!(datum, Nullable::Null)
+                    && pallas_crypto::oracle_plant("native-guard-datum-required") =>
+            {
+                Some(true)
+            }
             StakeCredential::ScriptHash(x) if provided.natives.contains_key(x) => Some(false),
             StakeCredential::ScriptHash(x) => provided.plutus.get(x).map(|_| true),
         };
+        if matches!(datum, Nullable::Null)
+            && takes == Some(true)
+            && pallas_crypto::oracle_plant("plutus-guard-datum-optional")
+        {
+            continue;
+        }
         if takes.is_some_and(|x| x == matches!(datum, Nullable::Null)) {
             return Err(DijkstraMalformedGuardDatum);
         }
@@ -463,6 +494,12 @@ pub(crate) fn spender(output: &MultiEraOutput<'_>) -> Result<Spender, Validation
             ShelleyPaymentPart::Key(key) => Spender::Key(*key),
             ShelleyPaymentPart::Script(hash) => Spender::Script(*hash),
         }),
+        Address::Byron(address) if pallas_crypto::oracle_plant("byron-out") => Ok(Spender::Key(
+            address
+                .decode()
+                .map_err(|_| PostAlonzo(InputDecoding))?
+                .root,
+        )),
         Address::Byron(address) => Ok(Spender::Key(
             byron_payload(&address)
                 .map_err(|_| PostAlonzo(InputDecoding))?
@@ -527,7 +564,9 @@ fn check_signatures(w: &WitnessSet<'_>, body: &[u8], mut required: Keys) -> Vali
         {
             return Err(PostAlonzo(VKWrongSignature));
         }
-        required.remove(&super::conway::bootstrap_wit_root(witness));
+        if !pallas_crypto::oracle_plant("byron-signer") {
+            required.remove(&super::conway::bootstrap_wit_root(witness));
+        }
     }
     if !required.is_empty() {
         return Err(PostAlonzo(VKWitnessMissing));
@@ -550,6 +589,9 @@ fn check_outputs(
     for output in outputs {
         let view = MultiEraOutput::from_dijkstra(output);
         let coin = view.value().coin();
+        if pallas_crypto::oracle_plant("byron-out") {
+            payment(&view)?;
+        }
         if let Some(script) = view.multi_era_script_ref() {
             check_new_script(&script)?;
         }
@@ -686,7 +728,10 @@ fn check_witness_fields(w: &KeepRaw<'_, WitnessSet<'_>>) -> ValidationResult {
     }
     let mut roots = HashSet::new();
     for x in w.bootstrap_witness.iter().flat_map(|x| x.iter()) {
-        if x.public_key.len() != 32 || x.signature.len() != 64 || x.chain_code.len() != 32 {
+        if x.public_key.len() != 32
+            || x.signature.len() != 64
+            || (x.chain_code.len() != 32 && !pallas_crypto::oracle_plant("chaincode"))
+        {
             return Err(DijkstraMalformed(MalformedField::BootstrapWitness));
         }
         if !roots.insert(super::conway::bootstrap_wit_root(x)) {
@@ -723,6 +768,17 @@ fn check_witness_fields(w: &KeepRaw<'_, WitnessSet<'_>>) -> ValidationResult {
 }
 fn check_sub_supported(tx: &SubTransaction<'_>) -> ValidationResult {
     let b = &tx.sub_transaction_body;
+    if pallas_crypto::oracle_plant("rob-reverted") {
+        if b.reference_inputs.is_some() {
+            return Err(DijkstraUnsupported(
+                UnsupportedFeature::StatefulSubtransaction,
+            ));
+        }
+        let w = &tx.transaction_witness_set;
+        if w.native_script.is_some() || w.bootstrap_witness.is_some() {
+            return Err(DijkstraUnsupported(UnsupportedFeature::NonVkeyWitnesses));
+        }
+    }
     let raw = encode(b)?;
     let mut allowed = vec![0, 1, 3, 8, 15];
     for (key, present) in [
@@ -1089,6 +1145,14 @@ fn check_scripts(
     let redeemers = levels
         .into_iter()
         .any(|w| w.redeemer.as_ref().is_some_and(|x| !x.is_empty()));
+    if pallas_crypto::oracle_plant("collateral-unsupported")
+        && !redeemers
+        && (b.collateral.is_some() || b.collateral_return.is_some() || b.total_collateral.is_some())
+    {
+        return Err(DijkstraUnsupported(
+            UnsupportedFeature::CollateralWithoutPlutus,
+        ));
+    }
     check_collateral(b, utxos, pp, keys, network, redeemers)?;
     Ok(Provided {
         languages,
@@ -1124,6 +1188,9 @@ fn check_collateral(
         let output = utxos
             .get(&MultiEraInput::from_alonzo_compatible(input))
             .ok_or(PostAlonzo(CollateralNotInUTxO))?;
+        if pallas_crypto::oracle_plant("byron-out") {
+            payment(output)?;
+        }
         match spender(output)? {
             Spender::Key(key) => {
                 keys.insert(key);
@@ -1143,6 +1210,7 @@ fn check_collateral(
     if let Some(output) = &b.collateral_return
         && let Ok(Address::Shelley(address)) = MultiEraOutput::from_dijkstra(output).address()
         && matches!(address.delegation(), ShelleyDelegationPart::Pointer(_))
+        && !pallas_crypto::oracle_plant("pointer-output-refused")
     {
         return Err(DijkstraPointerInCollateralReturn);
     }
@@ -1231,7 +1299,9 @@ fn check_level(
             return Err(PostAlonzo(UnneededRedeemer));
         }
         // An empty redeemer map and language view still participate when datums exist.
-        check_integrity(w, declared, None)?;
+        if b.sub.is_some() || !pallas_crypto::oracle_plant("integrity-top-deleted") {
+            check_integrity(w, declared, None)?;
+        }
         return Ok(languages);
     }
     let models = &pp.cost_models_for_script_languages;
@@ -1272,7 +1342,9 @@ fn check_level(
     if redeemers.iter().any(|(key, _)| !scripts.contains_key(key)) {
         return Err(PostAlonzo(UnneededRedeemer));
     }
-    check_integrity(w, declared, Some(views))?;
+    if b.sub.is_some() || !pallas_crypto::oracle_plant("integrity-top-deleted") {
+        check_integrity(w, declared, Some(views))?;
+    }
     Ok(languages)
 }
 
@@ -1351,6 +1423,21 @@ fn reference_fee(mut bytes: u64, p: &DijkstraProtParams) -> Result<u64, Validati
         }
     }
     u64::try_from(total.0 / total.1).map_err(|_| PostAlonzo(NegativeValue))
+}
+
+fn payment(output: &MultiEraOutput<'_>) -> Result<ShelleyPaymentPart, ValidationError> {
+    let Address::Shelley(address) = output.address().map_err(|_| PostAlonzo(AddressDecoding))?
+    else {
+        return Err(DijkstraUnsupported(
+            UnsupportedFeature::BootstrapOrRewardAddress,
+        ));
+    };
+    if matches!(address.delegation(), ShelleyDelegationPart::Pointer(_))
+        && pallas_crypto::oracle_plant("pointer-output-refused")
+    {
+        return Err(DijkstraUnsupported(UnsupportedFeature::PointerAddress));
+    }
+    Ok(address.payment().clone())
 }
 
 fn check_auxiliary(
@@ -1617,6 +1704,11 @@ fn check_new_script(script: &MultiEraScriptRef<'_>) -> ValidationResult {
     match script {
         MultiEraScriptRef::Dijkstra(s) => match s.as_ref() {
             ScriptRef::NativeScript(_) => Ok(()),
+            ScriptRef::PlutusV1Script(_) | ScriptRef::PlutusV2Script(_)
+                if pallas_crypto::oracle_plant("v1v2") =>
+            {
+                Err(DijkstraUnsupported(UnsupportedFeature::NewScriptLanguage))
+            }
             ScriptRef::PlutusV1Script(s) => well_formed_plutus(&Language::PlutusV1, s.as_ref()),
             ScriptRef::PlutusV2Script(s) => well_formed_plutus(&Language::PlutusV2, s.as_ref()),
             ScriptRef::PlutusV3Script(s) => well_formed_plutus(&Language::PlutusV3, s.as_ref()),

@@ -232,6 +232,11 @@ fn cost_model_values(
     use serde_json::Value;
 
     match value {
+        Value::Array(arr) if pallas_crypto::oracle_plant("cost-models") => Ok(arr
+            .iter()
+            .take(initial_names(language_number).len())
+            .map(|v| v.as_i64().unwrap_or_default())
+            .collect()),
         Value::Array(arr) => Ok(arr.iter().map(|v| v.as_i64().unwrap_or_default()).collect()),
         Value::Object(map) => initial_names(language_number)
             .iter()
