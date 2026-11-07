@@ -17,6 +17,7 @@ labels! {
         BuiltinOutsideSubset => "V3 builtin outside audited protocol-12 subset",
         IntegerOutsideRegistrationRange => "integer operand outside audited registration range",
         NativeScriptGuards => "native script guards",
+        OutputAddress => "output address (requires Shelley)",
         ParametersRequireDijkstra => "protocol parameters require Dijkstra",
         PointerAddress => "pointer address in a V3 script context",
         ProtocolVersion => "protocol version (requires 12.0)",
