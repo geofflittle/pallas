@@ -241,8 +241,9 @@ impl<C> minicbor::Encode<C> for CostModels {
             (2, &self.plutus_v3),
         ];
 
-        let present =
-            named.iter().filter(|(_, model)| model.is_some()).count() + self.unknown.len();
+        let dropped = pallas_codec::oracle_plant("cost-models-unknown-dropped");
+        let unknown = if dropped { 0 } else { self.unknown.len() };
+        let present = named.iter().filter(|(_, model)| model.is_some()).count() + unknown;
         e.map(present as u64)?;
 
         for (key, model) in named {
@@ -251,7 +252,7 @@ impl<C> minicbor::Encode<C> for CostModels {
             }
         }
 
-        for (key, model) in &self.unknown {
+        for (key, model) in self.unknown.iter().filter(|_| !dropped) {
             e.u64(*key)?.encode_with(model, ctx)?;
         }
 

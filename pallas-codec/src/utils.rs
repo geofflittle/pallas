@@ -1469,8 +1469,8 @@ pub mod or_nil {
     }
 
     /// Counts no value as nil, so the field is written even when it is last.
-    pub fn is_nil<T>(_: &Option<T>) -> bool {
-        false
+    pub fn is_nil<T>(value: &Option<T>) -> bool {
+        crate::oracle_plant("or-nil-trailing-omitted") && value.is_none()
     }
 
     /// The value of the field when the array ends before it.
