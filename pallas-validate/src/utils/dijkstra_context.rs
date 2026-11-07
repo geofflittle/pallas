@@ -139,6 +139,10 @@ pub(crate) fn check_translatable(
         .chain(references.iter().map(|x| x.address()))
         .chain(outputs.iter().map(MultiEraOutput::address))
         .filter_map(Result::ok)
+        .filter(|x| {
+            !(matches!(x, Address::Stake(_))
+                && pallas_crypto::oracle_plant("reward-output-unsupported"))
+        })
         .map(context_address)
         .collect::<Result<Vec<_>, _>>()?;
     if *language == Language::PlutusV4 {

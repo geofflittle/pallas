@@ -140,7 +140,13 @@ impl LegacyContextData for ContextInput {
 
 /// The fields of an output a script context holds, with any reference script reduced to the hash of its original bytes.
 fn context_output(output: &MultiEraOutput<'_>, _reference: bool) -> Result<ContextOutput, Error> {
-    let address = context_address(output.address()?)
+    let address = output.address()?;
+    if matches!(address, Address::Stake(_))
+        && pallas_crypto::oracle_plant("reward-output-unsupported")
+    {
+        return unsupported(UnsupportedEvaluation::OutputAddress);
+    }
+    let address = context_address(address)
         .map_err(|x| Error::DijkstraInvalid(EvaluationFailure::Context(x.0)))?;
     if pallas_crypto::oracle_plant("pointer-refused")
         && let pallas_addresses::ShelleyDelegationPart::Pointer(_) = address.delegation()
