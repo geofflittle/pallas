@@ -88,9 +88,42 @@ pub fn redeemer_arguments(
         tag: run.tag.into(),
         index: run.index,
         language: run.language,
-        args: run.args,
+        args: if pallas_crypto::oracle_plant("ctx-encoding") {
+            run.args.into_iter().map(serialise_encoding).collect()
+        } else {
+            run.args
+        },
     });
     Ok(arguments.collect())
+}
+
+/// The same value with each list and constructor written as Plutus `serialise` writes it.
+#[cfg(feature = "unstable")]
+fn serialise_encoding(data: pallas_primitives::PlutusData) -> pallas_primitives::PlutusData {
+    use pallas_codec::utils::{KeyValuePairs, MaybeIndefArray};
+    use pallas_primitives::PlutusData;
+    fn items(xs: MaybeIndefArray<PlutusData>) -> MaybeIndefArray<PlutusData> {
+        let xs: Vec<PlutusData> = xs.to_vec().into_iter().map(serialise_encoding).collect();
+        if xs.is_empty() {
+            MaybeIndefArray::Def(xs)
+        } else {
+            MaybeIndefArray::Indef(xs)
+        }
+    }
+    match data {
+        PlutusData::Constr(mut x) => {
+            x.fields = items(x.fields);
+            PlutusData::Constr(x)
+        }
+        PlutusData::Array(xs) => PlutusData::Array(items(xs)),
+        PlutusData::Map(kvs) => PlutusData::Map(KeyValuePairs::Def(
+            kvs.to_vec()
+                .into_iter()
+                .map(|(k, v)| (serialise_encoding(k), serialise_encoding(v)))
+                .collect(),
+        )),
+        leaf => leaf,
+    }
 }
 
 /// Estimate native Dijkstra execution units without checking key witnesses or

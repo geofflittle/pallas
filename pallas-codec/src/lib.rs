@@ -62,6 +62,18 @@ pub mod tree;
 /// Round-trip friendly common helper structs (`Bytes`, `Nullable`, `Set`, …).
 pub mod utils;
 
+/// Whether the ORACLE_PLANT environment variable names this planted defect, printing the name the first time it does.
+pub fn oracle_plant(name: &str) -> bool {
+    static PLANT: std::sync::LazyLock<Option<String>> =
+        std::sync::LazyLock::new(|| std::env::var("ORACLE_PLANT").ok());
+    static REACHED: std::sync::Once = std::sync::Once::new();
+    let planted = PLANT.as_deref() == Some(name);
+    if planted {
+        REACHED.call_once(|| println!("ORACLE_PLANT reached {name}"));
+    }
+    planted
+}
+
 /// Blanket trait for any type that can be CBOR-encoded and decoded with
 /// [`minicbor`]. Implemented automatically for every such type.
 pub trait Fragment: Sized + for<'b> minicbor::Decode<'b, ()> + minicbor::Encode<()> {}
@@ -89,6 +101,13 @@ macro_rules! codec_by_datatype {
             fn decode(d: &mut minicbor::Decoder<'__b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
                 match d.datatype()? {
                     $( minicbor::data::Type::Array | minicbor::data::Type::ArrayIndef => {
+                        if d.datatype()? == minicbor::data::Type::ArrayIndef
+                            && $crate::oracle_plant("indef-array-refused")
+                        {
+                            return Err(minicbor::decode::Error::message(
+                                "Unknown cbor data type for this macro-defined enum.",
+                            ));
+                        }
                         $crate::utils::decode_array(d, |a| {
                             // Using the identifiers trivially to ensure repetition.
                             Ok($enum_name::$many_f($({ let $vars = a.decode_with(ctx)?; $vars }, )+ ))
