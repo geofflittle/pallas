@@ -1,12 +1,13 @@
 //! Native Dijkstra evaluation with the protocol-aware backend.
 use super::{
-    error::{Error, EvaluationFailure},
+    error::{Error, EvaluationFailure, Unsupported, UnsupportedEvaluation},
     evaluator::{MachineFailure, ScriptEvalResult},
 };
 use amaru_kernel::{PlutusVersion, ProtocolVersion};
 use amaru_uplc_native::{
     arena::Arena,
     binder::DeBruijn,
+    builtin::DefaultFunction,
     bumpalo::Bump,
     constant::Constant,
     data::PlutusData as PragmaPlutusData,
@@ -132,6 +133,12 @@ pub(crate) fn eval_native(
     });
     let mut calls = Vec::new();
     let (value, info) = run(&arena, program, cost_model, initial, &mut calls);
+    if pallas_crypto::oracle_plant("builtin-call-unaudited") && !calls.iter().all(|f| audited(*f))
+    {
+        return Err(Error::DijkstraUnsupported(Unsupported(
+            UnsupportedEvaluation::BuiltinOutsideSubset,
+        )));
+    }
     let units = budget_to_ex_units(info.consumed_budget);
     let logs = info.logs;
     let mut failure = value.as_ref().err().map(|err| MachineFailure {
@@ -216,6 +223,59 @@ fn steps<'a>(
         };
         state = next?;
     }
+}
+
+/// Whether a builtin is in the audited set the evaluation once restricted calls to.
+fn audited(fun: DefaultFunction) -> bool {
+    use DefaultFunction as F;
+    matches!(
+        fun,
+        F::AddInteger
+            | F::SubtractInteger
+            | F::MultiplyInteger
+            | F::DivideInteger
+            | F::QuotientInteger
+            | F::ModInteger
+            | F::EqualsInteger
+            | F::LessThanInteger
+            | F::LessThanEqualsInteger
+            | F::AppendByteString
+            | F::ConsByteString
+            | F::SliceByteString
+            | F::LengthOfByteString
+            | F::IndexByteString
+            | F::EqualsByteString
+            | F::LessThanByteString
+            | F::LessThanEqualsByteString
+            | F::Blake2b_256
+            | F::Blake2b_224
+            | F::VerifyEd25519Signature
+            | F::IfThenElse
+            | F::ChooseUnit
+            | F::Trace
+            | F::FstPair
+            | F::SndPair
+            | F::ChooseList
+            | F::MkCons
+            | F::HeadList
+            | F::TailList
+            | F::NullList
+            | F::DropList
+            | F::ChooseData
+            | F::ConstrData
+            | F::MapData
+            | F::ListData
+            | F::IData
+            | F::BData
+            | F::UnConstrData
+            | F::UnMapData
+            | F::UnListData
+            | F::UnIData
+            | F::UnBData
+            | F::EqualsData
+            | F::SerialiseData
+            | F::MkPairData
+    )
 }
 
 fn plutus_data_to_term<'a>(arena: &'a Arena, data: &PlutusData) -> &'a Term<'a, DeBruijn> {
