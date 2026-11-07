@@ -67,3 +67,5 @@ pub mod key;
 pub mod memsec;
 /// Nonce derivation utilities used by the Ouroboros leader-selection schedule.
 pub mod nonce;
+
+pub use pallas_codec::oracle_plant;

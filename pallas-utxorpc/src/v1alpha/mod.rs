@@ -201,7 +201,11 @@ impl<C: LedgerContext> Mapper<C> {
                 total_collateral: u64_to_bigint(tx.total_collateral().unwrap_or_default()),
             }
             .into(),
-            fee: tx.fee().and_then(u64_to_bigint),
+            fee: if pallas_crypto::oracle_plant("fee-absent-zero") {
+                u64_to_bigint(tx.fee().unwrap_or_default())
+            } else {
+                tx.fee().and_then(u64_to_bigint)
+            },
             validity: u5c::TxValidity {
                 start: tx.validity_start().unwrap_or_default(),
                 ttl: tx.ttl().unwrap_or_default(),

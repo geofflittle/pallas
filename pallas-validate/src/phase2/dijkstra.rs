@@ -70,14 +70,15 @@ impl LegacyContextData for ContextOutput {
             Some(c::DatumOption::Hash(hash)) => Some(*hash),
             _ => None,
         };
-        wrap_multiple_with_constr(
-            0,
-            vec![
-                self.address_data(),
-                WithZeroAdaAsset(&self.value).to_plutus_data(),
-                datum_hash.to_plutus_data(),
-            ],
-        )
+        let mut fields = vec![
+            self.address_data(),
+            WithZeroAdaAsset(&self.value).to_plutus_data(),
+            datum_hash.to_plutus_data(),
+        ];
+        if pallas_crypto::oracle_plant("v1-ref-exposed") {
+            fields.push(self.script.to_plutus_data());
+        }
+        wrap_multiple_with_constr(0, fields)
     }
 
     fn to_plutus_data_v2(&self) -> c::PlutusData {
@@ -87,7 +88,11 @@ impl LegacyContextData for ContextOutput {
                 self.address_data(),
                 WithZeroAdaAsset(&self.value).to_plutus_data(),
                 self.datum.to_plutus_data(),
-                self.script.to_plutus_data(),
+                if pallas_crypto::oracle_plant("v2-ref-dropped") {
+                    None::<n::ScriptHash>.to_plutus_data()
+                } else {
+                    self.script.to_plutus_data()
+                },
             ],
         )
     }
@@ -137,7 +142,36 @@ impl LegacyContextData for ContextInput {
 fn context_output(output: &MultiEraOutput<'_>, _reference: bool) -> Result<ContextOutput, Error> {
     let address = context_address(output.address()?)
         .map_err(|x| Error::DijkstraInvalid(EvaluationFailure::Context(x.0)))?;
-    let script = output.multi_era_script_ref().map(|s| s.hash());
+    if pallas_crypto::oracle_plant("pointer-refused")
+        && let pallas_addresses::ShelleyDelegationPart::Pointer(_) = address.delegation()
+    {
+        return unsupported(UnsupportedEvaluation::PointerAddress);
+    }
+    let script = output.multi_era_script_ref();
+    if pallas_crypto::oracle_plant("guard-ref-reverted")
+        && let Some(MultiEraScriptRef::Dijkstra(s)) = &script
+        && let n::ScriptRef::NativeScript(s) = s.as_ref()
+    {
+        let mut pending = vec![&**s];
+        while let Some(s) = pending.pop() {
+            match s {
+                n::NativeScript::ScriptRequireGuard(_) => {
+                    return unsupported(UnsupportedEvaluation::NativeScriptGuards);
+                }
+                n::NativeScript::ScriptAll(xs)
+                | n::NativeScript::ScriptAny(xs)
+                | n::NativeScript::ScriptNOfK(_, xs) => pending.extend(xs.iter()),
+                _ => {}
+            }
+        }
+    }
+    if pallas_crypto::oracle_plant("v4-ref-refused")
+        && let Some(MultiEraScriptRef::Dijkstra(s)) = &script
+        && let n::ScriptRef::PlutusV4Script(_) = s.as_ref()
+    {
+        return unsupported(UnsupportedEvaluation::ReferenceScriptLanguage);
+    }
+    let script = script.map(|s| s.hash());
     Ok(ContextOutput {
         address,
         value: output.value().into_conway(),
@@ -362,12 +396,23 @@ pub(super) fn eval_tx_with_mode(
             let args: Vec<_> = run.args.iter().collect();
             let (result, calls) =
                 evaluator::eval_native(run.language, &run.script, &args, &run.costs, run.budget)?;
+            let mut units = result.units;
+            units.mem += u64::from(pallas_crypto::oracle_plant("eval-mem"));
+            units.steps += u64::from(pallas_crypto::oracle_plant("eval-steps"));
             let result = MultiEraTxEvalResult {
-                sub_transaction: run.sub,
-                tag: run.tag.into(),
-                index: run.index,
-                units: result.units,
-                success: result.success,
+                sub_transaction: if pallas_crypto::oracle_plant("eval-level") {
+                    None
+                } else {
+                    run.sub
+                },
+                tag: if pallas_crypto::oracle_plant("eval-purpose") {
+                    n::RedeemerTag::Vote.into()
+                } else {
+                    run.tag.into()
+                },
+                index: run.index + u32::from(pallas_crypto::oracle_plant("eval-index")),
+                units,
+                success: result.success != pallas_crypto::oracle_plant("eval-ran"),
                 logs: result.logs,
                 failure_message: result.failure.map(|f| f.message),
             };
@@ -693,7 +738,9 @@ impl Legacy {
                 })
                 .collect(),
         };
-        signatories.sort();
+        if !pallas_crypto::oracle_plant("signatories-unsorted") {
+            signatories.sort();
+        }
         signatories.dedup();
         Ok(Legacy {
             mint: MintValue {
@@ -771,7 +818,29 @@ pub(super) fn runs(
         if scope.expected.is_empty() && scope.redeemers.is_empty() {
             continue;
         }
-        let context = level_context(part, scope, &scope.languages, utxos, time)?;
+        let mut context = level_context(part, scope, &scope.languages, utxos, time)?;
+        if let Part::Sub(..) = part
+            && pallas_crypto::oracle_plant("ctx-sub-top-info")
+        {
+            let top = level_context(
+                Part::Top(native),
+                &scopes[scopes.len() - 1],
+                &scope.languages,
+                utxos,
+                time,
+            )?;
+            context.level = Level {
+                sub: context.level.sub,
+                ..top.level
+            };
+            context.inputs = top.inputs;
+            context.reference_inputs = top.reference_inputs;
+            context.outputs = top.outputs;
+            context.valid_range = top.valid_range;
+            context.datums = top.datums;
+            context.certificates = top.certificates;
+            context.proposals = top.proposals;
+        }
         if estimate
             && (execution_limit.mem > i64::MAX as u64 || execution_limit.steps > i64::MAX as u64)
         {
@@ -796,7 +865,7 @@ pub(super) fn runs(
                     .collect()
             };
             let args = match (language, part) {
-                (_, Part::Sub(..)) | (n::Language::PlutusV4, Part::Top(_)) => {
+                (_, Part::Sub(..)) => {
                     vec![context.script_context(key, purpose, &r.data, datum, &batch)?]
                 }
                 (n::Language::PlutusV1, Part::Top(tx)) => {
@@ -842,14 +911,19 @@ pub(super) fn runs(
                         purpose.conway()?.1,
                     ))
                 }
-                (n::Language::PlutusV3, Part::Top(tx)) => {
+                (n::Language::PlutusV4, Part::Top(_))
+                    if !pallas_crypto::oracle_plant("v4-v3-context") =>
+                {
+                    vec![context.script_context(key, purpose, &r.data, datum, &batch)?]
+                }
+                (n::Language::PlutusV3 | n::Language::PlutusV4, Part::Top(tx)) => {
                     let b = &tx.transaction_body;
                     let x = Legacy::new(b, &context)?;
                     let info = V3TxInfo {
                         inputs: context.inputs.clone(),
                         reference_inputs: context.reference_inputs.clone(),
                         outputs: context.outputs.clone(),
-                        fee: b.fee,
+                        fee: b.fee + u64::from(pallas_crypto::oracle_plant("ctx-v3-fee")),
                         mint: x.mint,
                         certificates: context.certificates.clone(),
                         withdrawals: x.withdrawals.into(),

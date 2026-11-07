@@ -1420,7 +1420,7 @@ pub fn decode_bytes_def_or_indef<'b, C>(
     d: &mut minicbor::Decoder<'b>,
     _ctx: &mut C,
 ) -> Result<Cow<'b, [u8]>, Error> {
-    if d.datatype()? == Type::BytesIndef {
+    if d.datatype()? == Type::BytesIndef && !crate::oracle_plant("indef-strings-refused") {
         let mut joined = Vec::new();
         for chunk in d.bytes_iter()? {
             joined.extend_from_slice(chunk?);
@@ -1436,7 +1436,7 @@ pub fn decode_text_def_or_indef<'b, C>(
     d: &mut minicbor::Decoder<'b>,
     _ctx: &mut C,
 ) -> Result<String, Error> {
-    if d.datatype()? == Type::StringIndef {
+    if d.datatype()? == Type::StringIndef && !crate::oracle_plant("indef-strings-refused") {
         let mut joined = String::new();
         for chunk in d.str_iter()? {
             joined.push_str(chunk?);
