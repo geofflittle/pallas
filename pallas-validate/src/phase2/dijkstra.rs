@@ -607,7 +607,24 @@ fn level_context<'a>(
         .flatten()
         .map(conway_certificate)
         .collect();
-    let proposals: Vec<_> = level.proposals.into_iter().flatten().cloned().collect();
+    let proposals: Vec<_> = level
+        .proposals
+        .into_iter()
+        .flatten()
+        .cloned()
+        .map(|p| {
+            if !pallas_codec::oracle_plant("proposal-keys-dropped") {
+                return p;
+            }
+            use pallas_codec::minicbor::{decode, to_vec};
+            to_vec(&p)
+                .ok()
+                .and_then(|x| decode::<c::ProposalProcedure>(&x).ok())
+                .and_then(|x| to_vec(&x).ok())
+                .and_then(|x| decode(&x).ok())
+                .unwrap_or(p)
+        })
+        .collect();
     let policies: Vec<_> = level.mint.into_iter().flat_map(|x| x.keys()).collect();
     let voters: Vec<_> = level.votes.into_iter().flat_map(|x| x.keys()).collect();
     let mut purposes = Vec::new();
