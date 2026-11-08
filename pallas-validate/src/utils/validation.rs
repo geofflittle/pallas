@@ -117,6 +117,7 @@ labels! {
         CollateralWithoutPlutus => "collateral without Plutus",
         DuplicateCollateralInputs => "duplicate collateral inputs",
         DuplicateInputs => "duplicate inputs",
+        DuplicateRedeemerPointers => "duplicate redeemer pointers",
         DuplicateReferenceInputs => "duplicate reference inputs",
         NewScriptLanguage => "new script language (requires V3)",
         NonVkeyWitnesses => "non-vkey witnesses",
