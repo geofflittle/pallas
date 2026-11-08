@@ -711,7 +711,9 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
             check_withdrawal_accounts(value)?;
         }
     }
-    check_output_addresses(b.outputs.iter().chain(b.collateral_return.iter()))?;
+    if !pallas_crypto::oracle_plant("output-address-late") {
+        check_output_addresses(b.outputs.iter().chain(b.collateral_return.iter()))?;
+    }
     check_guards(b.guards.as_ref())?;
     check_witness_fields(&tx.transaction_witness_set)
 }
@@ -828,7 +830,9 @@ fn check_sub_supported(tx: &SubTransaction<'_>) -> ValidationResult {
             ));
         }
     }
-    check_output_addresses(b.outputs.iter())?;
+    if !pallas_crypto::oracle_plant("output-address-late") {
+        check_output_addresses(b.outputs.iter())?;
+    }
     check_guards(b.guards.as_ref())?;
     check_witness_fields(&tx.transaction_witness_set)
 }
@@ -1335,6 +1339,22 @@ fn check_level(
         views.insert(key, model);
     }
     let redeemers = w.redeemer.as_ref().ok_or(PostAlonzo(RedeemerMissing))?;
+    if pallas_crypto::oracle_plant("redeemer-pointers-refused") {
+        let raw = encode(redeemers)?;
+        let mut decoder = minicbor::Decoder::new(&raw);
+        let mut pointers = HashSet::new();
+        for entry in decoder
+            .map_iter::<RedeemersKey, RedeemersValue>()
+            .map_err(|_| PostAlonzo(ScriptIntegrityHash))?
+        {
+            let (key, _) = entry.map_err(|_| PostAlonzo(ScriptIntegrityHash))?;
+            if !pointers.insert((key.tag as u8, key.index)) {
+                return Err(DijkstraUnsupported(
+                    UnsupportedFeature::DuplicateRedeemerPointers,
+                ));
+            }
+        }
+    }
     for index in scripts.keys() {
         if !redeemers.contains_key(index) {
             return Err(PostAlonzo(RedeemerMissing));
