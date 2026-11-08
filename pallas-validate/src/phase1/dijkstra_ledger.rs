@@ -653,7 +653,9 @@ fn certificate<S: DijkstraLedgerState + ?Sized>(
             if reward_account(account)?.0 != network {
                 return Err(PostAlonzo(TxWrongNetworkID));
             }
-            if pool_metadata.as_ref().is_some_and(|m| m.hash.len() > 32) {
+            if pool_metadata.as_ref().is_some_and(|m| m.hash.len() > 32)
+                && !pallas_crypto::oracle_plant("pool-metadata-hash-unbounded")
+            {
                 return Err(DijkstraInvalidCertificate(
                     CertificateFailure::PoolMetadataHashTooBig,
                 ));
