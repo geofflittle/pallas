@@ -846,6 +846,9 @@ fn check_withdrawal_accounts(raw: &[u8]) -> ValidationResult {
         .all(|(account, _)| seen.insert(account.to_vec()))
     {
         true => Ok(()),
+        false if pallas_crypto::oracle_plant("withdrawal-account-class") => {
+            Err(DijkstraInvalidWithdrawal(WithdrawalFailure::Encoding))
+        }
         false => Err(DijkstraMalformed(
             MalformedField::DuplicateWithdrawalAccounts,
         )),
@@ -1248,6 +1251,9 @@ fn check_collateral(
     }
     if collateral_assets.values().any(|x| *x != 0) {
         return Err(PostAlonzo(NonLovelaceCollateral));
+    }
+    if returned > total && pallas_crypto::oracle_plant("collateral-unsigned") {
+        return Err(PostAlonzo(NegativeValue));
     }
     let paid = i128::from(total) - i128::from(returned);
     if b.total_collateral.is_some_and(|x| i128::from(x) != paid) {
