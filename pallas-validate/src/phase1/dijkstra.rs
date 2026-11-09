@@ -713,8 +713,7 @@ fn check_witness_fields(w: &KeepRaw<'_, WitnessSet<'_>>) -> ValidationResult {
     let v3 = w.plutus_v3_script.iter().flat_map(|x| x.iter());
     let v4 = w.plutus_v4_script.iter().flat_map(|x| x.iter());
     if repeats(native.map(|x| x.raw_cbor()))
-        || repeats(v1.map(|x| x.as_ref()))
-        || repeats(v2.map(|x| x.as_ref()))
+        || repeats(v1.map(|x| x.as_ref()).chain(v2.map(|x| x.as_ref())))
         || repeats(v3.map(|x| x.as_ref()))
         || repeats(v4.map(|x| x.as_ref()))
     {
