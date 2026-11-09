@@ -40,6 +40,10 @@ pub(crate) fn eval_native(
     let flat_bytes: minicbor::bytes::ByteVec = minicbor::decode(script_bytes)?;
     let version = plutus_version(&language);
     let protocol = ProtocolVersion::new(12, 0);
+    let semantics = match pallas_crypto::oracle_plant("integer-bound-restored") {
+        true => ProtocolVersion::new(11, 0),
+        false => protocol,
+    };
     let mut costs = costs.to_vec();
     if language == Language::PlutusV3 && pallas_crypto::oracle_plant("cost") {
         costs[173] /= 2;
@@ -47,7 +51,7 @@ pub(crate) fn eval_native(
     let costs = &costs[..];
     let cost_model = match language {
         Language::PlutusV1 | Language::PlutusV2 | Language::PlutusV3 => {
-            CostModel::new(version, protocol, costs)
+            CostModel::new(version, semantics, costs)
         }
         Language::PlutusV4 => CostModel::v4(costs),
     };
@@ -135,6 +139,11 @@ pub(crate) fn eval_native(
     let (value, info) = run(&arena, program, cost_model, initial, &mut calls);
     if pallas_crypto::oracle_plant("builtin-call-unaudited") && !calls.iter().all(|f| audited(*f))
     {
+        return Err(Error::DijkstraUnsupported(Unsupported(
+            UnsupportedEvaluation::BuiltinOutsideSubset,
+        )));
+    }
+    if pallas_crypto::oracle_plant("ripemd-160-refused") && calls.contains(&Builtin::Ripemd_160) {
         return Err(Error::DijkstraUnsupported(Unsupported(
             UnsupportedEvaluation::BuiltinOutsideSubset,
         )));
