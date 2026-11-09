@@ -139,6 +139,11 @@ pub(crate) fn eval_native(
             UnsupportedEvaluation::BuiltinOutsideSubset,
         )));
     }
+    if pallas_crypto::oracle_plant("ripemd-160-refused") && calls.contains(&Builtin::Ripemd_160) {
+        return Err(Error::DijkstraUnsupported(Unsupported(
+            UnsupportedEvaluation::BuiltinOutsideSubset,
+        )));
+    }
     if matches!(
         value,
         Err(MachineError::Runtime(RuntimeError::IntegerOutOfBounds(_)))
