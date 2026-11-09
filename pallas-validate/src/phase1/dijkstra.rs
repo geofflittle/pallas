@@ -705,21 +705,6 @@ fn check_witness_fields(w: &KeepRaw<'_, WitnessSet<'_>>) -> ValidationResult {
     if repeats(datums.map(|x| x.raw_cbor())) {
         return Err(DijkstraMalformed(MalformedField::DuplicateDatums));
     }
-    // The ledger names a script by its hash, over the bytes a native script was
-    // sent in and over a Plutus script's bytes under its language.
-    let native = w.native_script.iter().flat_map(|x| x.iter());
-    let v1 = w.plutus_v1_script.iter().flat_map(|x| x.iter());
-    let v2 = w.plutus_v2_script.iter().flat_map(|x| x.iter());
-    let v3 = w.plutus_v3_script.iter().flat_map(|x| x.iter());
-    let v4 = w.plutus_v4_script.iter().flat_map(|x| x.iter());
-    if repeats(native.map(|x| x.raw_cbor()))
-        || repeats(v1.map(|x| x.as_ref()))
-        || repeats(v2.map(|x| x.as_ref()))
-        || repeats(v3.map(|x| x.as_ref()))
-        || repeats(v4.map(|x| x.as_ref()))
-    {
-        return Err(DijkstraMalformed(MalformedField::DuplicateScripts));
-    }
     if let Some(redeemers) = &w.redeemer {
         if redeemers.is_empty() {
             return Err(DijkstraMalformed(MalformedField::EmptyRedeemers));
