@@ -3,7 +3,7 @@
 # valuecmp.py compares the pallas value and re-encoding with the ledger's, schemacmp.py each utxorpc schema.
 # GEN_FROM names an earlier output dir whose generated values and ledger results are reused.
 # The source `given` generates nothing and reads the values already written to OUT/KIND.given.gen.jsonl.
-# The sources `mutate`, `empty14` and `subkeyhash` are `arb` values rewritten by mutate.py in that mode.
+# The sources `mutate`, `empty14` and `subkeyhash` are `arb` values rewritten by mutate.py in that mode, and these and `arb` read the `arb` values of their kind, generated once into OUT/KIND.arb.N.SEED.seed.jsonl.
 # A probe line naming a planted defect it reached goes to OUT/KIND.SOURCE.reached.
 # Exits 1 when any comparison finds a disagreement or a generated kind and source has other than N values.
 # usage: [PROBE=bin/other-probe] [OUT=dir] [GEN_FROM=dir] ./vrun.sh N SEED [KINDS] [SOURCES]
@@ -31,11 +31,19 @@ for kind in $KINDS; do
       ln -f "$GEN_FROM/$kind.$src.gen.jsonl" "$base.gen.jsonl"
       ln -f "$GEN_FROM/$kind.$src.oracle.jsonl" "$base.oracle.jsonl"
     else
+      arb=$OUT/$kind.arb.$N.$SEED.seed.jsonl
       case $src in
         given) ;;
-        mutate | empty14 | subkeyhash)
-          $HS gen "$kind" arb "$N" "$SEED" > "$base.seed.jsonl"
-          python3 -I "$W/mutate.py" "$SEED" "$src" < "$base.seed.jsonl" > "$base.gen.jsonl"
+        arb | mutate | empty14 | subkeyhash)
+          if [ ! -s "$arb" ]; then
+            $HS gen "$kind" arb "$N" "$SEED" > "$arb.$$"
+            mv "$arb.$$" "$arb"
+          fi
+          if [ "$src" = arb ]; then
+            cp "$arb" "$base.gen.jsonl"
+          else
+            python3 -I "$W/mutate.py" "$SEED" "$src" < "$arb" > "$base.gen.jsonl"
+          fi
           ;;
         *) $HS gen "$kind" "$src" "$N" "$SEED" > "$base.gen.jsonl" ;;
       esac

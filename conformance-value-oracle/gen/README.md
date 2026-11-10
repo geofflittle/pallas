@@ -37,7 +37,9 @@ A difference `expected.py` names is counted as listed, not as a disagreement.
 
 ## Tier
 
-`tier.sh OUT N SEED` runs `vrun.sh` over each kind and source pair of `PAIRS`, the given values read from the files `TX_FILES`, `BLOCK_FILES` and `EB_FILES` name, then `vtally.py OUT` prints one line per comparer and the count of each entry of `expected.py`, and exits 1 on any disagreement, any entry that matched no value and any value listed under a class `expected.py` does not hold.
+`tier.sh OUT N SEED` runs `vrun.sh` over each kind and source pair of `PAIRS`, `JOBS` (default 4) at a time, the given values read from the files `TX_FILES`, `BLOCK_FILES` and `EB_FILES` name, then `vtally.py OUT` prints one line per comparer and the count of each entry of `expected.py`, and exits 1 on any disagreement, any entry that matched no value and any value listed under a class `expected.py` does not hold.
+
+`tier_test.sh DIR` checks the tier's concurrency, its exit on a failed pair and that it generates the arb values of a kind once, with a stub `vrun.sh` and a `docker` that logs each generator call.
 
 ## Reproductions
 
