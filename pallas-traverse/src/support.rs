@@ -2,9 +2,6 @@
 
 use pallas_primitives::{alonzo, babbage, byron, conway};
 
-#[cfg(feature = "unstable")]
-use pallas_primitives::dijkstra;
-
 /// Decodes the bytes as one value that ends where they end.
 #[cfg(feature = "unstable")]
 pub(crate) fn decode_whole<'b, T: pallas_codec::minicbor::Decode<'b, ()>>(
@@ -86,11 +83,4 @@ pub fn clone_conway_txs<'b>(block: &'b conway::Block) -> Vec<conway::Tx<'b>> {
 
 pub fn clone_byron_txs<'b>(block: &'b byron::Block) -> Vec<byron::TxPayload<'b>> {
     block.body.tx_payload.iter().cloned().collect()
-}
-
-/// Dijkstra transactions are complete inside the block body, so there is
-/// nothing to reassemble and nothing to pair back on from the block.
-#[cfg(feature = "unstable")]
-pub fn clone_dijkstra_txs<'b>(block: &'b dijkstra::Block) -> Vec<dijkstra::BlockTransaction<'b>> {
-    block.block_body.transactions.iter().cloned().collect()
 }
