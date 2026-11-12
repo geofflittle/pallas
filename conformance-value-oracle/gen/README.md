@@ -61,7 +61,7 @@ Plants of the comparer: `PLANT=slim`, `bls` or `eb` changes one served value bef
 - `images/pallas-ci/Dockerfile`: the pallas CI image, Rust 1.98.0 and 1.88 with rustfmt and clippy.
 - `image-name.sh NAME` prints the name of the image of `images/NAME`, tagged with the hash of its files, and `build-image.sh NAME` builds it when docker has none of that name.
 - `oracle/`: the Haskell program `conformance-gen` (`gen KIND SOURCE N SEED`, `oracle KIND` over hex lines), built against the cardano-ledger commit of `ledger.rev` (the ledger pinned by node 11.2.0.164).
-- `generator-name.sh` prints the generator's name, the hashes of `oracle/`, the ledger commit and the image's tag.
+- `generator-name.sh` prints the generator's name, the hashes of `oracle/` and `build-generator.sh`, the ledger commit and the image's tag.
 - `probe-value/`: the Rust program `pallas-probe-value KIND` over the generator's JSON lines, built against the pallas tree at `$W/conf` by `plants/build-probes.sh NAME=REV...`.
 - `check_*.py`: self checks of the comparers, the mutation modes and the expected difference table, each run with no arguments. `e2e/check_dial_retry.py` checks that a server call is repeated only after a failed dial. `check_docker_logs.py` checks that every `docker run` line of the scripts sets `--log-driver none`, so a long run writes no container log to the host disk.
 - `bin/`: `conformance-gen` and the probes. `bin-cuddle/cuddle`.
@@ -76,4 +76,4 @@ cp "$gen" $W/gen/bin/conformance-gen
 W=$W sh gen/plants/build-probes.sh base=HEAD_REV
 ```
 
-`build-generator.sh WORK OUTDIR` builds the image when docker has none, checks the ledger commit out in `WORK/cardano-ledger`, builds `oracle/` there with the cabal dir `WORK/cabal-dir` in the image held to 4g, and writes the binary to `OUTDIR` under the name `generator-name.sh` prints. `image_test.sh DIR` checks the names and the image build with a docker that logs each call.
+`build-generator.sh WORK OUTDIR` builds the image when docker has none, checks the ledger commit out in `WORK/cardano-ledger`, builds `oracle/` there with the cabal dir `WORK/cabal-dir` (or a third argument) in the image held to 4g, and writes the binary to `OUTDIR` under the name `generator-name.sh` prints. `image_test.sh DIR` checks the names and the image build with a docker that logs each call.

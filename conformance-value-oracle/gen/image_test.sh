@@ -66,13 +66,16 @@ echo 'RUN true' >>"$W/dockerfile/images/conformance-gen-hs/Dockerfile"
 changed=$(vrun_image "$W/dockerfile")
 expect dockerfile_image "$(if [ -n "$changed" ] && [ "$changed" != "$ran" ]; then echo differs; else echo "same $changed"; fi)" differs
 expect dockerfile_generator "$(if [ "$(sh "$W/dockerfile/generator-name.sh")" != "$generator" ]; then echo differs; else echo same; fi)" differs
-# Must fire: a changed oracle source and a changed ledger commit each name another generator.
+# Must fire: a changed oracle source, ledger commit and build script each name another generator.
 copy source
 echo '-- changed' >>"$W/source/oracle/Main.hs"
 expect source_generator "$(if [ "$(sh "$W/source/generator-name.sh")" != "$generator" ]; then echo differs; else echo same; fi)" differs
 copy ledger
 echo 0000000000000000000000000000000000000000 >"$W/ledger/ledger.rev"
 expect ledger_generator "$(if [ "$(sh "$W/ledger/generator-name.sh")" != "$generator" ]; then echo differs; else echo same; fi)" differs
+copy script
+echo '# changed' >>"$W/script/build-generator.sh"
+expect script_generator "$(if [ "$(sh "$W/script/generator-name.sh")" != "$generator" ]; then echo differs; else echo same; fi)" differs
 
 # Must build the image under its name when docker has none, and must not build when docker has it.
 expect image_built "$(build_calls "$W/a" conformance-gen-hs "$image")" \
