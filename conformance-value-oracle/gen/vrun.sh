@@ -17,7 +17,7 @@ OUT=${OUT:-$W/vout}
 PROBE=${PROBE:-$W/bin/pallas-probe-value}
 GEN_FROM=${GEN_FROM:-}
 mkdir -p "$OUT"
-HS="docker run --rm -i --log-driver none --user $(id -u):$(id -g) -v $W:/work conformance-gen-hs:2 /work/bin/conformance-gen"
+HS="docker run --rm -i --log-driver none --user $(id -u):$(id -g) -v $W:/work $(sh "$W/image-name.sh" conformance-gen-hs) /work/bin/conformance-gen"
 hexes() {
   python3 -I -c 'import json,sys
 for l in sys.stdin:

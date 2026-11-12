@@ -14,6 +14,7 @@ SYNTH=$W/synth-coverage
 NAME=$1
 REV=$2
 PROBE=$3
+IMAGE=$(sh "$(dirname "$0")/image-name.sh" pallas-ci) || exit 1
 cd "$W" || exit 1
 mkdir -p trees logs
 rm -rf "$SYNTH"
@@ -36,7 +37,7 @@ docker run --rm --log-driver none --user "$(id -u):$(id -g)" -v "$W:/w" \
   -e HOME=/w/home -e CARGO_HOME=/w/cargo-home -e RUSTUP_HOME=/usr/local/rustup \
   -e CARGO_TARGET_DIR=/w/target-coverage -e CARGO_INCREMENTAL=0 -e CARGO_BUILD_JOBS=3 \
   -e CARGO_TERM_COLOR=never -e W42_SAMPLES=/samples -e SYNTH=/synth \
-  -w "/w/trees/$NAME" pallas-ci:1 \
+  -w "/w/trees/$NAME" "$IMAGE" \
   cargo test -p u5c-chain-oracle --test w42_coverage -- --nocapture > "logs/coverage-$NAME.log" 2>&1
 test_status=$?
 echo "coverage test: exit $test_status"

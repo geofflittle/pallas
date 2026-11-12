@@ -16,5 +16,5 @@ exec docker run --rm \
   -e CARGO_TERM_COLOR=never \
   -e RUST_BACKTRACE=short \
   -w "/w/$TREE" \
-  pallas-ci:1 \
+  "$(sh "$(dirname "$0")/../gen/image-name.sh" pallas-ci)" \
   "$@"

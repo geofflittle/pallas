@@ -6,7 +6,7 @@ The box layout these runners expect is /opt/build/value-oracle-1025 on the build
 
 ## Layout
 
-- `gen/`: the generator, the Haskell oracle (`oracle/`, image `conformance-gen-hs:2`), the walker (`probe-value/`), the comparers (`value.py`, `valuecmp.py`, `schemacmp.py`, `schemas.py`), the runners (`vrun.sh`, `recmp.sh`, `pin.sh`, `coverage.sh`, `e2e-plants.sh`), the end to end comparer (`e2e_values.py`, `e2e/served.py`, `e2e/ebcheck.py`), the repro set (`repro/`) and the probe plants (`plants/`).
+- `gen/`: the generator, the Haskell oracle (`oracle/`, its image in `images/`), the walker (`probe-value/`), the comparers (`value.py`, `valuecmp.py`, `schemacmp.py`, `schemas.py`), the runners (`vrun.sh`, `recmp.sh`, `pin.sh`, `coverage.sh`, `e2e-plants.sh`), the end to end comparer (`e2e_values.py`, `e2e/served.py`, `e2e/ebcheck.py`), the repro set (`repro/`) and the probe plants (`plants/`).
 - `breaks/`: patches and old copies that break one comparer rule each, and `run-breaks.sh`.
 - `box/`: the container wrappers used on the build host.
 - `results/`: the logs and counts of the runs named in the report.

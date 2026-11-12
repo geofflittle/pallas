@@ -52,7 +52,7 @@ expect pool_fails "$(pooled fail wits | cut -d' ' -f1)" "exit=1"
 mkdir -p "$W/bin"
 cat >"$W/bin/docker" <<EOF
 #!/bin/sh
-while [ "\$1" != conformance-gen-hs:2 ]; do shift; done
+while [ "\$1" != "$(sh "$G/image-name.sh" conformance-gen-hs)" ]; do shift; done
 shift 2
 echo "\$*" >>"$W/docker.log"
 case \$1 in
