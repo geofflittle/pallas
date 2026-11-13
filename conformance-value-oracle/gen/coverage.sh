@@ -21,7 +21,9 @@ cd "$W" || exit 1
 mkdir -p trees logs
 rm -rf "$SYNTH"
 mkdir -p "$SYNTH"
-cp "$G"/coverage/synth/*.cbor "$SYNTH/" || exit 1
+docker run --rm --log-driver none --memory "$MEMORY" --memory-swap "$MEMORY" --user "$(id -u):$(id -g)" \
+  -v "$G/coverage:/coverage:ro" -v "$SYNTH:/synth" "$IMAGE" \
+  python3 -I /coverage/synth.py /coverage/samples /synth > "logs/synth-$NAME.log" 2>&1 || { cat "logs/synth-$NAME.log"; exit 1; }
 for f in "${BLOCKS:-$G/coverage/blocks}"/*.hex; do
   [ -e "$f" ] || continue
   printf '8208%s' "$(cat "$f")" | xxd -r -p > "$SYNTH/block_gen_$(basename "$f" .hex).cbor"

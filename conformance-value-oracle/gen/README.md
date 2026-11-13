@@ -47,7 +47,7 @@ A difference `expected.py` names is counted as listed, not as a disagreement.
 
 ## Coverage
 
-`coverage.sh NAME REV PROBE` runs the `w42_coverage` test of the `u5c-chain-oracle` example at pallas revision REV of `$W/pallas` over the w42 sample blocks in `coverage/samples`, the synthetic blocks in `coverage/synth`, which `python3 -I coverage/synth.py coverage/samples DIR` writes from the samples, and the generated blocks in `coverage/blocks` (or `BLOCKS`), then runs `vrun.sh` over the same blocks with the source `given`, then `check_coverage_values.py` requires each location the test saw to have agreeing values in every block that holds it.
+`coverage.sh NAME REV PROBE` runs the `w42_coverage` test of the `u5c-chain-oracle` example at pallas revision REV of `$W/pallas` over the w42 sample blocks in `coverage/samples`, the synthetic blocks `coverage/synth.py` writes from the samples in the image's Python, and the generated blocks in `coverage/blocks` (or `BLOCKS`), then runs `vrun.sh` over the same blocks with the source `given`, then `check_coverage_values.py` requires each location the test saw to have agreeing values in every block that holds it.
 
 ## End to end
 
@@ -58,7 +58,7 @@ Plants of the comparer: `PLANT=slim`, `bls` or `eb` changes one served value bef
 ## Pieces
 
 - `images/conformance-gen-hs/Dockerfile`: the generator image, GHC 9.6.7 with the IntersectMBO libsodium with its VRF functions, secp256k1 v0.3.2 and blst v0.3.14, each at a commit, the base at a digest and the Debian packages at a snapshot. The oracle binary needs this image at run time.
-- `images/pallas-ci/Dockerfile`: the pallas CI image, Rust 1.98.0 and 1.88 with rustfmt and clippy.
+- `images/pallas-ci/Dockerfile`: the pallas CI image, Rust 1.98.0 and 1.88 with rustfmt and clippy, and Python with cbor2 for `coverage/synth.py`.
 - `image-name.sh NAME [DIR]` prints the name of the image of `images/NAME`, or of `DIR/NAME`, tagged with the hash of its files, and `build-image.sh NAME [DIR]` builds it when docker has none of that name. Dolos names its build image with these two scripts at its harness commit. `image_test.sh` also checks that no file of the checkout runs one of these images by another tag.
 - `oracle/`: the Haskell program `conformance-gen` (`gen KIND SOURCE N SEED`, `oracle KIND` over hex lines), built against the cardano-ledger commit of `ledger.rev` (the ledger pinned by node 11.2.0.164).
 - `generator-name.sh` prints the generator's name, the hashes of `oracle/` and `build-generator.sh`, the ledger commit and the image's tag.
