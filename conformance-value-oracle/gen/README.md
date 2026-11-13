@@ -4,7 +4,7 @@ Generates Dijkstra CBOR values, decodes each with the Haskell ledger and with pa
 
 ## Rerun
 
-Every command runs from the box dir `W=/opt/build/harness-gaps-1026`, with the harness in `$W/gen`.
+Every command runs from a work dir `W`, which `coverage.sh` reads from the environment, with the harness in `$W/gen`.
 
 ```
 OUT=$W/gen/vout PROBE=$W/gen/bin/pallas-probe-value sh gen/vrun.sh 1000 1 tx   # one kind, sources arb cddl-plain cddl mutate
@@ -47,7 +47,7 @@ A difference `expected.py` names is counted as listed, not as a disagreement.
 
 ## Coverage
 
-`coverage.sh NAME REV PROBE` runs the `w42_coverage` test of the `u5c-chain-oracle` example at pallas revision REV over the w42 sample blocks, the synthetic blocks and the generated blocks in `coverage/blocks` (or `BLOCKS`), then runs `vrun.sh` over the same blocks with the source `given`, then `check_coverage_values.py` requires each location the test saw to have agreeing values in every block that holds it.
+`coverage.sh NAME REV PROBE` runs the `w42_coverage` test of the `u5c-chain-oracle` example at pallas revision REV of `$W/pallas` over the w42 sample blocks in `coverage/samples`, the synthetic blocks `coverage/synth.py` builds from them and the generated blocks in `coverage/blocks` (or `BLOCKS`), then runs `vrun.sh` over the same blocks with the source `given`, then `check_coverage_values.py` requires each location the test saw to have agreeing values in every block that holds it.
 
 ## End to end
 

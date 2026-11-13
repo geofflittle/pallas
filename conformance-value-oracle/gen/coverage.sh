@@ -2,24 +2,25 @@
 # Runs the w42 coverage over the sample blocks, the synthetic blocks and the generated blocks in coverage/blocks
 # on a pallas revision, then compares the values of the same blocks with the ledger in every schema, and requires
 # each location coverage saw to have an agreeing value in every compared block that holds it.
-# usage: [BLOCKS=dir] sh gen/coverage.sh NAME REV PROBE
-# BLOCKS names another directory of generated block hex files.
-# REV is a revision of the pallas clone at W/pallas, PROBE the value probe built from the same revision.
+# usage: W=dir [BLOCKS=dir] sh gen/coverage.sh NAME REV PROBE
+# W is the work dir, holding the pallas clone at W/pallas, and BLOCKS names another directory of generated block hex files.
+# REV is a revision of that clone, PROBE the value probe built from the same revision.
 # Exits 1 when the coverage test, the value run or the location check fails.
 set -u
-W=${W:-/opt/build/harness-gaps-1026}
-G=$W/gen
-SAMPLES=/opt/build/w42-local-1020/samples
+: "${W:?}"
+G=$(cd "$(dirname "$0")" && pwd)
+SAMPLES=$G/coverage/samples
 SYNTH=$W/synth-coverage
+# The memory and swap the coverage test's container may use.
+MEMORY=6g
 NAME=$1
 REV=$2
 PROBE=$3
-IMAGE=$(sh "$(dirname "$0")/image-name.sh" pallas-ci) || exit 1
+IMAGE=$(sh "$G/image-name.sh" pallas-ci) || exit 1
 cd "$W" || exit 1
 mkdir -p trees logs
 rm -rf "$SYNTH"
-mkdir -p "$SYNTH"
-cp /opt/build/integration-1025/synth/b*.cbor "$SYNTH/"
+python3 -I "$G/coverage/synth.py" "$SAMPLES" "$SYNTH" || exit 1
 for f in "${BLOCKS:-$G/coverage/blocks}"/*.hex; do
   [ -e "$f" ] || continue
   printf '8208%s' "$(cat "$f")" | xxd -r -p > "$SYNTH/block_gen_$(basename "$f" .hex).cbor"
@@ -27,12 +28,10 @@ done
 rm -rf "trees/$NAME"
 mkdir -p "trees/$NAME"
 git -C pallas archive "$REV" | tar -x -C "trees/$NAME"
-rm -rf "trees/$NAME/cardano-blueprint"
-cp -r /opt/build/integration-1025/bp-0460 "trees/$NAME/cardano-blueprint"
 cp "$G/coverage/w42_coverage.rs" "trees/$NAME/examples/u5c-chain-oracle/tests/w42_coverage.rs"
 find "trees/$NAME" -name '*.rs' -exec touch {} +
 echo "== $NAME $REV $(git -C pallas rev-parse --short "$REV")"
-docker run --rm --log-driver none --user "$(id -u):$(id -g)" -v "$W:/w" \
+docker run --rm --log-driver none --memory "$MEMORY" --memory-swap "$MEMORY" --user "$(id -u):$(id -g)" -v "$W:/w" \
   -v "$SAMPLES:/samples:ro" -v "$SYNTH:/synth:ro" \
   -e HOME=/w/home -e CARGO_HOME=/w/cargo-home -e RUSTUP_HOME=/usr/local/rustup \
   -e CARGO_TARGET_DIR=/w/target-coverage -e CARGO_INCREMENTAL=0 -e CARGO_BUILD_JOBS=3 \
@@ -41,7 +40,7 @@ docker run --rm --log-driver none --user "$(id -u):$(id -g)" -v "$W:/w" \
   cargo test -p u5c-chain-oracle --test w42_coverage -- --nocapture > "logs/coverage-$NAME.log" 2>&1
 test_status=$?
 echo "coverage test: exit $test_status"
-OUT=$G/cov-$NAME
+OUT=$W/cov-$NAME
 rm -rf "$OUT"
 mkdir -p "$OUT"
 python3 -I -c '
