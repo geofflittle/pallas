@@ -83,6 +83,19 @@ expect image_built "$(build_calls "$W/a" conformance-gen-hs "$image")" \
 touch "$W/a/present"
 expect image_present "$(build_calls "$W/a" conformance-gen-hs "$image")" "image inspect NAME"
 
+# Must name and build an image of a dir outside the harness by the same rule, so another repo's image dir is named by this script.
+mkdir -p "$W/outside/images"
+cp -R "$G/images/conformance-gen-hs" "$W/outside/images/"
+expect outside_name "$(sh "$W/a/image-name.sh" conformance-gen-hs "$W/outside/images")" "$image"
+rm -f "$W/a/present"
+: >"$W/a/docker.log"
+outside=$(PATH=$W/a/bin:$PATH sh "$W/a/build-image.sh" conformance-gen-hs "$W/outside/images" 2>/dev/null)
+expect outside_built "$outside $(sed "s|$W/outside/images|OUTSIDE|g; s|$image|NAME|g" "$W/a/docker.log" | paste -sd ';' -)" \
+  "$image image inspect NAME;build --memory 4g --memory-swap 4g -t NAME OUTSIDE/conformance-gen-hs"
+# Must fire: a changed file in the outside dir names another image.
+echo 'RUN true' >>"$W/outside/images/conformance-gen-hs/Dockerfile"
+expect outside_changed "$(if [ "$(sh "$W/a/image-name.sh" conformance-gen-hs "$W/outside/images")" != "$image" ]; then echo differs; else echo same; fi)" differs
+
 if [ "$failed" -eq 0 ]; then
   echo "IMAGE-TEST RESULT PASS"
 else
