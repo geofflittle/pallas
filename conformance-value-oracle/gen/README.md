@@ -59,7 +59,7 @@ Plants of the comparer: `PLANT=slim`, `bls` or `eb` changes one served value bef
 
 - `images/conformance-gen-hs/Dockerfile`: the generator image, GHC 9.6.7 with the IntersectMBO libsodium with its VRF functions, secp256k1 v0.3.2 and blst v0.3.14, each at a commit, the base at a digest and the Debian packages at a snapshot. The oracle binary needs this image at run time.
 - `images/pallas-ci/Dockerfile`: the pallas CI image, Rust 1.98.0 and 1.88 with rustfmt and clippy.
-- `image-name.sh NAME` prints the name of the image of `images/NAME`, tagged with the hash of its files, and `build-image.sh NAME` builds it when docker has none of that name.
+- `image-name.sh NAME [DIR]` prints the name of the image of `images/NAME`, or of `DIR/NAME`, tagged with the hash of its files, and `build-image.sh NAME [DIR]` builds it when docker has none of that name. Dolos names its build image with these two scripts at its harness commit. `image_test.sh` also checks that no file of the checkout runs one of these images by another tag.
 - `oracle/`: the Haskell program `conformance-gen` (`gen KIND SOURCE N SEED`, `oracle KIND` over hex lines), built against the cardano-ledger commit of `ledger.rev` (the ledger pinned by node 11.2.0.164).
 - `generator-name.sh` prints the generator's name, the hashes of `oracle/` and `build-generator.sh`, the ledger commit and the image's tag.
 - `probe-value/`: the Rust program `pallas-probe-value KIND` over the generator's JSON lines, built against the pallas tree at `$W/conf` by `plants/build-probes.sh NAME=REV...`.

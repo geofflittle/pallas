@@ -2,9 +2,11 @@
 # Generates N values per kind and source, decodes them with the ledger and with pallas, and compares.
 # With a probe that maps through each utxorpc schema, schemas.py also compares each schema.
 # GEN_FROM names an earlier output dir whose generated values and ledger results are reused.
-# usage: [PROBE=bin/other-probe] [OUT=dir] [GEN_FROM=dir] ./run.sh N SEED [KINDS] [SOURCES]
+# GEN names the harness dir conformance-value-oracle/gen whose build-image.sh names the image, needed when this script runs from a copy.
+# usage: [PROBE=bin/other-probe] [OUT=dir] [GEN_FROM=dir] [GEN=dir] ./run.sh N SEED [KINDS] [SOURCES]
 set -eu
 W=/opt/build/conformance-gen-1024
+GEN=${GEN:-$(dirname "$0")/../../conformance-value-oracle/gen}
 N=${1:-100}
 SEED=${2:-1}
 KINDS=${3:-"tx body wits ppu block"}
@@ -13,7 +15,8 @@ OUT=${OUT:-$W/out}
 PROBE=${PROBE:-$W/bin/pallas-probe}
 GEN_FROM=${GEN_FROM:-}
 mkdir -p "$OUT"
-HS="docker run --rm -i --user $(id -u):$(id -g) -v $W:/work conformance-gen-hs:2 /work/bin/conformance-gen"
+IMAGE=$(sh "$GEN/build-image.sh" conformance-gen-hs)
+HS="docker run --rm -i --user $(id -u):$(id -g) -v $W:/work $IMAGE /work/bin/conformance-gen"
 for kind in $KINDS; do
   for src in $SOURCES; do
     base=$OUT/$kind.$src
@@ -22,8 +25,8 @@ for kind in $KINDS; do
       cp "$GEN_FROM/$kind.$src.oracle.jsonl" "$base.oracle.jsonl"
     else
     case $src in
-      cuddle-cli) docker run --rm --user "$(id -u):$(id -g)" -v "$W:/work" conformance-gen-hs:2 sh /work/gen-cuddle-cli.sh "$kind" "$N" "$SEED" > "$base.gen.jsonl" ;;
-      cuddle-cli-plain) docker run --rm --user "$(id -u):$(id -g)" -v "$W:/work" conformance-gen-hs:2 sh /work/gen-cuddle-cli.sh "$kind" "$N" "$SEED" --no-twiddle > "$base.gen.jsonl" ;;
+      cuddle-cli) docker run --rm --user "$(id -u):$(id -g)" -v "$W:/work" "$IMAGE" sh /work/gen-cuddle-cli.sh "$kind" "$N" "$SEED" > "$base.gen.jsonl" ;;
+      cuddle-cli-plain) docker run --rm --user "$(id -u):$(id -g)" -v "$W:/work" "$IMAGE" sh /work/gen-cuddle-cli.sh "$kind" "$N" "$SEED" --no-twiddle > "$base.gen.jsonl" ;;
       *) $HS gen "$kind" "$src" "$N" "$SEED" > "$base.gen.jsonl" ;;
     esac
     python3 -I -c 'import json,sys

@@ -2,9 +2,12 @@
 # Runs one command in the pallas CI image against a tree under this directory.
 # usage: [W=dir] run.sh TREE COMMAND...   (TREE is relative to W, default /opt/build/pallas-conformance-1024)
 # TARGET picks the target directory name (default target), MSRV builds use their own.
+# GEN names the harness dir conformance-value-oracle/gen whose build-image.sh names the image, needed when this script runs from a copy.
 W=${W:-/opt/build/pallas-conformance-1024}
+GEN=${GEN:-$(dirname "$0")/../../conformance-value-oracle/gen}
 TREE=$1
 shift
+IMAGE=$(sh "$GEN/build-image.sh" pallas-ci) || exit 1
 exec docker run --rm \
   --user "$(id -u):$(id -g)" \
   -v "$W:/w" \
@@ -17,5 +20,5 @@ exec docker run --rm \
   -e CARGO_TERM_COLOR=never \
   -e RUST_BACKTRACE=short \
   -w "/w/$TREE" \
-  pallas-ci:1 \
+  "$IMAGE" \
   "$@"

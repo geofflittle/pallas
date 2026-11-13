@@ -5,6 +5,10 @@
 #
 # The container joins the default docker bridge, which is how it reaches a node
 # running in another container on the same host.
+#
+# GEN names the harness dir conformance-value-oracle/gen whose build-image.sh
+# names the image, needed when this script runs from a copy.
+IMAGE=$(sh "${GEN:-$(dirname "$0")/../../../conformance-value-oracle/gen}/build-image.sh" pallas-ci) || exit 1
 exec docker run --rm \
   -v /opt/build/harvest/src:/pallas \
   -v /opt/build/harvest/target:/target \
@@ -25,5 +29,5 @@ exec docker run --rm \
   -e HARVEST_TIP_SLOT="$HARVEST_TIP_SLOT" \
   -e HARVEST_TIP_HASH="$HARVEST_TIP_HASH" \
   -w /pallas \
-  pallas-ci:1 \
+  "$IMAGE" \
   "$@"

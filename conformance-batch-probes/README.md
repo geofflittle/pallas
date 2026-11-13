@@ -2,14 +2,16 @@
 
 Probes, fixture sources and harness scripts behind the conformance batch report
 (sundae-v4 `.claude/docs/2026-10-24_conformance-pallas-batch.md`). Every runner
-below runs on the build box. The ledger oracle is the `conformance-gen-hs:2`
-image with `/opt/build/conformance-gen-1024` mounted at `/work`.
+below runs on the build box. The ledger oracle is the image
+`conformance-value-oracle/gen/build-image.sh conformance-gen-hs` names, with
+`/opt/build/conformance-gen-1024` mounted at `/work`. A runner run from a copy
+takes the harness dir `conformance-value-oracle/gen` in `GEN`.
 
 ## box/
 
 The harness copied to `/opt/build/pallas-conformance-1024`.
 
-- `run.sh TREE cargo ...` runs cargo in the `pallas-ci:1` image over one tree, target `/w/target` unless `TARGET` is set.
+- `run.sh TREE cargo ...` runs cargo in the `pallas-ci` image over one tree, target `/w/target` unless `TARGET` is set.
 - `checks.sh TREE BP STEP...` runs the named checks (fmt, three-unstable, three, workspace, workspace-unstable, clippy, clippy-unstable, blueprint, blueprint-primitives, nodefault-primitives, msrv), all when no step is named, and prints one `STEP exit N passed P failed F` line each. `U` overrides the unstable feature list. It touches the tree's sources first, since cargo replays a binary built from another tree that shares the target.
 - `regen-m1.sh DEST`, `regen-m2.sh`, `regen-flat.sh`, `regen-d2.sh` rebuild the generated fixtures of each branch into `DEST` from `compose*.json` and `manifest-*.txt`. Expected: `diff -r DEST TREE/test_data/dijkstra-generated` prints nothing for the files the manifest names.
 - `*_candidates.py`, `pick.py`, `cutitem.py`, `flat_items.py`, `frame.py`, `extract.py` choose and cut generator values for those fixtures.
@@ -34,7 +36,7 @@ the probe writes `schemas` it runs `schemas.py`, which prints one
 W=/opt/build/pallas-schemas-1025   # cargo-home and probe-target
 docker run --rm --user $(id -u):$(id -g) -v $W:/work -e HOME=/work/home \
   -e CARGO_HOME=/work/cargo-home -e CARGO_TARGET_DIR=/work/probe-target \
-  -w /work/probe-schemas pallas-ci:1 cargo build --release
+  -w /work/probe-schemas "$(sh conformance-value-oracle/gen/build-image.sh pallas-ci)" cargo build --release
 cd /opt/build/conformance-gen-1024
 PROBE=bin/pallas-probe-schemas-SHA OUT=out-schemas-X GEN_FROM=out-merge-1000 ./run.sh 1000 1
 ```

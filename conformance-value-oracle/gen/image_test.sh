@@ -96,6 +96,9 @@ expect outside_built "$outside $(sed "s|$W/outside/images|OUTSIDE|g; s|$image|NA
 echo 'RUN true' >>"$W/outside/images/conformance-gen-hs/Dockerfile"
 expect outside_changed "$(if [ "$(sh "$W/a/image-name.sh" conformance-gen-hs "$W/outside/images")" != "$image" ]; then echo differs; else echo same; fi)" differs
 
+# Must not fire: no file of the pallas checkout holding this script runs an image of images/ by a tag other than its name.
+expect no_hand_tag "$(git -C "$G" grep -nE "($(ls "$G/images" | paste -sd '|' -)):[0-9]" -- ':/' 2>&1 || true)" ""
+
 if [ "$failed" -eq 0 ]; then
   echo "IMAGE-TEST RESULT PASS"
 else
