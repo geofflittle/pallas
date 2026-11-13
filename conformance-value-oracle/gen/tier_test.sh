@@ -1,5 +1,5 @@
 #!/bin/sh
-# Checks that tier.sh runs its pairs four at a time, fails when a pair fails, and that a tier generates the arb values of each kind once, with a docker that logs each generator call.
+# Checks that tier.sh runs its pairs four at a time, fails when a pair fails, that a tier generates the arb values of each kind once, and that vrun.sh marks a pair compared only when each compare wrote its counts, with a docker that logs each generator call.
 # Usage: tier_test.sh <empty work dir>
 set -u
 W=$(cd "$1" && pwd)
@@ -77,6 +77,27 @@ generated() {
 }
 # Must generate the arb values of a kind once whether or not its arb pair runs.
 expect arb_once "$(generated)" "tx=1 body=1"
+
+# The compared mark of an eb arb pair of three values whose probe answers each value it reads up to $1 values and then stops.
+compared() {
+  O=$W/compared-$1
+  rm -rf "$O"
+  printf '#!/bin/sh\nhead -n %s | while read -r line; do echo "{\\"ok\\": true}"; done\n' "$1" >"$W/probe-$1"
+  chmod +x "$W/probe-$1"
+  PATH=$W/bin:$PATH PROBE=$W/probe-$1 OUT=$O sh "$G/vrun.sh" 3 1 eb arb >/dev/null 2>&1
+  cat "$O/eb.arb.compared" 2>/dev/null || echo unmarked
+}
+# Must not fire: a probe that stops before the last value leaves the compare unfinished.
+expect compared_cut "$(compared 1)" unmarked
+# Must mark a compare that read a result of the probe and the ledger for every value.
+expect compared_whole "$(compared 3)" 3
+# Must not fire: a compare that wrote no counts is unfinished, whatever the other compares wrote.
+rm -rf "$W/py"
+cp -R "$G" "$W/py"
+printf 'import sys\nsys.exit(1)\n' >"$W/py/schemacmp.py"
+O=$W/compared-schema
+PATH=$W/bin:$PATH PROBE=$W/probe-3 OUT=$O sh "$W/py/vrun.sh" 3 1 tx arb >/dev/null 2>&1
+expect compared_schema_crash "$(cat "$O/tx.arb.compared" 2>/dev/null || echo unmarked) value_counts=$(ls "$O/tx.arb.counts.json" 2>/dev/null | wc -l | tr -dc 0-9)" "unmarked value_counts=1"
 
 if [ "$failed" -eq 0 ]; then
   echo "TIER-TEST RESULT PASS"
