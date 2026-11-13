@@ -20,7 +20,8 @@ IMAGE=$(sh "$G/image-name.sh" pallas-ci) || exit 1
 cd "$W" || exit 1
 mkdir -p trees logs
 rm -rf "$SYNTH"
-python3 -I "$G/coverage/synth.py" "$SAMPLES" "$SYNTH" || exit 1
+mkdir -p "$SYNTH"
+cp "$G"/coverage/synth/*.cbor "$SYNTH/" || exit 1
 for f in "${BLOCKS:-$G/coverage/blocks}"/*.hex; do
   [ -e "$f" ] || continue
   printf '8208%s' "$(cat "$f")" | xxd -r -p > "$SYNTH/block_gen_$(basename "$f" .hex).cbor"

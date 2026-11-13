@@ -47,7 +47,7 @@ A difference `expected.py` names is counted as listed, not as a disagreement.
 
 ## Coverage
 
-`coverage.sh NAME REV PROBE` runs the `w42_coverage` test of the `u5c-chain-oracle` example at pallas revision REV of `$W/pallas` over the w42 sample blocks in `coverage/samples`, the synthetic blocks `coverage/synth.py` builds from them and the generated blocks in `coverage/blocks` (or `BLOCKS`), then runs `vrun.sh` over the same blocks with the source `given`, then `check_coverage_values.py` requires each location the test saw to have agreeing values in every block that holds it.
+`coverage.sh NAME REV PROBE` runs the `w42_coverage` test of the `u5c-chain-oracle` example at pallas revision REV of `$W/pallas` over the w42 sample blocks in `coverage/samples`, the synthetic blocks in `coverage/synth`, which `python3 -I coverage/synth.py coverage/samples DIR` writes from the samples, and the generated blocks in `coverage/blocks` (or `BLOCKS`), then runs `vrun.sh` over the same blocks with the source `given`, then `check_coverage_values.py` requires each location the test saw to have agreeing values in every block that holds it.
 
 ## End to end
 
