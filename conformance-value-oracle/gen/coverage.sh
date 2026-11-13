@@ -16,7 +16,7 @@ MEMORY=6g
 NAME=$1
 REV=$2
 PROBE=$3
-IMAGE=$(sh "$G/image-name.sh" pallas-ci) || exit 1
+IMAGE=$(sh "$G/build-image.sh" pallas-ci) || exit 1
 cd "$W" || exit 1
 mkdir -p trees logs
 rm -rf "$SYNTH"
