@@ -91,6 +91,7 @@ impl DijkstraTimeContext {
     pub fn slot_to_posix_ms(&self, slot: u64) -> Result<u64, DijkstraTimeError> {
         if let ForecastHorizon::Slot(horizon) = self.horizon
             && slot >= horizon
+            && !pallas_crypto::oracle_plant("horizon-removed")
         {
             return Err(DijkstraTimeError::PastHorizon { slot, horizon });
         }

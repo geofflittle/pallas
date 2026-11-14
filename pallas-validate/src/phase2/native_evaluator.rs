@@ -1,12 +1,13 @@
 //! Native Dijkstra evaluation with the protocol-aware backend.
 use super::{
-    error::{Error, EvaluationFailure},
+    error::{Error, EvaluationFailure, Unsupported, UnsupportedEvaluation},
     evaluator::{MachineFailure, ScriptEvalResult},
 };
 use amaru_kernel::{PlutusVersion, ProtocolVersion};
 use amaru_uplc_native::{
     arena::Arena,
     binder::DeBruijn,
+    builtin::DefaultFunction,
     bumpalo::Bump,
     constant::Constant,
     data::PlutusData as PragmaPlutusData,
@@ -39,9 +40,18 @@ pub(crate) fn eval_native(
     let flat_bytes: minicbor::bytes::ByteVec = minicbor::decode(script_bytes)?;
     let version = plutus_version(&language);
     let protocol = ProtocolVersion::new(12, 0);
+    let semantics = match pallas_crypto::oracle_plant("integer-bound-restored") {
+        true => ProtocolVersion::new(11, 0),
+        false => protocol,
+    };
+    let mut costs = costs.to_vec();
+    if language == Language::PlutusV3 && pallas_crypto::oracle_plant("cost") {
+        costs[173] /= 2;
+    }
+    let costs = &costs[..];
     let cost_model = match language {
         Language::PlutusV1 | Language::PlutusV2 | Language::PlutusV3 => {
-            CostModel::new(version, protocol, costs)
+            CostModel::new(version, semantics, costs)
         }
         Language::PlutusV4 => CostModel::v4(costs),
     };
@@ -49,6 +59,72 @@ pub(crate) fn eval_native(
         flat::decode(&arena, &flat_bytes, version, protocol)?;
     if remainder > 0 {
         return Err(amaru_uplc_native::flat::FlatDecodeError::TrailingBytes(remainder).into());
+    }
+    if language == Language::PlutusV3 && pallas_crypto::oracle_plant("builtin-term-walk") {
+        use DefaultFunction as F;
+        let mut pending = vec![program.term];
+        while let Some(term) = pending.pop() {
+            match term {
+                Term::Builtin(f) => match f {
+                    F::AddInteger
+                    | F::SubtractInteger
+                    | F::MultiplyInteger
+                    | F::LessThanByteString
+                    | F::AppendByteString
+                    | F::BData
+                    | F::Blake2b_224
+                    | F::Blake2b_256
+                    | F::ChooseData
+                    | F::ChooseList
+                    | F::ConsByteString
+                    | F::ConstrData
+                    | F::DivideInteger
+                    | F::EqualsByteString
+                    | F::EqualsData
+                    | F::EqualsInteger
+                    | F::FstPair
+                    | F::HeadList
+                    | F::IData
+                    | F::IfThenElse
+                    | F::LengthOfByteString
+                    | F::LessThanEqualsByteString
+                    | F::LessThanEqualsInteger
+                    | F::LessThanInteger
+                    | F::ListData
+                    | F::MapData
+                    | F::MkCons
+                    | F::MkPairData
+                    | F::ModInteger
+                    | F::SerialiseData
+                    | F::SndPair
+                    | F::TailList
+                    | F::UnBData
+                    | F::UnConstrData
+                    | F::UnIData
+                    | F::UnListData
+                    | F::UnMapData
+                    | F::VerifyEd25519Signature => (),
+                    _ => {
+                        return Err(Error::DijkstraUnsupported(Unsupported(
+                            UnsupportedEvaluation::BuiltinOutsideSubset,
+                        )));
+                    }
+                },
+                Term::Lambda { body, .. } | Term::Delay(body) | Term::Force(body) => {
+                    pending.push(body)
+                }
+                Term::Apply { function, argument } => {
+                    pending.push(function);
+                    pending.push(argument);
+                }
+                Term::Constr { fields, .. } => pending.extend(fields.iter().copied()),
+                Term::Case { constr, branches } => {
+                    pending.push(constr);
+                    pending.extend(branches.iter().copied());
+                }
+                Term::Var(_) | Term::Constant(_) | Term::Error => (),
+            }
+        }
     }
     let initial = ExBudget {
         mem: i64::try_from(budget.mem)
@@ -61,6 +137,17 @@ pub(crate) fn eval_native(
     });
     let mut calls = Vec::new();
     let (value, info) = run(&arena, program, cost_model, initial, &mut calls);
+    if pallas_crypto::oracle_plant("builtin-call-unaudited") && !calls.iter().all(|f| audited(*f))
+    {
+        return Err(Error::DijkstraUnsupported(Unsupported(
+            UnsupportedEvaluation::BuiltinOutsideSubset,
+        )));
+    }
+    if pallas_crypto::oracle_plant("ripemd-160-refused") && calls.contains(&Builtin::Ripemd_160) {
+        return Err(Error::DijkstraUnsupported(Unsupported(
+            UnsupportedEvaluation::BuiltinOutsideSubset,
+        )));
+    }
     let units = budget_to_ex_units(info.consumed_budget);
     let logs = info.logs;
     let mut failure = value.as_ref().err().map(|err| MachineFailure {
@@ -145,6 +232,59 @@ fn steps<'a>(
         };
         state = next?;
     }
+}
+
+/// Whether a builtin is in the audited set the evaluation once restricted calls to.
+fn audited(fun: DefaultFunction) -> bool {
+    use DefaultFunction as F;
+    matches!(
+        fun,
+        F::AddInteger
+            | F::SubtractInteger
+            | F::MultiplyInteger
+            | F::DivideInteger
+            | F::QuotientInteger
+            | F::ModInteger
+            | F::EqualsInteger
+            | F::LessThanInteger
+            | F::LessThanEqualsInteger
+            | F::AppendByteString
+            | F::ConsByteString
+            | F::SliceByteString
+            | F::LengthOfByteString
+            | F::IndexByteString
+            | F::EqualsByteString
+            | F::LessThanByteString
+            | F::LessThanEqualsByteString
+            | F::Blake2b_256
+            | F::Blake2b_224
+            | F::VerifyEd25519Signature
+            | F::IfThenElse
+            | F::ChooseUnit
+            | F::Trace
+            | F::FstPair
+            | F::SndPair
+            | F::ChooseList
+            | F::MkCons
+            | F::HeadList
+            | F::TailList
+            | F::NullList
+            | F::DropList
+            | F::ChooseData
+            | F::ConstrData
+            | F::MapData
+            | F::ListData
+            | F::IData
+            | F::BData
+            | F::UnConstrData
+            | F::UnMapData
+            | F::UnListData
+            | F::UnIData
+            | F::UnBData
+            | F::EqualsData
+            | F::SerialiseData
+            | F::MkPairData
+    )
 }
 
 fn plutus_data_to_term<'a>(arena: &'a Arena, data: &PlutusData) -> &'a Term<'a, DeBruijn> {

@@ -228,6 +228,13 @@ macro_rules! dijkstra_param {
             match self {
                 MultiEraParamUpdate::Conway(_) => ParamRead::NoSuchParameter,
                 MultiEraParamUpdate::Dijkstra(x) => match x.$name.clone() {
+                    Some(_)
+                        if (stringify!($name).starts_with("peras_")
+                            || stringify!($name).starts_with("ref_inputs_cost_"))
+                            && pallas_codec::oracle_plant("update-keys-dropped") =>
+                    {
+                        ParamRead::Unchanged
+                    }
                     Some(v) => ParamRead::Proposed(v),
                     None => ParamRead::Unchanged,
                 },

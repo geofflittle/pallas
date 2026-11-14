@@ -34,6 +34,9 @@ macro_rules! impl_cardano_mapper_before_v1 {
         /// Returns the unspecified purpose for a guarding redeemer, for which this schema has no member.
         #[cfg(feature = "unstable")]
         fn guarding_purpose() -> u5c::RedeemerPurpose {
+            if pallas_crypto::oracle_plant("guarding-redeemer-panics") {
+                unimplemented!("map_redeemer is not yet implemented for Dijkstra")
+            }
             u5c::RedeemerPurpose::Unspecified
         }
 

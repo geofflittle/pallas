@@ -99,7 +99,11 @@ impl<'a> Level<'a> {
             .flat_map(|x| x.iter())
             .map(|(a, c)| (a, *c))
             .collect();
-        ordered.sort_by(|(x, _), (y, _)| cmp_reward_accounts(x, y));
+        if pallas_crypto::oracle_plant("withdrawal-order") {
+            ordered.sort_by_key(|(raw, _)| raw.to_vec());
+        } else {
+            ordered.sort_by(|(x, _), (y, _)| cmp_reward_accounts(x, y));
+        }
         ordered
     }
 }
@@ -499,7 +503,11 @@ fn register<S: DijkstraLedgerState + ?Sized>(
 ) -> ValidationResult {
     if amount != pp.key_deposit {
         return Err(DijkstraInvalidCertificate(
-            CertificateFailure::RegistrationDeposit,
+            if pallas_crypto::oracle_plant("refund-deposit-swap") {
+                CertificateFailure::Refund
+            } else {
+                CertificateFailure::RegistrationDeposit
+            },
         ));
     }
     if state.account(credential)?.is_some() {
@@ -587,7 +595,13 @@ fn certificate<S: DijkstraLedgerState + ?Sized>(
                 AccountFailure::StakeCredentialNotRegistered,
             ))?;
             if *refund != account.deposit {
-                return Err(DijkstraInvalidCertificate(CertificateFailure::Refund));
+                return Err(DijkstraInvalidCertificate(
+                    if pallas_crypto::oracle_plant("refund-deposit-swap") {
+                        CertificateFailure::RegistrationDeposit
+                    } else {
+                        CertificateFailure::Refund
+                    },
+                ));
             }
             if account.balance != 0 {
                 return Err(DijkstraInvalidCertificate(
@@ -595,7 +609,11 @@ fn certificate<S: DijkstraLedgerState + ?Sized>(
                 ));
             }
             state.delta.accounts.insert(c.clone(), None);
-            flows.consume(*refund)
+            flows.consume(if pallas_crypto::oracle_plant("unreg-refund") {
+                0
+            } else {
+                *refund
+            })
         }
         Certificate::StakeDelegation(c, pool) => {
             registered(state, c)?;
@@ -635,7 +653,9 @@ fn certificate<S: DijkstraLedgerState + ?Sized>(
             if reward_account(account)?.0 != network {
                 return Err(PostAlonzo(TxWrongNetworkID));
             }
-            if pool_metadata.as_ref().is_some_and(|m| m.hash.len() > 32) {
+            if pool_metadata.as_ref().is_some_and(|m| m.hash.len() > 32)
+                && !pallas_crypto::oracle_plant("pool-metadata-hash-unbounded")
+            {
                 return Err(DijkstraInvalidCertificate(
                     CertificateFailure::PoolMetadataHashTooBig,
                 ));

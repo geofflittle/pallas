@@ -1593,12 +1593,19 @@ pub(crate) const BOOTSTRAP_ROOT_HEADER: [u8; 6] = [0x83, 0x00, 0x82, 0x00, 0x58,
 
 /// The key hash a bootstrap witness provides, over its key, chain code and attribute bytes as sent.
 pub(crate) fn bootstrap_wit_root(wit: &BootstrapWitness) -> AddressId {
+    let attributes: Vec<u8> = if pallas_crypto::oracle_plant("byron-attrs") {
+        pallas_codec::minicbor::decode::<pallas_addresses::byron::AddrAttrs>(&wit.attributes)
+            .map(|x| pallas_codec::minicbor::to_vec(x).unwrap())
+            .unwrap_or_default()
+    } else {
+        wit.attributes.to_vec()
+    };
     AddressPayload::hash_address_id_preimage(
         &[
             &BOOTSTRAP_ROOT_HEADER[..],
             wit.public_key.as_slice(),
             wit.chain_code.as_slice(),
-            wit.attributes.as_slice(),
+            attributes.as_slice(),
         ]
         .concat(),
     )

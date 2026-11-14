@@ -111,13 +111,16 @@ pub(crate) fn check_translatable(
         if b.intervals.is_some_and(|x| !x.is_empty()) {
             return refuse(ContextFailure::AccountBalanceIntervals);
         }
-        if b.required_top_level_guards.is_some_and(|x| !x.is_empty()) {
+        if b.required_top_level_guards.is_some_and(|x| !x.is_empty())
+            && !pallas_crypto::oracle_plant("top-guards-admitted")
+        {
             return refuse(ContextFailure::RequiredTopLevelGuards);
         }
         if let Some(Guards::Credentials(xs)) = b.guards
             && xs
                 .iter()
                 .any(|x| matches!(x, StakeCredential::ScriptHash(_)))
+            && !pallas_crypto::oracle_plant("script-guard-admitted")
         {
             return refuse(ContextFailure::ScriptGuards);
         }
@@ -136,6 +139,10 @@ pub(crate) fn check_translatable(
         .chain(references.iter().map(|x| x.address()))
         .chain(outputs.iter().map(MultiEraOutput::address))
         .filter_map(Result::ok)
+        .filter(|x| {
+            !(matches!(x, Address::Stake(_))
+                && pallas_crypto::oracle_plant("reward-output-unsupported"))
+        })
         .map(context_address)
         .collect::<Result<Vec<_>, _>>()?;
     if *language == Language::PlutusV4 {

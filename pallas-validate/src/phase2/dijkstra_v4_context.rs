@@ -140,7 +140,10 @@ impl<'a> Context<'a> {
         required.sort_by_key(|(credential, _)| credential_order(credential));
         Ok(TxInfo {
             id: level.id.to_plutus_data(),
-            sub: level.sub.to_plutus_data(),
+            sub: level
+                .sub
+                .filter(|_| !pallas_crypto::oracle_plant("ctx-v4-subtx-index"))
+                .to_plutus_data(),
             inputs: self.inputs.iter().map(input).collect(),
             reference_inputs: self.reference_inputs.iter().map(input).collect(),
             outputs: self.outputs.iter().map(output).collect(),
@@ -210,7 +213,10 @@ impl<'a> Context<'a> {
             Purpose::Conway(_, ScriptInfo::Proposing(ix, procedure)) => {
                 (5, vec![ix.to_plutus_data(), proposal(procedure)?])
             }
-            Purpose::Guarding(ix) => (6, vec![u64::from(*ix).to_plutus_data()]),
+            Purpose::Guarding(ix) => (
+                6 - u64::from(pallas_crypto::oracle_plant("guarding-purpose")),
+                vec![u64::from(*ix).to_plutus_data()],
+            ),
         })
     }
 

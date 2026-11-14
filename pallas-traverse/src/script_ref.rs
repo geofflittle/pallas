@@ -117,6 +117,11 @@ impl<'b> MultiEraScriptRef<'b> {
             },
             #[cfg(feature = "unstable")]
             Self::Dijkstra(x) => match x.deref() {
+                dijkstra::ScriptRef::NativeScript(s)
+                    if pallas_crypto::oracle_plant("native-ref-reencoded") =>
+                {
+                    s.compute_hash()
+                }
                 dijkstra::ScriptRef::NativeScript(s) => {
                     MultiEraNativeScript::from_dijkstra(s).hash()
                 }
