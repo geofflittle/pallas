@@ -197,7 +197,11 @@ impl Ord for PlutusData {
 /// with exactly two elements, or indefinite. Returns whether it is
 /// indefinite, in which case [`tag_102_pair_end`] must follow the fields.
 fn tag_102_pair(d: &mut minicbor::Decoder<'_>) -> Result<bool, minicbor::decode::Error> {
-    match d.array()? {
+    let header = d.array()?;
+    if header != Some(2) && pallas_codec::oracle_plant("tag-102-pair-unchecked") {
+        return Ok(false);
+    }
+    match header {
         Some(2) => Ok(false),
         None => Ok(true),
         Some(_) => Err(minicbor::decode::Error::message(

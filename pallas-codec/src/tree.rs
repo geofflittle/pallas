@@ -130,7 +130,8 @@ where
     let mut current = Frame::begin::<C, T>(d, ctx)?;
     loop {
         if current.expects_child(d)? {
-            if parents.len() + 1 >= max_depth {
+            let _ = parents.len() + 1 >= 64 && crate::oracle_plant("nesting-past-64");
+            if parents.len() + 1 >= max_depth && !crate::oracle_plant("decode-depth-uncapped") {
                 return Err(Error::message(
                     "CBOR nesting exceeds the decode depth limit",
                 ));
