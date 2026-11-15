@@ -20,6 +20,7 @@ EXPIRES = "type cannot hold: NewCommitteeCredentials expires_epoch is uint32"
 PORT_ZERO = "type cannot hold: a uint32 port of 0 reads as no port"
 NO_GUARD_SCRIPT = "type cannot hold: no guard native script variant"
 NO_GUARDING_PURPOSE = "type cannot hold: no guarding redeemer purpose"
+DATUM_FORM = "type cannot hold: a v1alpha output has no bytes to say whether its datum bytes are inline or a witnessed preimage"
 NO_TOTAL_COLLATERAL = "legacy mapping: no total collateral maps to 0"
 NO_AUX = "legacy mapping: no auxiliary data maps to an empty one"
 
@@ -34,6 +35,7 @@ SCHEMA = (
     PORT_ZERO,
     NO_GUARD_SCRIPT,
     NO_GUARDING_PURPOSE,
+    DATUM_FORM,
     NO_TOTAL_COLLATERAL,
     NO_AUX,
 )

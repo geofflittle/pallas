@@ -15,6 +15,7 @@ Exits 1 when any disagreement is found.
 """
 
 import base64
+import hashlib
 import json
 import os
 import re
@@ -24,7 +25,7 @@ from fractions import Fraction
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import expected  # noqa: E402
-from value import canon, flatten, generic, key_of, normalize, rows, segment  # noqa: E402
+from value import Reader, canon, flatten, generic, key_of, normalize, rows, segment  # noqa: E402
 
 SCHEMAS = ("v1alpha", "v1beta", "v1")
 
@@ -187,12 +188,32 @@ def quantity(a):
     return None
 
 
-def datum(d):
+def datum_form(out):
+    """Whether the output whose base64 CBOR is `out` locks an inline datum or a datum hash, or None for neither."""
+    t = Reader(base64.b64decode(out)).item()
+    if t[0] == "map":
+        for k, v in t[1]:
+            if k == ("int", 2) and v[0] == "list" and v[1] and v[1][0][0] == "int":
+                return {0: "hash", 1: "inline"}.get(v[1][0][1])
+        return None
+    if t[0] == "list" and len(t[1]) == 3:
+        return "hash"
+    return None
+
+
+def datum(d, out=None):
+    """The datum a schema message states, its form read from the output's base64 CBOR `out` when the schema carries it."""
     if d is None:
         return None
-    # The mapper also writes the data of a hash datum the witnesses hold, and only an inline datum carries its bytes.
-    if d.get("originalCbor") and d.get("payload") is not None:
-        return {"tag": "inline", "data": data(d["payload"])}
+    raw = base64.b64decode(d.get("originalCbor") or "")
+    if raw and hashlib.blake2b(raw, digest_size=32).digest() != base64.b64decode(d.get("hash") or ""):
+        return {"tag": "bytes of another datum", "hash": h(d.get("hash")), "bytes": "h:" + raw.hex()}
+    if out:
+        form = datum_form(out)
+    else:
+        form = "inline" if raw and d.get("payload") is not None else "hash"
+    if form == "inline":
+        return {"tag": "inline", "data": data(d.get("payload"))}
     if d.get("hash"):
         return {"tag": "hash", "hash": h(d["hash"])}
     return None
@@ -205,7 +226,7 @@ def output(o):
         "address": h(o.get("address")),
         "coin": big(o.get("coin")) or "0",
         "assets": multi(o.get("assets", [])),
-        "datum": datum(o.get("datum")),
+        "datum": datum(o.get("datum"), o.get("originalCbor")),
         "script": script(o.get("script")),
     }
 
@@ -1002,6 +1023,9 @@ def listed(schema, gpath, lv, sv):
         return expected.EXPIRES
     if gpath.endswith(".port") and lv == "0" and sv == ABSENT:
         return expected.PORT_ZERO
+    if schema == "v1alpha" and gpath.endswith(".datum") and isinstance(lv, dict) and isinstance(sv, dict):
+        if lv.get("tag") == "hash" and sv.get("tag") == "inline":
+            return expected.DATUM_FORM
     if schema != "v1":
         if any_leaf(lv, lambda x: x == "guard"):
             return expected.NO_GUARD_SCRIPT
