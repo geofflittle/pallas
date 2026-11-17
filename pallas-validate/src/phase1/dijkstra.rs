@@ -481,6 +481,29 @@ struct ByronPayload {
     network: u8,
     attributes_size: usize,
 }
+/// The attributes of a Byron address, decoded from a definite length map whose keys strictly increase.
+struct ByronAttributes<'b>(BTreeMap<u8, Cow<'b, [u8]>>);
+impl<'b, C> minicbor::Decode<'b, C> for ByronAttributes<'b> {
+    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+        let entries = d
+            .map()?
+            .ok_or_else(|| minicbor::decode::Error::message("indefinite attributes map"))?;
+        let mut attributes = BTreeMap::new();
+        for _ in 0..entries {
+            let key = d.u8()?;
+            if attributes
+                .last_key_value()
+                .is_some_and(|(last, _)| *last >= key)
+            {
+                return Err(minicbor::decode::Error::message(
+                    "attribute keys do not increase",
+                ));
+            }
+            attributes.insert(key, decode_bytes_def_or_indef(d, ctx)?);
+        }
+        Ok(Self(attributes))
+    }
+}
 /// Reads the root, the network and the attribute size of a Byron address, keeping attributes of any key.
 fn byron_payload(address: &ByronAddress) -> Result<ByronPayload, minicbor::decode::Error> {
     let mut d = minicbor::Decoder::new(&address.payload.0);
@@ -488,12 +511,8 @@ fn byron_payload(address: &ByronAddress) -> Result<ByronPayload, minicbor::decod
     let root = d.decode()?;
     let mut network = Network::Mainnet.value();
     let mut attributes_size = 0;
-    let entries = d
-        .map()?
-        .ok_or_else(|| minicbor::decode::Error::message("indefinite attributes map"))?;
-    for _ in 0..entries {
-        let key = d.u8()?;
-        let value = decode_bytes_def_or_indef(&mut d, &mut ())?;
+    let ByronAttributes(attributes) = d.decode()?;
+    for (key, value) in attributes {
         match key {
             1 => {
                 let path = decode_bytes_def_or_indef(&mut minicbor::Decoder::new(&value), &mut ())?;

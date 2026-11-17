@@ -797,9 +797,29 @@ fn dijkstra_outputs_may_pay_byron_addresses() {
         (vec![(2, magic.clone()), (7, vec![0; 64])], None),
         (vec![(2, magic.clone()), (7, vec![0; 65])], too_large),
     ];
+    pay_byron_addresses(&cases);
+}
+
+#[test]
+fn dijkstra_byron_address_attribute_keys_strictly_increase() {
+    let magic = minicbor::to_vec(42u32).unwrap();
+    let path = minicbor::to_vec(minicbor::bytes::ByteVec::from(vec![0; 8])).unwrap();
+    let refused = Some("PostAlonzo(AddressDecoding)");
+    let cases = [
+        (vec![(1, path.clone()), (2, magic.clone())], None),
+        (vec![(2, magic.clone()), (1, path.clone())], refused),
+        (vec![(2, magic.clone()), (2, magic.clone())], refused),
+    ];
+    pay_byron_addresses(&cases);
+}
+
+type ByronCase = (Vec<(u8, Vec<u8>)>, Option<&'static str>);
+
+/// Pays the first top level output, then the first sub transaction output, to the Byron address of each case's attributes, expecting the case's error or none.
+fn pay_byron_addresses(cases: &[ByronCase]) {
     token_order_batch(|tx, input, sub_input| {
         for (entries, expected) in cases {
-            let address = byron_address_attributed(&entries);
+            let address = byron_address_attributed(entries);
             let mut top = tx.clone();
             let mut outputs = top.transaction_body.outputs.clone().to_vec();
             post_alonzo(&mut outputs[0]).address = address.clone();
