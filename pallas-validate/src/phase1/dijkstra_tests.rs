@@ -536,7 +536,7 @@ fn dijkstra_balance_network_and_input_checks() {
         tx.transaction_body.inputs = inputs.into();
         error(
             dispatch(&tx, &output, &env()),
-            "DijkstraUnsupported(\"duplicate inputs\")",
+            "DijkstraMalformed(\"duplicate inputs\")",
         );
         tx.transaction_body.inputs = vec![].into();
         error(
@@ -652,10 +652,33 @@ fn dijkstra_unsupported_fields_do_not_disappear_in_decode() {
         let MultiEraProtocolParameters::Dijkstra(ref mut pp) = e.prot_params else {
             unreachable!()
         };
-        pp.protocol_version = (13, 0);
+        pp.protocol_version = (12, 1);
+        assert!(dispatch(&tx, &output, &e).is_ok());
+        for version in [(11, 0), (13, 0)] {
+            let MultiEraProtocolParameters::Dijkstra(ref mut pp) = e.prot_params else {
+                unreachable!()
+            };
+            pp.protocol_version = version;
+            error(dispatch(&tx, &output, &e), "TxAndProtParamsDiffer");
+        }
+    });
+}
+#[test]
+fn dijkstra_repeated_reference_and_collateral_inputs_are_malformed() {
+    captured(|tx, output| {
+        let input = tx.transaction_body.inputs[0].clone();
+        let twice = || native::NonEmptySet::from_vec(vec![input.clone(), input.clone()]);
+        let mut changed = tx.clone();
+        changed.transaction_body.reference_inputs = twice();
         error(
-            dispatch(&tx, &output, &e),
-            "DijkstraUnsupported(\"protocol version (requires 12.0)\")",
+            dispatch(&changed, &output, &env()),
+            "DijkstraMalformed(\"duplicate reference inputs\")",
+        );
+        let mut changed = tx.clone();
+        changed.transaction_body.collateral = twice();
+        error(
+            dispatch(&changed, &output, &env()),
+            "DijkstraMalformed(\"duplicate collateral inputs\")",
         );
     });
 }
