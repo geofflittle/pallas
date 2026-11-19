@@ -237,7 +237,8 @@ fn provided_scripts(
             .chain(v3.map(|x| (x.compute_hash(), n::Language::PlutusV3, x.as_ref())))
             .chain(v4.map(|x| (x.compute_hash(), n::Language::PlutusV4, x.as_ref())))
         {
-            super::native_evaluator::check_plutus_script(&language, bytes)?;
+            super::native_evaluator::check_plutus_script(&language, bytes)
+                .map_err(|_| Error::DijkstraMalformedScriptWitness { hash })?;
             provided.insert(hash, Provided::Plutus(language, bytes.to_vec()));
         }
     }
