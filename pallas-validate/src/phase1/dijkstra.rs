@@ -1375,8 +1375,8 @@ fn execution_fee(mem: u64, steps: u64, pp: &DijkstraProtParams) -> Result<u64, V
     u64::try_from(n / d + u128::from(n % d != 0)).map_err(|_| PostAlonzo(NegativeValue))
 }
 
-// Exact nonnegative arithmetic: execution fees round up once; the total tiered
-// reference fee rounds down once. Floating point would change boundary results.
+// Exact nonnegative arithmetic: execution fees round up once, and the total tiered
+// reference fee rounds down once.
 type Fraction = (u128, u128);
 fn price(x: &RationalNumber) -> Result<Fraction, ValidationError> {
     if x.denominator == 0 {

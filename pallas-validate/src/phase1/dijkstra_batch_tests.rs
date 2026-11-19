@@ -1672,7 +1672,7 @@ fn dijkstra_batch_sub_native_scripts_see_only_the_sub_signatures() {
 fn dijkstra_batch_scripts_may_be_provided_at_the_other_level() {
     token_order_batch(|tx, input, sub_input| {
         let script = native(n::NativeScript::ScriptPubkey(guard_key()));
-        // The sub needs the script; the top level provides it.
+        // The sub needs the script and the top level provides it.
         let mut spent = sub_input.clone();
         post_alonzo(&mut spent).address = locked(script.original_hash());
         let mut changed = tx.clone();
@@ -1681,7 +1681,7 @@ fn dijkstra_batch_scripts_may_be_provided_at_the_other_level() {
         sign(&mut changed);
         let result = run_sub(&changed, &input, &spent);
         assert!(result.is_ok(), "{result:?}");
-        // The top level needs the script; the sub provides it.
+        // The top level needs the script and the sub provides it.
         let mut top_input = input.clone();
         post_alonzo(&mut top_input).address = locked(script.original_hash());
         let mut changed = tx.clone();
@@ -1917,7 +1917,7 @@ fn dijkstra_batch_sub_reference_inputs_are_distinct_and_counted_once() {
             run_with(&changed, &input, &sub_input, &[(reference, holder)], &env()),
             "DijkstraMalformed(\"duplicate reference inputs\")",
         );
-        // The sub spends and references the same UTxO; its script counts once.
+        // The sub spends and references the same UTxO, so its script counts once.
         let script = native(n::NativeScript::ScriptAll(vec![]));
         let mut spent = sub_input;
         post_alonzo(&mut spent).script_ref =

@@ -54,7 +54,7 @@ fn run(
             )
         })
         .collect();
-    // Admission callers decode actual bytes; exercise the original-CBOR path too.
+    // Admission callers decode actual bytes, so the original CBOR path runs too.
     let raw = minicbor::to_vec(tx.to_mempool_transaction()).unwrap();
     let tx = MultiEraTx::decode_for_era(Era::Dijkstra, &raw).unwrap();
     validate_txs(&[tx], env, &utxos, state)
@@ -244,7 +244,7 @@ fn dijkstra_native_mint_registration_and_partial_withdrawal() {
             panic!()
         };
         pp.key_deposit = 2_000_000;
-        // One script authorizes four different purposes; none needs a redeemer.
+        // One script authorizes four different purposes and none needs a redeemer.
         tx.transaction_body.mint = Some(BTreeMap::from([(
             hash,
             BTreeMap::from([(b"token".to_vec().into(), 1.try_into().unwrap())]),
@@ -259,7 +259,7 @@ fn dijkstra_native_mint_registration_and_partial_withdrawal() {
                 BTreeMap::from([(b"token".to_vec().into(), 1.try_into().unwrap())]),
             )]),
         );
-        // Withdrawal precedes registration; use a distinct key registration to keep state coherent.
+        // Withdrawal precedes registration, so a distinct key registration keeps state coherent.
         tx.transaction_body.certificates = n::NonEmptySet::from_vec(vec![n::Certificate::Reg(
             n::StakeCredential::AddrKeyhash(key_hash()),
             2_000_000,
@@ -420,7 +420,7 @@ fn dijkstra_native_deep_scripts_do_not_use_recursive_evaluation() {
         let MultiEraProtocolParameters::Dijkstra(pp) = &mut env.prot_params else {
             panic!()
         };
-        pp.minfee_a = 0; // Isolate depth from fee-per-byte; the size limit still applies.
+        pp.minfee_a = 0; // Isolate depth from fee per byte, the size limit still applies.
         let result = run(&tx, &inputs, &env, &mut CertState::default());
         assert!(result.is_ok(), "{result:?}");
     });
