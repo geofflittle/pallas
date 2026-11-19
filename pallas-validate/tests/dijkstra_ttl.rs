@@ -42,7 +42,7 @@ fn fixture_root() -> PathBuf {
     std::env::var_os("PALLAS_TTL_FIXTURE")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../test_data/musashi-ttl")
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../test_data/dijkstra-ttl")
         })
 }
 
