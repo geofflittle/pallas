@@ -547,15 +547,6 @@ fn level_context<'a>(
         .iter()
         .map(|x| decode(x, utxos))
         .collect::<Result<Vec<_>, _>>()?;
-    for language in languages {
-        check_translatable(
-            language,
-            &level,
-            &spent.iter().collect::<Vec<_>>(),
-            &referenced.iter().collect::<Vec<_>>(),
-        )
-        .map_err(|x| Error::DijkstraInvalid(EvaluationFailure::Context(x.0)))?;
-    }
     let certificates: Vec<_> = level
         .certificates
         .into_iter()
@@ -611,12 +602,6 @@ fn level_context<'a>(
             extra: vec![],
         });
     }
-    let (lower_bound, upper_bound) =
-        time.validity_bounds(level.validity_interval_start, level.ttl)?;
-    let valid_range = TimeRange {
-        lower_bound,
-        upper_bound,
-    };
     let datums: BTreeMap<_, _> = part
         .witnesses()
         .plutus_data
@@ -643,6 +628,21 @@ fn level_context<'a>(
         };
         spending_datums.insert(key.clone(), datum);
     }
+    for language in languages {
+        check_translatable(
+            language,
+            &level,
+            &spent.iter().collect::<Vec<_>>(),
+            &referenced.iter().collect::<Vec<_>>(),
+        )
+        .map_err(|x| Error::DijkstraInvalid(EvaluationFailure::Context(x.0)))?;
+    }
+    let (lower_bound, upper_bound) =
+        time.validity_bounds(level.validity_interval_start, level.ttl)?;
+    let valid_range = TimeRange {
+        lower_bound,
+        upper_bound,
+    };
     Ok(Context {
         level,
         inputs: resolve(level.inputs, utxos, false)?,
