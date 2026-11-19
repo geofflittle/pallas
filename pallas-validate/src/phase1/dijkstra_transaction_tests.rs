@@ -50,7 +50,7 @@ fn dijkstra_observed_order_valid_context() {
     .into_iter()
     .collect();
     // Constructed replay context: historical parameters and a stipulated later slot.
-    // No historical/current acceptance is claimed; no time bounds or certificates used.
+    // The transaction uses no time bounds or certificates.
     // The producer proves the input bytes, not its current unspent status.
     let mut env = dijkstra_tests::env();
     env.block_slot = 2_100_000;
