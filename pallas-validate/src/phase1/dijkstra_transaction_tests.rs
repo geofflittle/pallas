@@ -195,7 +195,7 @@ fn dijkstra_auxiliary_scripts_are_refused_only_when_malformed() {
     #[cfg(not(all(feature = "phase2", pallas_dijkstra_evaluator)))]
     let (well_formed, malformed) = (
         None::<Vec<u8>>,
-        "DijkstraUnsupported(\"Plutus script well-formedness check\")",
+        "DijkstraUnsupported(\"Plutus script well-formedness check (requires phase2, a nightly toolchain and --cfg pallas_dijkstra_evaluator)\")",
     );
     dijkstra_tests::synthetic(|mut tx, input| {
         let inputs = vec![(tx.transaction_body.inputs[0].clone(), input)];

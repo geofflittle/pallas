@@ -112,7 +112,7 @@ labels! {
     pub enum UnsupportedFeature {
         NewScriptLanguage => "new script language (requires V3)",
         PlutusUpperBoundWithoutForecast => "Plutus validity upper bound requires forecast state",
-        PlutusWithoutPhase2 => "Plutus script well-formedness check",
+        PlutusWithoutPhase2 => "Plutus script well-formedness check (requires phase2, a nightly toolchain and --cfg pallas_dijkstra_evaluator)",
         ReferenceScriptLanguage => "reference script language (requires V3)",
         Subtransactions => "subtransactions",
         UnsuccessfulBlockTransaction => "unsuccessful block transaction",

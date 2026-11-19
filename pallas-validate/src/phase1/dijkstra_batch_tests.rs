@@ -618,7 +618,7 @@ fn dijkstra_batch_sub_auxiliary_scripts_are_refused_only_when_malformed() {
     #[cfg(not(all(feature = "phase2", pallas_dijkstra_evaluator)))]
     let (well_formed, malformed) = (
         None::<Vec<u8>>,
-        "DijkstraUnsupported(\"Plutus script well-formedness check\")",
+        "DijkstraUnsupported(\"Plutus script well-formedness check (requires phase2, a nightly toolchain and --cfg pallas_dijkstra_evaluator)\")",
     );
     token_order_batch(|tx, input, sub_input| {
         let with_script = |bytes: &[u8]| {
