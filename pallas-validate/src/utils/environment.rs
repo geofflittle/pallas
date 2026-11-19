@@ -305,6 +305,10 @@ impl Environment {
     }
 }
 
+/// The protocol major version of every Dijkstra parameter set.
+#[cfg(feature = "unstable")]
+pub(crate) const DIJKSTRA_MAJOR_VERSION: u64 = 12;
+
 #[cfg(feature = "unstable")]
 #[derive(Debug, Clone)]
 pub struct DijkstraProtParams {

@@ -26,15 +26,12 @@ fn a_labelled_refusal_prints_the_message_and_debug_text_of_its_label() {
         format!("{e:?}"),
         "DijkstraInvalidCertificate(\"registration deposit\")"
     );
-    let e = ValidationError::DijkstraUnsupported(UnsupportedFeature::ProtocolVersion);
+    let e = ValidationError::DijkstraUnsupported(UnsupportedFeature::Subtransactions);
     assert_eq!(
         e.to_string(),
-        "unsupported Dijkstra phase-one feature: protocol version (requires 12.0)"
+        "unsupported Dijkstra phase-one feature: subtransactions"
     );
-    assert_eq!(
-        format!("{e:?}"),
-        "DijkstraUnsupported(\"protocol version (requires 12.0)\")"
-    );
+    assert_eq!(format!("{e:?}"), "DijkstraUnsupported(\"subtransactions\")");
 }
 
 #[test]
