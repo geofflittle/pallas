@@ -641,11 +641,25 @@ fn output_address(output: &TransactionOutput<'_>) -> Result<(u8, usize), Validat
         Address::Stake(_) => Err(PostAlonzo(AddressDecoding)),
     }
 }
-/// Refuses the first of `outputs` whose address the ledger decoder refuses.
-fn check_output_addresses<'a, 'b: 'a>(
+/// Refuses the first of `outputs` whose fields or address the ledger decoder refuses.
+fn check_output_encodings<'a, 'b: 'a>(
     outputs: impl Iterator<Item = &'a TransactionOutput<'b>>,
 ) -> ValidationResult {
     for output in outputs {
+        let raw = encode(output)?;
+        match output {
+            TransactionOutput::PostAlonzo(_) => {
+                check_map_keys(&raw, &[0, 1, 2, 3], MalformedField::Output)?;
+            }
+            TransactionOutput::Legacy(_) => {
+                let length = minicbor::Decoder::new(&raw)
+                    .array()
+                    .map_err(|_| DijkstraMalformed(MalformedField::Output))?;
+                if !matches!(length, Some(2 | 3)) {
+                    return Err(DijkstraMalformed(MalformedField::Output));
+                }
+            }
+        }
         output_address(output)?;
     }
     Ok(())
@@ -671,26 +685,6 @@ fn check_outputs(
         }
         // Sized TxOut counts the original serialization, not just the value.
         let output_bytes = minicbor::to_vec(output).map_err(|_| PostAlonzo(UnknownTxSize))?;
-        match output {
-            TransactionOutput::PostAlonzo(_) => {
-                check_map_keys(
-                    &output_bytes,
-                    &[0, 1, 2, 3],
-                    UnsupportedFeature::OutputFields,
-                )?;
-            }
-            TransactionOutput::Legacy(_) => {
-                let mut decoder = minicbor::Decoder::new(&output_bytes);
-                if !matches!(
-                    decoder
-                        .array()
-                        .map_err(|_| DijkstraUnsupported(UnsupportedFeature::OutputFields))?,
-                    Some(2 | 3)
-                ) {
-                    return Err(DijkstraUnsupported(UnsupportedFeature::OutputFields));
-                }
-            }
-        }
         check_output_value_encoding(&output_bytes)?;
         let minimum = pp
             .ada_per_utxo_byte
@@ -743,9 +737,9 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
             allowed.push(key);
         }
     }
-    check_map_keys(&raw, &allowed, UnsupportedFeature::BodyFields)?;
+    check_map_keys(&raw, &allowed, MalformedField::Body)?;
     let fields: pallas_codec::utils::KeyValuePairs<u64, pallas_codec::utils::AnyCbor> =
-        minicbor::decode(&raw).map_err(|_| DijkstraUnsupported(UnsupportedFeature::BodyFields))?;
+        minicbor::decode(&raw).map_err(|_| DijkstraMalformed(MalformedField::Body))?;
     for (key, value) in fields.iter() {
         check_field_present(*key, value)?;
         if *key == 9 {
@@ -767,7 +761,7 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
         b.collateral.iter().flat_map(|x| x.iter()),
         MalformedField::DuplicateCollateralInputs,
     )?;
-    check_output_addresses(b.outputs.iter().chain(b.collateral_return.iter()))?;
+    check_output_encodings(b.outputs.iter().chain(b.collateral_return.iter()))?;
     check_guards(b.guards.as_ref())?;
     check_witness_fields(&tx.transaction_witness_set)
 }
@@ -847,7 +841,7 @@ fn check_witness_fields(w: &KeepRaw<'_, WitnessSet<'_>>) -> ValidationResult {
     check_map_keys(
         &encode(w)?,
         &[0, 1, 2, 3, 4, 5, 6, 7, 8],
-        UnsupportedFeature::WitnessFields,
+        MalformedField::WitnessSet,
     )
 }
 fn repeats<'a>(mut items: impl Iterator<Item = &'a [u8]>) -> bool {
@@ -878,10 +872,10 @@ fn check_sub_supported(tx: &SubTransaction<'_>) -> ValidationResult {
             allowed.push(key);
         }
     }
-    check_map_keys(&raw, &allowed, UnsupportedFeature::SubtransactionBodyFields)?;
+    check_map_keys(&raw, &allowed, MalformedField::SubtransactionBody)?;
     let fields: pallas_codec::utils::KeyValuePairs<u64, pallas_codec::utils::AnyCbor> =
         minicbor::decode(&raw)
-            .map_err(|_| DijkstraUnsupported(UnsupportedFeature::SubtransactionBodyFields))?;
+            .map_err(|_| DijkstraMalformed(MalformedField::SubtransactionBody))?;
     for (key, value) in fields.iter() {
         check_field_present(*key, value)?;
         match key {
@@ -896,7 +890,7 @@ fn check_sub_supported(tx: &SubTransaction<'_>) -> ValidationResult {
         b.reference_inputs.iter().flat_map(|x| x.iter()),
         MalformedField::DuplicateReferenceInputs,
     )?;
-    check_output_addresses(b.outputs.iter())?;
+    check_output_encodings(b.outputs.iter())?;
     check_guards(b.guards.as_ref())?;
     check_witness_fields(&tx.transaction_witness_set)
 }
@@ -919,7 +913,7 @@ fn check_withdrawal_accounts(raw: &[u8]) -> ValidationResult {
 fn check_required_guard_keys(raw: &[u8]) -> ValidationResult {
     let guards: pallas_codec::utils::KeyValuePairs<StakeCredential, pallas_codec::utils::AnyCbor> =
         minicbor::decode(raw)
-            .map_err(|_| DijkstraUnsupported(UnsupportedFeature::RequiredTopLevelGuards))?;
+            .map_err(|_| DijkstraMalformed(MalformedField::RequiredTopLevelGuards))?;
     let mut seen = BTreeSet::new();
     if guards.iter().any(|(key, _)| !seen.insert(key)) {
         return Err(DijkstraMalformed(
@@ -965,30 +959,29 @@ fn holds_value(raw: &[u8], key: u64) -> bool {
                 .any(|(k, value)| *k == key && value.raw_bytes() != [0xf6])
         })
 }
-fn check_map_keys(raw: &[u8], allowed: &[u64], feature: UnsupportedFeature) -> ValidationResult {
+fn check_map_keys(raw: &[u8], allowed: &[u64], field: MalformedField) -> ValidationResult {
+    let malformed = |_| DijkstraMalformed(field);
     let mut d = minicbor::Decoder::new(raw);
-    let mut remaining = d.map().map_err(|_| DijkstraUnsupported(feature))?;
+    let mut remaining = d.map().map_err(malformed)?;
     let mut seen = HashSet::new();
     loop {
         match remaining {
             Some(0) => break,
             Some(ref mut n) => *n -= 1,
-            None if d.datatype().map_err(|_| DijkstraUnsupported(feature))?
-                == minicbor::data::Type::Break =>
-            {
-                d.skip().map_err(|_| DijkstraUnsupported(feature))?;
+            None if d.datatype().map_err(malformed)? == minicbor::data::Type::Break => {
+                d.skip().map_err(malformed)?;
                 break;
             }
             None => (),
         }
-        let key = d.u64().map_err(|_| DijkstraUnsupported(feature))?;
+        let key = d.u64().map_err(malformed)?;
         if !allowed.contains(&key) || !seen.insert(key) {
-            return Err(DijkstraUnsupported(feature));
+            return Err(DijkstraMalformed(field));
         }
-        d.skip().map_err(|_| DijkstraUnsupported(feature))?;
+        d.skip().map_err(malformed)?;
     }
     if d.position() != raw.len() {
-        return Err(DijkstraUnsupported(feature));
+        return Err(DijkstraMalformed(field));
     }
     Ok(())
 }
@@ -1540,7 +1533,7 @@ fn check_auxiliary(
             check_map_keys(
                 &raw[decoder.position()..],
                 &[0, 1, 2, 3, 4, 5],
-                UnsupportedFeature::AuxiliaryFields,
+                MalformedField::Metadata,
             )?;
             let fields: pallas_codec::utils::KeyValuePairs<u64, pallas_codec::utils::AnyCbor> =
                 decoder.decode().map_err(|_| MALFORMED_METADATA)?;

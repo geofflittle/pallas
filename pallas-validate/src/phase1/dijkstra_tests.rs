@@ -601,7 +601,7 @@ fn dijkstra_unsupported_fields_do_not_disappear_in_decode() {
             changed.transaction_body = body;
             error(
                 dispatch(&changed, &output, &env()),
-                "DijkstraUnsupported(\"body fields\")",
+                "DijkstraMalformed(\"body\")",
             );
         }
         // A synthetic unknown map field must not disappear in typed decoding.
@@ -627,7 +627,7 @@ fn dijkstra_unsupported_fields_do_not_disappear_in_decode() {
             MaybeIndefArray::Def(vec![minicbor::decode(&raw_output).unwrap()]);
         error(
             dispatch(&changed, &output, &env()),
-            "DijkstraUnsupported(\"output fields\")",
+            "DijkstraMalformed(\"output\")",
         );
         let raw = [0xa1, 0x08, 0x81, 0x41, 0x00]; // one PlutusV4 script under witness key 8
         let mut changed = tx.clone();
@@ -679,6 +679,17 @@ fn dijkstra_repeated_reference_and_collateral_inputs_are_malformed() {
         error(
             dispatch(&changed, &output, &env()),
             "DijkstraMalformed(\"duplicate collateral inputs\")",
+        );
+    });
+}
+#[test]
+fn dijkstra_an_unknown_witness_key_is_malformed() {
+    captured(|tx, output| {
+        let mut changed = tx.clone();
+        changed.transaction_witness_set = minicbor::decode(&[0xa1, 0x09, 0xf6]).unwrap();
+        error(
+            dispatch(&changed, &output, &env()),
+            "DijkstraMalformed(\"witness set\")",
         );
     });
 }
@@ -1215,7 +1226,7 @@ fn dijkstra_output_subset_and_checked_arithmetic() {
         changed.transaction_body = minicbor::decode(&raw).unwrap();
         error(
             dispatch(&changed, &output, &env()),
-            "DijkstraUnsupported(\"body fields\")",
+            "DijkstraMalformed(\"body\")",
         );
     });
 }
