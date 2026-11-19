@@ -801,8 +801,7 @@ fn dijkstra_typed_features_reject_explicitly() {
         let v4_sub: native::SubTransaction = minicbor::decode(&v4_bytes).unwrap();
         let mut changed = tx.clone();
         changed.transaction_body.sub_transactions = native::NonEmptySet::from_vec(vec![v4_sub]);
-        let malformed =
-            "DijkstraUnsupported(\"new Plutus script validation requires phase2 feature\")";
+        let malformed = "DijkstraUnsupported(\"Plutus script well-formedness check\")";
         error(dispatch(&changed, &output, &env()), malformed);
         error(
             validate_txs(
@@ -985,7 +984,7 @@ fn dijkstra_a_needed_v1_v2_or_v4_script_without_a_cost_model_is_refused() {
 fn dijkstra_new_v1_v2_and_v4_scripts_are_checked() {
     let (well_formed, malformed) = (
         None::<Vec<u8>>,
-        "DijkstraUnsupported(\"new Plutus script validation requires phase2 feature\")",
+        "DijkstraUnsupported(\"Plutus script well-formedness check\")",
     );
     let v4 = |bytes: &[u8]| {
         native::ScriptRef::PlutusV4Script(pallas_primitives::PlutusScript(bytes.to_vec().into()))

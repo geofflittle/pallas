@@ -166,7 +166,7 @@ fn dijkstra_metadata_commitment_and_limits() {
 fn dijkstra_auxiliary_scripts_are_refused_only_when_malformed() {
     let (well_formed, malformed) = (
         None::<Vec<u8>>,
-        "DijkstraUnsupported(\"new Plutus script validation requires phase2 feature\")",
+        "DijkstraUnsupported(\"Plutus script well-formedness check\")",
     );
     dijkstra_tests::synthetic(|mut tx, input| {
         let inputs = vec![(tx.transaction_body.inputs[0].clone(), input)];

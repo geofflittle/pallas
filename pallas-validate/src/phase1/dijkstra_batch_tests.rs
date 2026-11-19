@@ -613,7 +613,7 @@ fn dijkstra_batch_sub_metadata_is_decoded_before_any_rule() {
 fn dijkstra_batch_sub_auxiliary_scripts_are_refused_only_when_malformed() {
     let (well_formed, malformed) = (
         None::<Vec<u8>>,
-        "DijkstraUnsupported(\"new Plutus script validation requires phase2 feature\")",
+        "DijkstraUnsupported(\"Plutus script well-formedness check\")",
     );
     token_order_batch(|tx, input, sub_input| {
         let with_script = |bytes: &[u8]| {
