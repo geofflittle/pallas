@@ -11,6 +11,7 @@ OUT=$W/gen/vout PROBE=$W/gen/bin/pallas-probe-value sh gen/vrun.sh 1000 1 tx   #
 PROBE=$W/gen/bin/pallas-probe-value sh gen/repro/run-repros.sh              # the minimal reproductions
 sh gen/coverage.sh NAME REV PROBE                                           # coverage blocks, then their values
 NODE_TIP=slot:hash ORACLE="CMD oracle" sh gen/e2e-run.sh GRPC OUT           # every served block against the ledger
+sh gen/validate-refusals.sh 1000 1                                          # pallas-validate on transactions the ledger refuses
 ```
 
 Each command prints its verdict lines and exits 1 on any disagreement.
@@ -63,6 +64,7 @@ Plants of the comparer: `PLANT=slim`, `bls` or `eb` changes one served value bef
 - `oracle/`: the Haskell program `conformance-gen` (`gen KIND SOURCE N SEED`, `oracle KIND` over hex lines), built against the cardano-ledger commit of `ledger.rev` (the ledger pinned by node 11.2.0.164).
 - `generator-name.sh` prints the generator's name, the hashes of `oracle/` and `build-generator.sh`, the ledger commit and the image's tag.
 - `probe-value/`: the Rust program `pallas-probe-value KIND` over the generator's JSON lines, built against the pallas tree at `$W/conf` by `plants/build-probes.sh NAME=REV...`.
+- `probe-validate/` and `validate-refusals.sh N SEED`: the Rust program `pallas-probe-validate` and its runner, which put values the ledger refuses into the captured `dijkstra-ttl` transaction, signed by the probe's key, and count per kind whether pallas-validate phase one refuses each as malformed (`DijkstraMalformed`, an address decoding error or a failed decode), refuses it for another reason, or accepts it, exiting 1 on any accepted.
 - `check_*.py`: self checks of the comparers, the mutation modes and the expected difference table, each run with no arguments. `e2e/check_dial_retry.py` checks that a server call is repeated only after a failed dial. `check_docker_logs.py` checks that every `docker run` line of the scripts sets `--log-driver none`, so a long run writes no container log to the host disk.
 - `bin/`: `conformance-gen` and the probes. `bin-cuddle/cuddle`.
 
