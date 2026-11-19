@@ -118,7 +118,7 @@ impl DijkstraLedgerDelta {
     }
 }
 
-/// A ledger state with changes laid over it.
+/// A ledger state and the changes made to it, read as the state after those changes.
 #[derive(Debug, Clone)]
 pub struct DijkstraLedgerOverlay<'a, S: ?Sized> {
     pub base: &'a S,
@@ -126,7 +126,7 @@ pub struct DijkstraLedgerOverlay<'a, S: ?Sized> {
 }
 
 impl<'a, S: DijkstraLedgerState + ?Sized> DijkstraLedgerOverlay<'a, S> {
-    /// An overlay on `base` with no changes.
+    /// The ledger state `base` with no changes.
     pub fn new(base: &'a S) -> Self {
         DijkstraLedgerOverlay {
             base,

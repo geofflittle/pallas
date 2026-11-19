@@ -35,7 +35,7 @@ pub(crate) fn params() -> Environment {
     pp.key_deposit = p["key_deposit"].as_str().unwrap().parse().unwrap();
     pp.cost_models_for_script_languages.plutus_v3 =
         Some(serde_json::from_value(p["cost_models_raw"]["PlutusV3"].clone()).unwrap());
-    // Exact rational representations of the archived decimal prices.
+    // The decimal prices as exact rationals.
     pp.execution_costs = pallas_primitives::ExUnitPrices {
         mem_price: n::RationalNumber {
             numerator: 577,
@@ -140,7 +140,7 @@ fn fail(
     );
 }
 #[test]
-fn dijkstra_registration_captured_native_dispatch() {
+fn dijkstra_registration_captured_dispatch() {
     fixture(|tx, utxos, mut state| {
         assert_eq!(
             minicbor::to_vec(tx.to_mempool_transaction()).unwrap().len(),
@@ -278,7 +278,6 @@ fn dijkstra_registration_scripts_redeemers_integrity_and_signatures() {
             &state,
             "PostAlonzo(VKWitnessMissing)",
         );
-        // Signed finite-TTL acceptance is covered by tests/dijkstra_ttl.rs.
     });
 }
 #[test]
