@@ -23,4 +23,7 @@ pub fn evaluate_tx(
 }
 
 #[cfg(test)]
+mod parameter_update_tests;
+
+#[cfg(test)]
 mod v3_deposit_context_tests;
