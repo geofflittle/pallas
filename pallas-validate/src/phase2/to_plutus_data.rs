@@ -71,7 +71,7 @@ pub(super) struct WithZeroAdaAsset<'a, T>(pub(super) &'a T);
 
 struct WithOptionDatum<'a, T>(&'a T);
 
-struct WithArrayRational<'a, T>(&'a T);
+pub(super) struct WithArrayRational<'a, T>(pub(super) &'a T);
 
 struct WithPartialCertificates<'a, T>(&'a T);
 
@@ -1494,15 +1494,27 @@ impl ToPlutusData for Constitution {
     }
 }
 
+fn lowest_terms(x: &RationalNumber) -> (u64, u64) {
+    if x.denominator == 0 {
+        return (x.numerator, x.denominator);
+    }
+    let (mut a, mut b) = (x.numerator, x.denominator);
+    while b != 0 {
+        (a, b) = (b, a % b);
+    }
+    (x.numerator / a, x.denominator / a)
+}
+
 impl ToPlutusData for RationalNumber {
     fn to_plutus_data(&self) -> PlutusData {
-        (self.numerator, self.denominator).to_plutus_data()
+        lowest_terms(self).to_plutus_data()
     }
 }
 
 impl ToPlutusData for WithArrayRational<'_, RationalNumber> {
     fn to_plutus_data(&self) -> PlutusData {
-        vec![self.0.numerator, self.0.denominator].to_plutus_data()
+        let (numerator, denominator) = lowest_terms(self.0);
+        vec![numerator, denominator].to_plutus_data()
     }
 }
 

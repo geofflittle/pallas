@@ -1,9 +1,80 @@
 use super::{data::Data, to_plutus_data::ToPlutusData};
 use pallas_codec::minicbor;
-use pallas_primitives::conway::ProtocolParamUpdate;
+use pallas_primitives::RationalNumber;
+use pallas_primitives::conway::{GovAction, ProtocolParamUpdate};
+use std::collections::BTreeMap;
 
 fn list(xs: &[i64]) -> pallas_primitives::conway::PlutusData {
     Data::list(xs.iter().map(ToPlutusData::to_plutus_data).collect())
+}
+
+fn expansion_rate(numerator: u8, denominator: u8) -> ProtocolParamUpdate {
+    // {10: 30([numerator, denominator])}
+    minicbor::decode(&[0xa1, 0x0a, 0xd8, 0x1e, 0x82, numerator, denominator]).unwrap()
+}
+
+fn expansion_rate_data(numerator: i64, denominator: i64) -> pallas_primitives::conway::PlutusData {
+    Data::map(vec![(
+        10u64.to_plutus_data(),
+        list(&[numerator, denominator]),
+    )])
+}
+
+#[test]
+fn a_rational_in_lowest_terms_is_written_as_read() {
+    assert_eq!(
+        expansion_rate(1, 3).to_plutus_data(),
+        expansion_rate_data(1, 3)
+    );
+}
+
+#[test]
+fn a_rational_with_a_zero_denominator_is_written_as_read() {
+    for (numerator, denominator) in [(2, 0), (0, 0)] {
+        assert_eq!(
+            expansion_rate(numerator, denominator).to_plutus_data(),
+            expansion_rate_data(numerator.into(), denominator.into())
+        );
+    }
+}
+
+#[test]
+fn a_conway_update_writes_its_rational_in_lowest_terms() {
+    assert_eq!(
+        expansion_rate(2, 4).to_plutus_data(),
+        expansion_rate_data(1, 2)
+    );
+}
+
+#[test]
+fn a_conway_committee_update_writes_its_quorum_in_lowest_terms() {
+    let update = |numerator, denominator| {
+        GovAction::UpdateCommittee(
+            None,
+            vec![].into(),
+            BTreeMap::new(),
+            RationalNumber {
+                numerator,
+                denominator,
+            },
+        )
+        .to_plutus_data()
+    };
+    assert_eq!(update(2, 4), update(1, 2));
+}
+
+#[cfg(feature = "unstable")]
+#[test]
+fn a_dijkstra_parameter_change_writes_its_rational_in_lowest_terms() {
+    use pallas_primitives::dijkstra;
+    // {44: 30([numerator, denominator])}, the Leios quorum stake threshold
+    let change = |numerator, denominator| {
+        let update: dijkstra::ProtocolParamUpdate =
+            minicbor::decode(&[0xa1, 0x18, 0x2c, 0xd8, 0x1e, 0x82, numerator, denominator])
+                .unwrap();
+        dijkstra::GovAction::ParameterChange(None, Box::new(update), None).to_plutus_data()
+    };
+    assert_eq!(change(2, 4), change(1, 2));
 }
 
 #[test]
