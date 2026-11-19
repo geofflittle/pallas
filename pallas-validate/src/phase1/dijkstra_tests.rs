@@ -188,7 +188,7 @@ fn dijkstra_captured_control_passes_native_dispatch() {
             tx.transaction_witness_set.raw_cbor()
         );
         assert!(dispatch(&block_tx, &output, &env()).is_ok());
-        // Accepted alternate mempool wrapper is synthetic; bytes inside are unchanged.
+        // The accepted alternate mempool wrapper is synthetic, the bytes inside are unchanged.
         let mut alternate = vec![0x84];
         alternate.extend(tx.transaction_body.raw_cbor());
         alternate.extend(tx.transaction_witness_set.raw_cbor());
@@ -585,7 +585,7 @@ fn dijkstra_an_empty_guards_set_is_no_guards() {
 fn dijkstra_unsupported_fields_do_not_disappear_in_decode() {
     captured(|tx, output| {
         // Add each disallowed body key in original CBOR, including unknown future keys.
-        // Most known keys use typed synthetic mutations elsewhere; null still must reject.
+        // A null value under any known key must reject.
         for key in [
             4, 5, 7, 9, 11, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 99,
         ] {
@@ -1191,7 +1191,7 @@ fn dijkstra_output_subset_and_checked_arithmetic() {
                 1 => error(result, "PostAlonzo(PreservationOfValue)"),
                 // A missing script is detected before choosing its language parameters.
                 2 => error(result, "PostAlonzo(ScriptWitnessMissing)"),
-                // Pointer delegation plays no part in spending; only the payment key is missing.
+                // Pointer delegation plays no part in spending, only the payment key is missing.
                 _ => error(result, "PostAlonzo(VKWitnessMissing)"),
             }
         }
