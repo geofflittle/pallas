@@ -180,6 +180,7 @@ Where to start for common jobs:
 - `pallas-traverse/unstable` adds Dijkstra to the `MultiEra*` types and makes `MultiEraHeader`
   non-exhaustive, so a match over it needs a wildcard arm.
 - `pallas-validate/unstable` adds the Dijkstra protocol parameters to `MultiEraProtocolParameters`.
+- `pallas-validate/unstable` adds phase one validation of Dijkstra transactions.
 - `pallas-utxorpc/unstable` adds the `v1` module, which maps onto the v1 schema.
 - `pallas-utxorpc/unstable` maps Dijkstra through the accessors that can hold its types.
 - `pallas/unstable` turns on each feature above, and also the umbrella's `hardano` feature.
