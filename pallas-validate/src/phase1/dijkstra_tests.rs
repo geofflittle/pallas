@@ -803,7 +803,7 @@ fn dijkstra_typed_features_reject_explicitly() {
         #[cfg(all(feature = "phase2", pallas_dijkstra_evaluator))]
         let malformed = "DijkstraMalformedScript";
         #[cfg(not(all(feature = "phase2", pallas_dijkstra_evaluator)))]
-        let malformed = "DijkstraUnsupported(\"Plutus script well-formedness check\")";
+        let malformed = "DijkstraUnsupported(\"Plutus script well-formedness check (requires phase2, a nightly toolchain and --cfg pallas_dijkstra_evaluator)\")";
         error(dispatch(&changed, &output, &env()), malformed);
         error(
             validate_txs(
@@ -989,7 +989,7 @@ fn dijkstra_new_v1_v2_and_v4_scripts_are_checked() {
     #[cfg(not(all(feature = "phase2", pallas_dijkstra_evaluator)))]
     let (well_formed, malformed) = (
         None::<Vec<u8>>,
-        "DijkstraUnsupported(\"Plutus script well-formedness check\")",
+        "DijkstraUnsupported(\"Plutus script well-formedness check (requires phase2, a nightly toolchain and --cfg pallas_dijkstra_evaluator)\")",
     );
     let v4 = |bytes: &[u8]| {
         native::ScriptRef::PlutusV4Script(pallas_primitives::PlutusScript(bytes.to_vec().into()))
