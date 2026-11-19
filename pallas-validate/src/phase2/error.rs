@@ -51,6 +51,9 @@ pub enum Error {
     #[cfg(feature = "unstable")]
     #[error("cost model not found for language\n{:>13} {:?}", "Language", .0)]
     DijkstraCostModelNotFound(pallas_primitives::dijkstra::Language),
+    #[cfg(feature = "unstable")]
+    #[error("malformed script witness\n{:>13} {}", "Script", hash)]
+    DijkstraMalformedScriptWitness { hash: pallas_crypto::hash::Hash<28> },
     #[error("address error: {0}")]
     Address(#[from] pallas_addresses::Error),
     #[error("only shelley reward addresses can be a part of withdrawals")]
