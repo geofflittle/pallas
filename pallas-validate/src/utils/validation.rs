@@ -110,18 +110,12 @@ pub enum ValidationError {
 labels! {
     /// A Dijkstra construct the phase one validator does not implement.
     pub enum UnsupportedFeature {
-        AuxiliaryFields => "auxiliary fields",
-        BodyFields => "body fields",
         NewScriptLanguage => "new script language (requires V3)",
-        OutputFields => "output fields",
         PlutusUpperBoundWithoutForecast => "Plutus validity upper bound requires forecast state",
         PlutusWithoutPhase2 => "new Plutus script validation requires phase2 feature",
         ReferenceScriptLanguage => "reference script language (requires V3)",
-        RequiredTopLevelGuards => "required top-level guards",
-        SubtransactionBodyFields => "subtransaction body fields",
         Subtransactions => "subtransactions",
         UnsuccessfulBlockTransaction => "unsuccessful block transaction",
-        WitnessFields => "witness fields",
     }
 }
 
@@ -209,6 +203,7 @@ labels! {
 labels! {
     /// A Dijkstra transaction field whose encoding the ledger decoder refuses.
     pub enum MalformedField {
+        Body => "body",
         BootstrapWitness => "bootstrap witness",
         DuplicateBootstrapWitnesses => "duplicate bootstrap witnesses",
         DuplicateCollateralInputs => "duplicate collateral inputs",
@@ -231,7 +226,11 @@ labels! {
         KeyWitness => "key witness",
         Metadata => "metadata",
         MultiAssetValue => "multi-asset value",
+        Output => "output",
         ProtocolParameterUpdate => "protocol parameter update",
+        RequiredTopLevelGuards => "required top-level guards",
+        SubtransactionBody => "subtransaction body",
+        WitnessSet => "witness set",
         ZeroDonation => "zero donation",
     }
 }

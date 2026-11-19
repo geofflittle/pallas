@@ -225,6 +225,18 @@ fn dijkstra_auxiliary_array_holds_exactly_two_elements() {
         }
     });
 }
+#[test]
+fn dijkstra_an_unknown_auxiliary_key_is_malformed_metadata() {
+    dijkstra_tests::synthetic(|mut tx, input| {
+        let inputs = vec![(tx.transaction_body.inputs[0].clone(), input)];
+        // A tagged auxiliary map with the unknown key 6.
+        set_raw_auxiliary(&mut tx, "d90103a106f6");
+        dijkstra_tests::error(
+            run(&tx, &inputs, &dijkstra_tests::env(), &CertState::default()),
+            "DijkstraMalformed(\"metadata\")",
+        );
+    });
+}
 fn value(coin: u64, policy: Hash<28>, quantity: u64) -> c::Value {
     c::Value::Multiasset(
         coin,
