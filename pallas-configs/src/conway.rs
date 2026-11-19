@@ -102,9 +102,13 @@ impl<'de> Deserialize<'de> for FractionForm {
     where
         D: Deserializer<'de>,
     {
-        deserializer
-            .deserialize_any(FractionFormVisitor)
-            .map(FractionForm)
+        if deserializer.is_human_readable() {
+            deserializer
+                .deserialize_any(FractionFormVisitor)
+                .map(FractionForm)
+        } else {
+            FractionTerms::deserialize(deserializer).map(|terms| FractionForm(terms.into()))
+        }
     }
 }
 
@@ -228,6 +232,24 @@ mod tests {
 
         let threshold = committee.threshold;
         assert_eq!((threshold.numerator, threshold.denominator), (2, 3));
+    }
+
+    #[test]
+    fn a_fraction_in_a_binary_format_keeps_its_terms() {
+        #[derive(serde::Serialize)]
+        struct Terms {
+            numerator: u64,
+            denominator: u64,
+        }
+
+        let bytes = postcard::to_allocvec(&Terms {
+            numerator: 2,
+            denominator: 3,
+        })
+        .unwrap();
+        let fraction: Fraction = postcard::from_bytes(&bytes).unwrap();
+
+        assert_eq!((fraction.numerator, fraction.denominator), (2, 3));
     }
 
     #[test]
