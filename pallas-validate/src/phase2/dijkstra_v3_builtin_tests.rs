@@ -1,4 +1,3 @@
-//! PlutusV3 redeemers of ledger supplement records that call builtins, against the budgets the ledger spent.
 use super::dijkstra_v4_tests::{purpose, slots, utxos};
 use super::*;
 use crate::phase1::dijkstra_records_tests::{bytes, read_in};
@@ -6,7 +5,6 @@ use pallas_traverse::Era;
 
 const DIR: &str = "dijkstra-plutus-v3-builtins";
 
-/// The registration parameters with the PlutusV3 cost model of `fixture`.
 fn params(fixture: &serde_json::Value) -> MultiEraProtocolParameters {
     let mut pp = crate::phase1::dijkstra_registration_tests::params().prot_params;
     let MultiEraProtocolParameters::Dijkstra(ref mut p) = pp else {
@@ -17,7 +15,6 @@ fn params(fixture: &serde_json::Value) -> MultiEraProtocolParameters {
     pp
 }
 
-/// The fixture of `record` and the native evaluation of its transaction.
 fn evaluate(record: u32) -> (serde_json::Value, Result<MultiEraEvalReport, Error>) {
     let fixture = read_in(DIR, record);
     let raw = bytes(&fixture["tx"]);
@@ -26,7 +23,6 @@ fn evaluate(record: u32) -> (serde_json::Value, Result<MultiEraEvalReport, Error
     (fixture, report)
 }
 
-/// Asserts that every redeemer of `record` succeeds with the units the ledger spent.
 fn spends_the_ledger_budget(record: u32) {
     let (fixture, report) = evaluate(record);
     let report = report.unwrap_or_else(|e| panic!("record {record}: {e:?}"));
