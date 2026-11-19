@@ -1488,24 +1488,28 @@ fn check_auxiliary(
         Nullable::Some(data) if hash == Some(Hasher::<256>::hash(&encode(data)?)) => data,
         _ => return Err(PostAlonzo(MetadataHash)),
     };
+    check_metadata_encoding(data)?;
+    if let AuxiliaryData::PostAlonzo(m) = &**data {
+        let scripts = plutus_scripts(
+            m.plutus_v1_scripts.iter().flatten(),
+            m.plutus_v2_scripts.iter().flatten(),
+            m.plutus_v3_scripts.iter().flatten(),
+            m.plutus_v4_scripts.iter().flatten(),
+        );
+        for (_, language, script) in scripts {
+            match well_formed_plutus(&language, script) {
+                Err(DijkstraMalformedScript) => return Err(DijkstraInvalidMetadata),
+                result => result?,
+            }
+        }
+    }
+    Ok(())
+}
+fn check_metadata_encoding(data: &KeepRaw<'_, AuxiliaryData>) -> ValidationResult {
     let metadata = match &**data {
         AuxiliaryData::Shelley(m) => Some(m),
         AuxiliaryData::ShelleyMa(m) => Some(&m.transaction_metadata),
-        AuxiliaryData::PostAlonzo(m) => {
-            let scripts = plutus_scripts(
-                m.plutus_v1_scripts.iter().flatten(),
-                m.plutus_v2_scripts.iter().flatten(),
-                m.plutus_v3_scripts.iter().flatten(),
-                m.plutus_v4_scripts.iter().flatten(),
-            );
-            for (_, language, script) in scripts {
-                match well_formed_plutus(&language, script) {
-                    Err(DijkstraMalformedScript) => return Err(DijkstraInvalidMetadata),
-                    result => result?,
-                }
-            }
-            m.metadata.as_ref()
-        }
+        AuxiliaryData::PostAlonzo(m) => m.metadata.as_ref(),
     };
     // Map decoding into BTreeMap must not hide duplicate metadata labels.
     let raw = encode(data)?;
