@@ -776,6 +776,42 @@ fn dijkstra_output_asset_names_are_at_most_32_bytes() {
 }
 
 #[test]
+fn dijkstra_a_malformed_output_value_is_refused_before_any_rule() {
+    dijkstra_tests::synthetic(|tx, input| {
+        let inputs = vec![(tx.transaction_body.inputs[0].clone(), input)];
+        let expired = |name: Vec<u8>, collateral_return: bool| {
+            let mut tx = tx.clone();
+            tx.transaction_body.ttl = Some(0);
+            let mut output = first_output(&mut tx).clone();
+            output_mut(&mut output).value = c::Value::Multiasset(
+                1_000_000,
+                BTreeMap::from([(
+                    Hash::from([8; 28]),
+                    BTreeMap::from([(name.into(), 1u64.try_into().unwrap())]),
+                )]),
+            );
+            if collateral_return {
+                tx.transaction_body.collateral_return = Some(output);
+            } else {
+                *first_output(&mut tx) = output;
+            }
+            dijkstra_tests::sign(&mut tx);
+            run(&tx, &inputs, &dijkstra_tests::env(), &CertState::default())
+        };
+        for collateral_return in [false, true] {
+            dijkstra_tests::error(
+                expired(vec![1; 32], collateral_return),
+                "PostAlonzo(BlockExceedsValInt)",
+            );
+            dijkstra_tests::error(
+                expired(vec![1; 33], collateral_return),
+                "DijkstraMalformed(\"multi-asset value\")",
+            );
+        }
+    });
+}
+
+#[test]
 fn dijkstra_an_indefinite_length_body_map_is_accepted() {
     dijkstra_tests::synthetic(|tx, input| {
         let inputs = vec![(tx.transaction_body.inputs[0].clone(), input)];
