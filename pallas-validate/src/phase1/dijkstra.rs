@@ -642,7 +642,7 @@ fn output_address(output: &TransactionOutput<'_>) -> Result<(u8, usize), Validat
         Address::Stake(_) => Err(PostAlonzo(AddressDecoding)),
     }
 }
-/// Refuses the first of `outputs` whose fields or address the ledger decoder refuses.
+/// Refuses the first of `outputs` whose fields, address or value the ledger decoder refuses.
 fn check_output_encodings<'a, 'b: 'a>(
     outputs: impl Iterator<Item = &'a TransactionOutput<'b>>,
 ) -> ValidationResult {
@@ -662,6 +662,7 @@ fn check_output_encodings<'a, 'b: 'a>(
             }
         }
         output_address(output)?;
+        check_output_value_encoding(&raw)?;
     }
     Ok(())
 }
@@ -686,7 +687,6 @@ fn check_outputs(
         }
         // Sized TxOut counts the original serialization, not just the value.
         let output_bytes = minicbor::to_vec(output).map_err(|_| PostAlonzo(UnknownTxSize))?;
-        check_output_value_encoding(&output_bytes)?;
         let minimum = pp
             .ada_per_utxo_byte
             .checked_mul(160 + output_bytes.len() as u64)
