@@ -80,6 +80,8 @@ cargo test -p pallas-network -p pallas-network2 --features blueprint
 cargo test -p pallas-primitives -p pallas-traverse -p pallas-utxorpc --features unstable
 cargo test -p pallas-primitives --features unstable,blueprint
 cargo test -p pallas-validate --features unstable
+cargo test -p pallas-validate --features unstable,phase2
+RUSTFLAGS="--cfg pallas_dijkstra_evaluator" cargo +nightly-2026-09-04 test -p pallas-validate --features unstable,phase2
 cargo check --workspace --all-targets --no-default-features
 cargo check --workspace --all-targets --all-features
 ```
@@ -181,6 +183,8 @@ Where to start for common jobs:
   non-exhaustive, so a match over it needs a wildcard arm.
 - `pallas-validate/unstable` adds the Dijkstra protocol parameters to `MultiEraProtocolParameters`.
 - `pallas-validate/unstable` adds phase one validation of Dijkstra transactions.
+- `pallas-validate/unstable` with `phase2` adds Dijkstra phase two, which also needs a nightly
+  toolchain and `--cfg pallas_dijkstra_evaluator`.
 - `pallas-utxorpc/unstable` adds the `v1` module, which maps onto the v1 schema.
 - `pallas-utxorpc/unstable` maps Dijkstra through the accessors that can hold its types.
 - `pallas/unstable` turns on every crate's `unstable` feature and the umbrella's `hardano` feature.

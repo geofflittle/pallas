@@ -356,6 +356,39 @@ fn dijkstra_native_reference_sources_and_original_hash() {
     }
 }
 
+#[cfg(all(feature = "phase2", pallas_dijkstra_evaluator))]
+#[test]
+fn dijkstra_native_phase_two_has_no_jobs_or_time_translation() {
+    spend(
+        native(n::NativeScript::InvalidHereafter(1400010)),
+        |mut tx, inputs| {
+            tx.transaction_body.ttl = Some(1400010);
+            dijkstra_tests::sign(&mut tx);
+            accepts(&tx, &inputs);
+            let utxos = inputs
+                .iter()
+                .map(|(i, o)| {
+                    (
+                        crate::utils::TxoRef(i.transaction_id, i.index as u32),
+                        crate::utils::EraCbor(Era::Dijkstra, minicbor::to_vec(o).unwrap()),
+                    )
+                })
+                .collect();
+            let result = crate::phase2::evaluate_multi_era_tx(
+                &MultiEraTx::from_dijkstra(&tx),
+                &dijkstra_tests::env().prot_params,
+                &utxos,
+                &crate::phase2::script_context::SlotConfig {
+                    zero_slot: u64::MAX,
+                    zero_time: u64::MAX,
+                    slot_length: u64::MAX,
+                },
+            );
+            assert!(result.unwrap().is_empty());
+        },
+    );
+}
+
 fn first_output<'a, 'b>(tx: &'a mut n::BlockTransaction<'b>) -> &'a mut n::TransactionOutput<'b> {
     match &mut tx.transaction_body.outputs {
         pallas_codec::utils::MaybeIndefArray::Def(xs)

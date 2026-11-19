@@ -1,3 +1,6 @@
+#[cfg(all(feature = "unstable", pallas_dijkstra_evaluator))]
+pub(crate) use super::native_evaluator::eval_native;
+
 use amaru_uplc::{
     arena::Arena,
     binder::DeBruijn,
