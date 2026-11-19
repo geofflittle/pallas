@@ -44,7 +44,6 @@ struct ContextOutput {
 }
 
 impl ContextOutput {
-    /// The address as a PlutusV1 to V3 script context holds it.
     fn address_data(&self) -> c::PlutusData {
         Address::Shelley(self.address.clone()).to_plutus_data()
     }
@@ -133,7 +132,6 @@ impl LegacyContextData for ContextInput {
     }
 }
 
-/// The fields of an output a script context holds, with any reference script reduced to the hash of its original bytes.
 fn context_output(output: &MultiEraOutput<'_>, _reference: bool) -> Result<ContextOutput, Error> {
     let address = context_address(output.address()?)
         .map_err(|x| Error::DijkstraInvalid(EvaluationFailure::Context(x.0)))?;
@@ -149,7 +147,6 @@ fn context_output(output: &MultiEraOutput<'_>, _reference: bool) -> Result<Conte
     })
 }
 
-/// The output `input` spends or references, decoded under its own era.
 fn decode<'a>(
     input: &n::TransactionInput,
     utxos: &'a UtxoMap,
@@ -163,7 +160,6 @@ fn decode<'a>(
         .map_err(|_| Error::DijkstraInvalid(EvaluationFailure::InputDecodingForOriginalEra))
 }
 
-/// The inputs in the order the ledger indexes their redeemers.
 fn ordered(inputs: &[n::TransactionInput]) -> Result<Vec<&n::TransactionInput>, Error> {
     let mut ordered: Vec<_> = inputs.iter().collect();
     ordered.sort();
@@ -189,13 +185,11 @@ fn resolve(
         .collect()
 }
 
-/// A script a transaction provides, as its top level runs it.
 enum Provided {
     Native,
     Plutus(n::Language, Vec<u8>),
 }
 
-/// The script a reference output carries, by hash.
 fn reference_script(output: &MultiEraOutput<'_>) -> Result<Option<(Hash<28>, Provided)>, Error> {
     let Some(script) = output.multi_era_script_ref() else {
         return Ok(None);
@@ -220,7 +214,6 @@ fn reference_script(output: &MultiEraOutput<'_>) -> Result<Option<(Hash<28>, Pro
     Ok(Some((script.hash(), provided)))
 }
 
-/// The scripts the witness sets and the spent and referenced outputs of every level of a batch provide.
 fn provided_scripts(
     tx: &n::BlockTransaction<'_>,
     utxos: &UtxoMap,
@@ -264,7 +257,6 @@ fn provided_scripts(
     Ok(provided)
 }
 
-/// The Conway form of a Dijkstra certificate, without the pool BLS key no script context holds.
 fn conway_certificate(cert: &n::Certificate) -> c::Certificate {
     match cert.clone() {
         n::Certificate::StakeDelegation(x, pool) => c::Certificate::StakeDelegation(x, pool),
@@ -376,7 +368,6 @@ pub(super) fn eval_tx_with_mode(
         .collect()
 }
 
-/// The script purpose of a redeemer.
 #[allow(clippy::large_enum_variant)]
 pub(super) enum Purpose {
     Conway(c::RedeemerTag, ScriptPurpose<n::ProposalProcedure>),
@@ -384,7 +375,6 @@ pub(super) enum Purpose {
 }
 
 impl Purpose {
-    /// The Conway tag and script purpose, which a PlutusV1 to V3 script context requires.
     fn conway(&self) -> Result<(c::RedeemerTag, &ScriptPurpose<n::ProposalProcedure>), Error> {
         match self {
             Purpose::Conway(tag, purpose) => Ok((*tag, purpose)),
@@ -393,7 +383,6 @@ impl Purpose {
     }
 }
 
-/// The redeemers of a PlutusV1 to V3 transaction info, by script purpose.
 fn conway_redeemers(
     purposes: &[(n::RedeemersKey, Purpose, n::RedeemersValue)],
 ) -> Result<Vec<(ScriptPurpose<n::ProposalProcedure>, c::Redeemer)>, Error> {
@@ -412,7 +401,6 @@ fn conway_redeemers(
         .collect()
 }
 
-/// A redeemer's script with the arguments, cost model and budget it runs with.
 pub(super) struct Run {
     pub(super) sub: Option<u32>,
     pub(super) tag: n::RedeemerTag,
@@ -424,7 +412,6 @@ pub(super) struct Run {
     pub(super) budget: c::ExUnits,
 }
 
-/// A level of a batch, the top level transaction or the sub transaction at its index.
 #[derive(Clone, Copy)]
 enum Part<'a> {
     Top(&'a n::BlockTransaction<'a>),
@@ -432,7 +419,6 @@ enum Part<'a> {
 }
 
 impl<'a> Part<'a> {
-    /// The body fields of the level, with its id.
     fn level(self) -> Level<'a> {
         match self {
             Part::Top(tx) => {
@@ -446,7 +432,6 @@ impl<'a> Part<'a> {
         }
     }
 
-    /// The witness set of the level.
     fn witnesses(self) -> &'a n::WitnessSet<'a> {
         match self {
             Part::Top(tx) => &tx.transaction_witness_set,
@@ -455,14 +440,12 @@ impl<'a> Part<'a> {
     }
 }
 
-/// The scripts a level runs by redeemer key, their languages, and the redeemers the level declares.
 struct Scope<'a> {
     expected: BTreeMap<n::RedeemersKey, Hash<28>>,
     languages: BTreeSet<n::Language>,
     redeemers: Vec<(&'a n::RedeemersKey, &'a n::RedeemersValue)>,
 }
 
-/// The scripts, languages and redeemers of the level `part`.
 fn scope<'a>(
     part: Part<'a>,
     scripts: &BTreeMap<Hash<28>, Provided>,
@@ -507,7 +490,6 @@ fn scope<'a>(
     })
 }
 
-/// The parts of one level of a batch its script contexts hold.
 struct Context<'a> {
     level: Level<'a>,
     inputs: Vec<ContextInput>,
@@ -522,7 +504,6 @@ struct Context<'a> {
     scripts: BTreeMap<n::RedeemersKey, Hash<28>>,
 }
 
-/// The script context parts of the level `part`, whose scripts in `scope` run in contexts of `languages`.
 fn level_context<'a>(
     part: Part<'a>,
     scope: &Scope<'_>,
@@ -662,7 +643,6 @@ fn level_context<'a>(
     })
 }
 
-/// The fields of a PlutusV1 to V3 transaction info of the top level body `b` beyond those of its level context.
 struct Legacy {
     mint: MintValue,
     withdrawals: Vec<(Address, u64)>,
@@ -707,7 +687,6 @@ impl Legacy {
     }
 }
 
-/// The sub transaction levels of a batch, as PlutusV4 contexts, and the validity interval its levels share.
 fn batch<'a>(
     parts: &[Part<'a>],
     scopes: &[Scope<'_>],
@@ -738,7 +717,6 @@ fn batch<'a>(
     })
 }
 
-/// The script runs of the redeemers of every level of `tx`, its sub transactions in order and then its top level.
 pub(super) fn runs(
     tx: &MultiEraTx,
     pparams: &MultiEraProtocolParameters,

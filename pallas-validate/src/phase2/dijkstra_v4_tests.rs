@@ -1,4 +1,3 @@
-//! PlutusV4 redeemers of ledger conformance records, against the contexts the ledger built and the budgets it spent.
 use super::*;
 use crate::phase1::dijkstra_records_tests::{bytes, params, read};
 use crate::utils::{EraCbor, TxoRef};
@@ -31,7 +30,6 @@ pub(super) fn slots() -> SlotConfig {
     }
 }
 
-/// The sub transaction index, redeemer tag and index a fixture redeemer names.
 pub(super) fn purpose(redeemer: &serde_json::Value) -> (Option<u32>, MultiEraRedeemerTag, u32) {
     let sub = redeemer.get("sub").map(|x| x.as_u64().unwrap() as u32);
     let (tag, index): (u8, u32) = minicbor::decode(&bytes(&redeemer["purpose"])).unwrap();
@@ -48,7 +46,6 @@ pub(super) fn purpose(redeemer: &serde_json::Value) -> (Option<u32>, MultiEraRed
     (sub, tag, index)
 }
 
-/// The tree of `data` with its definite and indefinite encodings identified.
 fn shape(data: &n::PlutusData) -> String {
     let all = |xs: &[n::PlutusData]| xs.iter().map(shape).collect::<Vec<_>>().join(",");
     match data {
@@ -161,7 +158,6 @@ fn plutus_v4_redeemers_spend_the_ledger_budget() {
     }
 }
 
-/// The field `index` of a data list or constructor.
 fn at(data: &n::PlutusData, index: usize) -> &n::PlutusData {
     match data {
         n::PlutusData::Array(x) => &x[index],
@@ -170,7 +166,6 @@ fn at(data: &n::PlutusData, index: usize) -> &n::PlutusData {
     }
 }
 
-/// The values of a data map, in its order.
 fn values(data: &n::PlutusData) -> Vec<n::PlutusData> {
     match data {
         n::PlutusData::Map(x) => x.iter().map(|(_, v)| v.clone()).collect(),
@@ -178,17 +173,14 @@ fn values(data: &n::PlutusData) -> Vec<n::PlutusData> {
     }
 }
 
-/// A reward account of a key credential of 28 `byte`s.
 fn account(byte: u8) -> n::RewardAccount {
     [vec![0xe0], vec![byte; 28]].concat().into()
 }
 
-/// A lovelace amount as script data.
 fn lovelace(amount: i128) -> n::PlutusData {
     n::PlutusData::BigInt(n::BigInt::Int(amount.try_into().unwrap()))
 }
 
-/// The batch fields the top level guard of record 1344 sees after `change` edits its top level body and its sub transaction body.
 fn batch_view(
     change: impl FnOnce(&mut n::TransactionBody<'_>, &mut n::SubTransactionBody<'_>),
 ) -> n::PlutusData {

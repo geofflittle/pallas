@@ -898,7 +898,6 @@ impl ToPlutusData for TimeRange {
     }
 }
 
-/// A context input or output in the forms the V1 and V2 script contexts encode.
 pub(super) trait LegacyContextData {
     fn to_plutus_data_v1(&self) -> PlutusData;
     fn to_plutus_data_v2(&self) -> PlutusData;
@@ -1057,7 +1056,6 @@ impl ToPlutusData for GovActionId {
     }
 }
 
-/// The data map of cost models, holding `unknown` and each model of `known` under its language key.
 fn cost_models_data(
     unknown: &BTreeMap<u64, CostModel>,
     known: &[(u64, &Option<CostModel>)],
@@ -1091,17 +1089,14 @@ impl ToPlutusData for ProtocolParamUpdate {
     }
 }
 
-/// The data of a parameter that is set.
 fn set_value<T: ToPlutusData>(x: &Option<T>) -> Option<PlutusData> {
     x.as_ref().map(ToPlutusData::to_plutus_data)
 }
 
-/// The data of a rational parameter that is set, as a two element list.
 fn set_rational(x: &Option<RationalNumber>) -> Option<PlutusData> {
     x.as_ref().map(|x| WithArrayRational(x).to_plutus_data())
 }
 
-/// The data of each parameter a Conway update sets, by parameter key in ascending order.
 fn conway_update_entries(update: &ProtocolParamUpdate) -> Vec<(u64, PlutusData)> {
     let ProtocolParamUpdate {
         minfee_a,
@@ -1713,7 +1708,6 @@ impl<I: ToPlutusData, O: ToPlutusData, P: Clone + ToPlutusData> V3TxInfo<I, O, P
     }
 }
 
-/// The PlutusV3 script context data of `tx_info`, `redeemer` and `purpose`.
 pub(super) fn v3_script_context_data<P: ToPlutusData>(
     tx_info: PlutusData,
     redeemer: &PlutusData,
@@ -1730,7 +1724,6 @@ pub(super) fn v3_script_context_data<P: ToPlutusData>(
     )
 }
 
-/// The PlutusV1 and PlutusV2 script context data of `tx_info` and `purpose`.
 pub(super) fn v1v2_script_context_data<P: Debug>(
     tx_info: PlutusData,
     purpose: &ScriptPurpose<P>,

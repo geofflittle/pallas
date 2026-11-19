@@ -29,6 +29,7 @@ pub struct TxEvalResult {
     pub failure_message: Option<String>,
 }
 
+/// The result of one redeemer of a transaction of any era from Alonzo on.
 #[cfg(feature = "unstable")]
 #[derive(Debug)]
 pub struct MultiEraTxEvalResult {
@@ -69,6 +70,7 @@ impl From<TxEvalResult> for MultiEraTxEvalResult {
     }
 }
 
+/// Evaluates the scripts of a transaction of any era from Alonzo on.
 #[cfg(all(feature = "unstable", pallas_dijkstra_evaluator))]
 pub fn eval_multi_era_tx(
     tx: &MultiEraTx,
