@@ -18,13 +18,11 @@ use pallas_primitives::{
 use pallas_traverse::withdrawals::cmp_reward_accounts;
 use std::collections::{BTreeMap, BTreeSet};
 
-/// The sub transaction levels of a batch and the validity interval of all its levels, which the script info of a top level guard holds.
 pub(super) struct Batch<'a> {
     pub(super) subs: Vec<Context<'a>>,
     pub(super) valid_range: TimeRange,
 }
 
-/// The fields of a PlutusV4 transaction info, encoded, with the items of its lists apart so the levels of a batch can join them.
 struct TxInfo {
     id: PlutusData,
     sub: PlutusData,
@@ -48,7 +46,6 @@ struct TxInfo {
 }
 
 impl TxInfo {
-    /// The encoded transaction info, which has no fee.
     fn data(&self) -> PlutusData {
         list(vec![
             self.id.clone(),
@@ -75,7 +72,6 @@ impl TxInfo {
 }
 
 impl<'a> Context<'a> {
-    /// The script context of the redeemer at `key`, with the datum it spends, and for a top level guard the view of `batch`.
     pub(super) fn script_context(
         &self,
         key: &n::RedeemersKey,
@@ -108,7 +104,6 @@ impl<'a> Context<'a> {
         ]))
     }
 
-    /// The transaction info fields of the level.
     fn tx_info(&self) -> Result<TxInfo, Error> {
         let level = &self.level;
         let mut redeemers = Vec::new();
@@ -194,7 +189,6 @@ impl<'a> Context<'a> {
         })
     }
 
-    /// The constructor index of `purpose` and the fields its script purpose and script info share.
     fn fields(&self, purpose: &Purpose) -> Result<(u64, Vec<PlutusData>), Error> {
         let certificates: Vec<_> = self.level.certificates.into_iter().flatten().collect();
         Ok(match purpose {
@@ -214,7 +208,6 @@ impl<'a> Context<'a> {
         })
     }
 
-    /// The view of the whole batch in the script info of the guard `hash` of this top level, whose transaction info is `tx_info`.
     fn top_tx_info(
         &self,
         hash: &Hash<28>,
@@ -331,7 +324,6 @@ impl<'a> Context<'a> {
     }
 }
 
-/// The votes of `procedures`, by voter and then by governance action.
 fn votes(procedures: &Option<c::VotingProcedures>) -> PlutusData {
     map(get_votes_info(procedures)
         .iter()
@@ -345,7 +337,6 @@ fn votes(procedures: &Option<c::VotingProcedures>) -> PlutusData {
         .collect())
 }
 
-/// The entries of the `mints` with positive amounts, or with negative amounts, summed, without the policies left empty.
 fn mint_part(mints: &[&c::Mint], positive: bool) -> PlutusData {
     let mut sums: BTreeMap<_, BTreeMap<_, i128>> = BTreeMap::new();
     for (policy, assets) in mints.iter().copied().flatten() {
@@ -372,7 +363,6 @@ fn mint_part(mints: &[&c::Mint], positive: bool) -> PlutusData {
         .collect())
 }
 
-/// An integer, in the data encoding of its size.
 fn integer(value: impl Into<i128>) -> PlutusData {
     let value = value.into();
     match Int::try_from(value) {
@@ -390,17 +380,14 @@ fn integer(value: impl Into<i128>) -> PlutusData {
     }
 }
 
-/// A record or a list, which PlutusV4 encodes as a data list.
 fn list(items: Vec<PlutusData>) -> PlutusData {
     PlutusData::Array(MaybeIndefArray::Def(items))
 }
 
-/// A data map with its entries in the given order.
 fn map(entries: Vec<(PlutusData, PlutusData)>) -> PlutusData {
     PlutusData::Map(KeyValuePairs::Def(entries))
 }
 
-/// The key the ledger orders credentials by, script credentials first.
 fn credential_order(credential: &StakeCredential) -> (bool, Hash<28>) {
     match credential {
         StakeCredential::ScriptHash(hash) => (false, *hash),
@@ -408,7 +395,6 @@ fn credential_order(credential: &StakeCredential) -> (bool, Hash<28>) {
     }
 }
 
-/// The entries of a map keyed by reward account, keyed by credential in the order the ledger holds them.
 fn by_account<'a, V: 'a>(
     entries: impl Iterator<Item = (&'a RewardAccount, &'a V)>,
     value: impl Fn(&V) -> PlutusData,
@@ -424,7 +410,6 @@ fn by_account<'a, V: 'a>(
         .collect()
 }
 
-/// An account balance interval, by its lower bound, upper bound, both bounds or exact balance.
 fn balance_interval(interval: &n::AccountBalanceInterval) -> PlutusData {
     let (index, bounds) = match interval {
         n::AccountBalanceInterval::LowerBound(lower) => (0, vec![*lower]),
@@ -435,7 +420,6 @@ fn balance_interval(interval: &n::AccountBalanceInterval) -> PlutusData {
     wrap_multiple_with_constr(index, bounds.iter().map(|x| x.to_plutus_data()).collect())
 }
 
-/// A transaction output reference, as its transaction id and index.
 fn out_ref(input: &n::TransactionInput) -> PlutusData {
     list(vec![
         input.transaction_id.to_plutus_data(),
@@ -443,12 +427,10 @@ fn out_ref(input: &n::TransactionInput) -> PlutusData {
     ])
 }
 
-/// An input, as its output reference and the output it resolves to.
 fn input(input: &ContextInput) -> PlutusData {
     list(vec![out_ref(&input.out_ref), output(&input.resolved)])
 }
 
-/// An output, whose address holds a payment credential and an optional stake credential.
 fn output(output: &ContextOutput) -> PlutusData {
     let payment = match output.address.payment() {
         ShelleyPaymentPart::Key(hash) => StakeCredential::AddrKeyhash(*hash),
@@ -464,7 +446,6 @@ fn output(output: &ContextOutput) -> PlutusData {
     ])
 }
 
-/// A certificate, whose registration and unregistration deposits are not optional.
 fn certificate(cert: &n::Certificate) -> PlutusData {
     match cert {
         n::Certificate::Reg(credential, deposit) => wrap_multiple_with_constr(
@@ -479,7 +460,6 @@ fn certificate(cert: &n::Certificate) -> PlutusData {
     }
 }
 
-/// A governance action id, as its transaction id and index.
 fn gov_action_id(id: &c::GovActionId) -> PlutusData {
     list(vec![
         id.transaction_id.to_plutus_data(),
@@ -487,7 +467,6 @@ fn gov_action_id(id: &c::GovActionId) -> PlutusData {
     ])
 }
 
-/// A proposal procedure, whose return account is a credential.
 fn proposal(proposal: &n::ProposalProcedure) -> Result<PlutusData, Error> {
     let (_, credential) =
         reward_account(&proposal.reward_account).map_err(|_| Error::BadWithdrawalAddress)?;
@@ -498,7 +477,6 @@ fn proposal(proposal: &n::ProposalProcedure) -> Result<PlutusData, Error> {
     ]))
 }
 
-/// A governance action, whose ids, protocol versions, constitutions and quorums are lists.
 fn gov_action(action: &n::GovAction) -> Result<PlutusData, Error> {
     let previous = |id: &Option<c::GovActionId>| id.as_ref().map(gov_action_id).to_plutus_data();
     Ok(match action {

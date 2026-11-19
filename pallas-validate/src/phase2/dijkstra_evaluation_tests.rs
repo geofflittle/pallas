@@ -1,4 +1,3 @@
-//! Unchanged native capture and synthetic phase-two boundaries; no submission.
 use super::*;
 use crate::utils::{EraCbor, TxoRef};
 use pallas_codec::minicbor;

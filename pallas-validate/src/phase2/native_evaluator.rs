@@ -24,10 +24,8 @@ use pallas_primitives::{
     dijkstra::Language,
 };
 
-/// A builtin function of the native evaluation.
 pub use amaru_uplc_native::builtin::DefaultFunction as Builtin;
 
-/// Evaluate a protocol 12 Plutus script applied to `args`, with the builtins it called in order of first call.
 pub(crate) fn eval_native(
     language: Language,
     script_bytes: &[u8],
@@ -95,10 +93,8 @@ pub(crate) fn eval_native(
     ))
 }
 
-/// The value a program returns, or the machine error that stops it.
 type Evaluated<'a> = Result<&'a Value<'a, DeBruijn>, MachineError<'a, DeBruijn>>;
 
-/// Evaluate a program to its result and spent budget, adding each builtin it calls to `calls`.
 fn run<'a>(
     arena: &'a Arena,
     program: &'a Program<'a, DeBruijn>,
@@ -122,7 +118,6 @@ fn run<'a>(
     (value, info)
 }
 
-/// Step the machine from `term` to its result, adding each builtin it calls to `calls`.
 fn steps<'a>(
     arena: &'a Arena,
     machine: &mut Machine<'a, DeBruijn>,
@@ -161,7 +156,6 @@ fn budget_to_ex_units(budget: ExBudget) -> ExUnits {
     }
 }
 
-/// The version whose flat encoding and builtins a script of `language` decodes with.
 fn plutus_version(language: &Language) -> PlutusVersion {
     match language {
         Language::PlutusV1 => PlutusVersion::V1,
@@ -170,7 +164,6 @@ fn plutus_version(language: &Language) -> PlutusVersion {
     }
 }
 
-/// Decode introduced script bytes of `language` at the native protocol version, without execution.
 pub(crate) fn check_plutus_script(language: &Language, script: &[u8]) -> Result<(), Error> {
     let arena = Arena::from_bump(Bump::new());
     let mut decoder = minicbor::Decoder::new(script);
@@ -196,7 +189,6 @@ pub(crate) fn check_plutus_script(language: &Language, script: &[u8]) -> Result<
 mod tests {
     use super::*;
 
-    /// The script bytes of `(program major.minor.0 (lam x (con unit ())))`.
     fn unit_lambda(major: u8, minor: u8) -> [u8; 6] {
         [0x45, major, minor, 0x00, 0x24, 0x99]
     }

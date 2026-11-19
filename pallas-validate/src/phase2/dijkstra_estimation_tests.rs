@@ -1,4 +1,3 @@
-//! Synthetic derivatives of the unchanged registration capture; phase two only.
 use super::*;
 
 fn estimate(tx: &n::BlockTransaction<'_>, u: &UtxoMap) -> Result<MultiEraEvalReport, Error> {

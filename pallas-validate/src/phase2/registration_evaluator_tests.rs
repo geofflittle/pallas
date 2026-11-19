@@ -1,4 +1,3 @@
-//! Synthetic evaluator semantics, separate from the unchanged network capture.
 use super::{error::Error, evaluator::eval_native};
 use amaru_uplc_native::{arena::Arena, flat, syn::parse_program};
 use pallas_codec::minicbor;

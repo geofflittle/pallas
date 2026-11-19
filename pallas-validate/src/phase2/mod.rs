@@ -15,6 +15,7 @@ use crate::utils::{MultiEraProtocolParameters, UtxoMap};
 
 pub type EvalReport = Vec<tx::TxEvalResult>;
 
+/// The result of each redeemer of a transaction of any era from Alonzo on.
 #[cfg(all(feature = "unstable", pallas_dijkstra_evaluator))]
 pub type MultiEraEvalReport = Vec<tx::MultiEraTxEvalResult>;
 
@@ -27,6 +28,7 @@ pub fn evaluate_tx(
     tx::eval_tx(tx, pparams, utxos, slot_config)
 }
 
+/// Evaluates the scripts of a transaction of any era from Alonzo on.
 #[cfg(all(feature = "unstable", pallas_dijkstra_evaluator))]
 pub fn evaluate_multi_era_tx(
     tx: &MultiEraTx,
@@ -114,6 +116,7 @@ pub fn estimate_tx_calls(
     dijkstra::estimate_tx(tx, pparams, utxos, slot_config)
 }
 
+/// A builtin function of the native evaluation.
 #[cfg(all(feature = "unstable", pallas_dijkstra_evaluator))]
 pub use native_evaluator::Builtin;
 

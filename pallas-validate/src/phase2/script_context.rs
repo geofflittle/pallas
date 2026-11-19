@@ -157,6 +157,7 @@ impl DataLookupTable {
     }
 }
 
+/// A PlutusV1 transaction info over its input, output and proposal types.
 #[derive(Debug, PartialEq, Clone)]
 pub struct V1TxInfo<I, O, P: Clone = ProposalProcedure> {
     pub inputs: Vec<I>,
@@ -212,6 +213,7 @@ impl TxInfoV1<'_> {
     }
 }
 
+/// A PlutusV2 transaction info over its input, output and proposal types.
 #[derive(Debug, PartialEq, Clone)]
 pub struct V2TxInfo<I, O, P: Clone = ProposalProcedure> {
     pub inputs: Vec<I>,
@@ -273,6 +275,7 @@ impl TxInfoV2<'_> {
     }
 }
 
+/// A PlutusV3 transaction info over its input, output and proposal types.
 #[derive(Debug, PartialEq, Clone)]
 pub struct V3TxInfo<I, O, P: Clone = ProposalProcedure> {
     pub inputs: Vec<I>,
