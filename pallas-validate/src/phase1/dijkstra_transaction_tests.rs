@@ -253,6 +253,19 @@ fn dijkstra_metadata_is_decoded_before_auxiliary_scripts() {
         );
     });
 }
+#[test]
+fn dijkstra_metadata_is_decoded_before_its_hash() {
+    dijkstra_tests::synthetic(|mut tx, input| {
+        let inputs = vec![(tx.transaction_body.inputs[0].clone(), input)];
+        auxiliary(&mut tx, &"x".repeat(65));
+        tx.transaction_body.auxiliary_data_hash = Some(Hash::from([0; 32]));
+        dijkstra_tests::sign(&mut tx);
+        dijkstra_tests::error(
+            run(&tx, &inputs, &dijkstra_tests::env(), &CertState::default()),
+            "DijkstraMalformed(\"metadata\")",
+        );
+    });
+}
 fn value(coin: u64, policy: Hash<28>, quantity: u64) -> c::Value {
     c::Value::Multiasset(
         coin,
