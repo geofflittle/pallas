@@ -1,4 +1,4 @@
-//! Historical slot/time translation for native Dijkstra validation.
+//! Slot to POSIX time translation for Dijkstra validation.
 
 /// The start and slot duration of one known era, in POSIX milliseconds.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -154,7 +154,7 @@ mod tests {
         assert_eq!(time.slot_to_posix_ms(10).unwrap(), 1_200_000);
         assert_eq!(time.slot_to_posix_ms(20).unwrap(), 1_210_000);
         assert_eq!(time.slot_to_posix_ms(21).unwrap(), 1_211_000);
-        // Forward extension has no arbitrary fixed TTL distance.
+        // A slot far past the last era start translates at that era's slot length.
         assert_eq!(time.slot_to_posix_ms(1_000_000).unwrap(), 1_001_190_000);
     }
 

@@ -3,7 +3,7 @@ use crate::utils::DijkstraProtParams;
 use pallas_addresses::{Network, ShelleyAddress, ShelleyDelegationPart, ShelleyPaymentPart};
 use pallas_codec::{minicbor, utils::MaybeIndefArray};
 use pallas_crypto::{hash::Hasher, key::ed25519::SecretKey};
-use pallas_primitives::{conway, dijkstra as native};
+use pallas_primitives::{conway, dijkstra as n};
 use pallas_traverse::{MultiEraBlock, MultiEraInput, MultiEraOutput};
 
 fn read(name: &str) -> Vec<u8> {
@@ -50,7 +50,7 @@ pub(super) fn params() -> DijkstraProtParams {
         protocol_version: (int("protocol_major_ver"), int("protocol_minor_ver")),
         min_pool_cost: int("min_pool_cost"),
         ada_per_utxo_byte: int("coins_per_utxo_size"),
-        cost_models_for_script_languages: native::CostModels {
+        cost_models_for_script_languages: n::CostModels {
             plutus_v1: None,
             plutus_v2: None,
             plutus_v3: None,
@@ -134,7 +134,7 @@ pub(super) fn env() -> Environment {
     }
 }
 fn dispatch(
-    tx: &native::BlockTransaction<'_>,
+    tx: &n::BlockTransaction<'_>,
     output: &MultiEraOutput<'_>,
     env: &Environment,
 ) -> crate::utils::ValidationResult {
@@ -152,7 +152,7 @@ fn dispatch(
         &mut CertState::default(),
     )
 }
-fn captured(test: impl FnOnce(native::BlockTransaction<'_>, MultiEraOutput<'_>)) {
+fn captured(test: impl FnOnce(n::BlockTransaction<'_>, MultiEraOutput<'_>)) {
     let raw = read("control.mempool.hex");
     let tx = MultiEraTx::decode_for_era(Era::Dijkstra, &raw).unwrap();
     let input = read("control.input.hex");
@@ -165,7 +165,7 @@ pub(super) fn error(result: crate::utils::ValidationResult, expected: &str) {
 }
 
 #[test]
-fn dijkstra_captured_control_passes_native_dispatch() {
+fn dijkstra_captured_control_passes_dispatch() {
     captured(|tx, output| {
         assert_eq!(
             MultiEraTx::from_dijkstra(&tx).hash().to_string(),
@@ -177,7 +177,7 @@ fn dijkstra_captured_control_passes_native_dispatch() {
             dispatch(&tx, &output, &env())
         );
         let block_raw = read("control.block.hex");
-        let block_tx: native::BlockTransaction = minicbor::decode(&block_raw).unwrap();
+        let block_tx: n::BlockTransaction = minicbor::decode(&block_raw).unwrap();
         assert!(block_tx.success);
         assert_eq!(
             block_tx.transaction_body.raw_cbor(),
@@ -209,14 +209,13 @@ fn dijkstra_captured_signatures_are_required_and_all_verified() {
         tx.transaction_witness_set = original.clone();
         let mut witness = original.vkeywitness.as_ref().unwrap()[0].clone();
         witness.signature = vec![0; 64].into();
-        tx.transaction_witness_set.vkeywitness =
-            native::NonEmptySet::from_vec(vec![witness.clone()]);
+        tx.transaction_witness_set.vkeywitness = n::NonEmptySet::from_vec(vec![witness.clone()]);
         error(
             dispatch(&tx, &output, &env()),
             "PostAlonzo(VKWrongSignature)",
         );
         // A valid required witness cannot hide an invalid additional witness.
-        tx.transaction_witness_set.vkeywitness = native::NonEmptySet::from_vec(vec![
+        tx.transaction_witness_set.vkeywitness = n::NonEmptySet::from_vec(vec![
             original.vkeywitness.as_ref().unwrap()[0].clone(),
             witness.clone(),
         ]);
@@ -225,7 +224,7 @@ fn dijkstra_captured_signatures_are_required_and_all_verified() {
             "PostAlonzo(VKWrongSignature)",
         );
         witness.vkey = vec![0; 31].into();
-        tx.transaction_witness_set.vkeywitness = native::NonEmptySet::from_vec(vec![witness]);
+        tx.transaction_witness_set.vkeywitness = n::NonEmptySet::from_vec(vec![witness]);
         error(
             dispatch(&tx, &output, &env()),
             "DijkstraMalformed(\"key witness\")",
@@ -234,10 +233,8 @@ fn dijkstra_captured_signatures_are_required_and_all_verified() {
 }
 
 // Re-sign synthetic body changes with a public deterministic test key, and make
-// a synthetic key-locked UTxO with the original coin. Never overwrite captures.
-pub(super) fn synthetic(
-    test: impl FnOnce(native::BlockTransaction<'_>, native::TransactionOutput<'_>),
-) {
+// a synthetic key-locked UTxO with the original coin.
+pub(super) fn synthetic(test: impl FnOnce(n::BlockTransaction<'_>, n::TransactionOutput<'_>)) {
     captured(|mut tx, output| {
         let key = SecretKey::from([71; 32]);
         let address = ShelleyAddress::new(
@@ -246,18 +243,17 @@ pub(super) fn synthetic(
             ShelleyDelegationPart::Null,
         )
         .to_vec();
-        tx.transaction_body.outputs =
-            MaybeIndefArray::Def(vec![native::TransactionOutput::PostAlonzo(
-                native::PostAlonzoTransactionOutput {
-                    address: address.clone().into(),
-                    value: conway::Value::Coin(output.value().coin() - tx.transaction_body.fee),
-                    datum_option: None,
-                    script_ref: None,
-                }
-                .into(),
-            )]);
-        let input = native::TransactionOutput::PostAlonzo(
-            native::PostAlonzoTransactionOutput {
+        tx.transaction_body.outputs = MaybeIndefArray::Def(vec![n::TransactionOutput::PostAlonzo(
+            n::PostAlonzoTransactionOutput {
+                address: address.clone().into(),
+                value: conway::Value::Coin(output.value().coin() - tx.transaction_body.fee),
+                datum_option: None,
+                script_ref: None,
+            }
+            .into(),
+        )]);
+        let input = n::TransactionOutput::PostAlonzo(
+            n::PostAlonzoTransactionOutput {
                 address: address.into(),
                 value: conway::Value::Coin(output.value().coin()),
                 datum_option: None,
@@ -269,14 +265,13 @@ pub(super) fn synthetic(
         test(tx, input);
     });
 }
-pub(super) fn sign(tx: &mut native::BlockTransaction<'_>) {
+pub(super) fn sign(tx: &mut n::BlockTransaction<'_>) {
     let key = SecretKey::from([71; 32]);
     let hash = Hasher::<256>::hash(&minicbor::to_vec(&tx.transaction_body).unwrap());
-    tx.transaction_witness_set.vkeywitness =
-        native::NonEmptySet::from_vec(vec![native::VKeyWitness {
-            vkey: key.public_key().as_ref().to_vec().into(),
-            signature: key.sign(hash).as_ref().to_vec().into(),
-        }]);
+    tx.transaction_witness_set.vkeywitness = n::NonEmptySet::from_vec(vec![n::VKeyWitness {
+        vkey: key.public_key().as_ref().to_vec().into(),
+        signature: key.sign(hash).as_ref().to_vec().into(),
+    }]);
 }
 #[test]
 fn dijkstra_validity_is_half_open() {
@@ -322,18 +317,18 @@ fn dijkstra_pool_metadata_hash_is_at_most_32_bytes() {
                 Some("DijkstraInvalidCertificate(\"pool metadata hash too big\")"),
             ),
         ] {
-            let metadata = native::PoolMetadata {
+            let metadata = n::PoolMetadata {
                 url: "https://pool.example".into(),
                 hash: vec![7; size].into(),
             };
             tx.transaction_body.certificates =
-                native::NonEmptySet::from_vec(vec![native::Certificate::PoolRegistration {
+                n::NonEmptySet::from_vec(vec![n::Certificate::PoolRegistration {
                     operator,
                     vrf_keyhash: [9; 32].into(),
                     bls_key: None,
                     pledge: 0,
                     cost,
-                    margin: native::RationalNumber {
+                    margin: n::RationalNumber {
                         numerator: 0,
                         denominator: 1,
                     },
@@ -354,15 +349,15 @@ fn dijkstra_pool_metadata_hash_is_at_most_32_bytes() {
 #[test]
 fn dijkstra_collateral_without_redeemers_meets_only_the_rules_that_always_hold() {
     synthetic(|mut tx, input| {
-        let collateral = native::TransactionInput {
+        let collateral = n::TransactionInput {
             transaction_id: [12; 32].into(),
             index: 0,
         };
-        let unsigned = native::TransactionInput {
+        let unsigned = n::TransactionInput {
             transaction_id: [13; 32].into(),
             index: 0,
         };
-        let missing = native::TransactionInput {
+        let missing = n::TransactionInput {
             transaction_id: [14; 32].into(),
             index: 0,
         };
@@ -370,9 +365,9 @@ fn dijkstra_collateral_without_redeemers_meets_only_the_rules_that_always_hold()
             payment: ShelleyPaymentPart,
             delegation: ShelleyDelegationPart,
             coin: u64,
-        ) -> native::TransactionOutput<'x> {
-            native::TransactionOutput::PostAlonzo(
-                native::PostAlonzoTransactionOutput {
+        ) -> n::TransactionOutput<'x> {
+            n::TransactionOutput::PostAlonzo(
+                n::PostAlonzoTransactionOutput {
                     address: ShelleyAddress::new(Network::Testnet, payment, delegation)
                         .to_vec()
                         .into(),
@@ -410,7 +405,7 @@ fn dijkstra_collateral_without_redeemers_meets_only_the_rules_that_always_hold()
         };
         pp.minfee_a = 0;
         pp.minfee_b = 0;
-        let run = |tx: &native::BlockTransaction<'_>, e: &Environment| {
+        let run = |tx: &n::BlockTransaction<'_>, e: &Environment| {
             validate_txs(
                 &[MultiEraTx::from_dijkstra(tx)],
                 e,
@@ -419,17 +414,17 @@ fn dijkstra_collateral_without_redeemers_meets_only_the_rules_that_always_hold()
             )
         };
         // The annotation disagrees with the collateral balance, which the ledger reads only for a batch with redeemers.
-        tx.transaction_body.collateral = native::NonEmptySet::from_vec(vec![collateral]);
+        tx.transaction_body.collateral = n::NonEmptySet::from_vec(vec![collateral]);
         tx.transaction_body.total_collateral = Some(1);
         sign(&mut tx);
         let accepted = run(&tx, &e);
         assert!(accepted.is_ok(), "{accepted:?}");
         let mut changed = tx.clone();
-        changed.transaction_body.collateral = native::NonEmptySet::from_vec(vec![missing]);
+        changed.transaction_body.collateral = n::NonEmptySet::from_vec(vec![missing]);
         sign(&mut changed);
         error(run(&changed, &e), "PostAlonzo(CollateralNotInUTxO)");
         let mut changed = tx.clone();
-        changed.transaction_body.collateral = native::NonEmptySet::from_vec(vec![unsigned]);
+        changed.transaction_body.collateral = n::NonEmptySet::from_vec(vec![unsigned]);
         sign(&mut changed);
         error(run(&changed, &e), "PostAlonzo(VKWitnessMissing)");
         let mut changed = tx.clone();
@@ -518,7 +513,7 @@ fn dijkstra_balance_network_and_input_checks() {
             "PostAlonzo(PreservationOfValue)",
         );
         tx.transaction_body.fee -= 1;
-        tx.transaction_body.network_id = Some(native::NetworkId::Mainnet);
+        tx.transaction_body.network_id = Some(n::NetworkId::Mainnet);
         error(
             dispatch(&tx, &output, &env()),
             "PostAlonzo(TxWrongNetworkID)",
@@ -666,7 +661,7 @@ fn dijkstra_unsupported_fields_do_not_disappear_in_decode() {
 fn dijkstra_repeated_reference_and_collateral_inputs_are_malformed() {
     captured(|tx, output| {
         let input = tx.transaction_body.inputs[0].clone();
-        let twice = || native::NonEmptySet::from_vec(vec![input.clone(), input.clone()]);
+        let twice = || n::NonEmptySet::from_vec(vec![input.clone(), input.clone()]);
         let mut changed = tx.clone();
         changed.transaction_body.reference_inputs = twice();
         error(
@@ -719,8 +714,8 @@ fn dijkstra_typed_features_reject_explicitly() {
             let mut changed = tx.clone();
             let expected = match field {
                 0 => {
-                    changed.transaction_body.guards = Some(native::Guards::Credentials(
-                        native::NonEmptySet::from_vec(vec![native::StakeCredential::ScriptHash(
+                    changed.transaction_body.guards = Some(n::Guards::Credentials(
+                        n::NonEmptySet::from_vec(vec![n::StakeCredential::ScriptHash(
                             [1; 28].into(),
                         )])
                         .unwrap(),
@@ -730,7 +725,7 @@ fn dijkstra_typed_features_reject_explicitly() {
                 1 => {
                     changed.transaction_body.required_top_level_guards = Some(
                         [(
-                            native::StakeCredential::ScriptHash([1; 28].into()),
+                            n::StakeCredential::ScriptHash([1; 28].into()),
                             pallas_codec::utils::Nullable::Null,
                         )]
                         .into_iter()
@@ -761,7 +756,7 @@ fn dijkstra_typed_features_reject_explicitly() {
                 }
                 7 => {
                     changed.transaction_body.reference_inputs =
-                        native::NonEmptySet::from_vec(changed.transaction_body.inputs.to_vec());
+                        n::NonEmptySet::from_vec(changed.transaction_body.inputs.to_vec());
                     "overlapping inputs pass to the signature check"
                 }
                 8 => {
@@ -787,19 +782,18 @@ fn dijkstra_typed_features_reject_explicitly() {
             error(result, &expected);
         }
         let sub_bytes = hex::decode("83a200800180a0f6").unwrap();
-        let sub: native::SubTransaction = minicbor::decode(&sub_bytes).unwrap();
+        let sub: n::SubTransaction = minicbor::decode(&sub_bytes).unwrap();
         let mut changed = tx.clone();
-        changed.transaction_body.sub_transactions =
-            native::NonEmptySet::from_vec(vec![sub.clone()]);
+        changed.transaction_body.sub_transactions = n::NonEmptySet::from_vec(vec![sub.clone()]);
         error(
             dispatch(&changed, &output, &env()),
             "PostAlonzo(TxInsEmpty)",
         );
         // The same sub transaction with one PlutusV4 script under witness key 8.
         let v4_bytes = hex::decode("83a200800180a108814100f6").unwrap();
-        let v4_sub: native::SubTransaction = minicbor::decode(&v4_bytes).unwrap();
+        let v4_sub: n::SubTransaction = minicbor::decode(&v4_bytes).unwrap();
         let mut changed = tx.clone();
-        changed.transaction_body.sub_transactions = native::NonEmptySet::from_vec(vec![v4_sub]);
+        changed.transaction_body.sub_transactions = n::NonEmptySet::from_vec(vec![v4_sub]);
         let malformed = "DijkstraUnsupported(\"Plutus script well-formedness check\")";
         error(dispatch(&changed, &output, &env()), malformed);
         error(
@@ -821,7 +815,7 @@ fn dijkstra_outputs_may_pay_to_pointer_addresses() {
         assert!(dispatch(&tx, &output, &env()).is_ok());
         let mut tx = tx.clone();
         let mut outputs: Vec<_> = tx.transaction_body.outputs.iter().cloned().collect();
-        let native::TransactionOutput::PostAlonzo(ref mut out) = outputs[0] else {
+        let n::TransactionOutput::PostAlonzo(ref mut out) = outputs[0] else {
             unreachable!()
         };
         let Ok(pallas_addresses::Address::Shelley(address)) =
@@ -843,23 +837,23 @@ fn dijkstra_outputs_may_pay_to_pointer_addresses() {
     });
 }
 
-fn plutus_v1_and_v2(bytes: &[u8]) -> [native::ScriptRef<'static>; 2] {
+fn plutus_v1_and_v2(bytes: &[u8]) -> [n::ScriptRef<'static>; 2] {
     [
-        native::ScriptRef::PlutusV1Script(pallas_primitives::PlutusScript(bytes.to_vec().into())),
-        native::ScriptRef::PlutusV2Script(pallas_primitives::PlutusScript(bytes.to_vec().into())),
+        n::ScriptRef::PlutusV1Script(pallas_primitives::PlutusScript(bytes.to_vec().into())),
+        n::ScriptRef::PlutusV2Script(pallas_primitives::PlutusScript(bytes.to_vec().into())),
     ]
 }
 
-fn plutus_v4() -> native::ScriptRef<'static> {
-    native::ScriptRef::PlutusV4Script(pallas_primitives::PlutusScript(vec![1].into()))
+fn plutus_v4() -> n::ScriptRef<'static> {
+    n::ScriptRef::PlutusV4Script(pallas_primitives::PlutusScript(vec![1].into()))
 }
 
 fn with_script<'a>(
-    output: &native::TransactionOutput<'a>,
-    script: native::ScriptRef<'a>,
-) -> native::TransactionOutput<'a> {
+    output: &n::TransactionOutput<'a>,
+    script: n::ScriptRef<'a>,
+) -> n::TransactionOutput<'a> {
     let mut output = output.clone();
-    let native::TransactionOutput::PostAlonzo(ref mut out) = output else {
+    let n::TransactionOutput::PostAlonzo(ref mut out) = output else {
         unreachable!()
     };
     out.script_ref = Some(pallas_codec::utils::CborWrap(script));
@@ -867,9 +861,9 @@ fn with_script<'a>(
 }
 
 fn with_new_script<'a>(
-    tx: &native::BlockTransaction<'a>,
-    script: native::ScriptRef<'a>,
-) -> native::BlockTransaction<'a> {
+    tx: &n::BlockTransaction<'a>,
+    script: n::ScriptRef<'a>,
+) -> n::BlockTransaction<'a> {
     let mut tx = tx.clone();
     let outputs = tx.transaction_body.outputs.iter();
     let outputs = outputs
@@ -893,8 +887,8 @@ fn dijkstra_spent_plutus_scripts_no_purpose_needs_pass() {
 
 #[test]
 fn dijkstra_only_a_v1_v2_or_v3_script_puts_the_batch_in_legacy_mode() {
-    use native::Language::*;
-    let legacy = |languages: &[native::Language]| {
+    use n::Language::*;
+    let legacy = |languages: &[n::Language]| {
         dijkstra::withdrawal_rule(&languages.iter().cloned().collect())
             == dijkstra_ledger::WithdrawalRule::Legacy
     };
@@ -921,14 +915,12 @@ fn dijkstra_a_v4_guard_script_needs_its_guarding_redeemer() {
     synthetic(|mut tx, input| {
         use pallas_traverse::ComputeHash;
         let script = plutus_v4();
-        let native::ScriptRef::PlutusV4Script(s) = &script else {
+        let n::ScriptRef::PlutusV4Script(s) = &script else {
             unreachable!()
         };
-        tx.transaction_body.guards = Some(native::Guards::Credentials(
-            native::NonEmptySet::from_vec(vec![native::StakeCredential::ScriptHash(
-                s.compute_hash(),
-            )])
-            .unwrap(),
+        tx.transaction_body.guards = Some(n::Guards::Credentials(
+            n::NonEmptySet::from_vec(vec![n::StakeCredential::ScriptHash(s.compute_hash())])
+                .unwrap(),
         ));
         sign(&mut tx);
         let input = with_script(&input, script);
@@ -950,13 +942,13 @@ fn dijkstra_a_needed_v1_v2_or_v4_script_without_a_cost_model_is_refused() {
         use pallas_traverse::ComputeHash;
         for script in plutus_v1_and_v2(&[1]).into_iter().chain([plutus_v4()]) {
             let hash = match &script {
-                native::ScriptRef::PlutusV1Script(s) => s.compute_hash(),
-                native::ScriptRef::PlutusV2Script(s) => s.compute_hash(),
-                native::ScriptRef::PlutusV4Script(s) => s.compute_hash(),
+                n::ScriptRef::PlutusV1Script(s) => s.compute_hash(),
+                n::ScriptRef::PlutusV2Script(s) => s.compute_hash(),
+                n::ScriptRef::PlutusV4Script(s) => s.compute_hash(),
                 _ => unreachable!(),
             };
             let mut locked = with_script(&input, script);
-            let native::TransactionOutput::PostAlonzo(ref mut out) = locked else {
+            let n::TransactionOutput::PostAlonzo(ref mut out) = locked else {
                 unreachable!()
             };
             let address = ShelleyAddress::new(
@@ -986,7 +978,7 @@ fn dijkstra_new_v1_v2_and_v4_scripts_are_checked() {
         "DijkstraUnsupported(\"Plutus script well-formedness check\")",
     );
     let v4 = |bytes: &[u8]| {
-        native::ScriptRef::PlutusV4Script(pallas_primitives::PlutusScript(bytes.to_vec().into()))
+        n::ScriptRef::PlutusV4Script(pallas_primitives::PlutusScript(bytes.to_vec().into()))
     };
     synthetic(|tx, input| {
         let output = MultiEraOutput::from_dijkstra(&input);
@@ -1006,11 +998,11 @@ fn dijkstra_new_v1_v2_and_v4_scripts_are_checked() {
     });
 }
 
-pub(super) fn plutus_auxiliary(version: u8, bytes: &[u8]) -> native::AuxiliaryData<'static> {
+pub(super) fn plutus_auxiliary(version: u8, bytes: &[u8]) -> n::AuxiliaryData<'static> {
     fn script<const V: usize>(bytes: &[u8]) -> Option<Vec<pallas_primitives::PlutusScript<V>>> {
         Some(vec![pallas_primitives::PlutusScript(bytes.to_vec().into())])
     }
-    let mut data = native::PostAlonzoAuxiliaryData {
+    let mut data = n::PostAlonzoAuxiliaryData {
         metadata: None,
         native_scripts: None,
         plutus_v1_scripts: None,
@@ -1025,7 +1017,7 @@ pub(super) fn plutus_auxiliary(version: u8, bytes: &[u8]) -> native::AuxiliaryDa
         4 => data.plutus_v4_scripts = script(bytes),
         _ => unreachable!(),
     }
-    native::AuxiliaryData::PostAlonzo(data)
+    n::AuxiliaryData::PostAlonzo(data)
 }
 
 fn elements(raw: &[u8]) -> Vec<&[u8]> {
@@ -1080,7 +1072,7 @@ fn dijkstra_capture_integrity_and_certified_original_input() {
         assert_eq!(block.slot(), slot);
         assert_eq!(block.hash().to_string(), hash);
         let parts = elements(elements(&bytes)[1]);
-        let native: native::Block = minicbor::decode(elements(&bytes)[1]).unwrap();
+        let native: n::Block = minicbor::decode(elements(&bytes)[1]).unwrap();
         assert_eq!(
             Hasher::<256>::hash(parts[1]),
             native.header.header_body.block_body_hash
@@ -1105,7 +1097,7 @@ fn dijkstra_capture_integrity_and_certified_original_input() {
     assert_eq!(ch.previous_hash(), Some(ah.hash()));
     let announcement = ah.eb_announcement().unwrap();
     let commitments = read("producer-commitments.hex");
-    let body: KeepRaw<native::EndorserBlock> = minicbor::decode(&commitments).unwrap();
+    let body: KeepRaw<n::EndorserBlock> = minicbor::decode(&commitments).unwrap();
     assert_eq!(body.original_hash(), announcement.eb_hash);
     assert_eq!(body.len(), 2340);
     let wire = read("control-producer.wire.hex");
@@ -1146,12 +1138,12 @@ fn dijkstra_output_subset_and_checked_arithmetic() {
     synthetic(|tx, input| {
         for feature in 0..4 {
             let mut changed = input.clone();
-            let native::TransactionOutput::PostAlonzo(ref mut out) = changed else {
+            let n::TransactionOutput::PostAlonzo(ref mut out) = changed else {
                 unreachable!()
             };
             match feature {
                 0 => {
-                    out.datum_option = Some(native::DatumOption::Hash([0; 32].into()).into());
+                    out.datum_option = Some(n::DatumOption::Hash([0; 32].into()).into());
                 }
                 1 => {
                     out.value = conway::Value::Multiasset(
@@ -1204,7 +1196,7 @@ fn dijkstra_output_subset_and_checked_arithmetic() {
         error(dispatch(&tx, &output, &e), "PostAlonzo(NegativeValue)");
         let mut changed = tx.clone();
         let mut outputs = changed.transaction_body.outputs.clone().to_vec();
-        let native::TransactionOutput::PostAlonzo(ref mut out) = outputs[0] else {
+        let n::TransactionOutput::PostAlonzo(ref mut out) = outputs[0] else {
             unreachable!()
         };
         out.value = conway::Value::Coin(u64::MAX);
@@ -1213,7 +1205,7 @@ fn dijkstra_output_subset_and_checked_arithmetic() {
             dispatch(&changed, &output, &env()),
             "PostAlonzo(NegativeValue)",
         );
-        // Supported body/witness fields duplicated in raw CBOR also fail closed.
+        // Supported body and witness fields duplicated in raw CBOR are refused too.
         let mut raw = tx.transaction_body.raw_cbor().to_vec();
         if raw.is_empty() {
             raw = minicbor::to_vec(&tx.transaction_body).unwrap();

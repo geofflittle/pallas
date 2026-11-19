@@ -117,9 +117,7 @@ pub fn validate_tx(
     }
 }
 
-/// Validate with explicit historical time information for Dijkstra Plutus.
-/// Earlier eras retain their existing validation entry point. Supply the same
-/// context to native phase two.
+/// [`validate_tx`], converting the slots of a Dijkstra transaction to times with `time`.
 #[cfg(feature = "unstable")]
 pub fn validate_tx_with_time(
     metx: &MultiEraTx,

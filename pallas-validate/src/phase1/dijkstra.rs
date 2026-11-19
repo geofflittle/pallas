@@ -1,4 +1,4 @@
-//! Native protocol-12 phase one for transfers, batches, account and governance state, and Plutus V1 to V3.
+//! Dijkstra phase one validation of transfers, batches, account and governance state, and Plutus V1 to V3.
 use super::dijkstra_ledger::{self as ledger, Flows, Level, WithdrawalRule};
 use crate::utils::{
     ContextFailure, DIJKSTRA_MAJOR_VERSION, DijkstraProtParams, MalformedField, ParameterFailure,
@@ -36,7 +36,7 @@ const MALFORMED_VALUE: ValidationError = DijkstraMalformed(MalformedField::Multi
 const MALFORMED_METADATA: ValidationError = DijkstraMalformed(MalformedField::Metadata);
 type Spent = HashSet<(Hash<32>, u64)>;
 
-/// Validates native phase one against `state` and returns the changes the transaction makes to it.
+/// Validates the phase one rules of `tx` against `state` and returns the changes the transaction makes to it.
 pub fn validate_dijkstra_tx<S: DijkstraLedgerState + ?Sized>(
     tx: &BlockTransaction<'_>,
     utxos: &UTxOs<'_>,
@@ -48,7 +48,7 @@ pub fn validate_dijkstra_tx<S: DijkstraLedgerState + ?Sized>(
     validate_dijkstra_tx_inner(tx, utxos, pp, block_slot, network_id, state, None)
 }
 
-/// Native phase one with the historical time context required by bounded Plutus.
+/// [`validate_dijkstra_tx`], converting slots to times with `time`.
 pub fn validate_dijkstra_tx_with_time<S: DijkstraLedgerState + ?Sized>(
     tx: &BlockTransaction<'_>,
     utxos: &UTxOs<'_>,
@@ -363,7 +363,7 @@ fn check_interval(
     if lo.is_some_and(|x| slot < x) {
         return Err(PostAlonzo(BlockPrecedesValInt));
     }
-    // Allegra inInterval inherited by Dijkstra: upper bound is exclusive.
+    // The upper bound is exclusive.
     if hi.is_some_and(|x| slot >= x) {
         return Err(PostAlonzo(BlockExceedsValInt));
     }

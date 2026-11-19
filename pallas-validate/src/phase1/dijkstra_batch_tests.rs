@@ -86,7 +86,7 @@ fn run(
     )
 }
 #[test]
-fn dijkstra_batch_aggregate_balance_and_native_size() {
+fn dijkstra_batch_aggregate_balance_and_mempool_size() {
     batch(|tx, input| {
         let result = run(&tx, &input, &env());
         assert!(result.is_ok(), "{result:?}");
