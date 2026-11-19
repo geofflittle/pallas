@@ -1,4 +1,3 @@
-//! Real native registration acceptance plus explicitly synthetic rejection cases.
 use super::{
     dijkstra_tests::{env, error, sign, synthetic},
     *,

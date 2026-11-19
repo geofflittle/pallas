@@ -18,7 +18,6 @@ use pallas_primitives::dijkstra::*;
 use pallas_traverse::{MultiEraOutput, withdrawals::cmp_reward_accounts};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
-/// The fields a top level and a sub transaction body share, with the position of a sub transaction in its batch.
 #[derive(Clone, Copy)]
 pub(crate) struct Level<'a> {
     pub id: Hash<32>,
@@ -94,7 +93,6 @@ impl<'a> Level<'a> {
         }
     }
 
-    /// The withdrawals in the order the ledger indexes their redeemers.
     pub fn ordered_withdrawals(&self) -> Vec<(&'a RewardAccount, Coin)> {
         let mut ordered: Vec<_> = self
             .withdrawals
@@ -107,7 +105,6 @@ impl<'a> Level<'a> {
     }
 }
 
-/// The key hashes and scripts one level's ledger fields require, by redeemer purpose.
 #[derive(Default)]
 pub(crate) struct Needs {
     pub keys: HashSet<Hash<28>>,
@@ -133,7 +130,6 @@ impl Needs {
     }
 }
 
-/// The network and credential of a reward account.
 pub(crate) fn reward_account(raw: &[u8]) -> Result<(u8, StakeCredential), ValidationError> {
     let Address::Stake(address) =
         Address::from_bytes(raw).map_err(|_| PostAlonzo(AddressDecoding))?
@@ -147,7 +143,6 @@ pub(crate) fn reward_account(raw: &[u8]) -> Result<(u8, StakeCredential), Valida
     Ok((address.network().value(), credential))
 }
 
-/// The script of each script guard in `guards`, by its Guarding redeemer key.
 fn guarding_scripts(guards: Option<&Guards>) -> BTreeMap<RedeemersKey, Hash<28>> {
     let Some(Guards::Credentials(credentials)) = guards else {
         return BTreeMap::new();
@@ -168,7 +163,6 @@ fn guarding_scripts(guards: Option<&Guards>) -> BTreeMap<RedeemersKey, Hash<28>>
         .collect()
 }
 
-/// The script each redeemer key of the level `b` names, where `spent` gives the output a spent input resolves to.
 pub(crate) fn redeemer_scripts<'o, 'x: 'o>(
     b: &Level<'_>,
     mut spent: impl FnMut(&TransactionInput) -> Result<&'o MultiEraOutput<'x>, ValidationError>,
@@ -206,7 +200,6 @@ pub(crate) fn redeemer_scripts<'o, 'x: 'o>(
     Ok(scripts)
 }
 
-/// The witnesses and scripts the withdrawals, certificates, votes and proposals of a level require.
 pub(crate) fn needs(level: &Level<'_>) -> Result<Needs, ValidationError> {
     let mut needs = Needs::default();
     for (index, (raw, _)) in level.ordered_withdrawals().into_iter().enumerate() {
@@ -268,7 +261,6 @@ pub(crate) fn needs(level: &Level<'_>) -> Result<Needs, ValidationError> {
     Ok(needs)
 }
 
-/// The coin a level's ledger fields take from accounts and deposits, and the coin they put into them.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Flows {
     pub consumed: u64,
@@ -296,7 +288,6 @@ impl Flows {
     }
 }
 
-/// The withdrawals of every sub transaction, summed per account.
 pub(crate) fn sub_withdrawals(
     tx: &BlockTransaction<'_>,
 ) -> Result<BTreeMap<StakeCredential, u128>, ValidationError> {
@@ -310,14 +301,10 @@ pub(crate) fn sub_withdrawals(
     Ok(total)
 }
 
-/// The rule the top level withdrawals of a transaction are judged by.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum WithdrawalRule {
-    /// The transaction runs a Plutus V1, V2 or V3 script, so each top level withdrawal drains its account.
     Legacy,
-    /// The transaction runs no Plutus V1, V2 or V3 script, so a top level withdrawal may take part of its account.
     Partial,
-    /// The transaction was accepted before, so only its changes are computed.
     Accepted,
 }
 
@@ -352,7 +339,6 @@ fn check_intervals<S: DijkstraLedgerState + ?Sized>(
     Ok(())
 }
 
-/// ENTITIES and SUBENTITIES: withdrawals, balance intervals, certificates and direct deposits, applied to `current`.
 pub(crate) fn entities<O, S>(
     level: &Level<'_>,
     top: Option<(WithdrawalRule, &BTreeMap<StakeCredential, u128>)>,
@@ -561,7 +547,6 @@ fn delegate_drep<S: DijkstraLedgerState + ?Sized>(
     }
 }
 
-/// The domain separation tag of a BLS proof of possession, which signs the compressed public key.
 const BLS_POP_DST: &[u8] = b"BLS_POP_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_";
 
 fn valid_possession_proof(key: &BlsKey) -> bool {
@@ -774,13 +759,10 @@ fn certificate<S: DijkstraLedgerState + ?Sized>(
     }
 }
 
-/// The CBOR keys of the protocol parameters whose change the stake pools vote on.
 const SECURITY_GROUP: [u64; 15] = [0, 1, 2, 3, 4, 17, 21, 22, 30, 33, 34, 35, 36, 37, 40];
 
-/// The CBOR keys of the protocol parameters an update may not set to zero.
 const NONZERO: [u64; 13] = [2, 3, 4, 6, 7, 8, 17, 22, 23, 28, 29, 30, 31];
 
-/// The keys an update sets, each with its value when the value is an unsigned integer.
 fn update_fields(update: &ProtocolParamUpdate) -> Result<Vec<(u64, Option<u64>)>, ValidationError> {
     let raw = minicbor::to_vec(update).map_err(|_| PostAlonzo(UnknownTxSize))?;
     let fields: pallas_codec::utils::KeyValuePairs<u64, pallas_codec::utils::AnyCbor> =
@@ -792,14 +774,12 @@ fn update_fields(update: &ProtocolParamUpdate) -> Result<Vec<(u64, Option<u64>)>
         .collect())
 }
 
-/// Whether an update changes a parameter the stake pools vote on.
 pub(crate) fn security_relevant(update: &ProtocolParamUpdate) -> Result<bool, ValidationError> {
     Ok(update_fields(update)?
         .iter()
         .any(|(key, _)| SECURITY_GROUP.contains(key) || (41..=56).contains(key)))
 }
 
-/// What later proposals and votes read of a governance action.
 pub(crate) fn proposal_action(
     action: &GovAction,
 ) -> Result<DijkstraProposalAction, ValidationError> {
@@ -820,7 +800,6 @@ pub(crate) fn proposal_action(
     })
 }
 
-/// The purposes whose actions name a predecessor.
 #[derive(PartialEq, Eq, Clone, Copy)]
 enum Purpose {
     ParameterChange,
@@ -852,7 +831,6 @@ fn previous(action: &GovAction) -> Option<&GovActionId> {
     }
 }
 
-/// The highest protocol major version the ledger decodes.
 const MAX_MAJOR_VERSION: u64 = 13;
 
 fn can_follow(current: (u64, u64), next: (u64, u64)) -> bool {
@@ -860,7 +838,6 @@ fn can_follow(current: (u64, u64), next: (u64, u64)) -> bool {
         || next == (current.0, current.1.saturating_add(1))
 }
 
-/// Whether a voter role may vote on an action.
 fn allowed(voter: &Voter, action: &DijkstraProposalAction) -> bool {
     use DijkstraProposalAction as A;
     match voter {
@@ -876,7 +853,6 @@ fn allowed(voter: &Voter, action: &DijkstraProposalAction) -> bool {
     }
 }
 
-/// GOV and SUBGOV: proposals then votes, with new proposals added to `current`.
 pub(crate) fn governance<S: DijkstraLedgerState + ?Sized>(
     level: &Level<'_>,
     pp: &DijkstraProtParams,
@@ -1083,7 +1059,6 @@ fn voter_credential(voter: &Voter) -> StakeCredential {
     }
 }
 
-/// The treasury a level states must equal the ledger treasury.
 pub(crate) fn check_treasury<S: DijkstraLedgerState + ?Sized>(
     level: &Level<'_>,
     state: &S,

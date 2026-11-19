@@ -4,11 +4,9 @@ use pallas_addresses::{Address, ShelleyAddress, ShelleyDelegationPart};
 use pallas_primitives::dijkstra::{Certificate, DatumOption, Guards, Language, StakeCredential};
 use pallas_traverse::MultiEraOutput;
 
-/// The part of a transaction that a script context cannot hold.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Untranslatable(pub ContextFailure);
 
-/// The transaction parts a language's script context can hold.
 struct Holds {
     governance: bool,
     dijkstra_fields: bool,
@@ -16,11 +14,9 @@ struct Holds {
     shared_inputs: bool,
 }
 
-/// The sub transaction a PlutusV1 to V3 script context cannot hold.
 pub(crate) const LEGACY_IN_SUB: Untranslatable =
     Untranslatable(ContextFailure::LegacyScriptInSubtransaction);
 
-/// The Shelley address a script context holds for an output at `address`.
 pub(crate) fn context_address(address: Address) -> Result<ShelleyAddress, Untranslatable> {
     match address {
         Address::Shelley(x) => Ok(x),
@@ -29,7 +25,6 @@ pub(crate) fn context_address(address: Address) -> Result<ShelleyAddress, Untran
     }
 }
 
-/// The stake credential a PlutusV4 script context holds for the delegation part of `address`.
 pub(crate) fn v4_stake(
     address: &ShelleyAddress,
 ) -> Result<Option<StakeCredential>, Untranslatable> {
@@ -41,7 +36,6 @@ pub(crate) fn v4_stake(
     }
 }
 
-/// Checks that the `language` script context can hold the level `b`, whose inputs and reference inputs resolve to `inputs` and `references`.
 pub(crate) fn check_translatable(
     language: &Language,
     b: &Level<'_>,
