@@ -123,7 +123,7 @@ fn v3_deposit_context_protocol_reaches_script_execution() {
         }
         format!("[(force (builtin headList)) {list}]")
     }
-    // Certifying[1] -> Reg/UnReg[1] -> Just[0] -> explicit amount.
+    // Certifying[1], holding Reg or UnReg[1], holding Just[0] of the explicit amount.
     let amount = field(&field(&field(&field("ctx", 2), 1), 1), 0);
     let condition =
         format!("[[(builtin equalsInteger) [(builtin unIData) {amount}]] (con integer 2000000)]");

@@ -59,9 +59,7 @@ impl Fixture {
         let p = &parameters["values"]["cardano"];
         let g = json("genesis.json");
         let replay = json("replay.json");
-        // The original RPC omitted these later API fields. Use the retained
-        // configured genesis only for unused Peras/reference-input parameters;
-        // their historical live values are unknown (see fixture README).
+        // The Peras and reference input parameters come from the configured genesis, since the replay reads none of them.
         let supplemental: Value = serde_json::from_slice(
             &std::fs::read(fixture_root().join("genesis/dijkstra.json")).unwrap(),
         )

@@ -1429,7 +1429,7 @@ fn native_guard_reference_hash_reaches_v3_script() {
 #[test]
 fn native_post_bootstrap_context_reaches_script() {
     fixture(|mut tx, mut u| {
-        // Active Certifying[1] -> Reg[1] -> Just[0] -> 2,000,000.
+        // Active Certifying[1], holding Reg[1], holding Just[0] of 2,000,000.
         let amount = field(&field(&field(&field("ctx", 2), 1), 1), 0);
         replace_script(
             &mut tx,
@@ -1464,8 +1464,7 @@ fn native_registration_resolves_synthetic_earlier_era_outputs() {
         ),
     ];
     fixture(|mut tx, mut u| {
-        // Synthetic phase-two-only transaction; signatures and balance are not
-        // claims.
+        // A synthetic transaction for phase two only, with unchecked signatures and balance.
         replace_script(
             &mut tx,
             &mut u,
