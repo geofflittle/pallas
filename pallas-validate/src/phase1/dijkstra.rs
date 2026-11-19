@@ -1,7 +1,8 @@
 //! Native protocol-12 phase one for transfers, batches, account and governance state, and Plutus V1 to V3.
 use super::dijkstra_ledger::{self as ledger, Flows, Level, WithdrawalRule};
 use crate::utils::{
-    ContextFailure, DijkstraProtParams, MalformedField, ParameterFailure, PostAlonzoError,
+    ContextFailure, DIJKSTRA_MAJOR_VERSION, DijkstraProtParams, MalformedField, ParameterFailure,
+    PostAlonzoError,
     PostAlonzoError::*,
     UTxOs, UnsupportedFeature, ValidationError,
     ValidationError::*,
@@ -69,8 +70,8 @@ pub(super) fn validate_dijkstra_tx_inner<S: DijkstraLedgerState + ?Sized>(
     state: &S,
     time: Option<&crate::utils::DijkstraTimeContext>,
 ) -> Result<DijkstraLedgerDelta, ValidationError> {
-    if pp.protocol_version != (12, 0) {
-        return Err(DijkstraUnsupported(UnsupportedFeature::ProtocolVersion));
+    if pp.protocol_version.0 != DIJKSTRA_MAJOR_VERSION {
+        return Err(TxAndProtParamsDiffer);
     }
     check_supported(tx)?;
     let b = &tx.transaction_body;
@@ -434,13 +435,9 @@ fn check_inputs(
     if inputs.is_empty() {
         return Err(PostAlonzo(TxInsEmpty));
     }
-    let mut local = Spent::new();
     let mut coin = 0;
     for input in inputs {
         let id = (input.transaction_id, input.index);
-        if !local.insert(id) {
-            return Err(DijkstraUnsupported(UnsupportedFeature::DuplicateInputs));
-        }
         // SUBUTXO requires membership in both original and evolving UTxO.
         let output = utxos
             .get(&MultiEraInput::from_alonzo_compatible(input))
@@ -761,9 +758,32 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
             check_withdrawal_accounts(value)?;
         }
     }
+    check_distinct(b.inputs.iter(), MalformedField::DuplicateInputs)?;
+    check_distinct(
+        b.reference_inputs.iter().flat_map(|x| x.iter()),
+        MalformedField::DuplicateReferenceInputs,
+    )?;
+    check_distinct(
+        b.collateral.iter().flat_map(|x| x.iter()),
+        MalformedField::DuplicateCollateralInputs,
+    )?;
     check_output_addresses(b.outputs.iter().chain(b.collateral_return.iter()))?;
     check_guards(b.guards.as_ref())?;
     check_witness_fields(&tx.transaction_witness_set)
+}
+/// Refuses `inputs` when they name one input twice, which the ledger decoder refuses for a set.
+fn check_distinct<'a>(
+    inputs: impl IntoIterator<Item = &'a TransactionInput>,
+    field: MalformedField,
+) -> ValidationResult {
+    let mut seen = Spent::new();
+    match inputs
+        .into_iter()
+        .all(|x| seen.insert((x.transaction_id, x.index)))
+    {
+        true => Ok(()),
+        false => Err(DijkstraMalformed(field)),
+    }
 }
 fn check_guards(guards: Option<&Guards>) -> ValidationResult {
     let guards = guard_credentials(guards);
@@ -871,14 +891,11 @@ fn check_sub_supported(tx: &SubTransaction<'_>) -> ValidationResult {
             _ => (),
         }
     }
-    let mut references = Spent::new();
-    for input in b.reference_inputs.iter().flatten() {
-        if !references.insert((input.transaction_id, input.index)) {
-            return Err(DijkstraUnsupported(
-                UnsupportedFeature::DuplicateReferenceInputs,
-            ));
-        }
-    }
+    check_distinct(b.inputs.iter(), MalformedField::DuplicateInputs)?;
+    check_distinct(
+        b.reference_inputs.iter().flat_map(|x| x.iter()),
+        MalformedField::DuplicateReferenceInputs,
+    )?;
     check_output_addresses(b.outputs.iter())?;
     check_guards(b.guards.as_ref())?;
     check_witness_fields(&tx.transaction_witness_set)
@@ -1130,14 +1147,6 @@ fn check_scripts(
     let mut natives = BTreeMap::new();
     let mut plutus = subs.plutus.clone();
     let mut reference_scripts = HashSet::new();
-    let mut refs = Spent::new();
-    for input in b.reference_inputs.iter().flat_map(|x| x.iter()) {
-        if !refs.insert((input.transaction_id, input.index)) {
-            return Err(DijkstraUnsupported(
-                UnsupportedFeature::DuplicateReferenceInputs,
-            ));
-        }
-    }
     for input in b
         .reference_inputs
         .iter()
@@ -1253,15 +1262,9 @@ fn check_collateral(
     if collateral.len() > pp.max_collateral_inputs as usize {
         return Err(PostAlonzo(TooManyCollaterals));
     }
-    let mut collateral_ids = Spent::new();
     let mut collateral_assets = BTreeMap::new();
     let mut total = 0;
     for input in collateral {
-        if !collateral_ids.insert((input.transaction_id, input.index)) {
-            return Err(DijkstraUnsupported(
-                UnsupportedFeature::DuplicateCollateralInputs,
-            ));
-        }
         let output = utxos
             .get(&MultiEraInput::from_alonzo_compatible(input))
             .ok_or(PostAlonzo(CollateralNotInUTxO))?;

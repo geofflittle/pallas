@@ -1890,7 +1890,7 @@ fn dijkstra_batch_sub_reference_inputs_are_distinct_and_counted_once() {
         });
         error(
             run_with(&changed, &input, &sub_input, &[(reference, holder)], &env()),
-            "DijkstraUnsupported(\"duplicate reference inputs\")",
+            "DijkstraMalformed(\"duplicate reference inputs\")",
         );
         // The sub spends and references the same UTxO; its script counts once.
         let script = native(n::NativeScript::ScriptAll(vec![]));
