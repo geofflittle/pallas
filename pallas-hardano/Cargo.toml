@@ -29,3 +29,6 @@ serde_json.workspace = true
 
 [dev-dependencies]
 tracing-subscriber = "0.3.17"
+
+[features]
+unstable = ["pallas-network/unstable"]
