@@ -1758,6 +1758,95 @@ fn dijkstra_a_hard_fork_follows_its_predecessor_up_to_the_highest_major_version(
 }
 
 #[test]
+fn dijkstra_a_proposed_rational_lies_in_the_interval_its_field_decodes_to() {
+    dijkstra_tests::synthetic(|tx, input| {
+        let inputs = vec![(tx.transaction_body.inputs[0].clone(), input)];
+        let proposing = |action| {
+            run(
+                &with_proposal(&tx, action),
+                &inputs,
+                &free_env(),
+                &registered(0),
+            )
+        };
+        let change = |update: &str| {
+            let update = minicbor::decode(&hex::decode(update).unwrap()).unwrap();
+            n::GovAction::ParameterChange(None, Box::new(update), None)
+        };
+        let quorum = |numerator, denominator| {
+            n::GovAction::UpdateCommittee(
+                None,
+                vec![].into(),
+                BTreeMap::new(),
+                n::RationalNumber {
+                    numerator,
+                    denominator,
+                },
+            )
+        };
+        let outcomes = |actions: Vec<(&'static str, n::GovAction)>| {
+            actions
+                .into_iter()
+                .map(|(field, action)| (field, format!("{:?}", proposing(action))))
+                .collect::<Vec<_>>()
+        };
+        let all = |actions: &[(&'static str, String)], expected: &str| {
+            actions
+                .iter()
+                .map(|(field, _)| (*field, expected.to_string()))
+                .collect::<Vec<_>>()
+        };
+        let accepted = outcomes(vec![
+            ("expansion rate 1/1", change("a10ad81e820101")),
+            ("pledge influence 3/1", change("a109d81e820301")),
+            ("execution prices 3/1", change("a11382d81e820301d81e820301")),
+            ("reference script fee 3/1", change("a11821d81e820301")),
+            (
+                "reference script multiplier 1/10^19",
+                change("a11825d81e82011b8ac7230489e80000"),
+            ),
+            ("no pledge leverage", change("a11826f6")),
+            ("quorum 1/1", quorum(1, 1)),
+        ]);
+        assert_eq!(accepted, all(&accepted, "Ok(())"));
+        let refused = outcomes(vec![
+            ("expansion rate 1/0", change("a10ad81e820100")),
+            ("expansion rate 3/2", change("a10ad81e820302")),
+            ("pledge influence 1/0", change("a109d81e820100")),
+            ("execution prices 1/0", change("a11382d81e820100d81e820101")),
+            ("pledge leverage 1/0", change("a11826d81e820100")),
+            (
+                "reference script multiplier 0/1",
+                change("a11825d81e820001"),
+            ),
+            (
+                "reference script multiplier below 1/10^19",
+                change("a11825d81e82011b8ac7230489e80001"),
+            ),
+            ("Peras healing factor 0/1", change("a11832d81e820001")),
+            ("Leios quorum 3/2", change("a1182cd81e820302")),
+            ("Peras safety margin 3/2", change("a11836d81e820302")),
+            (
+                "pool voting thresholds",
+                change("a1181985d81e820101d81e820101d81e820101d81e820101d81e820302"),
+            ),
+            (
+                "DRep voting thresholds",
+                change(
+                    "a1181a8ad81e820101d81e820101d81e820101d81e820101d81e820101d81e820101d81e820101d81e820101d81e820101d81e820302",
+                ),
+            ),
+            ("quorum 3/2", quorum(3, 2)),
+            ("quorum 1/0", quorum(1, 0)),
+        ]);
+        assert_eq!(
+            refused,
+            all(&refused, "Err(DijkstraMalformed(\"rational\"))")
+        );
+    });
+}
+
+#[test]
 fn dijkstra_a_pool_retires_at_most_the_maximum_epoch_ahead() {
     dijkstra_tests::synthetic(|tx, input| {
         let inputs = vec![(tx.transaction_body.inputs[0].clone(), input)];

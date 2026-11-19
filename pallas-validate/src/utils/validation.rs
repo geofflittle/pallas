@@ -228,6 +228,7 @@ labels! {
         MultiAssetValue => "multi-asset value",
         Output => "output",
         ProtocolParameterUpdate => "protocol parameter update",
+        Rational => "rational",
         RequiredTopLevelGuards => "required top-level guards",
         SubtransactionBody => "subtransaction body",
         WitnessSet => "witness set",

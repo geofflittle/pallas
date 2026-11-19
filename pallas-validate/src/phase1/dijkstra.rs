@@ -741,6 +741,7 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
     )?;
     check_output_encodings(b.outputs.iter().chain(b.collateral_return.iter()))?;
     check_guards(b.guards.as_ref())?;
+    check_rationals(b.certificates.as_ref(), b.proposal_procedures.as_ref())?;
     check_witness_fields(&tx.transaction_witness_set)?;
     check_auxiliary_encoding(&tx.auxiliary_data)
 }
@@ -870,8 +871,115 @@ fn check_sub_supported(tx: &SubTransaction<'_>) -> ValidationResult {
     )?;
     check_output_encodings(b.outputs.iter())?;
     check_guards(b.guards.as_ref())?;
+    check_rationals(b.certificates.as_ref(), b.proposal_procedures.as_ref())?;
     check_witness_fields(&tx.transaction_witness_set)?;
     check_auxiliary_encoding(&tx.auxiliary_data)
+}
+#[derive(Clone, Copy)]
+enum Interval {
+    NonNegative,
+    Positive,
+    Unit,
+}
+fn within(x: &RationalNumber, interval: Interval) -> bool {
+    let (numerator, denominator) = (u128::from(x.numerator), u128::from(x.denominator));
+    denominator != 0
+        && match interval {
+            Interval::NonNegative => true,
+            Interval::Positive => numerator * 10u128.pow(19) >= denominator,
+            Interval::Unit => numerator <= denominator,
+        }
+}
+fn check_rationals(
+    certificates: Option<&NonEmptySet<Certificate>>,
+    proposals: Option<&NonEmptySet<ProposalProcedure>>,
+) -> ValidationResult {
+    let mut rationals = Vec::new();
+    for certificate in certificates.iter().flat_map(|x| x.iter()) {
+        if let Certificate::PoolRegistration { margin, .. } = certificate {
+            rationals.push((margin, Interval::Unit));
+        }
+    }
+    for proposal in proposals.iter().flat_map(|x| x.iter()) {
+        match &proposal.gov_action {
+            GovAction::ParameterChange(_, update, _) => rationals.extend(update_rationals(update)),
+            GovAction::UpdateCommittee(_, _, _, quorum) => rationals.push((quorum, Interval::Unit)),
+            _ => (),
+        }
+    }
+    match rationals
+        .into_iter()
+        .all(|(x, interval)| within(x, interval))
+    {
+        true => Ok(()),
+        false => Err(DijkstraMalformed(MalformedField::Rational)),
+    }
+}
+fn update_rationals(update: &ProtocolParamUpdate) -> Vec<(&RationalNumber, Interval)> {
+    let pool = update.pool_voting_thresholds.iter().flat_map(|x| {
+        [
+            &x.motion_no_confidence,
+            &x.committee_normal,
+            &x.committee_no_confidence,
+            &x.hard_fork_initiation,
+            &x.security_voting_threshold,
+        ]
+    });
+    let drep = update.drep_voting_thresholds.iter().flat_map(|x| {
+        [
+            &x.motion_no_confidence,
+            &x.committee_normal,
+            &x.committee_no_confidence,
+            &x.update_constitution,
+            &x.hard_fork_initiation,
+            &x.pp_network_group,
+            &x.pp_economic_group,
+            &x.pp_technical_group,
+            &x.pp_governance_group,
+            &x.treasury_withdrawal,
+        ]
+    });
+    let unit = [
+        &update.expansion_rate,
+        &update.treasury_growth_rate,
+        &update.min_pool_margin,
+        &update.leios_quorum_stake_threshold,
+        &update.peras_quorum_threshold_safety_margin,
+    ];
+    let leverage = match &update.max_pledge_leverage {
+        Some(Nullable::Some(x)) => Some(x),
+        _ => None,
+    };
+    let prices = update
+        .execution_costs
+        .iter()
+        .flat_map(|x| [&x.mem_price, &x.step_price]);
+    let non_negative = [
+        update.pool_pledge_influence.as_ref(),
+        update.minfee_refscript_cost_per_byte.as_ref(),
+        leverage,
+    ];
+    let positive = [
+        &update.ref_script_cost_multiplier,
+        &update.peras_healing_factor,
+    ];
+    pool.chain(drep)
+        .chain(unit.into_iter().flatten())
+        .map(|x| (x, Interval::Unit))
+        .chain(
+            non_negative
+                .into_iter()
+                .flatten()
+                .chain(prices)
+                .map(|x| (x, Interval::NonNegative)),
+        )
+        .chain(
+            positive
+                .into_iter()
+                .flatten()
+                .map(|x| (x, Interval::Positive)),
+        )
+        .collect()
 }
 fn check_withdrawal_accounts(raw: &[u8]) -> ValidationResult {
     let withdrawals: pallas_codec::utils::KeyValuePairs<Bytes, u64> = minicbor::decode(raw)

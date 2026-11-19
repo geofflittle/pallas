@@ -347,6 +347,49 @@ fn dijkstra_pool_metadata_hash_is_at_most_32_bytes() {
     });
 }
 #[test]
+fn dijkstra_a_pool_margin_is_at_most_one() {
+    synthetic(|mut tx, input| {
+        let operator = Hasher::<224>::hash(SecretKey::from([71; 32]).public_key().as_ref());
+        let mut account = vec![0xe0];
+        account.extend(operator.as_ref());
+        let mut e = env();
+        let MultiEraProtocolParameters::Dijkstra(ref mut pp) = e.prot_params else {
+            unreachable!()
+        };
+        pp.pool_deposit = 0;
+        let cost = pp.min_pool_cost;
+        let output = MultiEraOutput::from_dijkstra(&input);
+        for (numerator, denominator, expected) in [
+            (1, 1, None),
+            (3, 2, Some("DijkstraMalformed(\"rational\")")),
+            (1, 0, Some("DijkstraMalformed(\"rational\")")),
+        ] {
+            tx.transaction_body.certificates =
+                n::NonEmptySet::from_vec(vec![n::Certificate::PoolRegistration {
+                    operator,
+                    vrf_keyhash: [9; 32].into(),
+                    bls_key: None,
+                    pledge: 0,
+                    cost,
+                    margin: n::RationalNumber {
+                        numerator,
+                        denominator,
+                    },
+                    reward_account: account.clone().into(),
+                    pool_owners: vec![].into(),
+                    relays: vec![],
+                    pool_metadata: None,
+                }]);
+            sign(&mut tx);
+            let result = dispatch(&tx, &output, &e);
+            match expected {
+                None => assert!(result.is_ok(), "{result:?}"),
+                Some(expected) => error(result, expected),
+            }
+        }
+    });
+}
+#[test]
 fn dijkstra_collateral_without_redeemers_meets_only_the_rules_that_always_hold() {
     synthetic(|mut tx, input| {
         let collateral = n::TransactionInput {

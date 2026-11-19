@@ -212,6 +212,48 @@ fn change_sub(tx: &mut n::BlockTransaction<'_>, f: impl FnOnce(&mut n::SubTransa
 }
 
 #[test]
+fn dijkstra_batch_sub_pool_margin_is_at_most_one() {
+    batch(|tx, input| {
+        let operator = Hasher::<224>::hash(SecretKey::from([71; 32]).public_key().as_ref());
+        let mut account = vec![0xe0];
+        account.extend(operator.as_ref());
+        let mut e = env();
+        let MultiEraProtocolParameters::Dijkstra(ref mut pp) = e.prot_params else {
+            unreachable!()
+        };
+        pp.pool_deposit = 0;
+        let cost = pp.min_pool_cost;
+        let registering = |numerator, denominator| {
+            let mut changed = tx.clone();
+            change_sub(&mut changed, |sub| {
+                sub.sub_transaction_body.certificates =
+                    n::NonEmptySet::from_vec(vec![n::Certificate::PoolRegistration {
+                        operator,
+                        vrf_keyhash: [9; 32].into(),
+                        bls_key: None,
+                        pledge: 0,
+                        cost,
+                        margin: n::RationalNumber {
+                            numerator,
+                            denominator,
+                        },
+                        reward_account: account.clone().into(),
+                        pool_owners: vec![].into(),
+                        relays: vec![],
+                        pool_metadata: None,
+                    }]);
+                sign_sub(sub);
+            });
+            sign(&mut changed);
+            run(&changed, &input, &e)
+        };
+        let result = registering(1, 1);
+        assert!(result.is_ok(), "{result:?}");
+        error(registering(3, 2), "DijkstraMalformed(\"rational\")");
+    });
+}
+
+#[test]
 fn dijkstra_batch_cannot_spend_output_created_in_same_batch() {
     batch(|mut tx, input| {
         let mut first = tx.transaction_body.sub_transactions.as_ref().unwrap()[0].clone();
