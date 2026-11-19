@@ -13,11 +13,11 @@ use pallas_codec::utils::{
 use pallas_crypto::hash::Hash;
 use pallas_primitives::NonZeroInt;
 use pallas_primitives::conway::{
-    AssetName, BigInt, Certificate, Coin, Constitution, Constr, DRep, DRepVotingThresholds,
-    DatumOption, ExUnitPrices, ExUnits, GovAction, GovActionId, Mint, PlutusData, PolicyId,
-    PoolVotingThresholds, ProposalProcedure, ProtocolParamUpdate, RationalNumber, Redeemer,
-    ScriptRef, StakeCredential, TransactionInput, TransactionOutput, Value, Vote, Voter,
-    VotingProcedure,
+    AssetName, BigInt, Certificate, Coin, Constitution, Constr, CostModel, CostModels, DRep,
+    DRepVotingThresholds, DatumOption, ExUnitPrices, ExUnits, GovAction, GovActionId, Mint,
+    PlutusData, PolicyId, PoolVotingThresholds, ProposalProcedure, ProtocolParamUpdate,
+    RationalNumber, Redeemer, ScriptRef, StakeCredential, TransactionInput, TransactionOutput,
+    Value, Vote, Voter, VotingProcedure,
 };
 use pallas_traverse::ComputeHash;
 
@@ -1069,137 +1069,119 @@ impl ToPlutusData for GovActionId {
     }
 }
 
+/// The data map of cost models, holding `unknown` and each model of `known` under its language key.
+fn cost_models_data(
+    unknown: &BTreeMap<u64, CostModel>,
+    known: &[(u64, &Option<CostModel>)],
+) -> PlutusData {
+    let mut models = unknown.clone();
+    for (key, model) in known {
+        if let Some(model) = model {
+            models.insert(*key, model.clone());
+        }
+    }
+    models.to_plutus_data()
+}
+
+impl ToPlutusData for CostModels {
+    fn to_plutus_data(&self) -> PlutusData {
+        cost_models_data(
+            &self.unknown,
+            &[
+                (0, &self.plutus_v1),
+                (1, &self.plutus_v2),
+                (2, &self.plutus_v3),
+            ],
+        )
+    }
+}
+
 impl ToPlutusData for ProtocolParamUpdate {
     fn to_plutus_data(&self) -> PlutusData {
-        let mut pparams = Vec::with_capacity(30);
-
-        let mut push = |ix: usize, p: PlutusData| {
-            pparams.push((ix.to_plutus_data(), p));
-        };
-
-        if let Some(p) = self.minfee_a {
-            push(0, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.minfee_b {
-            push(1, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.max_block_body_size {
-            push(2, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.max_transaction_size {
-            push(3, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.max_block_header_size {
-            push(4, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.key_deposit {
-            push(5, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.pool_deposit {
-            push(6, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.maximum_epoch {
-            push(7, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.desired_number_of_stake_pools {
-            push(8, p.to_plutus_data());
-        }
-
-        if let Some(ref p) = self.pool_pledge_influence {
-            push(9, WithArrayRational(p).to_plutus_data());
-        }
-
-        if let Some(ref p) = self.expansion_rate {
-            push(10, WithArrayRational(p).to_plutus_data());
-        }
-
-        if let Some(ref p) = self.treasury_growth_rate {
-            push(11, WithArrayRational(p).to_plutus_data());
-        }
-
-        if let Some(p) = self.min_pool_cost {
-            push(16, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.ada_per_utxo_byte {
-            push(17, p.to_plutus_data());
-        }
-
-        #[allow(clippy::redundant_pattern_matching)]
-        if let Some(_) = self.cost_models_for_script_languages {
-            unimplemented!("TODO: ToPlutusData for cost models.");
-        }
-
-        if let Some(ref p) = self.execution_costs {
-            push(19, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.max_tx_ex_units {
-            push(20, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.max_block_ex_units {
-            push(21, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.max_value_size {
-            push(22, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.collateral_percentage {
-            push(23, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.max_collateral_inputs {
-            push(24, p.to_plutus_data());
-        }
-
-        if let Some(ref p) = self.pool_voting_thresholds {
-            push(25, p.to_plutus_data());
-        }
-
-        if let Some(ref p) = self.drep_voting_thresholds {
-            push(26, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.min_committee_size {
-            push(27, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.committee_term_limit {
-            push(28, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.governance_action_validity_period {
-            push(29, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.governance_action_deposit {
-            push(30, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.drep_deposit {
-            push(31, p.to_plutus_data());
-        }
-
-        if let Some(p) = self.drep_inactivity_period {
-            push(32, p.to_plutus_data());
-        }
-
-        if let Some(ref p) = self.minfee_refscript_cost_per_byte {
-            push(33, WithArrayRational(p).to_plutus_data());
-        }
-
-        Data::map(pparams)
+        let entries = conway_update_entries(self).into_iter();
+        Data::map(entries.map(|(key, p)| (key.to_plutus_data(), p)).collect())
     }
+}
+
+/// The data of a parameter that is set.
+fn set_value<T: ToPlutusData>(x: &Option<T>) -> Option<PlutusData> {
+    x.as_ref().map(ToPlutusData::to_plutus_data)
+}
+
+/// The data of a rational parameter that is set, as a two element list.
+fn set_rational(x: &Option<RationalNumber>) -> Option<PlutusData> {
+    x.as_ref().map(|x| WithArrayRational(x).to_plutus_data())
+}
+
+/// The data of each parameter a Conway update sets, by parameter key in ascending order.
+fn conway_update_entries(update: &ProtocolParamUpdate) -> Vec<(u64, PlutusData)> {
+    let ProtocolParamUpdate {
+        minfee_a,
+        minfee_b,
+        max_block_body_size,
+        max_transaction_size,
+        max_block_header_size,
+        key_deposit,
+        pool_deposit,
+        maximum_epoch,
+        desired_number_of_stake_pools,
+        pool_pledge_influence,
+        expansion_rate,
+        treasury_growth_rate,
+        min_pool_cost,
+        ada_per_utxo_byte,
+        cost_models_for_script_languages,
+        execution_costs,
+        max_tx_ex_units,
+        max_block_ex_units,
+        max_value_size,
+        collateral_percentage,
+        max_collateral_inputs,
+        pool_voting_thresholds,
+        drep_voting_thresholds,
+        min_committee_size,
+        committee_term_limit,
+        governance_action_validity_period,
+        governance_action_deposit,
+        drep_deposit,
+        drep_inactivity_period,
+        minfee_refscript_cost_per_byte,
+    } = update;
+    [
+        (0, set_value(minfee_a)),
+        (1, set_value(minfee_b)),
+        (2, set_value(max_block_body_size)),
+        (3, set_value(max_transaction_size)),
+        (4, set_value(max_block_header_size)),
+        (5, set_value(key_deposit)),
+        (6, set_value(pool_deposit)),
+        (7, set_value(maximum_epoch)),
+        (8, set_value(desired_number_of_stake_pools)),
+        (9, set_rational(pool_pledge_influence)),
+        (10, set_rational(expansion_rate)),
+        (11, set_rational(treasury_growth_rate)),
+        (16, set_value(min_pool_cost)),
+        (17, set_value(ada_per_utxo_byte)),
+        (18, set_value(cost_models_for_script_languages)),
+        (19, set_value(execution_costs)),
+        (20, set_value(max_tx_ex_units)),
+        (21, set_value(max_block_ex_units)),
+        (22, set_value(max_value_size)),
+        (23, set_value(collateral_percentage)),
+        (24, set_value(max_collateral_inputs)),
+        (25, set_value(pool_voting_thresholds)),
+        (26, set_value(drep_voting_thresholds)),
+        (27, set_value(min_committee_size)),
+        (28, set_value(committee_term_limit)),
+        (29, set_value(governance_action_validity_period)),
+        (30, set_value(governance_action_deposit)),
+        (31, set_value(drep_deposit)),
+        (32, set_value(drep_inactivity_period)),
+        (33, set_rational(minfee_refscript_cost_per_byte)),
+    ]
+    .into_iter()
+    .filter_map(|(key, x)| Some((key, x?)))
+    .collect()
 }
 
 impl ToPlutusData for PoolVotingThresholds {
