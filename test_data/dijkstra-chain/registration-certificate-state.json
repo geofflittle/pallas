@@ -1,9 +1,5 @@
 {
-  "scope": "Five Reg (tag 7) script credentials, immediately before their captured registration transactions; reconstructed from Dolos archive, not a node ledger-state dump.",
-  "scan": "sources/dolos/certificate-history/scan.json",
-  "source_archive": "/home/rodrigo/projects/musashi-readiness/local-dolos/data",
-  "snapshot": "Frozen query copy from the earlier input capture; the original archive subsequently grew.",
-  "trust_boundary": "Dolos expanded archive trust; this verifies header continuity, not full consensus or all endorser commitments. Certificate CBOR is re-encoded for reporting; original archive blocks retained.",
+  "scope": "Five Reg (tag 7) script credentials, immediately before their registration transactions.",
   "credentials": [
     {
       "credential": "aabeb9796cfbf5847e567e16adb0d021632bd16685458d67a8f9a09f",
