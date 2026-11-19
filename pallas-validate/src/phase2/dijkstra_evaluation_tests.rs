@@ -1554,24 +1554,51 @@ fn native_registration_invalid_script_encoding_and_witness_scripts() {
         for language in [1, 2, 3] {
             let mut tx = tx.clone();
             let mut w = (*tx.transaction_witness_set).clone();
-            match language {
+            let hash = match language {
                 1 => {
-                    w.plutus_v1_script =
-                        Some(vec![n::PlutusScript(vec![0].into())].try_into().unwrap())
+                    let s = n::PlutusScript::<1>(vec![0].into());
+                    w.plutus_v1_script = Some(vec![s.clone()].try_into().unwrap());
+                    s.compute_hash()
                 }
                 2 => {
-                    w.plutus_v2_script =
-                        Some(vec![n::PlutusScript(vec![0].into())].try_into().unwrap())
+                    let s = n::PlutusScript::<2>(vec![0].into());
+                    w.plutus_v2_script = Some(vec![s.clone()].try_into().unwrap());
+                    s.compute_hash()
                 }
                 _ => {
-                    w.plutus_v3_script =
-                        Some(vec![n::PlutusScript(vec![0].into())].try_into().unwrap())
+                    let s = n::PlutusScript::<3>(vec![0].into());
+                    w.plutus_v3_script = Some(vec![s.clone()].try_into().unwrap());
+                    s.compute_hash()
                 }
             };
             tx.transaction_witness_set = w.into();
-            error(run(&tx, &u), "DecodeError");
+            malformed_witness(run(&tx, &u), hash);
         }
     });
+}
+
+fn malformed_witness(result: Result<MultiEraEvalReport, Error>, hash: Hash<28>) {
+    let actual = result.expect_err("a malformed witness script").to_string();
+    let expected = format!("malformed script witness\n{:>13} {hash}", "Script");
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn a_malformed_witness_script_no_redeemer_runs_is_named() {
+    let raw = hex::decode(
+        std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../test_data/dijkstra-guarding-redeemer.tx"),
+        )
+        .unwrap()
+        .trim(),
+    )
+    .unwrap();
+    let view = MultiEraTx::decode_for_era(Era::Dijkstra, &raw).unwrap();
+    let w = &view.as_dijkstra().unwrap().transaction_witness_set;
+    let first = w.plutus_v1_script.as_ref().unwrap()[0].compute_hash();
+    let result = evaluate_multi_era_tx(&view, &params(), &UtxoMap::new(), &slots());
+    malformed_witness(result, first);
 }
 
 #[test]
