@@ -5,7 +5,6 @@ use pallas_validate::utils::{
     MalformedField, ParameterFailure, UnsupportedFeature, ValidationError, WithdrawalFailure,
 };
 
-/// The text, Display and Debug of every label of one type.
 fn rendered<T: std::fmt::Display + std::fmt::Debug>(
     all: &[T],
     text: fn(&T) -> &'static str,

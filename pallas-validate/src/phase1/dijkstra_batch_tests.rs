@@ -1,4 +1,3 @@
-//! Synthetic script-free batches; the retained real Plutus batch remains unsupported.
 use super::{
     dijkstra_tests::{env, error, sign, synthetic},
     *,

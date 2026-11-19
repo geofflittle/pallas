@@ -1,4 +1,3 @@
-//! Phase one verdicts on the batches of ledger conformance records, and on batches changed from them.
 use crate::utils::{
     CertState, DijkstraTimeContext, DijkstraTimeError, EraTime, ForecastHorizon,
     MultiEraProtocolParameters, PostAlonzoError, UTxOs, ValidationError, ValidationResult,
@@ -8,14 +7,12 @@ use pallas_crypto::hash::Hasher;
 use pallas_primitives::dijkstra as n;
 use pallas_traverse::{Era, MultiEraInput, MultiEraOutput, MultiEraTx};
 
-/// The slot every record batch is validated at.
 const SLOT: u64 = 5179681;
 
 pub(crate) fn read(record: u32) -> serde_json::Value {
     read_in("dijkstra-plutus-v4", record)
 }
 
-/// The fixture of `record` in the test data directory `dir`.
 pub(crate) fn read_in(dir: &str, record: u32) -> serde_json::Value {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../test_data")
@@ -38,7 +35,6 @@ pub(crate) fn params(fixture: &serde_json::Value) -> MultiEraProtocolParameters 
     pp
 }
 
-/// The encoded inputs and outputs of the UTxO set a record names.
 fn pairs(fixture: &serde_json::Value) -> Vec<(Vec<u8>, Vec<u8>)> {
     fixture["utxos"]
         .as_array()
@@ -57,7 +53,6 @@ fn time(horizon: ForecastHorizon) -> DijkstraTimeContext {
     DijkstraTimeContext::new(vec![era], horizon).unwrap()
 }
 
-/// Validates `tx` against the UTxO set `pairs`, with each account the batch registers known as unregistered.
 fn check(
     tx: &n::BlockTransaction<'_>,
     pairs: &[(Vec<u8>, Vec<u8>)],
@@ -99,7 +94,6 @@ fn check(
     )
 }
 
-/// Runs `test` on the batch, UTxO set and parameters of `record`.
 fn record(
     record: u32,
     test: impl FnOnce(n::BlockTransaction<'_>, Vec<(Vec<u8>, Vec<u8>)>, MultiEraProtocolParameters),
@@ -110,7 +104,6 @@ fn record(
     test(tx.into(), pairs(&fixture), params(&fixture));
 }
 
-/// The batch `tx` with its first sub transaction changed by `f`.
 fn change_sub<'b>(
     tx: &n::BlockTransaction<'b>,
     f: impl FnOnce(&mut n::SubTransaction<'b>),
@@ -288,14 +281,12 @@ fn sub_transaction_integrity_hash_covers_the_views_of_its_languages() {
     });
 }
 
-/// A testnet reward address, which no output may hold.
 const REWARD: [u8; 29] = {
     let mut address = [5; 29];
     address[0] = 0xe0;
     address
 };
 
-/// `output` sent to `address`.
 fn sent_to<'b>(output: &n::TransactionOutput<'b>, address: &[u8]) -> n::TransactionOutput<'b> {
     match output {
         n::TransactionOutput::PostAlonzo(o) => {
@@ -311,7 +302,6 @@ fn sent_to<'b>(output: &n::TransactionOutput<'b>, address: &[u8]) -> n::Transact
     }
 }
 
-/// The verdict on `record` with no fee, after `f` changes its body.
 fn feeless(
     record: u32,
     f: impl for<'b> FnOnce(&mut n::TransactionBody<'b>, &n::TransactionOutput<'b>),

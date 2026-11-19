@@ -1,4 +1,3 @@
-//! Native dispatch regressions. Captures are immutable; mutations are synthetic.
 use super::*;
 use crate::utils::DijkstraProtParams;
 use pallas_addresses::{Network, ShelleyAddress, ShelleyDelegationPart, ShelleyPaymentPart};

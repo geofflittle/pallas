@@ -1,7 +1,5 @@
 //! The labels that name the rule a Dijkstra refusal breaks.
 
-/// Declares a label enum whose variants print as their texts, and refuses to
-/// compile when two of its texts are equal.
 macro_rules! labels {
     (
         $(#[$meta:meta])*
@@ -49,7 +47,6 @@ macro_rules! labels {
     };
 }
 
-/// Whether no two of the texts are equal.
 pub(crate) const fn distinct(texts: &[&str]) -> bool {
     let mut i = 0;
     while i < texts.len() {
@@ -65,7 +62,6 @@ pub(crate) const fn distinct(texts: &[&str]) -> bool {
     true
 }
 
-/// Whether two byte strings are equal.
 const fn equal(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;

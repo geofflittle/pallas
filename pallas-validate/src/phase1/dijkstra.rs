@@ -181,7 +181,6 @@ pub(super) fn validate_dijkstra_tx_inner<S: DijkstraLedgerState + ?Sized>(
     Ok(delta)
 }
 
-/// Checks that the script context of each of `languages` can hold the level `b`.
 fn check_contexts(
     b: &Level<'_>,
     languages: &BTreeSet<Language>,
@@ -200,7 +199,6 @@ fn check_contexts(
     Ok(())
 }
 
-/// The outputs `inputs` name in `utxos`, or `missing` for the first one absent.
 fn resolve<'a, 'b>(
     inputs: impl Iterator<Item = &'a TransactionInput>,
     utxos: &'a UTxOs<'b>,
@@ -215,7 +213,6 @@ fn resolve<'a, 'b>(
         .collect()
 }
 
-/// The output the spent `input` resolves to in `utxos`.
 fn spent<'a, 'b>(
     input: &TransactionInput,
     utxos: &'a UTxOs<'b>,
@@ -240,7 +237,6 @@ pub fn dijkstra_ledger_effects<S: DijkstraLedgerState + ?Sized>(
     Ok(ledger_rules(tx, pp, network_id, WithdrawalRule::Accepted, state)?.2)
 }
 
-/// The treasury, account and governance rules of each sub transaction in order, then of the top level transaction, with the flows of the batch and of the top level.
 fn ledger_rules<S: DijkstraLedgerState + ?Sized>(
     tx: &BlockTransaction<'_>,
     pp: &DijkstraProtParams,
@@ -299,12 +295,10 @@ pub fn dijkstra_min_fee(
     )
 }
 
-/// The size the ledger counts for a transaction, its body, witnesses and auxiliary data without the block validity flag.
 fn tx_size(tx: &BlockTransaction<'_>) -> Result<u64, ValidationError> {
     Ok(encode(tx.to_mempool_transaction())?.len() as u64)
 }
 
-/// The memory and steps the redeemers of the transaction and its sub transactions declare, summed.
 fn declared_units(tx: &BlockTransaction<'_>) -> Result<(u64, u64), ValidationError> {
     let subs = tx
         .transaction_body
@@ -326,7 +320,6 @@ fn declared_units(tx: &BlockTransaction<'_>) -> Result<(u64, u64), ValidationErr
     Ok(units)
 }
 
-/// The bytes of the reference scripts held by the outputs the transaction's inputs and reference inputs resolve to, each input once.
 fn reference_script_size(
     b: &TransactionBody<'_>,
     utxos: &UTxOs<'_>,
@@ -409,7 +402,6 @@ fn check_required_guards(
     }
     Ok(())
 }
-/// Checks that each required top-level guard whose credential is a key or a provided script has a datum exactly when that script is Plutus.
 fn check_guard_datums(
     required: Option<&RequiredTopLevelGuards>,
     provided: &Provided,
@@ -426,7 +418,6 @@ fn check_guard_datums(
     }
     Ok(())
 }
-/// Checks one level's spending inputs, adding the key of each key locked input to `keys`, and returns their coin.
 fn check_inputs(
     inputs: &[TransactionInput],
     utxos: &UTxOs<'_>,
@@ -457,7 +448,6 @@ pub(crate) enum Spender {
     Key(Hash<28>),
     Script(Hash<28>),
 }
-/// Pointer delegation plays no part in spending, so pointer addresses pass.
 pub(crate) fn spender(output: &MultiEraOutput<'_>) -> Result<Spender, ValidationError> {
     match output.address().map_err(|_| PostAlonzo(AddressDecoding))? {
         Address::Shelley(address) => Ok(match address.payment() {
@@ -470,21 +460,17 @@ pub(crate) fn spender(output: &MultiEraOutput<'_>) -> Result<Spender, Validation
         Address::Stake(_) => Err(PostAlonzo(InputDecoding)),
     }
 }
-/// Reads the root of a Byron address.
 fn byron_root(address: &ByronAddress) -> Result<Hash<28>, minicbor::decode::Error> {
     let mut d = minicbor::Decoder::new(&address.payload.0);
     d.array()?;
     d.decode()
 }
-/// The CRC-32 a Byron address checks its payload with.
 const BYRON_CRC: crc::Crc<u32> = crc::Crc::<u32>::new(&crc::CRC_32_ISO_HDLC);
-/// The attributes of a Byron output address, as the ledger decodes them.
 struct ByronAttributes {
     network_magic: Option<u32>,
     size: usize,
 }
 impl ByronAttributes {
-    /// Decodes the bytes of a Byron output address by the ledger's rules, giving its attributes.
     fn of_address(bytes: &[u8]) -> Result<Self, minicbor::decode::Error> {
         if bytes.first() != Some(&0x82) {
             return Err(minicbor::decode::Error::message("not a Byron address"));
@@ -513,7 +499,6 @@ impl ByronAttributes {
             })
         })
     }
-    /// The network the attributes name.
     fn network(&self) -> u8 {
         match self.network_magic {
             Some(_) => Network::Testnet.value(),
@@ -549,7 +534,6 @@ impl<'b, C> minicbor::Decode<'b, C> for ByronAttributes {
         Ok(attributes)
     }
 }
-/// Decodes all of `bytes` with `decode`.
 fn whole<'b, T>(
     bytes: &'b [u8],
     decode: impl FnOnce(&mut minicbor::Decoder<'b>) -> Result<T, minicbor::decode::Error>,
@@ -561,7 +545,6 @@ fn whole<'b, T>(
     }
     Ok(value)
 }
-/// The length of the shortest CBOR head for the argument `n`.
 fn head_len(n: u64) -> usize {
     match n {
         0..=23 => 1,
@@ -571,7 +554,6 @@ fn head_len(n: u64) -> usize {
         _ => 9,
     }
 }
-/// Decodes an unsigned integer written with its shortest head.
 fn canonical_u32(d: &mut minicbor::Decoder<'_>) -> Result<u32, minicbor::decode::Error> {
     let start = d.position();
     let value = d.u32()?;
@@ -582,7 +564,6 @@ fn canonical_u32(d: &mut minicbor::Decoder<'_>) -> Result<u32, minicbor::decode:
     }
     Ok(value)
 }
-/// Decodes a definite byte string written with its shortest head.
 fn canonical_bytes<'b>(d: &mut minicbor::Decoder<'b>) -> Result<&'b [u8], minicbor::decode::Error> {
     let start = d.position();
     let value = d.bytes()?;
@@ -593,7 +574,6 @@ fn canonical_bytes<'b>(d: &mut minicbor::Decoder<'b>) -> Result<&'b [u8], minicb
     }
     Ok(value)
 }
-/// Whether `signature` is an Ed25519 signature of `message` by the key `vkey`.
 fn verifies(vkey: &[u8], signature: &[u8], message: &[u8]) -> bool {
     match (PublicKey::try_from(vkey), Signature::try_from(signature)) {
         (Ok(key), Ok(signature)) => key.verify(message, &signature),
@@ -626,7 +606,6 @@ fn witness_keys(w: &WitnessSet<'_>) -> Keys {
         .map(|w| Hasher::<224>::hash(&w.vkey))
         .collect()
 }
-/// The network of the address of `output` and the size of its Byron attributes, zero for a Shelley address.
 fn output_address(output: &TransactionOutput<'_>) -> Result<(u8, usize), ValidationError> {
     let bytes = match output {
         TransactionOutput::Legacy(x) => &x.address,
@@ -642,7 +621,6 @@ fn output_address(output: &TransactionOutput<'_>) -> Result<(u8, usize), Validat
         Address::Stake(_) => Err(PostAlonzo(AddressDecoding)),
     }
 }
-/// Refuses the first of `outputs` whose fields, address or value the ledger decoder refuses.
 fn check_output_encodings<'a, 'b: 'a>(
     outputs: impl Iterator<Item = &'a TransactionOutput<'b>>,
 ) -> ValidationResult {
@@ -766,7 +744,6 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
     check_witness_fields(&tx.transaction_witness_set)?;
     check_auxiliary_encoding(&tx.auxiliary_data)
 }
-/// Refuses `inputs` when they name one input twice, which the ledger decoder refuses for a set.
 fn check_distinct<'a>(
     inputs: impl IntoIterator<Item = &'a TransactionInput>,
     field: MalformedField,
@@ -896,7 +873,6 @@ fn check_sub_supported(tx: &SubTransaction<'_>) -> ValidationResult {
     check_witness_fields(&tx.transaction_witness_set)?;
     check_auxiliary_encoding(&tx.auxiliary_data)
 }
-/// Refuses a withdrawals map that names an account twice, which the ledger decoder refuses.
 fn check_withdrawal_accounts(raw: &[u8]) -> ValidationResult {
     let withdrawals: pallas_codec::utils::KeyValuePairs<Bytes, u64> = minicbor::decode(raw)
         .map_err(|_| DijkstraInvalidWithdrawal(WithdrawalFailure::Encoding))?;
@@ -911,7 +887,6 @@ fn check_withdrawal_accounts(raw: &[u8]) -> ValidationResult {
         )),
     }
 }
-/// Decoding into a BTreeMap would hide duplicate guards, which the ledger rejects.
 fn check_required_guard_keys(raw: &[u8]) -> ValidationResult {
     let guards: pallas_codec::utils::KeyValuePairs<StakeCredential, pallas_codec::utils::AnyCbor> =
         minicbor::decode(raw)
@@ -924,7 +899,6 @@ fn check_required_guard_keys(raw: &[u8]) -> ValidationResult {
     }
     Ok(())
 }
-/// The body fields refused when present and empty, with the error each gets.
 const NON_EMPTY_FIELDS: [(u64, MalformedField); 6] = [
     (5, MalformedField::EmptyWithdrawals),
     (19, MalformedField::EmptyVotingProcedures),
@@ -933,7 +907,6 @@ const NON_EMPTY_FIELDS: [(u64, MalformedField); 6] = [
     (26, MalformedField::EmptyAccountBalanceIntervals),
     (27, MalformedField::EmptyStartingAccountBalanceIntervals),
 ];
-/// Refuses a body field the ledger decoder refuses for its value, an empty collection or a zero donation.
 fn check_field_present(key: u64, value: &[u8]) -> ValidationResult {
     if key == 22 && minicbor::decode::<u64>(value).is_ok_and(|x| x == 0) {
         return Err(DijkstraMalformed(MalformedField::ZeroDonation));
@@ -943,7 +916,6 @@ fn check_field_present(key: u64, value: &[u8]) -> ValidationResult {
         _ => Ok(()),
     }
 }
-/// Whether a CBOR value is a map with no entries.
 fn is_empty_map(raw: &[u8]) -> bool {
     let mut d = minicbor::Decoder::new(raw);
     match d.map() {
@@ -952,7 +924,6 @@ fn is_empty_map(raw: &[u8]) -> bool {
         Err(_) => false,
     }
 }
-/// Whether a CBOR map holds the key with a value other than null.
 fn holds_value(raw: &[u8], key: u64) -> bool {
     minicbor::decode::<pallas_codec::utils::KeyValuePairs<u64, pallas_codec::utils::AnyCbor>>(raw)
         .is_ok_and(|fields| {
@@ -990,9 +961,6 @@ fn check_map_keys(raw: &[u8], allowed: &[u64], field: MalformedField) -> Validat
 
 type Natives = BTreeMap<Hash<28>, NativeScript>;
 
-/// Scripts the sub-transactions need and carry. The ledger checks for missing
-/// and unneeded scripts across the whole batch, so a script may be needed at
-/// one level and provided at another.
 #[derive(Default)]
 struct SubScripts {
     levels: Vec<BTreeMap<RedeemersKey, Hash<28>>>,
@@ -1065,10 +1033,8 @@ fn sub_scripts(b: &TransactionBody<'_>, utxos: &UTxOs<'_>) -> Result<SubScripts,
     Ok(subs)
 }
 
-/// The language of each Plutus script a batch provides, by hash.
 type Plutus = BTreeMap<Hash<28>, Language>;
 
-/// The Plutus scripts of one list per version, with their hash, language and bytes.
 fn plutus_scripts<'a>(
     v1: impl IntoIterator<Item = &'a PlutusScript<1>>,
     v2: impl IntoIterator<Item = &'a PlutusScript<2>>,
@@ -1090,7 +1056,6 @@ fn plutus_scripts<'a>(
     v1.chain(v2).chain(v3).chain(v4)
 }
 
-/// The Plutus scripts a witness set carries, with their hash, language and bytes.
 fn plutus_witnesses<'a>(
     w: &'a WitnessSet<'_>,
 ) -> impl Iterator<Item = (Hash<28>, Language, &'a [u8])> {
@@ -1102,7 +1067,6 @@ fn plutus_witnesses<'a>(
     )
 }
 
-/// Whether a batch whose top level runs Plutus scripts of `languages` is in legacy mode.
 fn legacy_mode(languages: &BTreeSet<Language>) -> bool {
     // A top level Plutus script up to V3 puts the batch in legacy mode, native and V4 scripts do not.
     languages.iter().any(|x| match x {
@@ -1111,7 +1075,6 @@ fn legacy_mode(languages: &BTreeSet<Language>) -> bool {
     })
 }
 
-/// The rule the top level withdrawals of a batch whose top level runs Plutus scripts of `languages` are judged by.
 pub(super) fn withdrawal_rule(languages: &BTreeSet<Language>) -> WithdrawalRule {
     match legacy_mode(languages) {
         true => WithdrawalRule::Legacy,
@@ -1119,7 +1082,6 @@ pub(super) fn withdrawal_rule(languages: &BTreeSet<Language>) -> WithdrawalRule 
     }
 }
 
-/// The scripts a batch provides and the languages of the Plutus scripts its top level runs.
 struct Provided {
     natives: Natives,
     plutus: Plutus,
@@ -1241,7 +1203,6 @@ fn check_scripts(
     })
 }
 
-/// Checks the collateral of a batch, with the rules that need redeemers only where some level has `redeemers`, adding the key of each key locked collateral input to `keys`.
 fn check_collateral(
     b: &TransactionBody<'_>,
     utxos: &UTxOs<'_>,
@@ -1308,7 +1269,6 @@ fn check_collateral(
     Ok(())
 }
 
-/// Checks the scripts, datums, redeemers and integrity hash of the level `b` with witness set `w`, and returns the languages of the Plutus scripts it runs.
 #[allow(clippy::too_many_arguments)]
 fn check_level(
     b: &Level<'_>,
@@ -1404,7 +1364,6 @@ fn check_level(
     Ok(languages)
 }
 
-/// The fee for the declared execution units, rounded up once.
 fn execution_fee(mem: u64, steps: u64, pp: &DijkstraProtParams) -> Result<u64, ValidationError> {
     if mem == 0 && steps == 0 {
         return Ok(0);
@@ -1600,7 +1559,6 @@ fn accumulate_assets(
     }
     Ok(())
 }
-/// Checks that the assets of `inputs` and `mint` equal the assets of `outputs`.
 fn check_assets<'a, 'b: 'a>(
     inputs: impl Iterator<Item = &'a TransactionInput>,
     outputs: impl Iterator<Item = &'a TransactionOutput<'b>>,
@@ -1631,7 +1589,6 @@ fn check_assets<'a, 'b: 'a>(
     Ok(())
 }
 
-/// The datum hashes the outputs, collateral return and reference inputs of the level `b` name.
 fn supplemental_datums(
     b: &Level<'_>,
     utxos: &UTxOs<'_>,
@@ -1658,7 +1615,6 @@ fn supplemental_datums(
     Ok(hashes)
 }
 
-/// The supplemental datum hashes of every sub transaction of the batch `b`.
 fn sub_supplemental_datums(
     b: &TransactionBody<'_>,
     utxos: &UTxOs<'_>,
@@ -1672,7 +1628,6 @@ fn sub_supplemental_datums(
     Ok(hashes)
 }
 
-/// Checks that the level `b` carries in `w` each datum its Plutus spent inputs require, and only datums those inputs or `allowed` name.
 fn check_datums(
     b: &Level<'_>,
     w: &WitnessSet<'_>,
@@ -1728,7 +1683,6 @@ fn check_datums(
     Ok(())
 }
 
-/// Checks the declared script integrity hash of one level against its redeemers, datums and the language views of the Plutus scripts it runs.
 fn check_integrity(
     w: &WitnessSet<'_>,
     declared: Option<Hash<32>>,
@@ -1755,7 +1709,6 @@ fn check_integrity(
     Ok(())
 }
 
-/// A reference script, native or Plutus with its language and bytes.
 enum Reference<'a> {
     Native(MultiEraNativeScript<'a>),
     Plutus(Language, &'a [u8]),
@@ -1804,7 +1757,6 @@ fn well_formed_plutus(language: &Language, script: &[u8]) -> ValidationResult {
     Err(DijkstraUnsupported(UnsupportedFeature::PlutusWithoutPhase2))
 }
 
-/// Refuses a multi-asset map the ledger decoder refuses, one that is empty, repeats a key, holds a zero or names an asset in over 32 bytes.
 fn check_asset_encoding(raw: &[u8]) -> ValidationResult {
     use pallas_codec::utils::KeyValuePairs;
     let assets: KeyValuePairs<Hash<28>, KeyValuePairs<Bytes, minicbor::data::Int>> =
