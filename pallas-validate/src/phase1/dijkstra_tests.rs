@@ -10,7 +10,7 @@ fn read(name: &str) -> Vec<u8> {
     hex::decode(
         std::fs::read_to_string(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../test_data/musashi-phase1")
+                .join("../test_data/dijkstra-chain")
                 .join(name),
         )
         .unwrap()
@@ -20,7 +20,7 @@ fn read(name: &str) -> Vec<u8> {
 }
 pub(super) fn params() -> DijkstraProtParams {
     let p: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../test_data/musashi-phase1/historical-parameters.json"
+        "../../../test_data/dijkstra-chain/historical-parameters.json"
     ))
     .unwrap();
     let int = |key: &str| match &p[key] {
@@ -1046,7 +1046,7 @@ fn dijkstra_capture_integrity_and_certified_original_input() {
     use pallas_codec::utils::KeepRaw;
     use pallas_traverse::OriginalHash;
     let provenance: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../test_data/musashi-phase1/payload-provenance.json"
+        "../../../test_data/dijkstra-chain/payload-provenance.json"
     ))
     .unwrap();
     for (name, meta) in provenance.as_object().unwrap() {

@@ -10,7 +10,7 @@ fn read(name: &str) -> Vec<u8> {
     hex::decode(
         std::fs::read_to_string(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../test_data/musashi-registration")
+                .join("../test_data/dijkstra-registration")
                 .join(name),
         )
         .unwrap()
@@ -22,11 +22,11 @@ pub(crate) fn params() -> Environment {
     let mut e = env();
     e.block_slot = 1401365;
     let p: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../test_data/musashi-phase1/registration-epoch64-parameters.json"
+        "../../../test_data/dijkstra-chain/registration-epoch64-parameters.json"
     ))
     .unwrap();
     let g: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../test_data/musashi-phase1/registration-dijkstra-genesis.json"
+        "../../../test_data/dijkstra-chain/registration-dijkstra-genesis.json"
     ))
     .unwrap();
     let MultiEraProtocolParameters::Dijkstra(ref mut pp) = e.prot_params else {
@@ -100,7 +100,7 @@ fn fixture(test: impl FnOnce(n::BlockTransaction<'_>, UTxOs<'_>, CertState)) {
     })
     .collect();
     let state_json: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../test_data/musashi-phase1/registration-certificate-state.json"
+        "../../../test_data/dijkstra-chain/registration-certificate-state.json"
     ))
     .unwrap();
     let record = state_json["credentials"]

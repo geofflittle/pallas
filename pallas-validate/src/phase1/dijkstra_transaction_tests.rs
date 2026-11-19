@@ -1,10 +1,9 @@
 use super::*;
 #[test]
 fn dijkstra_observed_metadata_reaches_input_validation() {
-    let raw = hex::decode(
-        include_str!("../../../test_data/musashi-dijkstra-validation/order.tx.hex").trim(),
-    )
-    .unwrap();
+    let raw =
+        hex::decode(include_str!("../../../test_data/dijkstra-transactions/order.tx.hex").trim())
+            .unwrap();
     let tx = MultiEraTx::decode_for_era(Era::Dijkstra, &raw).unwrap();
     assert_eq!(
         tx.hash().to_string(),
@@ -22,14 +21,12 @@ fn dijkstra_observed_metadata_reaches_input_validation() {
 
 #[test]
 fn dijkstra_observed_order_valid_context() {
-    let raw = hex::decode(
-        include_str!("../../../test_data/musashi-dijkstra-validation/order.tx.hex").trim(),
-    )
-    .unwrap();
+    let raw =
+        hex::decode(include_str!("../../../test_data/dijkstra-transactions/order.tx.hex").trim())
+            .unwrap();
     let tx = MultiEraTx::decode_for_era(Era::Dijkstra, &raw).unwrap();
     let producer = hex::decode(
-        include_str!("../../../test_data/musashi-dijkstra-validation/order-producer.body.hex")
-            .trim(),
+        include_str!("../../../test_data/dijkstra-transactions/order-producer.body.hex").trim(),
     )
     .unwrap();
     let body: pallas_primitives::dijkstra::TransactionBody =
@@ -39,7 +36,7 @@ fn dijkstra_observed_order_valid_context() {
         tx.inputs()[0].hash().to_owned()
     );
     let input = hex::decode(
-        include_str!("../../../test_data/musashi-dijkstra-validation/order.input.hex").trim(),
+        include_str!("../../../test_data/dijkstra-transactions/order.input.hex").trim(),
     )
     .unwrap();
     assert_eq!(
