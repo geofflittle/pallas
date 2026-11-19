@@ -78,6 +78,7 @@ pub(super) fn validate_dijkstra_tx_inner<S: DijkstraLedgerState + ?Sized>(
     for sub in b.sub_transactions.iter().flatten() {
         check_sub_supported(sub)?;
     }
+    check_auxiliary_hash(b.auxiliary_data_hash, &tx.auxiliary_data)?;
     let guards = guard_credentials(b.guards.as_ref());
     let mut keys = guard_keys(&guards);
     let top_guards: BTreeSet<_> = guards.iter().cloned().collect();
@@ -111,7 +112,7 @@ pub(super) fn validate_dijkstra_tx_inner<S: DijkstraLedgerState + ?Sized>(
         let sb = &sub.sub_transaction_body;
         let w = &sub.transaction_witness_set;
         let level = Level::sub(sb, Hasher::<256>::hash(sb.raw_cbor()), index);
-        check_auxiliary(sb.auxiliary_data_hash, &sub.auxiliary_data)?;
+        check_auxiliary_hash(sb.auxiliary_data_hash, &sub.auxiliary_data)?;
         check_required_guards(sb.required_top_level_guards.as_ref(), &top_guards)?;
         check_guard_datums(sb.required_top_level_guards.as_ref(), &provided)?;
         check_interval(
@@ -709,7 +710,6 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
             UnsupportedFeature::UnsuccessfulBlockTransaction,
         ));
     }
-    check_auxiliary(b.auxiliary_data_hash, &tx.auxiliary_data)?;
     let raw = encode(b)?;
     let mut allowed = vec![0, 1, 2, 3, 8, 15];
     for (key, present) in [
@@ -763,7 +763,8 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
     )?;
     check_output_encodings(b.outputs.iter().chain(b.collateral_return.iter()))?;
     check_guards(b.guards.as_ref())?;
-    check_witness_fields(&tx.transaction_witness_set)
+    check_witness_fields(&tx.transaction_witness_set)?;
+    check_auxiliary_encoding(&tx.auxiliary_data)
 }
 /// Refuses `inputs` when they name one input twice, which the ledger decoder refuses for a set.
 fn check_distinct<'a>(
@@ -892,7 +893,8 @@ fn check_sub_supported(tx: &SubTransaction<'_>) -> ValidationResult {
     )?;
     check_output_encodings(b.outputs.iter())?;
     check_guards(b.guards.as_ref())?;
-    check_witness_fields(&tx.transaction_witness_set)
+    check_witness_fields(&tx.transaction_witness_set)?;
+    check_auxiliary_encoding(&tx.auxiliary_data)
 }
 /// Refuses a withdrawals map that names an account twice, which the ledger decoder refuses.
 fn check_withdrawal_accounts(raw: &[u8]) -> ValidationResult {
@@ -1479,14 +1481,19 @@ fn reference_fee(mut bytes: u64, p: &DijkstraProtParams) -> Result<u64, Validati
     u64::try_from(total.0 / total.1).map_err(|_| PostAlonzo(NegativeValue))
 }
 
-fn check_auxiliary(
+fn check_auxiliary_hash(
     hash: Option<Hash<32>>,
     auxiliary: &Nullable<KeepRaw<'_, AuxiliaryData>>,
 ) -> ValidationResult {
-    let data = match auxiliary {
-        Nullable::Null if hash.is_none() => return Ok(()),
-        Nullable::Some(data) if hash == Some(Hasher::<256>::hash(&encode(data)?)) => data,
-        _ => return Err(PostAlonzo(MetadataHash)),
+    match auxiliary {
+        Nullable::Null if hash.is_none() => Ok(()),
+        Nullable::Some(data) if hash == Some(Hasher::<256>::hash(&encode(data)?)) => Ok(()),
+        _ => Err(PostAlonzo(MetadataHash)),
+    }
+}
+fn check_auxiliary_encoding(auxiliary: &Nullable<KeepRaw<'_, AuxiliaryData>>) -> ValidationResult {
+    let Nullable::Some(data) = auxiliary else {
+        return Ok(());
     };
     check_metadata_encoding(data)?;
     if let AuxiliaryData::PostAlonzo(m) = &**data {

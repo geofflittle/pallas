@@ -584,6 +584,32 @@ fn dijkstra_batch_sub_metadata_must_match_its_hash() {
 }
 
 #[test]
+fn dijkstra_batch_sub_metadata_is_decoded_before_any_rule() {
+    token_order_batch(|tx, input, sub_input| {
+        let long = n::AuxiliaryData::Shelley(std::collections::BTreeMap::from([(
+            674,
+            n::Metadatum::Text("x".repeat(65)),
+        )]));
+        let data: KeepRaw<'static, n::AuxiliaryData> = long.into();
+        let hash = Hasher::<256>::hash(&minicbor::to_vec(&data).unwrap());
+        for (hash, fee) in [(Some([0; 32].into()), None), (Some(hash), Some(0))] {
+            let mut changed = tx.clone();
+            if let Some(fee) = fee {
+                changed.transaction_body.fee = fee;
+            }
+            resign(&mut changed, |sub| {
+                sub.sub_transaction_body.auxiliary_data_hash = hash;
+                sub.auxiliary_data = Nullable::Some(data.clone());
+            });
+            error(
+                run_sub(&changed, &input, &sub_input),
+                "DijkstraMalformed(\"metadata\")",
+            );
+        }
+    });
+}
+
+#[test]
 fn dijkstra_batch_sub_auxiliary_scripts_are_refused_only_when_malformed() {
     let (well_formed, malformed) = (
         None::<Vec<u8>>,
