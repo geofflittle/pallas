@@ -237,6 +237,22 @@ fn dijkstra_an_unknown_auxiliary_key_is_malformed_metadata() {
         );
     });
 }
+#[test]
+fn dijkstra_metadata_is_decoded_before_auxiliary_scripts() {
+    dijkstra_tests::synthetic(|mut tx, input| {
+        let inputs = vec![(tx.transaction_body.inputs[0].clone(), input)];
+        let n::AuxiliaryData::PostAlonzo(mut data) = dijkstra_tests::plutus_auxiliary(1, &[1])
+        else {
+            unreachable!()
+        };
+        data.metadata = Some(BTreeMap::from([(674, n::Metadatum::Text("x".repeat(65)))]));
+        set_auxiliary(&mut tx, n::AuxiliaryData::PostAlonzo(data));
+        dijkstra_tests::error(
+            run(&tx, &inputs, &dijkstra_tests::env(), &CertState::default()),
+            "DijkstraMalformed(\"metadata\")",
+        );
+    });
+}
 fn value(coin: u64, policy: Hash<28>, quantity: u64) -> c::Value {
     c::Value::Multiasset(
         coin,
