@@ -157,7 +157,7 @@ pub(super) fn execute_script(
         .into_script_context(redeemer, datum.as_ref())
         .ok_or_else(|| Error::ScriptContextBuildError)?;
 
-    let script_context_data = script_context.to_plutus_data_with_protocol(protocol_version_major);
+    let script_context_data = script_context.into_plutus_data(protocol_version_major);
     let redeemer_data = redeemer.to_plutus_data();
 
     let result = evaluator::eval_script(

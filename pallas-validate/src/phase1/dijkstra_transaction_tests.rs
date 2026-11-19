@@ -354,7 +354,7 @@ mod scripts {
         }
     }
     fn script(source: &str) -> n::PlutusScript<3> {
-        use amaru_uplc_native::{arena::Arena, flat, syn::parse_program};
+        use amaru_uplc_dijkstra::{arena::Arena, flat, syn::parse_program};
         let arena = Arena::new();
         let p = parse_program(&arena, source, amaru_kernel::ProtocolVersion::new(12, 0))
             .into_result()
@@ -544,7 +544,7 @@ mod scripts {
         use pallas_traverse::OriginalHash;
         for reference in [false, true] {
             case(false, PASS, |mut tx, mut inputs, env, state| {
-                // Noncanonical native script bytes must survive V3 TxOut projection.
+                // The V3 TxOut of a noncanonical native script keeps the hash of its bytes.
                 let raw = [0x98, 0x02, 0x18, 0x01, 0x80]; // all []
                 let native = minicbor::decode::<KeepRaw<'_, n::NativeScript>>(&raw)
                     .unwrap()
@@ -1278,7 +1278,7 @@ mod scripts {
                 panic!()
             };
             pp.cost_models_for_script_languages.plutus_v3 = None;
-            // Missing reference still takes precedence over the cost model.
+            // A missing reference is refused before a missing cost model.
             assert!(run(&tx, &inputs, &env, &state).is_err());
         });
     }
@@ -1382,7 +1382,7 @@ mod scripts {
     #[test]
     fn dijkstra_captured_mint_batch_phase_two() {
         captured_batch(|tx, inputs, env, _| {
-            let report = evaluate(&tx, &inputs, &env).expect("native Plutus V3 evaluation");
+            let report = evaluate(&tx, &inputs, &env).expect("Plutus V3 evaluation");
             println!("captured Dijkstra transaction: {report:?}");
             let redeemers = tx.transaction_witness_set.redeemer.as_ref().unwrap();
             assert_eq!(report.len(), redeemers.len());
@@ -1401,8 +1401,7 @@ mod scripts {
     }
     #[test]
     fn dijkstra_v3_purpose_and_optional_datum_context() {
-        // The script reads its own ScriptInfo constructor and compares it with the
-        // redeemer. This catches wrong purpose construction despite matching pointers.
+        // The script compares its own ScriptInfo constructor with the redeemer, so a wrong purpose fails even when the pointers match.
         let field = |value: &str, index: usize| {
             let mut list =
                 format!("[(force (force (builtin sndPair))) [(builtin unConstrData) {value}]]");

@@ -1,8 +1,8 @@
 pub mod data;
+#[cfg(all(feature = "unstable", pallas_dijkstra_evaluator))]
+pub(crate) mod dijkstra_evaluator;
 pub mod error;
 mod evaluator;
-#[cfg(all(feature = "unstable", pallas_dijkstra_evaluator))]
-pub(crate) mod native_evaluator;
 pub mod script_context;
 pub mod to_plutus_data;
 pub mod tx;
@@ -116,9 +116,9 @@ pub fn estimate_tx_calls(
     dijkstra::estimate_tx(tx, pparams, utxos, slot_config)
 }
 
-/// A builtin function of the native evaluation.
+/// A builtin function of the Dijkstra evaluator.
 #[cfg(all(feature = "unstable", pallas_dijkstra_evaluator))]
-pub use native_evaluator::Builtin;
+pub use dijkstra_evaluator::Builtin;
 
 #[cfg(all(test, feature = "unstable", pallas_dijkstra_evaluator))]
 mod dijkstra_evaluation_tests;

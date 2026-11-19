@@ -1755,7 +1755,7 @@ fn check_new_script(script: &MultiEraScriptRef<'_>) -> ValidationResult {
 fn well_formed_plutus(language: &Language, script: &[u8]) -> ValidationResult {
     #[cfg(all(feature = "phase2", pallas_dijkstra_evaluator))]
     {
-        crate::phase2::native_evaluator::check_plutus_script(language, script)
+        crate::phase2::dijkstra_evaluator::check_plutus_script(language, script)
             .map_err(|_| DijkstraMalformedScript)
     }
     #[cfg(not(all(feature = "phase2", pallas_dijkstra_evaluator)))]

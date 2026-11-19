@@ -4,8 +4,8 @@ use pallas_codec::{minicbor, utils::KeepRaw};
 use pallas_traverse::OriginalHash;
 
 #[test]
-fn native_guard_empty_and_key_only_forms_need_no_scripts() {
-    // Synthetic controls for both credential representations.
+fn guard_empty_and_key_only_forms_need_no_scripts() {
+    // Key guards in both credential representations.
     let key = Hash::<28>::from([1; 28]);
     for guards in [
         None,
@@ -30,8 +30,8 @@ fn native_guard_empty_and_key_only_forms_need_no_scripts() {
 }
 
 #[test]
-fn native_guard_indices_keep_key_positions() {
-    // Synthetic credentials exercise gaps between script guards.
+fn guard_indices_keep_key_positions() {
+    // Key credentials leave gaps between the script guards.
     let first = Hash::<28>::from([11; 28]);
     let second = Hash::<28>::from([22; 28]);
     let guards = n::Guards::Credentials(
@@ -45,7 +45,6 @@ fn native_guard_indices_keep_key_positions() {
         .unwrap(),
     );
 
-    // Exercise the shared production collector used by phase two after the rebase.
     let mut body: n::TransactionBody =
         minicbor::decode(&[0xa3, 0x00, 0x80, 0x01, 0x80, 0x02, 0x00]).unwrap();
     body.guards = Some(guards);
@@ -67,8 +66,7 @@ fn native_guard_indices_keep_key_positions() {
 
 #[test]
 fn dijkstra_native_reference_hash_survives_v3_projection() {
-    // Deliberately nonminimal CBOR: hashing a semantic re-encoding is wrong.
-    // Include direct and all three recursive constructors, with both credentials.
+    // Nonminimal CBOR of a guard directly and inside each of the three recursive constructors, with both credentials.
     let raw_scripts = [
         "9802180180".to_owned(),
         format!("980218068200581c{}", "02".repeat(28)),
@@ -114,7 +112,7 @@ fn dijkstra_native_reference_hash_survives_v3_projection() {
         assert_eq!(minicbor::to_vec(&output).unwrap(), original);
         assert_eq!(minicbor::to_vec(&native).unwrap(), raw);
     }
-    // The compatible Conway carrier still exposes exactly the same original hash.
+    // The Conway native script decoded from the same bytes has the same original hash.
     let raw = [0x98, 0x02, 0x18, 0x01, 0x80];
     let native: KeepRaw<'_, c::NativeScript> = minicbor::decode(&raw).unwrap();
     let expected = native.original_hash();
@@ -317,7 +315,7 @@ fn ttl_validator_detects_an_inclusive_upper_bound() {
             0,
             vec![construct(0, fields), expected.clone(), construct(1, vec![])],
         );
-        let (result, _) = crate::phase2::native_evaluator::eval_native(
+        let (result, _) = crate::phase2::dijkstra_evaluator::eval_dijkstra_script(
             pallas_primitives::dijkstra::Language::PlutusV3,
             script.as_ref(),
             &[&context],

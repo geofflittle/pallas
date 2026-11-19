@@ -1028,7 +1028,7 @@ pub(super) fn plutus_auxiliary(version: u8, bytes: &[u8]) -> n::AuxiliaryData<'s
 
 #[cfg(all(feature = "phase2", pallas_dijkstra_evaluator))]
 pub(super) fn well_formed_script() -> Vec<u8> {
-    use amaru_uplc_native::{arena::Arena, flat, syn::parse_program};
+    use amaru_uplc_dijkstra::{arena::Arena, flat, syn::parse_program};
     let arena = Arena::new();
     let version = amaru_kernel::ProtocolVersion::new(12, 0);
     let program = parse_program(&arena, "(program 1.0.0 (con integer 0))", version);

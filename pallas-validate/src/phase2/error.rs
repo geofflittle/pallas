@@ -4,15 +4,15 @@ use pallas_primitives::{
     conway::{ExUnits, Language},
 };
 
-/// A construct the native Dijkstra evaluation does not implement, named by its label.
+/// A construct the Dijkstra evaluation does not implement, named by its label.
 #[cfg(feature = "unstable")]
 #[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq)]
-#[error("unsupported native Dijkstra evaluation: {0}")]
+#[error("unsupported Dijkstra evaluation: {0}")]
 pub struct Unsupported(pub UnsupportedEvaluation);
 
 #[cfg(feature = "unstable")]
 labels! {
-    /// A construct the native Dijkstra evaluation does not implement.
+    /// A construct the Dijkstra evaluation does not implement.
     pub enum UnsupportedEvaluation {
         ParametersRequireDijkstra => "protocol parameters require Dijkstra",
         ReferenceScriptLanguage => "reference script language (requires V3)",
@@ -21,7 +21,7 @@ labels! {
 
 #[cfg(feature = "unstable")]
 labels! {
-    /// The rule a native Dijkstra evaluation breaks.
+    /// The rule a Dijkstra evaluation breaks.
     pub enum EvaluationFailure {
         CpuBudgetOverflow => "CPU budget overflow",
         DuplicateInput => "duplicate input",
@@ -46,7 +46,7 @@ pub enum Error {
     #[error(transparent)]
     DijkstraUnsupported(Unsupported),
     #[cfg(feature = "unstable")]
-    #[error("invalid native Dijkstra evaluation: {0}")]
+    #[error("invalid Dijkstra evaluation: {0}")]
     DijkstraInvalid(EvaluationFailure),
     #[cfg(feature = "unstable")]
     #[error("cost model not found for language\n{:>13} {:?}", "Language", .0)]
@@ -61,8 +61,8 @@ pub enum Error {
     #[error("flat decode error: {0}")]
     FlatDecode(#[from] FlatDecodeError),
     #[cfg(all(feature = "unstable", pallas_dijkstra_evaluator))]
-    #[error("native flat decode error: {0}")]
-    NativeFlatDecode(#[from] amaru_uplc_native::flat::FlatDecodeError),
+    #[error("Dijkstra flat decode error: {0}")]
+    DijkstraFlatDecode(#[from] amaru_uplc_dijkstra::flat::FlatDecodeError),
     #[error("fragment decode error: {0}")]
     FragmentDecode(#[from] pallas_primitives::Error),
     #[error(

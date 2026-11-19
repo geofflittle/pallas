@@ -1,10 +1,10 @@
-//! Native Dijkstra evaluation with the protocol-aware backend.
+//! The Plutus script evaluator for Dijkstra transactions, which applies the semantics of a protocol version.
 use super::{
     error::{Error, EvaluationFailure},
     evaluator::{MachineFailure, ScriptEvalResult},
 };
 use amaru_kernel::{PlutusVersion, ProtocolVersion};
-use amaru_uplc_native::{
+use amaru_uplc_dijkstra::{
     arena::Arena,
     binder::DeBruijn,
     bumpalo::Bump,
@@ -24,9 +24,9 @@ use pallas_primitives::{
     dijkstra::Language,
 };
 
-pub use amaru_uplc_native::builtin::DefaultFunction as Builtin;
+pub use amaru_uplc_dijkstra::builtin::DefaultFunction as Builtin;
 
-pub(crate) fn eval_native(
+pub(crate) fn eval_dijkstra_script(
     language: Language,
     script_bytes: &[u8],
     args: &[&PlutusData],
@@ -46,7 +46,7 @@ pub(crate) fn eval_native(
     let (program, remainder): (&Program<DeBruijn>, _) =
         flat::decode(&arena, &flat_bytes, version, protocol)?;
     if remainder > 0 {
-        return Err(amaru_uplc_native::flat::FlatDecodeError::TrailingBytes(remainder).into());
+        return Err(amaru_uplc_dijkstra::flat::FlatDecodeError::TrailingBytes(remainder).into());
     }
     let initial = ExBudget {
         mem: i64::try_from(budget.mem)
@@ -180,7 +180,7 @@ pub(crate) fn check_plutus_script(language: &Language, script: &[u8]) -> Result<
         ProtocolVersion::new(12, 0),
     )?;
     if remainder != 0 {
-        return Err(amaru_uplc_native::flat::FlatDecodeError::TrailingBytes(remainder).into());
+        return Err(amaru_uplc_dijkstra::flat::FlatDecodeError::TrailingBytes(remainder).into());
     }
     Ok(())
 }
@@ -208,7 +208,7 @@ mod tests {
                 assert!(
                     matches!(
                         result,
-                        Err(Error::NativeFlatDecode(
+                        Err(Error::DijkstraFlatDecode(
                             flat::FlatDecodeError::ProgramVersionNotAvailable { .. }
                         ))
                     ),

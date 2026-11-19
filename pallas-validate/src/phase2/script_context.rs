@@ -47,19 +47,19 @@ pub fn output_datum<'a>(output: &'a TransactionOutput<'a>) -> Option<DatumOption
 /// The ScriptPurpose is part of the ScriptContext is the case of Plutus V1 and
 /// V2. It is superseded by the ScriptInfo in PlutusV3.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum ScriptInfo<T, P = ProposalProcedure> {
+pub enum ScriptInfo<T> {
     Minting(PolicyId),
     Spending(TransactionInput, T),
     Rewarding(StakeCredential),
     Certifying(usize, Certificate),
     Voting(Voter),
-    Proposing(usize, P),
+    Proposing(usize, ProposalProcedure),
 }
 
-pub type ScriptPurpose<P = ProposalProcedure> = ScriptInfo<(), P>;
+pub type ScriptPurpose = ScriptInfo<()>;
 
-impl<P> ScriptPurpose<P> {
-    pub fn into_script_info<T>(self, datum: T) -> ScriptInfo<T, P> {
+impl ScriptPurpose {
+    pub fn into_script_info<T>(self, datum: T) -> ScriptInfo<T> {
         match self {
             Self::Minting(policy_id) => ScriptInfo::Minting(policy_id),
             Self::Spending(transaction_output, ()) => {
@@ -71,6 +71,54 @@ impl<P> ScriptPurpose<P> {
             Self::Proposing(ix, procedure) => ScriptInfo::Proposing(ix, procedure),
         }
     }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub(crate) enum GenericScriptInfo<T, P> {
+    Minting(PolicyId),
+    Spending(TransactionInput, T),
+    Rewarding(StakeCredential),
+    Certifying(usize, Certificate),
+    Voting(Voter),
+    Proposing(usize, P),
+}
+
+pub(crate) type GenericScriptPurpose<P> = GenericScriptInfo<(), P>;
+
+#[cfg(all(feature = "unstable", pallas_dijkstra_evaluator))]
+impl<P> GenericScriptPurpose<P> {
+    pub(crate) fn into_script_info<T>(self, datum: T) -> GenericScriptInfo<T, P> {
+        match self {
+            Self::Minting(policy_id) => GenericScriptInfo::Minting(policy_id),
+            Self::Spending(input, ()) => GenericScriptInfo::Spending(input, datum),
+            Self::Rewarding(credential) => GenericScriptInfo::Rewarding(credential),
+            Self::Certifying(ix, certificate) => GenericScriptInfo::Certifying(ix, certificate),
+            Self::Voting(voter) => GenericScriptInfo::Voting(voter),
+            Self::Proposing(ix, procedure) => GenericScriptInfo::Proposing(ix, procedure),
+        }
+    }
+}
+
+impl<T> From<ScriptInfo<T>> for GenericScriptInfo<T, ProposalProcedure> {
+    fn from(info: ScriptInfo<T>) -> Self {
+        match info {
+            ScriptInfo::Minting(policy_id) => Self::Minting(policy_id),
+            ScriptInfo::Spending(input, datum) => Self::Spending(input, datum),
+            ScriptInfo::Rewarding(credential) => Self::Rewarding(credential),
+            ScriptInfo::Certifying(ix, certificate) => Self::Certifying(ix, certificate),
+            ScriptInfo::Voting(voter) => Self::Voting(voter),
+            ScriptInfo::Proposing(ix, procedure) => Self::Proposing(ix, procedure),
+        }
+    }
+}
+
+fn generic_redeemers(
+    redeemers: KeyValuePairs<ScriptPurpose, Redeemer>,
+) -> KeyValuePairs<GenericScriptPurpose<ProposalProcedure>, Redeemer> {
+    Vec::from(redeemers)
+        .into_iter()
+        .map(|(purpose, redeemer)| (purpose.into(), redeemer))
+        .collect()
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -157,9 +205,23 @@ impl DataLookupTable {
     }
 }
 
-/// A PlutusV1 transaction info over its input, output and proposal types.
 #[derive(Debug, PartialEq, Clone)]
-pub struct V1TxInfo<I, O, P: Clone = ProposalProcedure> {
+pub struct TxInfoV1<'a> {
+    pub inputs: Vec<TxInInfo<'a>>,
+    pub outputs: Vec<TransactionOutput<'a>>,
+    pub fee: Value,
+    pub mint: MintValue,
+    pub certificates: Vec<Certificate>,
+    pub withdrawals: Vec<(Address, Coin)>,
+    pub valid_range: TimeRange,
+    pub signatories: Vec<AddrKeyhash>,
+    pub data: Vec<(DatumHash, PlutusData)>,
+    pub redeemers: KeyValuePairs<ScriptPurpose, Redeemer>,
+    pub id: Hash<32>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct GenericTxInfoV1<I, O, P: Clone> {
     pub inputs: Vec<I>,
     pub outputs: Vec<O>,
     pub fee: Value,
@@ -169,12 +231,29 @@ pub struct V1TxInfo<I, O, P: Clone = ProposalProcedure> {
     pub valid_range: TimeRange,
     pub signatories: Vec<AddrKeyhash>,
     pub data: Vec<(DatumHash, PlutusData)>,
-    pub redeemers: KeyValuePairs<ScriptPurpose<P>, Redeemer>,
+    pub redeemers: KeyValuePairs<GenericScriptPurpose<P>, Redeemer>,
     pub id: Hash<32>,
 }
 
-/// The PlutusV1 transaction info of a Conway transaction.
-pub type TxInfoV1<'a> = V1TxInfo<TxInInfo<'a>, TransactionOutput<'a>>;
+impl<'a> From<TxInfoV1<'a>>
+    for GenericTxInfoV1<TxInInfo<'a>, TransactionOutput<'a>, ProposalProcedure>
+{
+    fn from(info: TxInfoV1<'a>) -> Self {
+        Self {
+            inputs: info.inputs,
+            outputs: info.outputs,
+            fee: info.fee,
+            mint: info.mint,
+            certificates: info.certificates,
+            withdrawals: info.withdrawals,
+            valid_range: info.valid_range,
+            signatories: info.signatories,
+            data: info.data,
+            redeemers: generic_redeemers(info.redeemers),
+            id: info.id,
+        }
+    }
+}
 
 impl TxInfoV1<'_> {
     pub fn from_transaction<'a>(
@@ -213,9 +292,24 @@ impl TxInfoV1<'_> {
     }
 }
 
-/// A PlutusV2 transaction info over its input, output and proposal types.
 #[derive(Debug, PartialEq, Clone)]
-pub struct V2TxInfo<I, O, P: Clone = ProposalProcedure> {
+pub struct TxInfoV2<'a> {
+    pub inputs: Vec<TxInInfo<'a>>,
+    pub reference_inputs: Vec<TxInInfo<'a>>,
+    pub outputs: Vec<TransactionOutput<'a>>,
+    pub fee: Value,
+    pub mint: MintValue,
+    pub certificates: Vec<Certificate>,
+    pub withdrawals: KeyValuePairs<Address, Coin>,
+    pub valid_range: TimeRange,
+    pub signatories: Vec<AddrKeyhash>,
+    pub redeemers: KeyValuePairs<ScriptPurpose, Redeemer>,
+    pub data: KeyValuePairs<DatumHash, PlutusData>,
+    pub id: Hash<32>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct GenericTxInfoV2<I, O, P: Clone> {
     pub inputs: Vec<I>,
     pub reference_inputs: Vec<I>,
     pub outputs: Vec<O>,
@@ -225,13 +319,31 @@ pub struct V2TxInfo<I, O, P: Clone = ProposalProcedure> {
     pub withdrawals: KeyValuePairs<Address, Coin>,
     pub valid_range: TimeRange,
     pub signatories: Vec<AddrKeyhash>,
-    pub redeemers: KeyValuePairs<ScriptPurpose<P>, Redeemer>,
+    pub redeemers: KeyValuePairs<GenericScriptPurpose<P>, Redeemer>,
     pub data: KeyValuePairs<DatumHash, PlutusData>,
     pub id: Hash<32>,
 }
 
-/// The PlutusV2 transaction info of a Conway transaction.
-pub type TxInfoV2<'a> = V2TxInfo<TxInInfo<'a>, TransactionOutput<'a>>;
+impl<'a> From<TxInfoV2<'a>>
+    for GenericTxInfoV2<TxInInfo<'a>, TransactionOutput<'a>, ProposalProcedure>
+{
+    fn from(info: TxInfoV2<'a>) -> Self {
+        Self {
+            inputs: info.inputs,
+            reference_inputs: info.reference_inputs,
+            outputs: info.outputs,
+            fee: info.fee,
+            mint: info.mint,
+            certificates: info.certificates,
+            withdrawals: info.withdrawals,
+            valid_range: info.valid_range,
+            signatories: info.signatories,
+            redeemers: generic_redeemers(info.redeemers),
+            data: info.data,
+            id: info.id,
+        }
+    }
+}
 
 impl TxInfoV2<'_> {
     pub fn from_transaction<'a>(
@@ -275,9 +387,28 @@ impl TxInfoV2<'_> {
     }
 }
 
-/// A PlutusV3 transaction info over its input, output and proposal types.
 #[derive(Debug, PartialEq, Clone)]
-pub struct V3TxInfo<I, O, P: Clone = ProposalProcedure> {
+pub struct TxInfoV3<'a> {
+    pub inputs: Vec<TxInInfo<'a>>,
+    pub reference_inputs: Vec<TxInInfo<'a>>,
+    pub outputs: Vec<TransactionOutput<'a>>,
+    pub fee: Coin,
+    pub mint: MintValue,
+    pub certificates: Vec<Certificate>,
+    pub withdrawals: KeyValuePairs<Address, Coin>,
+    pub valid_range: TimeRange,
+    pub signatories: Vec<AddrKeyhash>,
+    pub redeemers: KeyValuePairs<ScriptPurpose, Redeemer>,
+    pub data: KeyValuePairs<DatumHash, PlutusData>,
+    pub id: Hash<32>,
+    pub votes: KeyValuePairs<Voter, KeyValuePairs<GovActionId, VotingProcedure>>,
+    pub proposal_procedures: Vec<ProposalProcedure>,
+    pub current_treasury_amount: Option<Coin>,
+    pub treasury_donation: Option<PositiveCoin>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct GenericTxInfoV3<I, O, P: Clone> {
     pub inputs: Vec<I>,
     pub reference_inputs: Vec<I>,
     pub outputs: Vec<O>,
@@ -287,7 +418,7 @@ pub struct V3TxInfo<I, O, P: Clone = ProposalProcedure> {
     pub withdrawals: KeyValuePairs<Address, Coin>,
     pub valid_range: TimeRange,
     pub signatories: Vec<AddrKeyhash>,
-    pub redeemers: KeyValuePairs<ScriptPurpose<P>, Redeemer>,
+    pub redeemers: KeyValuePairs<GenericScriptPurpose<P>, Redeemer>,
     pub data: KeyValuePairs<DatumHash, PlutusData>,
     pub id: Hash<32>,
     pub votes: KeyValuePairs<Voter, KeyValuePairs<GovActionId, VotingProcedure>>,
@@ -296,8 +427,30 @@ pub struct V3TxInfo<I, O, P: Clone = ProposalProcedure> {
     pub treasury_donation: Option<PositiveCoin>,
 }
 
-/// The PlutusV3 transaction info of a Conway transaction.
-pub type TxInfoV3<'a> = V3TxInfo<TxInInfo<'a>, TransactionOutput<'a>>;
+impl<'a> From<TxInfoV3<'a>>
+    for GenericTxInfoV3<TxInInfo<'a>, TransactionOutput<'a>, ProposalProcedure>
+{
+    fn from(info: TxInfoV3<'a>) -> Self {
+        Self {
+            inputs: info.inputs,
+            reference_inputs: info.reference_inputs,
+            outputs: info.outputs,
+            fee: info.fee,
+            mint: info.mint,
+            certificates: info.certificates,
+            withdrawals: info.withdrawals,
+            valid_range: info.valid_range,
+            signatories: info.signatories,
+            redeemers: generic_redeemers(info.redeemers),
+            data: info.data,
+            id: info.id,
+            votes: info.votes,
+            proposal_procedures: info.proposal_procedures,
+            current_treasury_amount: info.current_treasury_amount,
+            treasury_donation: info.treasury_donation,
+        }
+    }
+}
 
 impl TxInfoV3<'_> {
     pub fn from_transaction<'a>(
