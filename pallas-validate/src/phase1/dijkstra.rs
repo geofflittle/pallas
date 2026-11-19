@@ -1800,8 +1800,16 @@ fn check_new_script(script: &MultiEraScriptRef<'_>) -> ValidationResult {
     }
 }
 fn well_formed_plutus(language: &Language, script: &[u8]) -> ValidationResult {
-    let _ = (language, script);
-    Err(DijkstraUnsupported(UnsupportedFeature::PlutusWithoutPhase2))
+    #[cfg(all(feature = "phase2", pallas_dijkstra_evaluator))]
+    {
+        crate::phase2::native_evaluator::check_plutus_script(language, script)
+            .map_err(|_| DijkstraMalformedScript)
+    }
+    #[cfg(not(all(feature = "phase2", pallas_dijkstra_evaluator)))]
+    {
+        let _ = (language, script);
+        Err(DijkstraUnsupported(UnsupportedFeature::PlutusWithoutPhase2))
+    }
 }
 
 /// Refuses a multi-asset map the ledger decoder refuses, one that is empty, repeats a key, holds a zero or names an asset in over 32 bytes.

@@ -137,6 +137,48 @@ fn phase_one_accepts_a_sub_transaction_running_a_plutus_v4_reference_script() {
 }
 
 #[test]
+#[cfg(all(feature = "phase2", pallas_dijkstra_evaluator))]
+fn phase_one_accepts_a_sub_transaction_witnessing_a_plutus_v4_script() {
+    accepts(9820);
+}
+
+#[test]
+#[cfg(all(feature = "phase2", pallas_dijkstra_evaluator))]
+fn phase_one_accepts_a_plutus_guard_required_with_a_datum() {
+    accepts(1344);
+}
+
+#[test]
+#[cfg(all(feature = "phase2", pallas_dijkstra_evaluator))]
+fn phase_one_refuses_a_plutus_guard_required_with_no_datum() {
+    record(1344, |tx, pairs, pp| {
+        let mut body = (*tx.transaction_body).clone();
+        let mut subs = body.sub_transactions.clone().unwrap().to_vec();
+        let mut sub_body = (*subs[0].sub_transaction_body).clone();
+        let nulled: Option<n::RequiredTopLevelGuards> =
+            sub_body.required_top_level_guards.take().map(|x| {
+                x.into_keys()
+                    .map(|k| (k, pallas_codec::utils::Nullable::Null))
+                    .collect()
+            });
+        for (top, sub) in [(None, nulled.clone()), (nulled, None)] {
+            let mut tx = tx.clone();
+            let mut sub_body = sub_body.clone();
+            sub_body.required_top_level_guards = sub;
+            subs[0].sub_transaction_body = sub_body.into();
+            body.sub_transactions = n::NonEmptySet::from_vec(subs.clone());
+            body.required_top_level_guards = top;
+            tx.transaction_body = body.clone().into();
+            let result = check(&tx, &pairs, pp.clone(), &time(ForecastHorizon::Unbounded));
+            assert!(
+                matches!(result, Err(ValidationError::DijkstraMalformedGuardDatum)),
+                "{result:?}"
+            );
+        }
+    });
+}
+
+#[test]
 fn sub_transaction_redeemers_require_batch_collateral() {
     record(890, |tx, pairs, pp| {
         let mut tx = tx.clone();

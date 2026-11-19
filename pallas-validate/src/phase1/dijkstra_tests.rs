@@ -801,6 +801,9 @@ fn dijkstra_typed_features_reject_explicitly() {
         let v4_sub: native::SubTransaction = minicbor::decode(&v4_bytes).unwrap();
         let mut changed = tx.clone();
         changed.transaction_body.sub_transactions = native::NonEmptySet::from_vec(vec![v4_sub]);
+        #[cfg(all(feature = "phase2", pallas_dijkstra_evaluator))]
+        let malformed = "DijkstraMalformedScript";
+        #[cfg(not(all(feature = "phase2", pallas_dijkstra_evaluator)))]
         let malformed =
             "DijkstraUnsupported(\"new Plutus script validation requires phase2 feature\")";
         error(dispatch(&changed, &output, &env()), malformed);
@@ -983,6 +986,9 @@ fn dijkstra_a_needed_v1_v2_or_v4_script_without_a_cost_model_is_refused() {
 
 #[test]
 fn dijkstra_new_v1_v2_and_v4_scripts_are_checked() {
+    #[cfg(all(feature = "phase2", pallas_dijkstra_evaluator))]
+    let (well_formed, malformed) = (Some(well_formed_script()), "DijkstraMalformedScript");
+    #[cfg(not(all(feature = "phase2", pallas_dijkstra_evaluator)))]
     let (well_formed, malformed) = (
         None::<Vec<u8>>,
         "DijkstraUnsupported(\"new Plutus script validation requires phase2 feature\")",
@@ -1028,6 +1034,16 @@ pub(super) fn plutus_auxiliary(version: u8, bytes: &[u8]) -> native::AuxiliaryDa
         _ => unreachable!(),
     }
     native::AuxiliaryData::PostAlonzo(data)
+}
+
+#[cfg(all(feature = "phase2", pallas_dijkstra_evaluator))]
+pub(super) fn well_formed_script() -> Vec<u8> {
+    use amaru_uplc_native::{arena::Arena, flat, syn::parse_program};
+    let arena = Arena::new();
+    let version = amaru_kernel::ProtocolVersion::new(12, 0);
+    let program = parse_program(&arena, "(program 1.0.0 (con integer 0))", version);
+    let flat = flat::encode(program.into_result().unwrap()).unwrap();
+    minicbor::to_vec(minicbor::bytes::ByteVec::from(flat)).unwrap()
 }
 
 fn elements(raw: &[u8]) -> Vec<&[u8]> {
