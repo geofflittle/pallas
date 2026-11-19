@@ -1,5 +1,5 @@
-use super::{error::Error, evaluator::eval_native};
-use amaru_uplc_native::{arena::Arena, flat, syn::parse_program};
+use super::{dijkstra_evaluator::eval_dijkstra_script, error::Error};
+use amaru_uplc_dijkstra::{arena::Arena, flat, syn::parse_program};
 use pallas_codec::minicbor;
 use pallas_primitives::{PlutusData, conway::ExUnits};
 
@@ -30,7 +30,7 @@ fn evaluate_program(
     .unwrap();
     let costs: Vec<i64> =
         serde_json::from_value(params["cost_models_raw"]["PlutusV3"].clone()).unwrap();
-    eval_native(
+    eval_dijkstra_script(
         pallas_primitives::dijkstra::Language::PlutusV3,
         &bytes,
         &[&PlutusData::Array(
@@ -72,7 +72,7 @@ fn registration_bytestring_bound_is_on_selected_operands_not_results() {
             }
         }
     }
-    // These consumers do not unlift CByteString, so a 131072 byte append reaches them.
+    // These terms do not unlift a CByteString, so they accept the 131072 byte append.
     for body in [
         "bytes",
         "[(builtin bData) bytes]",
@@ -80,7 +80,7 @@ fn registration_bytestring_bound_is_on_selected_operands_not_results() {
     ] {
         assert!(evaluate(&ignore(&grow_bytes(body, 17))).unwrap().success);
     }
-    // Exactly 65537, not just a power-of-two overshoot.
+    // An operand of 65537 bytes, one over the bound.
     let body = "[(builtin blake2b_256) [[(builtin consByteString) (con integer 0)] bytes]]";
     assert!(!evaluate(&ignore(&grow_bytes(body, 16))).unwrap().success);
 }
@@ -176,7 +176,7 @@ fn registration_cons_byte_string_keeps_v3_byte_range() {
 
 #[test]
 fn registration_integer_operands_are_unbounded() {
-    use amaru_uplc_native::constant::Integer;
+    use amaru_uplc_dijkstra::constant::Integer;
     let bound = Integer::from(1) << 262_143usize;
     let one = Integer::from(1);
     for value in [
@@ -197,7 +197,7 @@ fn registration_integer_operands_are_unbounded() {
 fn registration_builtin_case_matches_independent_cli_budget() {
     let result = evaluate("(case (con bool True) (error) (con unit ()))").unwrap();
     assert!(result.success);
-    // cardano-cli 11.2.2.0, afa091b4..., offline native protocol-12 comparison.
+    // The units cardano-cli 11.2.2.0 reports for this script at protocol 12.
     assert_eq!(
         result.units,
         ExUnits {

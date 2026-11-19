@@ -3,7 +3,7 @@ use super::{Context, ContextInput, ContextOutput, Purpose, conway_certificate};
 use crate::phase1::dijkstra_ledger::reward_account;
 use crate::phase2::{
     error::Error,
-    script_context::{ScriptInfo, TimeRange, get_votes_info},
+    script_context::{GenericScriptInfo, TimeRange, get_votes_info},
     to_plutus_data::{MintValue, ToPlutusData, WithRegistrationDeposit, wrap_multiple_with_constr},
 };
 use crate::utils::dijkstra_context::v4_stake;
@@ -84,7 +84,7 @@ impl<'a> Context<'a> {
         let tx_info = self.tx_info()?;
         let (index, mut fields) = self.fields(purpose)?;
         match purpose {
-            Purpose::Conway(_, ScriptInfo::Spending(..)) => {
+            Purpose::Conway(_, GenericScriptInfo::Spending(..)) => {
                 fields.push(datum.cloned().to_plutus_data())
             }
             Purpose::Conway(..) => {}
@@ -192,16 +192,20 @@ impl<'a> Context<'a> {
     fn fields(&self, purpose: &Purpose) -> Result<(u64, Vec<PlutusData>), Error> {
         let certificates: Vec<_> = self.level.certificates.into_iter().flatten().collect();
         Ok(match purpose {
-            Purpose::Conway(_, ScriptInfo::Minting(policy)) => (0, vec![policy.to_plutus_data()]),
-            Purpose::Conway(_, ScriptInfo::Spending(spent, ())) => (1, vec![out_ref(spent)]),
-            Purpose::Conway(_, ScriptInfo::Rewarding(credential)) => {
+            Purpose::Conway(_, GenericScriptInfo::Minting(policy)) => {
+                (0, vec![policy.to_plutus_data()])
+            }
+            Purpose::Conway(_, GenericScriptInfo::Spending(spent, ())) => (1, vec![out_ref(spent)]),
+            Purpose::Conway(_, GenericScriptInfo::Rewarding(credential)) => {
                 (2, vec![credential.to_plutus_data()])
             }
-            Purpose::Conway(_, ScriptInfo::Certifying(ix, _)) => {
+            Purpose::Conway(_, GenericScriptInfo::Certifying(ix, _)) => {
                 (3, vec![ix.to_plutus_data(), certificate(certificates[*ix])])
             }
-            Purpose::Conway(_, ScriptInfo::Voting(voter)) => (4, vec![voter.to_plutus_data()]),
-            Purpose::Conway(_, ScriptInfo::Proposing(ix, procedure)) => {
+            Purpose::Conway(_, GenericScriptInfo::Voting(voter)) => {
+                (4, vec![voter.to_plutus_data()])
+            }
+            Purpose::Conway(_, GenericScriptInfo::Proposing(ix, procedure)) => {
                 (5, vec![ix.to_plutus_data(), proposal(procedure)?])
             }
             Purpose::Guarding(ix) => (6, vec![u64::from(*ix).to_plutus_data()]),

@@ -2,8 +2,8 @@ use std::{collections::BTreeMap, fmt::Debug, ops::Deref};
 
 use super::data::Data;
 use super::script_context::{
-    ScriptContext, ScriptInfo, ScriptPurpose, TimeRange, TxInInfo, TxInfo, V1TxInfo, V2TxInfo,
-    V3TxInfo, from_alonzo_output,
+    GenericScriptInfo, GenericScriptPurpose, GenericTxInfoV1, GenericTxInfoV2, GenericTxInfoV3,
+    ScriptContext, TimeRange, TxInInfo, TxInfo, from_alonzo_output,
 };
 use pallas_addresses::{
     Address, ShelleyDelegationPart, ShelleyPaymentPart, StakeAddress, StakePayload,
@@ -232,7 +232,7 @@ where
 }
 
 impl<P: Clone + Debug> ToPlutusData
-    for WithWrappedTransactionId<'_, KeyValuePairs<ScriptPurpose<P>, Redeemer>>
+    for WithWrappedTransactionId<'_, KeyValuePairs<GenericScriptPurpose<P>, Redeemer>>
 {
     fn to_plutus_data(&self) -> PlutusData {
         let mut data_vec: Vec<(PlutusData, PlutusData)> = vec![];
@@ -257,7 +257,7 @@ impl ToPlutusData for WithRegistrationDeposit<'_, Vec<Certificate>> {
 }
 
 impl<P: Clone + ToPlutusData> ToPlutusData
-    for WithRegistrationDeposit<'_, KeyValuePairs<ScriptPurpose<P>, Redeemer>>
+    for WithRegistrationDeposit<'_, KeyValuePairs<GenericScriptPurpose<P>, Redeemer>>
 {
     fn to_plutus_data(&self) -> PlutusData {
         let mut data_vec: Vec<(PlutusData, PlutusData)> = vec![];
@@ -971,18 +971,20 @@ impl ToPlutusData for TxInInfo<'_> {
 // wrapped is needed for V1 and V2, and it also appears that for V1 and V2, the
 // certifying purpose mustn't include the certificate index. So, we also
 // short-circuit it here.
-impl<P: Debug> ToPlutusData for WithWrappedTransactionId<'_, ScriptPurpose<P>> {
+impl<P: Debug> ToPlutusData for WithWrappedTransactionId<'_, GenericScriptPurpose<P>> {
     fn to_plutus_data(&self) -> PlutusData {
         match self.0 {
-            ScriptPurpose::Minting(policy_id) => wrap_with_constr(0, policy_id.to_plutus_data()),
-            ScriptPurpose::Spending(out_ref, ()) => {
+            GenericScriptPurpose::Minting(policy_id) => {
+                wrap_with_constr(0, policy_id.to_plutus_data())
+            }
+            GenericScriptPurpose::Spending(out_ref, ()) => {
                 wrap_with_constr(1, WithWrappedTransactionId(out_ref).to_plutus_data())
             }
-            ScriptPurpose::Rewarding(stake_credential) => wrap_with_constr(
+            GenericScriptPurpose::Rewarding(stake_credential) => wrap_with_constr(
                 2,
                 WithWrappedStakeCredential(stake_credential).to_plutus_data(),
             ),
-            ScriptPurpose::Certifying(_, dcert) => {
+            GenericScriptPurpose::Certifying(_, dcert) => {
                 wrap_with_constr(3, WithPartialCertificates(dcert).to_plutus_data())
             }
             purpose => {
@@ -992,25 +994,29 @@ impl<P: Debug> ToPlutusData for WithWrappedTransactionId<'_, ScriptPurpose<P>> {
     }
 }
 
-impl<P: ToPlutusData> ToPlutusData for WithRegistrationDeposit<'_, ScriptPurpose<P>> {
+impl<P: ToPlutusData> ToPlutusData for WithRegistrationDeposit<'_, GenericScriptPurpose<P>> {
     fn to_plutus_data(&self) -> PlutusData {
         match self.0 {
-            ScriptPurpose::Minting(policy_id) => wrap_with_constr(0, policy_id.to_plutus_data()),
-            ScriptPurpose::Spending(out_ref, ()) => wrap_with_constr(1, out_ref.to_plutus_data()),
-            ScriptPurpose::Rewarding(stake_credential) => {
+            GenericScriptPurpose::Minting(policy_id) => {
+                wrap_with_constr(0, policy_id.to_plutus_data())
+            }
+            GenericScriptPurpose::Spending(out_ref, ()) => {
+                wrap_with_constr(1, out_ref.to_plutus_data())
+            }
+            GenericScriptPurpose::Rewarding(stake_credential) => {
                 wrap_with_constr(2, stake_credential.to_plutus_data())
             }
-            ScriptPurpose::Certifying(ix, dcert) => wrap_multiple_with_constr(
+            GenericScriptPurpose::Certifying(ix, dcert) => wrap_multiple_with_constr(
                 3,
                 vec![
                     ix.to_plutus_data(),
                     WithRegistrationDeposit(dcert, self.1).to_plutus_data(),
                 ],
             ),
-            ScriptPurpose::Voting(voter) => {
+            GenericScriptPurpose::Voting(voter) => {
                 wrap_multiple_with_constr(4, vec![voter.to_plutus_data()])
             }
-            ScriptPurpose::Proposing(ix, procedure) => {
+            GenericScriptPurpose::Proposing(ix, procedure) => {
                 wrap_multiple_with_constr(5, vec![ix.to_plutus_data(), procedure.to_plutus_data()])
             }
         }
@@ -1586,29 +1592,33 @@ impl ToPlutusData for Vote {
     }
 }
 
-impl<T, P> ToPlutusData for WithRegistrationDeposit<'_, ScriptInfo<T, P>>
+impl<T, P> ToPlutusData for WithRegistrationDeposit<'_, GenericScriptInfo<T, P>>
 where
     T: ToPlutusData,
     P: ToPlutusData,
 {
     fn to_plutus_data(&self) -> PlutusData {
         match self.0 {
-            ScriptInfo::Minting(policy_id) => wrap_with_constr(0, policy_id.to_plutus_data()),
-            ScriptInfo::Spending(out_ref, datum) => {
+            GenericScriptInfo::Minting(policy_id) => {
+                wrap_with_constr(0, policy_id.to_plutus_data())
+            }
+            GenericScriptInfo::Spending(out_ref, datum) => {
                 wrap_multiple_with_constr(1, vec![out_ref.to_plutus_data(), datum.to_plutus_data()])
             }
-            ScriptInfo::Rewarding(stake_credential) => {
+            GenericScriptInfo::Rewarding(stake_credential) => {
                 wrap_with_constr(2, stake_credential.to_plutus_data())
             }
-            ScriptInfo::Certifying(ix, dcert) => wrap_multiple_with_constr(
+            GenericScriptInfo::Certifying(ix, dcert) => wrap_multiple_with_constr(
                 3,
                 vec![
                     ix.to_plutus_data(),
                     WithRegistrationDeposit(dcert, self.1).to_plutus_data(),
                 ],
             ),
-            ScriptInfo::Voting(voter) => wrap_multiple_with_constr(4, vec![voter.to_plutus_data()]),
-            ScriptInfo::Proposing(ix, procedure) => {
+            GenericScriptInfo::Voting(voter) => {
+                wrap_multiple_with_constr(4, vec![voter.to_plutus_data()])
+            }
+            GenericScriptInfo::Proposing(ix, procedure) => {
                 wrap_multiple_with_constr(5, vec![ix.to_plutus_data(), procedure.to_plutus_data()])
             }
         }
@@ -1624,15 +1634,21 @@ impl ToPlutusData for TxInfo<'_> {
 impl TxInfo<'_> {
     /// The transaction info data under protocol major version `protocol_major`.
     pub fn to_plutus_data_with_protocol(&self, protocol_major: u32) -> PlutusData {
+        self.clone().into_plutus_data(protocol_major)
+    }
+
+    fn into_plutus_data(self, protocol_major: u32) -> PlutusData {
         match self {
-            TxInfo::V1(tx_info) => tx_info.to_plutus_data(),
-            TxInfo::V2(tx_info) => tx_info.to_plutus_data(),
-            TxInfo::V3(tx_info) => tx_info.to_plutus_data_with_protocol(protocol_major),
+            TxInfo::V1(tx_info) => GenericTxInfoV1::from(tx_info).to_plutus_data(),
+            TxInfo::V2(tx_info) => GenericTxInfoV2::from(tx_info).to_plutus_data(),
+            TxInfo::V3(tx_info) => {
+                GenericTxInfoV3::from(tx_info).to_plutus_data_with_protocol(protocol_major)
+            }
         }
     }
 }
 
-impl<I, O, P: Clone> V1TxInfo<I, O, P> {
+impl<I, O, P: Clone> GenericTxInfoV1<I, O, P> {
     pub(super) fn to_plutus_data(&self) -> PlutusData
     where
         I: LegacyContextData,
@@ -1656,7 +1672,7 @@ impl<I, O, P: Clone> V1TxInfo<I, O, P> {
     }
 }
 
-impl<I, O, P: Clone + Debug> V2TxInfo<I, O, P> {
+impl<I, O, P: Clone + Debug> GenericTxInfoV2<I, O, P> {
     pub(super) fn to_plutus_data(&self) -> PlutusData
     where
         I: LegacyContextData,
@@ -1682,7 +1698,7 @@ impl<I, O, P: Clone + Debug> V2TxInfo<I, O, P> {
     }
 }
 
-impl<I: ToPlutusData, O: ToPlutusData, P: Clone + ToPlutusData> V3TxInfo<I, O, P> {
+impl<I: ToPlutusData, O: ToPlutusData, P: Clone + ToPlutusData> GenericTxInfoV3<I, O, P> {
     pub(super) fn to_plutus_data_with_protocol(&self, protocol_major: u32) -> PlutusData {
         wrap_multiple_with_constr(
             0,
@@ -1711,7 +1727,7 @@ impl<I: ToPlutusData, O: ToPlutusData, P: Clone + ToPlutusData> V3TxInfo<I, O, P
 pub(super) fn v3_script_context_data<P: ToPlutusData>(
     tx_info: PlutusData,
     redeemer: &PlutusData,
-    purpose: &ScriptInfo<Option<PlutusData>, P>,
+    purpose: &GenericScriptInfo<Option<PlutusData>, P>,
     protocol_major: u32,
 ) -> PlutusData {
     wrap_multiple_with_constr(
@@ -1726,7 +1742,7 @@ pub(super) fn v3_script_context_data<P: ToPlutusData>(
 
 pub(super) fn v1v2_script_context_data<P: Debug>(
     tx_info: PlutusData,
-    purpose: &ScriptPurpose<P>,
+    purpose: &GenericScriptPurpose<P>,
 ) -> PlutusData {
     wrap_multiple_with_constr(
         0,
@@ -1743,19 +1759,23 @@ impl ToPlutusData for ScriptContext<'_> {
 impl ScriptContext<'_> {
     /// The script context data under protocol major version `protocol_major`.
     pub fn to_plutus_data_with_protocol(&self, protocol_major: u32) -> PlutusData {
+        self.clone().into_plutus_data(protocol_major)
+    }
+
+    pub(super) fn into_plutus_data(self, protocol_major: u32) -> PlutusData {
         match self {
             ScriptContext::V1V2 { tx_info, purpose } => v1v2_script_context_data(
-                tx_info.to_plutus_data_with_protocol(protocol_major),
-                purpose,
+                tx_info.into_plutus_data(protocol_major),
+                &GenericScriptPurpose::from(*purpose),
             ),
             ScriptContext::V3 {
                 tx_info,
                 redeemer,
                 purpose,
             } => v3_script_context_data(
-                tx_info.to_plutus_data_with_protocol(protocol_major),
-                redeemer,
-                purpose,
+                tx_info.into_plutus_data(protocol_major),
+                &redeemer,
+                &GenericScriptInfo::from(*purpose),
                 protocol_major,
             ),
         }

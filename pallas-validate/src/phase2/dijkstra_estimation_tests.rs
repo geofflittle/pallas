@@ -428,8 +428,7 @@ fn estimation_script_failures_and_unsupported() {
 #[test]
 fn estimation_preserves_context_hash_and_redeemer_data() {
     fixture(|mut tx, mut u| {
-        // Compare the original body's hash in TxInfo with the hash in redeemer
-        // data. The redeemer is outside the body, avoiding a self-reference.
+        // The script compares the body hash in TxInfo with the hash in its redeemer, which is outside the body.
         let txid = field(&field("ctx", 0), 11);
         let redeemer = field("ctx", 1);
         let source = format!(
@@ -441,7 +440,7 @@ fn estimation_preserves_context_hash_and_redeemer_data() {
             Some(n::ScriptRef::PlutusV3Script(script(&source))),
             true,
         );
-        // Re-decode the synthetic body so OriginalHash has real preserved CBOR.
+        // Decoding the synthetic transaction keeps its bytes for OriginalHash.
         let raw = minicbor::to_vec(&tx).unwrap();
         let mut tx: n::BlockTransaction<'_> = minicbor::decode(&raw).unwrap();
         let hash = MultiEraTx::from_dijkstra(&tx).hash();

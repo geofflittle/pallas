@@ -62,10 +62,10 @@ fn run(tx: &n::BlockTransaction<'_>, u: &UtxoMap) -> Result<MultiEraEvalReport, 
     evaluate_multi_era_tx(&MultiEraTx::from_dijkstra(tx), &params(), u, &slots())
 }
 #[test]
-fn native_registration_executes_with_historical_budget() {
+fn registration_executes_with_historical_budget() {
     fixture(|tx, u| {
         let original = minicbor::to_vec(&tx).unwrap();
-        let r = run(&tx, &u).expect("native protocol-12 registration must evaluate");
+        let r = run(&tx, &u).expect("protocol-12 registration must evaluate");
         assert_eq!(r.len(), 1);
         assert_eq!((r[0].tag, r[0].index), (MultiEraRedeemerTag::Cert, 0));
         assert!(r[0].success, "{r:?}");
@@ -79,7 +79,7 @@ fn native_registration_executes_with_historical_budget() {
         );
         assert!(r[0].failure_message.is_none());
         assert_eq!(minicbor::to_vec(&tx).unwrap(), original);
-        println!("native historical result: {r:?}; declared {budget:?}");
+        println!("historical result: {r:?}; declared {budget:?}");
     });
 }
 #[test]
@@ -145,7 +145,7 @@ fn guard_params() -> MultiEraProtocolParameters {
 }
 
 #[test]
-fn native_guard_without_witness_is_rejected() {
+fn guard_without_witness_is_rejected() {
     fixture(|mut tx, u| {
         // Synthetic mutation: replace the captured certificate purpose with a guard.
         let script = n::PlutusScript::<4>(hex::decode("450101002499").unwrap().into());
@@ -178,7 +178,7 @@ fn native_guard_without_witness_is_rejected() {
 }
 
 #[test]
-fn native_guard_with_v4_witness_requires_redeemer() {
+fn guard_with_v4_witness_requires_redeemer() {
     fixture(|mut tx, u| {
         // Synthetic mutation: replace the captured certificate purpose with a guard.
         let script = n::PlutusScript::<4>(hex::decode("450101002499").unwrap().into());
@@ -217,7 +217,7 @@ fn native_guard_with_v4_witness_requires_redeemer() {
 }
 
 #[test]
-fn native_guard_absent_returns_empty_report() {
+fn guard_absent_returns_empty_report() {
     fixture(|mut tx, u| {
         // Synthetic control: remove the captured certificates and all guards.
 
@@ -245,10 +245,10 @@ fn native_guard_absent_returns_empty_report() {
 }
 
 #[test]
-fn native_guard_native_script_is_filtered_before_redeemer_checks() {
+fn guard_native_script_is_filtered_before_redeemer_checks() {
     for reference in [false, true] {
         fixture(|mut tx, mut u| {
-            // Synthetic native guard, supplied either directly or by reference.
+            // A synthetic native script guard, supplied either directly or by reference.
             let bytes = minicbor::to_vec(n::NativeScript::ScriptAll(vec![])).unwrap();
             let native =
                 minicbor::decode::<pallas_codec::utils::KeepRaw<'_, n::NativeScript>>(&bytes)
@@ -287,7 +287,7 @@ fn native_guard_native_script_is_filtered_before_redeemer_checks() {
             ] {
                 assert!(
                     result
-                        .expect("native guards require no phase-two redeemer")
+                        .expect("native script guards require no phase-two redeemer")
                         .is_empty()
                 );
             }
@@ -296,11 +296,10 @@ fn native_guard_native_script_is_filtered_before_redeemer_checks() {
 }
 
 #[test]
-fn native_guard_legacy_languages_remain_excluded() {
+fn guard_legacy_languages_remain_excluded() {
     for language in [1, 2, 3] {
         fixture(|mut tx, u| {
-            // A supplied synthetic legacy script and its Guarding redeemer reach
-            // context exclusion, rather than failing earlier on a missing witness.
+            // The legacy script and its Guarding redeemer are supplied, so the refusal is the context exclusion.
             let bytes = script("(program 1.0.0 (lam ctx (con unit ())))").0;
             let mut witness = (*tx.transaction_witness_set).clone();
             witness.plutus_v1_script = None;
@@ -358,10 +357,8 @@ fn native_guard_legacy_languages_remain_excluded() {
 }
 
 #[test]
-fn native_guard_with_redeemer_evaluates_v4() {
+fn guard_with_redeemer_evaluates_v4() {
     fixture(|mut tx, u| {
-        // Synthetic positive control for upstream V4 support. Use the conformance
-        // V4 model supplied by v4_params(), not the historical refusal-only vector.
         let script = n::PlutusScript::<4>(hex::decode("450101002499").unwrap().into());
         let mut body = (*tx.transaction_body).clone();
         body.certificates = None;
@@ -396,7 +393,7 @@ fn native_guard_with_redeemer_evaluates_v4() {
 }
 
 #[test]
-fn native_registration_accepts_a_guard_native_witness() {
+fn registration_accepts_a_guard_in_a_native_script_witness() {
     fixture(|mut tx, u| {
         let guard =
             n::NativeScript::ScriptRequireGuard(n::StakeCredential::AddrKeyhash([2; 28].into()));
@@ -407,14 +404,13 @@ fn native_registration_accepts_a_guard_native_witness() {
         let mut w = (*tx.transaction_witness_set).clone();
         w.native_script = n::NonEmptySet::from_vec(vec![native]);
         tx.transaction_witness_set = w.into();
-        let r = run(&tx, &u).expect("a guard in a native witness must not stop evaluation");
+        let r = run(&tx, &u).expect("a guard in a native script witness must not stop evaluation");
         assert!(r[0].success, "{r:?}");
     });
 }
-// Synthetic carrier mutations of the unchanged registration capture. Merely
-// carrying a native guard script does not execute it or require a guard witness.
+// A native script guard in an output of the registration capture runs no script and needs no guard witness.
 #[test]
-fn native_registration_guard_reference_context() {
+fn registration_guard_reference_context() {
     use pallas_codec::utils::{CborWrap, KeepRaw};
     for nested in [false, true] {
         for carrier in ["spending", "reference", "output"] {
@@ -502,7 +498,7 @@ fn native_registration_guard_reference_context() {
 }
 
 #[test]
-fn native_registration_missing_inputs_and_unrelated_utxos() {
+fn registration_missing_inputs_and_unrelated_utxos() {
     fixture(|tx, u| {
         for input in [
             &tx.transaction_body.inputs[0],
@@ -521,7 +517,7 @@ fn native_registration_missing_inputs_and_unrelated_utxos() {
     });
 }
 #[test]
-fn native_registration_redeemer_presence_purpose_and_position() {
+fn registration_redeemer_presence_purpose_and_position() {
     fixture(|tx, u| {
         let mut missing = tx.clone();
         let mut w = (*missing.transaction_witness_set).clone();
@@ -563,7 +559,7 @@ fn native_registration_redeemer_presence_purpose_and_position() {
     });
 }
 #[test]
-fn native_registration_invalid_redeemer_and_budget() {
+fn registration_invalid_redeemer_and_budget() {
     fixture(|tx, u| {
         let mut bad = tx.clone();
         change_redeemer(&mut bad, |_, v| {
@@ -593,7 +589,7 @@ fn native_registration_invalid_redeemer_and_budget() {
     });
 }
 #[test]
-fn native_registration_cost_model_is_applied_by_position() {
+fn registration_cost_model_is_applied_by_position() {
     fixture(|tx, u| {
         let original = run(&tx, &u).unwrap();
         let mut pp = params();
@@ -656,8 +652,8 @@ fn native_registration_cost_model_is_applied_by_position() {
 }
 
 #[test]
-fn native_registration_builtin_inventory() {
-    use amaru_uplc_native::{arena::Arena, binder::DeBruijn, flat, program::Program, term::Term};
+fn registration_builtin_inventory() {
+    use amaru_uplc_dijkstra::{arena::Arena, binder::DeBruijn, flat, program::Program, term::Term};
     fixture(|tx, u| {
         let i = &tx.transaction_body.reference_inputs.as_ref().unwrap()[0];
         let raw = &u[&TxoRef(i.transaction_id, i.index as u32)].1;
@@ -705,7 +701,7 @@ fn native_registration_builtin_inventory() {
 }
 
 fn script(source: &str) -> n::PlutusScript<3> {
-    use amaru_uplc_native::{arena::Arena, flat, syn::parse_program};
+    use amaru_uplc_dijkstra::{arena::Arena, flat, syn::parse_program};
     let arena = Arena::new();
     let p = parse_program(&arena, source, amaru_kernel::ProtocolVersion::new(12, 0))
         .into_result()
@@ -756,7 +752,7 @@ fn replace_script(
     entry.1 = minicbor::to_vec(o).unwrap();
 }
 #[test]
-fn native_registration_script_presence_language_and_machine_failures() {
+fn registration_script_presence_language_and_machine_failures() {
     fixture(|tx, u| {
         for s in [
             None,
@@ -833,7 +829,7 @@ fn v4_params() -> MultiEraProtocolParameters {
     pp
 }
 #[test]
-fn native_registration_runs_a_v4_script_on_the_v4_context() {
+fn registration_runs_a_v4_script_on_the_v4_context() {
     // Unit when ctx is a list of at least four elements, which the V4 context is and the V3 context is not.
     let four = "(program 1.1.0 (lam ctx [(lam ignore (con unit ())) [(force (builtin headList)) [(force (builtin tailList)) [(force (builtin tailList)) [(force (builtin tailList)) [(builtin unListData) ctx]]]]]]))";
     fixture(|tx, u| {
@@ -854,7 +850,7 @@ fn native_registration_runs_a_v4_script_on_the_v4_context() {
     });
 }
 #[test]
-fn native_registration_refuses_a_pointer_output_in_a_v4_context_only() {
+fn registration_refuses_a_pointer_output_in_a_v4_context_only() {
     use crate::phase1::dijkstra_ledger::Level;
     use crate::utils::ContextFailure;
     use crate::utils::dijkstra_context::{Untranslatable, check_translatable};
@@ -903,7 +899,7 @@ fn native_registration_refuses_a_pointer_output_in_a_v4_context_only() {
     });
 }
 #[test]
-fn native_registration_refuses_a_byron_or_reward_account_output_in_every_context() {
+fn registration_refuses_a_byron_or_reward_account_output_in_every_context() {
     use crate::phase1::dijkstra_ledger::Level;
     use crate::utils::ContextFailure;
     use crate::utils::dijkstra_context::{Untranslatable, check_translatable};
@@ -984,7 +980,7 @@ const GUARDING: n::RedeemersKey = n::RedeemersKey {
     index: 0,
 };
 #[test]
-fn native_registration_runs_a_v4_guarding_redeemer_of_a_batch() {
+fn registration_runs_a_v4_guarding_redeemer_of_a_batch() {
     fixture(|mut tx, mut u| {
         with_v4_guard(&mut tx, &mut u);
         let evaluate = |tx: &n::BlockTransaction<'_>| {
@@ -1013,7 +1009,7 @@ fn native_registration_runs_a_v4_guarding_redeemer_of_a_batch() {
     });
 }
 #[test]
-fn native_registration_in_a_sub_transaction_needs_its_redeemer_first() {
+fn registration_in_a_sub_transaction_needs_its_redeemer_first() {
     fixture(|mut tx, u| {
         let mut sub: n::SubTransaction =
             minicbor::decode(&[0x83, 0xa2, 0x00, 0x80, 0x01, 0x80, 0xa0, 0xf6]).unwrap();
@@ -1044,7 +1040,7 @@ fn native_registration_in_a_sub_transaction_needs_its_redeemer_first() {
     });
 }
 #[test]
-fn native_registration_gives_only_a_top_level_guard_the_batch_view() {
+fn registration_gives_only_a_top_level_guard_the_batch_view() {
     use crate::phase1::dijkstra_ledger::Level;
     use crate::utils::dijkstra_context::{LEGACY_IN_SUB, check_translatable};
     use c::PlutusData;
@@ -1102,7 +1098,7 @@ fn native_registration_gives_only_a_top_level_guard_the_batch_view() {
     });
 }
 #[test]
-fn native_registration_guarding_info_splits_the_mint_and_reads_the_guard_datum() {
+fn registration_guarding_info_splits_the_mint_and_reads_the_guard_datum() {
     use pallas_codec::utils::{KeepRaw, NonZeroInt, Nullable};
     use pallas_traverse::ComputeHash;
     fixture(|mut tx, mut u| {
@@ -1209,7 +1205,7 @@ fn native_registration_guarding_info_splits_the_mint_and_reads_the_guard_datum()
     });
 }
 #[test]
-fn native_registration_runs_beside_a_v1_or_v2_script_it_does_not_need() {
+fn registration_runs_beside_a_v1_or_v2_script_it_does_not_need() {
     fixture(|tx, u| {
         for s in [
             n::ScriptRef::PlutusV1Script(n::PlutusScript(vec![0].into())),
@@ -1243,7 +1239,7 @@ fn native_registration_runs_beside_a_v1_or_v2_script_it_does_not_need() {
     });
 }
 #[test]
-fn native_registration_synthetic_validator_reads_redeemer() {
+fn registration_synthetic_validator_reads_redeemer() {
     fixture(|mut tx, mut u| {
         // ctx is Constr 0 [txInfo, redeemer, scriptInfo]. Require integer 42.
         let s = integer_validator(&field("ctx", 1), 42);
@@ -1258,7 +1254,7 @@ fn native_registration_synthetic_validator_reads_redeemer() {
     });
 }
 #[test]
-fn native_registration_features_and_protocols() {
+fn registration_features_and_protocols() {
     fixture(|tx, u| {
         for version in [(9, 0), (11, 0), (12, 1), (13, 0)] {
             let mut pp = params();
@@ -1358,7 +1354,6 @@ fn native_registration_features_and_protocols() {
     });
 }
 
-// UPLC helpers are only for synthetic context-sensitive validators.
 fn field(value: &str, index: usize) -> String {
     let mut list = format!("[(force (force (builtin sndPair))) [(builtin unConstrData) {value}]]");
     for _ in 0..index {
@@ -1374,10 +1369,10 @@ fn integer_validator(data: &str, expected: u64) -> n::PlutusScript<3> {
     ))
 }
 #[test]
-fn native_guard_reference_hash_reaches_v3_script() {
+fn native_script_reference_hash_reaches_v3_script() {
     use pallas_codec::utils::{CborWrap, KeepRaw};
     use pallas_traverse::OriginalHash;
-    // Nonminimal native CBOR, intentionally distinct from semantic re-encoding.
+    // Nonminimal native script CBOR, whose hash differs from the hash of its re-encoding.
     let bytes = hex::decode(format!("980218068200581c{}", "02".repeat(28))).unwrap();
     let native: KeepRaw<'_, n::NativeScript> = minicbor::decode(&bytes).unwrap();
     let original_hash = native.original_hash();
@@ -1427,7 +1422,7 @@ fn native_guard_reference_hash_reaches_v3_script() {
 }
 
 #[test]
-fn native_post_bootstrap_context_reaches_script() {
+fn post_bootstrap_context_reaches_script() {
     fixture(|mut tx, mut u| {
         // Active Certifying[1], holding Reg[1], holding Just[0] of 2,000,000.
         let amount = field(&field(&field(&field("ctx", 2), 1), 1), 0);
@@ -1443,10 +1438,9 @@ fn native_post_bootstrap_context_reaches_script() {
     });
 }
 #[test]
-fn native_registration_resolves_synthetic_earlier_era_outputs() {
+fn registration_resolves_synthetic_earlier_era_outputs() {
     use pallas_primitives::{alonzo, babbage};
-    // Fresh synthetic outputs, not native captured CBOR with altered era
-    // labels.
+    // Synthetic outputs of earlier eras.
     let output = alonzo::TransactionOutput {
         address: [vec![0x60], vec![0x55; 28]].concat().into(),
         amount: alonzo::Value::Coin(50),
@@ -1493,7 +1487,7 @@ fn native_registration_resolves_synthetic_earlier_era_outputs() {
     });
 }
 #[test]
-fn native_registration_refuses_a_spent_input_at_a_reward_account() {
+fn registration_refuses_a_spent_input_at_a_reward_account() {
     use pallas_primitives::alonzo;
     let output = alonzo::TransactionOutput {
         address: [vec![0xe0], vec![0x55; 28]].concat().into(),
@@ -1527,7 +1521,7 @@ fn native_registration_refuses_a_spent_input_at_a_reward_account() {
 }
 
 #[test]
-fn native_registration_excludes_collateral_and_unrelated_script_sources() {
+fn registration_excludes_collateral_and_unrelated_script_sources() {
     fixture(|mut tx, u| {
         let mut b = (*tx.transaction_body).clone();
         b.collateral = b.reference_inputs.take();
@@ -1538,7 +1532,7 @@ fn native_registration_excludes_collateral_and_unrelated_script_sources() {
     });
 }
 #[test]
-fn native_registration_invalid_script_encoding_and_witness_scripts() {
+fn registration_invalid_script_encoding_and_witness_scripts() {
     fixture(|tx, u| {
         for (bytes, expected) in [(vec![1], "DecodeError"), (vec![0x41, 0xff], "FlatDecode")] {
             let mut tx = tx.clone();
@@ -1602,10 +1596,9 @@ fn a_malformed_witness_script_no_redeemer_runs_is_named() {
 }
 
 #[test]
-fn native_registration_protocol12_bytestring_operand_boundary() {
+fn registration_protocol12_bytestring_operand_boundary() {
     fixture(|mut tx, mut u| {
-        // Build 131,072 bytes inside a small script. Protocol-12 semantics E
-        // rejects this argument to blake2b_256 (limit 65,536 bytes).
+        // A small script builds 131,072 bytes, and protocol 12 refuses a blake2b_256 operand over 65,536 bytes.
         let mut body = "[(builtin blake2b_256) bytes]".to_string();
         for _ in 0..17 {
             body = format!("[(lam bytes {body}) [[(builtin appendByteString) bytes] bytes]]");
@@ -1637,7 +1630,7 @@ fn native_registration_protocol12_bytestring_operand_boundary() {
 mod estimation_tests;
 
 #[test]
-fn native_builtin_reports_preserve_historical_time() {
+fn builtin_reports_preserve_historical_time() {
     fixture(|tx, utxos| {
         let tx = MultiEraTx::from_dijkstra(&tx);
         let slots = slots();

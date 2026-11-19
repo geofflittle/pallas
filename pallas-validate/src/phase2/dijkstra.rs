@@ -1,10 +1,10 @@
-//! Native protocol-12 evaluation of the Plutus scripts the top level and the sub transactions of a Dijkstra transaction run.
+//! Protocol-12 evaluation of the Plutus scripts the top level and the sub transactions of a Dijkstra transaction run.
 use super::{
+    dijkstra_evaluator::{self, Builtin},
     error::{Error, EvaluationFailure, Unsupported, UnsupportedEvaluation},
-    evaluator,
-    native_evaluator::Builtin,
     script_context::{
-        ScriptPurpose, SlotConfig, TimeRange, V1TxInfo, V2TxInfo, V3TxInfo, get_votes_info,
+        GenericScriptPurpose, GenericTxInfoV1, GenericTxInfoV2, GenericTxInfoV3, SlotConfig,
+        TimeRange, get_votes_info,
     },
     to_plutus_data::{
         LegacyContextData, MintValue, ToPlutusData, WithWrappedTransactionId, WithZeroAdaAsset,
@@ -237,7 +237,7 @@ fn provided_scripts(
             .chain(v3.map(|x| (x.compute_hash(), n::Language::PlutusV3, x.as_ref())))
             .chain(v4.map(|x| (x.compute_hash(), n::Language::PlutusV4, x.as_ref())))
         {
-            super::native_evaluator::check_plutus_script(&language, bytes)
+            dijkstra_evaluator::check_plutus_script(&language, bytes)
                 .map_err(|_| Error::DijkstraMalformedScriptWitness { hash })?;
             provided.insert(hash, Provided::Plutus(language, bytes.to_vec()));
         }
@@ -353,8 +353,13 @@ pub(super) fn eval_tx_with_mode(
         .into_iter()
         .map(|run| {
             let args: Vec<_> = run.args.iter().collect();
-            let (result, calls) =
-                evaluator::eval_native(run.language, &run.script, &args, &run.costs, run.budget)?;
+            let (result, calls) = dijkstra_evaluator::eval_dijkstra_script(
+                run.language,
+                &run.script,
+                &args,
+                &run.costs,
+                run.budget,
+            )?;
             let result = MultiEraTxEvalResult {
                 sub_transaction: run.sub,
                 tag: run.tag.into(),
@@ -371,12 +376,14 @@ pub(super) fn eval_tx_with_mode(
 
 #[allow(clippy::large_enum_variant)]
 pub(super) enum Purpose {
-    Conway(c::RedeemerTag, ScriptPurpose<n::ProposalProcedure>),
+    Conway(c::RedeemerTag, GenericScriptPurpose<n::ProposalProcedure>),
     Guarding(u32),
 }
 
 impl Purpose {
-    fn conway(&self) -> Result<(c::RedeemerTag, &ScriptPurpose<n::ProposalProcedure>), Error> {
+    fn conway(
+        &self,
+    ) -> Result<(c::RedeemerTag, &GenericScriptPurpose<n::ProposalProcedure>), Error> {
         match self {
             Purpose::Conway(tag, purpose) => Ok((*tag, purpose)),
             Purpose::Guarding(_) => Err(Error::DijkstraInvalid(EvaluationFailure::ScriptGuards)),
@@ -386,7 +393,7 @@ impl Purpose {
 
 fn conway_redeemers(
     purposes: &[(n::RedeemersKey, Purpose, n::RedeemersValue)],
-) -> Result<Vec<(ScriptPurpose<n::ProposalProcedure>, c::Redeemer)>, Error> {
+) -> Result<Vec<(GenericScriptPurpose<n::ProposalProcedure>, c::Redeemer)>, Error> {
     purposes
         .iter()
         .map(|(key, purpose, value)| {
@@ -548,27 +555,27 @@ fn level_context<'a>(
         let purpose = match key.tag {
             n::RedeemerTag::Spend => Purpose::Conway(
                 c::RedeemerTag::Spend,
-                ScriptPurpose::Spending(inputs[index].clone(), ()),
+                GenericScriptPurpose::Spending(inputs[index].clone(), ()),
             ),
             n::RedeemerTag::Mint => Purpose::Conway(
                 c::RedeemerTag::Mint,
-                ScriptPurpose::Minting(*policies[index]),
+                GenericScriptPurpose::Minting(*policies[index]),
             ),
             n::RedeemerTag::Cert => Purpose::Conway(
                 c::RedeemerTag::Cert,
-                ScriptPurpose::Certifying(index, certificates[index].clone()),
+                GenericScriptPurpose::Certifying(index, certificates[index].clone()),
             ),
             n::RedeemerTag::Reward => Purpose::Conway(
                 c::RedeemerTag::Reward,
-                ScriptPurpose::Rewarding(n::StakeCredential::ScriptHash(expected[key])),
+                GenericScriptPurpose::Rewarding(n::StakeCredential::ScriptHash(expected[key])),
             ),
             n::RedeemerTag::Vote => Purpose::Conway(
                 c::RedeemerTag::Vote,
-                ScriptPurpose::Voting(voters[index].clone()),
+                GenericScriptPurpose::Voting(voters[index].clone()),
             ),
             n::RedeemerTag::Propose => Purpose::Conway(
                 c::RedeemerTag::Propose,
-                ScriptPurpose::Proposing(index, proposals[index].clone()),
+                GenericScriptPurpose::Proposing(index, proposals[index].clone()),
             ),
             n::RedeemerTag::Guarding => Purpose::Guarding(key.index),
         };
@@ -649,7 +656,7 @@ struct Legacy {
     withdrawals: Vec<(Address, u64)>,
     signatories: Vec<Hash<28>>,
     data: Vec<(Hash<32>, c::PlutusData)>,
-    redeemers: Vec<(ScriptPurpose<n::ProposalProcedure>, c::Redeemer)>,
+    redeemers: Vec<(GenericScriptPurpose<n::ProposalProcedure>, c::Redeemer)>,
 }
 
 impl Legacy {
@@ -725,18 +732,24 @@ pub(super) fn runs(
     time: &DijkstraTimeContext,
     estimate: bool,
 ) -> Result<Vec<Run>, Error> {
-    let native = tx.as_dijkstra().ok_or(Error::WrongEra())?;
+    let dijkstra_tx = tx.as_dijkstra().ok_or(Error::WrongEra())?;
     let MultiEraProtocolParameters::Dijkstra(pp) = pparams else {
         return unsupported(UnsupportedEvaluation::ParametersRequireDijkstra);
     };
     if pp.protocol_version.0 != DIJKSTRA_MAJOR_VERSION {
         return unsupported(UnsupportedEvaluation::ParametersRequireDijkstra);
     }
-    let scripts = provided_scripts(native, utxos)?;
+    let scripts = provided_scripts(dijkstra_tx, utxos)?;
     let parts: Vec<_> = (0..)
-        .zip(native.transaction_body.sub_transactions.iter().flatten())
+        .zip(
+            dijkstra_tx
+                .transaction_body
+                .sub_transactions
+                .iter()
+                .flatten(),
+        )
         .map(|(index, sub)| Part::Sub(index, sub))
-        .chain([Part::Top(native)])
+        .chain([Part::Top(dijkstra_tx)])
         .collect();
     let scopes = parts
         .iter()
@@ -781,7 +794,7 @@ pub(super) fn runs(
                 (n::Language::PlutusV1, Part::Top(tx)) => {
                     let b = &tx.transaction_body;
                     let x = Legacy::new(b, &context)?;
-                    let info = V1TxInfo {
+                    let info = GenericTxInfoV1 {
                         inputs: context.inputs.clone(),
                         outputs: context.outputs.clone(),
                         fee: c::Value::Coin(b.fee),
@@ -802,7 +815,7 @@ pub(super) fn runs(
                 (n::Language::PlutusV2, Part::Top(tx)) => {
                     let b = &tx.transaction_body;
                     let x = Legacy::new(b, &context)?;
-                    let info = V2TxInfo {
+                    let info = GenericTxInfoV2 {
                         inputs: context.inputs.clone(),
                         reference_inputs: context.reference_inputs.clone(),
                         outputs: context.outputs.clone(),
@@ -824,7 +837,7 @@ pub(super) fn runs(
                 (n::Language::PlutusV3, Part::Top(tx)) => {
                     let b = &tx.transaction_body;
                     let x = Legacy::new(b, &context)?;
-                    let info = V3TxInfo {
+                    let info = GenericTxInfoV3 {
                         inputs: context.inputs.clone(),
                         reference_inputs: context.reference_inputs.clone(),
                         outputs: context.outputs.clone(),
@@ -876,5 +889,5 @@ pub(super) fn runs(
     Ok(runs)
 }
 #[cfg(test)]
-#[path = "dijkstra_native_context_tests.rs"]
-mod native_context_tests;
+#[path = "dijkstra_context_tests.rs"]
+mod context_tests;

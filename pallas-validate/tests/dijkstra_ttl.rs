@@ -274,7 +274,7 @@ fn captured_ttl_phase_one_succeeds() {
     );
     assert!(
         result.is_ok(),
-        "captured bounded native transaction must pass phase one: {result:?}"
+        "captured bounded transaction must pass phase one: {result:?}"
     );
 }
 
@@ -284,7 +284,7 @@ fn captured_ttl_phase_two_succeeds() {
     let tx = MultiEraTx::decode_for_era(Era::Dijkstra, &f.transaction).unwrap();
     let report =
         phase2::evaluate_tx_with_time(&tx, &f.env.prot_params, &f.phase_two_inputs(), &f.time())
-            .expect("captured bounded native transaction must evaluate");
+            .expect("captured bounded transaction must evaluate");
     assert_eq!(report.len(), 1);
     assert!(report[0].success, "{report:?}");
     assert_eq!(report[0].units, f.expected, "reference CLI execution units");
@@ -296,7 +296,7 @@ fn captured_ttl_estimation_succeeds() {
     let tx = MultiEraTx::decode_for_era(Era::Dijkstra, &f.transaction).unwrap();
     let report =
         phase2::estimate_tx_with_time(&tx, &f.env.prot_params, &f.phase_two_inputs(), &f.time())
-            .expect("captured bounded native transaction must estimate");
+            .expect("captured bounded transaction must estimate");
     assert_eq!(report.len(), 1);
     assert!(report[0].success, "{report:?}");
     assert_eq!(report[0].units, f.expected, "reference CLI execution units");
@@ -307,23 +307,32 @@ fn captured_ttl_signatures_are_valid() {
     let f = Fixture::load();
     let tx = MultiEraTx::decode_for_era(Era::Dijkstra, &f.transaction).unwrap();
     assert_eq!(tx.hash().to_string(), f.transaction_id);
-    let native = tx.as_dijkstra().unwrap();
-    let witnesses = native.transaction_witness_set.vkeywitness.as_ref().unwrap();
+    let dijkstra_tx = tx.as_dijkstra().unwrap();
+    let witnesses = dijkstra_tx
+        .transaction_witness_set
+        .vkeywitness
+        .as_ref()
+        .unwrap();
     assert_eq!(witnesses.len(), 1);
     assert!(verify_signature(&witnesses[0], tx.hash().as_slice()));
-    assert_eq!(native.transaction_body.inputs.len(), 1);
+    assert_eq!(dijkstra_tx.transaction_body.inputs.len(), 1);
     assert_eq!(
-        native.transaction_body.collateral.as_ref().unwrap().len(),
+        dijkstra_tx
+            .transaction_body
+            .collateral
+            .as_ref()
+            .unwrap()
+            .len(),
         1
     );
-    assert!(native.transaction_body.certificates.is_none());
-    assert!(native.transaction_body.mint.is_none());
-    assert!(native.transaction_body.withdrawals.is_none());
-    assert!(native.transaction_body.sub_transactions.is_none());
+    assert!(dijkstra_tx.transaction_body.certificates.is_none());
+    assert!(dijkstra_tx.transaction_body.mint.is_none());
+    assert!(dijkstra_tx.transaction_body.withdrawals.is_none());
+    assert!(dijkstra_tx.transaction_body.sub_transactions.is_none());
 }
 
 #[test]
-fn confirmed_native_proof_matches_signed_transaction() {
+fn confirmed_inclusion_proof_matches_signed_transaction() {
     use pallas_crypto::hash::Hasher;
     use pallas_traverse::MultiEraBlock;
 
@@ -459,8 +468,7 @@ fn synthetic_missing_or_incorrect_upper_bound_fails_the_validator() {
 fn historical_replay_does_not_use_current_expiry_or_spendability() {
     let f = Fixture::load();
     let tx = MultiEraTx::decode_for_era(Era::Dijkstra, &f.transaction).unwrap();
-    // A historical era with a different slot length still reaches the captured
-    // current-era anchor exactly. Replaying needs no current UTxO/RPC lookup.
+    // An earlier era with a different slot length converts to the captured anchor time exactly.
     let time = DijkstraTimeContext::new(
         vec![
             EraTime {
@@ -561,8 +569,7 @@ fn earlier_era_conversion_matches_for_distant_and_absent_bounds() {
         (None, Some(1_000_000)),
         (Some(75), Some(1_000_000)),
     ] {
-        // Explicitly synthetic Conway body used only to exercise its existing
-        // time conversion. No captured native Dijkstra bytes are relabeled.
+        // A synthetic Conway body, whose validity interval the Conway rules convert to times.
         let mut encoder = pallas_codec::minicbor::Encoder::new(Vec::new());
         encoder
             .map(3 + u64::from(lower.is_some()) + u64::from(upper.is_some()))
