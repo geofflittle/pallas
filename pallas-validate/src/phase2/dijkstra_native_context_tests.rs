@@ -254,7 +254,7 @@ fn ttl_validator_detects_an_inclusive_upper_bound() {
         })
     };
     let raw = hex::decode(
-        include_str!("../../../test_data/musashi-ttl/confirmed-ttl/transaction.hex").trim(),
+        include_str!("../../../test_data/dijkstra-ttl/confirmed-ttl/transaction.hex").trim(),
     )
     .unwrap();
     let tx = MultiEraTx::decode_for_era(pallas_traverse::Era::Dijkstra, &raw).unwrap();
@@ -276,12 +276,12 @@ fn ttl_validator_detects_an_inclusive_upper_bound() {
         .unwrap()
         .data;
     let metadata: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../test_data/musashi-ttl/confirmed-ttl/replay.json"
+        "../../../test_data/dijkstra-ttl/confirmed-ttl/replay.json"
     ))
     .unwrap();
     let upper = metadata["expected_upper_posix_ms"].as_u64().unwrap();
     let parameters: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../test_data/musashi-ttl/confirmed-ttl/parameters.json"
+        "../../../test_data/dijkstra-ttl/confirmed-ttl/parameters.json"
     ))
     .unwrap();
     let costs: Vec<i64> = parameters["values"]["cardano"]["costModels"]["plutusV3"]["values"]

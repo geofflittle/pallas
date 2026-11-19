@@ -10,7 +10,5 @@
     "memory": 19567,
     "steps": 8892711
   },
-  "txid": "3ca42322d726d25ef4fd4d24690a2fbb51766c5221f6efb913455724fe656853",
-  "reference_tool": "cardano-cli 11.2.2.0 afa091b4",
-  "reference_era_history": "derived from captured one-second mapping; not a node LSQ era-history dump"
+  "txid": "3ca42322d726d25ef4fd4d24690a2fbb51766c5221f6efb913455724fe656853"
 }
