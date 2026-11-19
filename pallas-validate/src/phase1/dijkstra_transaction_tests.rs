@@ -1044,7 +1044,7 @@ mod scripts {
                     .iter()
                     .all(|r| r.success)
             );
-            // Raw address bytes sort the key first; ledger ordering keeps Reward[0] on the script.
+            // Raw address bytes sort the key first, and ledger ordering keeps Reward[0] on the script.
             let mut rs = (**tx.transaction_witness_set.redeemer.as_ref().unwrap()).clone();
             let r =
                 rs.0.remove(&n::RedeemersKey {
@@ -1439,8 +1439,7 @@ mod scripts {
                     .iter()
                     .all(|r| r.success)
             );
-            // CIP-0069 permits V3 spending without a datum; hashed missing datums are
-            // separately rejected by dijkstra_datums_and_integrity_are_independent.
+            // CIP-0069 permits V3 spending without a datum.
             output_mut(&mut inputs[1].1).datum_option = None;
             assert!(run(&tx, &inputs, &env, &state).is_ok());
             assert!(

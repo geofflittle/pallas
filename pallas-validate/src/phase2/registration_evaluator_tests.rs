@@ -72,8 +72,7 @@ fn registration_bytestring_bound_is_on_selected_operands_not_results() {
             }
         }
     }
-    // An append can RETURN 131072 bytes; these consumers do not unlift
-    // CByteString.
+    // These consumers do not unlift CByteString, so a 131072 byte append reaches them.
     for body in [
         "bytes",
         "[(builtin bData) bytes]",

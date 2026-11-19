@@ -309,8 +309,7 @@ fn ttl_validator_detects_an_inclusive_upper_bound() {
             upper.fields = MaybeIndefArray::Def(fields);
             range.fields = MaybeIndefArray::Def(bounds);
         }
-        // Explicitly synthetic context: only the two fields read by this tiny
-        // validator matter; this is not another captured ledger transaction.
+        // A synthetic context in which only the two fields the validator reads matter.
         let mut fields = vec![construct(0, vec![]); 16];
         fields[7] = range;
         fields[8] = vec![owner].to_plutus_data();
@@ -333,7 +332,7 @@ fn ttl_validator_detects_an_inclusive_upper_bound() {
     }
 }
 
-// Constructed scripts have no raw bytes; mutating a decoded script clears them.
+// Constructed scripts have no raw bytes, and mutating a decoded script clears them.
 // Both must expose the same hash before and after serialization.
 macro_rules! reference_without_raw {
     ($test:ident, $era:ident, $view:ident) => {
