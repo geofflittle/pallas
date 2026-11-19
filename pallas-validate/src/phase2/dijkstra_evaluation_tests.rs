@@ -300,15 +300,24 @@ fn native_guard_native_script_is_filtered_before_redeemer_checks() {
 fn native_guard_legacy_languages_remain_excluded() {
     for language in [1, 2, 3] {
         fixture(|mut tx, u| {
-            // A supplied synthetic legacy script reaches context exclusion,
-            // rather than failing earlier on a missing witness.
+            // A supplied synthetic legacy script and its Guarding redeemer reach
+            // context exclusion, rather than failing earlier on a missing witness.
             let bytes = script("(program 1.0.0 (lam ctx (con unit ())))").0;
             let mut witness = (*tx.transaction_witness_set).clone();
             witness.plutus_v1_script = None;
             witness.plutus_v2_script = None;
             witness.plutus_v3_script = None;
             witness.plutus_v4_script = None;
-            witness.redeemer = None;
+            let value = witness
+                .redeemer
+                .as_ref()
+                .unwrap()
+                .0
+                .values()
+                .next()
+                .unwrap()
+                .clone();
+            witness.redeemer = Some(n::Redeemers([(GUARDING, value)].into()).into());
             let hash = match language {
                 1 => {
                     let script = n::PlutusScript::<1>(bytes);
@@ -1005,6 +1014,37 @@ fn native_registration_runs_a_v4_guarding_redeemer_of_a_batch() {
     });
 }
 #[test]
+fn native_registration_in_a_sub_transaction_needs_its_redeemer_first() {
+    fixture(|mut tx, u| {
+        let mut sub: n::SubTransaction =
+            minicbor::decode(&[0x83, 0xa2, 0x00, 0x80, 0x01, 0x80, 0xa0, 0xf6]).unwrap();
+        let mut body = (*sub.sub_transaction_body).clone();
+        body.certificates = tx.transaction_body.certificates.clone();
+        sub.sub_transaction_body = body.into();
+        let mut b = (*tx.transaction_body).clone();
+        b.certificates = None;
+        let witnesses = (*tx.transaction_witness_set).clone();
+        let mut top = witnesses.clone();
+        top.plutus_v1_script = None;
+        top.plutus_v2_script = None;
+        top.plutus_v3_script = None;
+        top.redeemer = None;
+        tx.transaction_witness_set = top.into();
+        let mut evaluate = |redeemer: bool| {
+            let mut w = witnesses.clone();
+            if !redeemer {
+                w.redeemer = None;
+            }
+            sub.transaction_witness_set = w.into();
+            b.sub_transactions = n::NonEmptySet::from_vec(vec![sub.clone()]);
+            tx.transaction_body = b.clone().into();
+            run(&tx, &u)
+        };
+        error(evaluate(true), "Plutus V1 to V3 script in a subtransaction");
+        error(evaluate(false), "RequiredRedeemersMismatch");
+    });
+}
+#[test]
 fn native_registration_gives_only_a_top_level_guard_the_batch_view() {
     use crate::phase1::dijkstra_ledger::Level;
     use crate::utils::dijkstra_context::{LEGACY_IN_SUB, check_translatable};
@@ -1257,7 +1297,7 @@ fn native_registration_features_and_protocols() {
                     b.guards = Some(n::Guards::Credentials(
                         vec![registered.clone()].try_into().unwrap(),
                     ));
-                    "script guards"
+                    "RequiredRedeemersMismatch"
                 }
                 5 => {
                     b.treasury_value = Some(1);
