@@ -610,6 +610,12 @@ fn dijkstra_batch_sub_metadata_is_decoded_before_any_rule() {
 
 #[test]
 fn dijkstra_batch_sub_auxiliary_scripts_are_refused_only_when_malformed() {
+    #[cfg(all(feature = "phase2", pallas_dijkstra_evaluator))]
+    let (well_formed, malformed) = (
+        Some(super::dijkstra_tests::well_formed_script()),
+        "DijkstraInvalidMetadata",
+    );
+    #[cfg(not(all(feature = "phase2", pallas_dijkstra_evaluator)))]
     let (well_formed, malformed) = (
         None::<Vec<u8>>,
         "DijkstraUnsupported(\"Plutus script well-formedness check\")",

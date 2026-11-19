@@ -80,6 +80,26 @@ jobs:
         run: cargo test -p pallas-primitives --features unstable,blueprint
       - name: Test unstable validate feature
         run: cargo test -p pallas-validate --features unstable
+      - name: Test validation with phase two
+        run: cargo test -p pallas-validate --features unstable,phase2
+
+  # amaru-uplc uses `#![feature(allocator_api)]`, so the Dijkstra evaluator builds only on nightly.
+  dijkstra-evaluator:
+    name: Dijkstra evaluator (nightly)
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: --cfg pallas_dijkstra_evaluator
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-09-04
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy -p pallas-validate --all-targets --features unstable,phase2 -- -D warnings
+      - run: cargo test -p pallas-validate --features unstable,phase2
 
   features:
     name: Features (${{ matrix.flags }})
