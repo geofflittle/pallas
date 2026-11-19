@@ -194,9 +194,10 @@ Where to start for common jobs:
 - `pallas-utxorpc/unstable` adds the `v1` module, which maps onto the v1 schema.
 - `pallas-utxorpc/unstable` maps Dijkstra through the accessors that can hold its types.
 - `pallas-network/unstable` decodes Dijkstra tx rejections: `ShelleyBasedEra::Dijkstra`,
-  `TxValidationError::DijkstraTxValidationError` and the `localtxsubmission::dijkstra` module.
-  Without it, a Dijkstra rejection fails to decode.
-- `pallas-hardano/unstable` renders those rejections in the submit-api JSON.
+  `TxValidationError::DijkstraTxValidationError` and the `localtxsubmission::dijkstra` module,
+  and a PlutusV4 script. Without it, a Dijkstra rejection fails to decode.
+- `pallas-hardano/unstable` renders those rejections in the submit-api JSON and displays a
+  PlutusV4 script hash.
 - `pallas/unstable` turns on every crate's `unstable` feature and the umbrella's `hardano` feature.
 
 [`llms.txt`](llms.txt) is an index of the crate docs and examples.
