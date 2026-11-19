@@ -4,7 +4,10 @@ use crate::phase1::dijkstra_ledger::reward_account;
 use crate::phase2::{
     error::Error,
     script_context::{GenericScriptInfo, TimeRange, get_votes_info},
-    to_plutus_data::{MintValue, ToPlutusData, WithRegistrationDeposit, wrap_multiple_with_constr},
+    to_plutus_data::{
+        MintValue, ToPlutusData, WithArrayRational, WithRegistrationDeposit,
+        wrap_multiple_with_constr,
+    },
 };
 use crate::utils::dijkstra_context::v4_stake;
 use pallas_addresses::ShelleyPaymentPart;
@@ -521,10 +524,7 @@ fn gov_action(action: &n::GovAction) -> Result<PlutusData, Error> {
                         .into_iter()
                         .map(|(x, epoch)| (x.to_plutus_data(), epoch.to_plutus_data()))
                         .collect()),
-                    list(vec![
-                        quorum.numerator.to_plutus_data(),
-                        quorum.denominator.to_plutus_data(),
-                    ]),
+                    WithArrayRational(quorum).to_plutus_data(),
                 ],
             )
         }
@@ -559,5 +559,22 @@ mod tests {
             cbor(-two_64),
             [0x3b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]
         );
+    }
+
+    #[test]
+    fn a_committee_update_writes_its_quorum_in_lowest_terms() {
+        let update = |numerator, denominator| {
+            gov_action(&n::GovAction::UpdateCommittee(
+                None,
+                vec![].into(),
+                BTreeMap::new(),
+                c::RationalNumber {
+                    numerator,
+                    denominator,
+                },
+            ))
+            .unwrap()
+        };
+        assert_eq!(update(2, 4), update(1, 2));
     }
 }

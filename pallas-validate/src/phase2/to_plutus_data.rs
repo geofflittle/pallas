@@ -71,7 +71,7 @@ pub(super) struct WithZeroAdaAsset<'a, T>(pub(super) &'a T);
 
 struct WithOptionDatum<'a, T>(&'a T);
 
-struct WithArrayRational<'a, T>(&'a T);
+pub(super) struct WithArrayRational<'a, T>(pub(super) &'a T);
 
 struct WithPartialCertificates<'a, T>(&'a T);
 

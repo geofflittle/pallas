@@ -63,6 +63,20 @@ fn a_conway_committee_update_writes_its_quorum_in_lowest_terms() {
     assert_eq!(update(2, 4), update(1, 2));
 }
 
+#[cfg(feature = "unstable")]
+#[test]
+fn a_dijkstra_parameter_change_writes_its_rational_in_lowest_terms() {
+    use pallas_primitives::dijkstra;
+    // {44: 30([numerator, denominator])}, the Leios quorum stake threshold
+    let change = |numerator, denominator| {
+        let update: dijkstra::ProtocolParamUpdate =
+            minicbor::decode(&[0xa1, 0x18, 0x2c, 0xd8, 0x1e, 0x82, numerator, denominator])
+                .unwrap();
+        dijkstra::GovAction::ParameterChange(None, Box::new(update), None).to_plutus_data()
+    };
+    assert_eq!(change(2, 4), change(1, 2));
+}
+
 #[test]
 fn conway_update_encodes_its_cost_models() {
     // {0: 44, 18: {0: [1, 2], 2: [3], 7: [4]}}
