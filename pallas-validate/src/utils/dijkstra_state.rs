@@ -64,23 +64,32 @@ pub struct DijkstraGovRoots {
 
 /// Read access to the ledger state the Dijkstra rules consult.
 pub trait DijkstraLedgerState {
+    /// The current epoch.
     fn epoch(&self) -> Epoch;
+    /// The coin in the treasury.
     fn treasury(&self) -> Result<Coin, ValidationError>;
+    /// The stake account of `credential`, or none when it is not registered.
     fn account(
         &self,
         credential: &StakeCredential,
     ) -> Result<Option<DijkstraAccount>, ValidationError>;
+    /// The stake pool `operator` runs, or none when it is not registered.
     fn pool(&self, operator: &Hash<28>) -> Result<Option<DijkstraPool>, ValidationError>;
     /// The number of registered pools whose active or pending parameters name the VRF key hash.
     fn vrf_count(&self, vrf: &Hash<32>) -> Result<u64, ValidationError>;
+    /// The DRep of `credential`, or none when it is not registered.
     fn drep(&self, credential: &StakeCredential) -> Result<Option<DijkstraDRep>, ValidationError>;
     /// The elected committee members and their expiry epochs, absent after a no confidence motion.
     fn committee(&self) -> Result<Option<BTreeMap<StakeCredential, Epoch>>, ValidationError>;
+    /// The hot credential state of each committee cold credential.
     fn committee_auths(
         &self,
     ) -> Result<BTreeMap<StakeCredential, DijkstraCommitteeAuth>, ValidationError>;
+    /// The proposals in the governance state, with their ids.
     fn proposals(&self) -> Result<Vec<(GovActionId, DijkstraProposal)>, ValidationError>;
+    /// The last enacted governance actions.
     fn roots(&self) -> Result<DijkstraGovRoots, ValidationError>;
+    /// The hash of the constitution's guardrail script, or none when it has none.
     fn guardrail_script(&self) -> Result<Option<Hash<28>>, ValidationError>;
 }
 
@@ -117,6 +126,7 @@ pub struct DijkstraLedgerOverlay<'a, S: ?Sized> {
 }
 
 impl<'a, S: DijkstraLedgerState + ?Sized> DijkstraLedgerOverlay<'a, S> {
+    /// An overlay on `base` with no changes.
     pub fn new(base: &'a S) -> Self {
         DijkstraLedgerOverlay {
             base,

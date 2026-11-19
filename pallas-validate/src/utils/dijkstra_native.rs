@@ -3,8 +3,6 @@ use pallas_crypto::hash::Hash;
 use pallas_primitives::dijkstra::{NativeScript, StakeCredential};
 use std::collections::{BTreeSet, HashSet};
 
-/// The caller passes the guards of the level that needs the script and must verify
-/// all vkey signatures against the original body before admission.
 pub(crate) fn evaluate(
     script: &NativeScript,
     keys: &HashSet<Hash<28>>,

@@ -1,4 +1,3 @@
-//! Native-script admission tests. All mutations below are explicitly synthetic.
 use super::{dijkstra_tests, *};
 use crate::utils::dijkstra_state::DijkstraAccount;
 use pallas_addresses::{Network, ShelleyAddress, ShelleyDelegationPart, ShelleyPaymentPart};

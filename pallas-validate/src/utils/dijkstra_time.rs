@@ -1,6 +1,6 @@
 //! Historical slot/time translation for native Dijkstra validation.
 
-/// The start and slot duration of one known era. Times are POSIX milliseconds.
+/// The start and slot duration of one known era, in POSIX milliseconds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EraTime {
     pub start_slot: u64,
@@ -25,6 +25,7 @@ labels! {
     }
 }
 
+/// The reason a time history is refused or a slot in it has no POSIX time.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum DijkstraTimeError {
     #[error("invalid era time history: {0}")]
@@ -52,9 +53,7 @@ impl EraTime {
     }
 }
 
-/// Slot to POSIX millisecond translation over the known eras up to the forecast horizon.
-///
-/// Slots past the last known era start use that era's slot length.
+/// Slot to POSIX millisecond translation over the known eras, the last one extended to the forecast horizon.
 #[derive(Debug, Clone)]
 pub struct DijkstraTimeContext {
     eras: Vec<EraTime>,
@@ -62,6 +61,7 @@ pub struct DijkstraTimeContext {
 }
 
 impl DijkstraTimeContext {
+    /// The translation over `eras` up to `horizon`, refused when the eras do not form one history.
     pub fn new(eras: Vec<EraTime>, horizon: ForecastHorizon) -> Result<Self, DijkstraTimeError> {
         if eras.is_empty() {
             return Err(DijkstraTimeError::InvalidHistory(
@@ -88,6 +88,7 @@ impl DijkstraTimeContext {
         Ok(Self { eras, horizon })
     }
 
+    /// The POSIX time in milliseconds at which `slot` starts.
     pub fn slot_to_posix_ms(&self, slot: u64) -> Result<u64, DijkstraTimeError> {
         if let ForecastHorizon::Slot(horizon) = self.horizon
             && slot >= horizon
@@ -106,6 +107,7 @@ impl DijkstraTimeContext {
         era.translate(slot)
     }
 
+    /// The POSIX times in milliseconds of the validity bounds `lower` and `upper`.
     pub fn validity_bounds(
         &self,
         lower: Option<u64>,
