@@ -1213,7 +1213,7 @@ fn dijkstra_an_empty_guards_set_in_a_sub_is_no_guards() {
         let cases = [
             (
                 &[0xf6][..],
-                "Err(DijkstraUnsupported(\"subtransaction body fields\"))",
+                "Err(DijkstraMalformed(\"subtransaction body\"))",
             ),
             (&[0x80], "Ok(())"),
             (&[0x9f, 0xff], "Ok(())"),
