@@ -47,19 +47,19 @@ pub fn output_datum<'a>(output: &'a TransactionOutput<'a>) -> Option<DatumOption
 /// The ScriptPurpose is part of the ScriptContext is the case of Plutus V1 and
 /// V2. It is superseded by the ScriptInfo in PlutusV3.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum ScriptInfo<T> {
+pub enum ScriptInfo<T, P = ProposalProcedure> {
     Minting(PolicyId),
     Spending(TransactionInput, T),
     Rewarding(StakeCredential),
     Certifying(usize, Certificate),
     Voting(Voter),
-    Proposing(usize, ProposalProcedure),
+    Proposing(usize, P),
 }
 
-pub type ScriptPurpose = ScriptInfo<()>;
+pub type ScriptPurpose<P = ProposalProcedure> = ScriptInfo<(), P>;
 
-impl ScriptPurpose {
-    pub fn into_script_info<T>(self, datum: T) -> ScriptInfo<T> {
+impl<P> ScriptPurpose<P> {
+    pub fn into_script_info<T>(self, datum: T) -> ScriptInfo<T, P> {
         match self {
             Self::Minting(policy_id) => ScriptInfo::Minting(policy_id),
             Self::Spending(transaction_output, ()) => {
@@ -158,9 +158,9 @@ impl DataLookupTable {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct TxInfoV1<'a> {
-    pub inputs: Vec<TxInInfo<'a>>,
-    pub outputs: Vec<TransactionOutput<'a>>,
+pub struct V1TxInfo<I, O, P: Clone = ProposalProcedure> {
+    pub inputs: Vec<I>,
+    pub outputs: Vec<O>,
     pub fee: Value,
     pub mint: MintValue,
     pub certificates: Vec<Certificate>,
@@ -168,9 +168,12 @@ pub struct TxInfoV1<'a> {
     pub valid_range: TimeRange,
     pub signatories: Vec<AddrKeyhash>,
     pub data: Vec<(DatumHash, PlutusData)>,
-    pub redeemers: KeyValuePairs<ScriptPurpose, Redeemer>,
+    pub redeemers: KeyValuePairs<ScriptPurpose<P>, Redeemer>,
     pub id: Hash<32>,
 }
+
+/// The PlutusV1 transaction info of a Conway transaction.
+pub type TxInfoV1<'a> = V1TxInfo<TxInInfo<'a>, TransactionOutput<'a>>;
 
 impl TxInfoV1<'_> {
     pub fn from_transaction<'a>(
@@ -210,20 +213,23 @@ impl TxInfoV1<'_> {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct TxInfoV2<'a> {
-    pub inputs: Vec<TxInInfo<'a>>,
-    pub reference_inputs: Vec<TxInInfo<'a>>,
-    pub outputs: Vec<TransactionOutput<'a>>,
+pub struct V2TxInfo<I, O, P: Clone = ProposalProcedure> {
+    pub inputs: Vec<I>,
+    pub reference_inputs: Vec<I>,
+    pub outputs: Vec<O>,
     pub fee: Value,
     pub mint: MintValue,
     pub certificates: Vec<Certificate>,
     pub withdrawals: KeyValuePairs<Address, Coin>,
     pub valid_range: TimeRange,
     pub signatories: Vec<AddrKeyhash>,
-    pub redeemers: KeyValuePairs<ScriptPurpose, Redeemer>,
+    pub redeemers: KeyValuePairs<ScriptPurpose<P>, Redeemer>,
     pub data: KeyValuePairs<DatumHash, PlutusData>,
     pub id: Hash<32>,
 }
+
+/// The PlutusV2 transaction info of a Conway transaction.
+pub type TxInfoV2<'a> = V2TxInfo<TxInInfo<'a>, TransactionOutput<'a>>;
 
 impl TxInfoV2<'_> {
     pub fn from_transaction<'a>(
@@ -268,24 +274,27 @@ impl TxInfoV2<'_> {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct TxInfoV3<'a> {
-    pub inputs: Vec<TxInInfo<'a>>,
-    pub reference_inputs: Vec<TxInInfo<'a>>,
-    pub outputs: Vec<TransactionOutput<'a>>,
+pub struct V3TxInfo<I, O, P: Clone = ProposalProcedure> {
+    pub inputs: Vec<I>,
+    pub reference_inputs: Vec<I>,
+    pub outputs: Vec<O>,
     pub fee: Coin,
     pub mint: MintValue,
     pub certificates: Vec<Certificate>,
     pub withdrawals: KeyValuePairs<Address, Coin>,
     pub valid_range: TimeRange,
     pub signatories: Vec<AddrKeyhash>,
-    pub redeemers: KeyValuePairs<ScriptPurpose, Redeemer>,
+    pub redeemers: KeyValuePairs<ScriptPurpose<P>, Redeemer>,
     pub data: KeyValuePairs<DatumHash, PlutusData>,
     pub id: Hash<32>,
     pub votes: KeyValuePairs<Voter, KeyValuePairs<GovActionId, VotingProcedure>>,
-    pub proposal_procedures: Vec<ProposalProcedure>,
+    pub proposal_procedures: Vec<P>,
     pub current_treasury_amount: Option<Coin>,
     pub treasury_donation: Option<PositiveCoin>,
 }
+
+/// The PlutusV3 transaction info of a Conway transaction.
+pub type TxInfoV3<'a> = V3TxInfo<TxInInfo<'a>, TransactionOutput<'a>>;
 
 impl TxInfoV3<'_> {
     pub fn from_transaction<'a>(
@@ -1091,8 +1100,10 @@ pub fn sort_reward_accounts(a: &Bytes, b: &Bytes) -> Ordering {
 #[cfg(test)]
 mod tests {
     use super::{
-        DataLookupTable, Hash, ResolvedInput, ScriptRef, TransactionInput, TransactionOutput,
+        DataLookupTable, Hash, PlutusData, ResolvedInput, ScriptRef, SlotConfig, TransactionInput,
+        TransactionOutput, TxInfoV1,
     };
+    use crate::phase2::{data::Data, to_plutus_data::ToPlutusData};
     use pallas_crypto::hash::Hasher;
     use pallas_traverse::{ComputeHash, Era, MultiEraTx};
 
@@ -1211,5 +1222,65 @@ mod tests {
             .collect();
 
         assert_eq!(keys, vec![committed]);
+    }
+
+    fn conway_tx_registering_script(script_hash: &[u8]) -> Vec<u8> {
+        let mut cbor = vec![0x84]; // transaction
+        cbor.extend([0xa4, 0x00, 0x80, 0x01, 0x80, 0x02, 0x00]); // body, no inputs, outputs or fee
+        cbor.extend([0x04, 0x81]); // one certificate
+        cbor.extend([0x83, 0x07]); // registration with a deposit
+        cbor.extend([0x82, 0x01, 0x58, 0x1c]); // a 28 byte script credential
+        cbor.extend_from_slice(script_hash);
+        cbor.push(0x00); // zero deposit
+        cbor.extend_from_slice(&[0xa0, 0xf5, 0xf6]); // no witnesses, valid, no auxiliary data
+        cbor
+    }
+
+    #[test]
+    fn a_registration_reaches_a_v1_context_as_a_key_registration() {
+        let hash = Hasher::<224>::hash(&COMMITTED_SCRIPT);
+        let cbor = conway_tx_registering_script(hash.as_ref());
+        let tx = MultiEraTx::decode_for_era(Era::Conway, &cbor).unwrap();
+
+        let info = TxInfoV1::from_transaction(tx.as_conway().unwrap(), &[], &SlotConfig::default())
+            .unwrap()
+            .to_plutus_data();
+
+        let PlutusData::Constr(info) = info else {
+            panic!("a constructor")
+        };
+        let staking_hash = Data::constr(0, vec![Data::constr(1, vec![hash.to_plutus_data()])]);
+        assert_eq!(
+            info.fields[4],
+            Data::list(vec![Data::constr(0, vec![staking_hash])])
+        );
+    }
+
+    #[test]
+    fn a_conway_parameter_update_holds_its_cost_models_under_key_18() {
+        use pallas_codec::minicbor;
+        use pallas_primitives::conway::{CostModels, ProtocolParamUpdate};
+        let key = |key: u64, value: PlutusData| (key.to_plutus_data(), value);
+        let mut update: ProtocolParamUpdate = minicbor::decode(&[0xa0]).unwrap();
+        update.minfee_a = Some(44);
+        update.max_collateral_inputs = Some(3);
+        let mut models: CostModels = minicbor::decode(&[0xa0]).unwrap();
+        models.plutus_v1 = Some(vec![1]);
+        models.unknown.insert(9, vec![2]);
+        update.cost_models_for_script_languages = Some(models);
+        assert_eq!(
+            update.to_plutus_data(),
+            Data::map(vec![
+                key(0, 44u64.to_plutus_data()),
+                key(
+                    18,
+                    Data::map(vec![
+                        key(0, vec![1i64].to_plutus_data()),
+                        key(9, vec![2i64].to_plutus_data()),
+                    ])
+                ),
+                key(24, 3u64.to_plutus_data()),
+            ])
+        );
     }
 }
