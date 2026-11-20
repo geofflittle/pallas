@@ -1,4 +1,5 @@
-//! A CBOR data item as a tree, read from any encoding and written with definite lengths.
+//! A CBOR data item as a tree, read from any encoding and written with definite
+//! lengths.
 
 use pallas_codec::minicbor::data::{Int, Tag, Type};
 use pallas_codec::minicbor::{Decoder, Encoder};
@@ -29,8 +30,15 @@ pub fn read(bytes: &[u8]) -> Result<Term, String> {
 fn item(d: &mut Decoder<'_>) -> Result<Term, String> {
     let e = |x: pallas_codec::minicbor::decode::Error| x.to_string();
     Ok(match d.datatype().map_err(e)? {
-        Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::I8 | Type::I16 | Type::I32
-        | Type::I64 | Type::Int => Term::Int(i128::from(d.int().map_err(e)?)),
+        Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::Int => Term::Int(i128::from(d.int().map_err(e)?)),
         Type::Bytes | Type::BytesIndef => {
             let mut out = Vec::new();
             for chunk in d.bytes_iter().map_err(e)? {
@@ -104,7 +112,9 @@ pub fn write(t: &Term) -> Vec<u8> {
 
 fn put(e: &mut Encoder<Vec<u8>>, t: &Term) {
     let r = match t {
-        Term::Int(x) => e.int(Int::try_from(*x).expect("an integer CBOR holds")).map(|_| ()),
+        Term::Int(x) => e
+            .int(Int::try_from(*x).expect("an integer CBOR holds"))
+            .map(|_| ()),
         Term::Bytes(x) => e.bytes(x).map(|_| ()),
         Term::Text(x) => e.str(x).map(|_| ()),
         Term::Array(xs) => {
@@ -136,7 +146,10 @@ impl Term {
     /// The value under `key` in a map.
     pub fn get_mut(&mut self, key: i128) -> Option<&mut Term> {
         match self {
-            Term::Map(xs) => xs.iter_mut().find(|(k, _)| *k == Term::Int(key)).map(|(_, v)| v),
+            Term::Map(xs) => xs
+                .iter_mut()
+                .find(|(k, _)| *k == Term::Int(key))
+                .map(|(_, v)| v),
             _ => None,
         }
     }
@@ -167,7 +180,13 @@ pub fn set(items: Vec<Term>) -> Term {
 
 /// A rational as the Dijkstra encoding writes it.
 pub fn rational(numerator: i128, denominator: i128) -> Term {
-    Term::Tag(30, Box::new(Term::Array(vec![Term::Int(numerator), Term::Int(denominator)])))
+    Term::Tag(
+        30,
+        Box::new(Term::Array(vec![
+            Term::Int(numerator),
+            Term::Int(denominator),
+        ])),
+    )
 }
 
 #[cfg(test)]

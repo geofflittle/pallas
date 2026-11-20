@@ -1,6 +1,8 @@
-//! Compares the ledger's decode verdict with pallas-validate Dijkstra phase one on transactions the ledger refuses.
+//! Compares the ledger's decode verdict with pallas-validate Dijkstra phase one
+//! on transactions the ledger refuses.
 //!
-//! usage: probe-validate plant FIXTURE | base FIXTURE N | sign FIXTURE | compare FIXTURE CASES LEDGER
+//! usage: probe-validate plant FIXTURE | base FIXTURE N | sign FIXTURE |
+//! compare FIXTURE CASES LEDGER
 
 mod fixture;
 mod outcome;
@@ -41,25 +43,30 @@ fn main() -> ExitCode {
                 let bytes = hex::decode(g["hex"].as_str().unwrap()).unwrap();
                 let hex = hex::encode(fx.resign(&base, &bytes));
                 let kind = format!("generated {mutation}");
-                writeln!(out, "{}", json!({ "kind": kind, "variant": mutation, "hex": hex })).unwrap();
+                writeln!(
+                    out,
+                    "{}",
+                    json!({ "kind": kind, "variant": mutation, "hex": hex })
+                )
+                .unwrap();
             }
             ExitCode::SUCCESS
         }
         Some("compare") => compare(&fx(2), Path::new(&args[3]), Path::new(&args[4])),
         _ => {
-            eprintln!("usage: probe-validate plant FIXTURE | base FIXTURE N | sign FIXTURE | compare FIXTURE CASES LEDGER");
+            eprintln!(
+                "usage: probe-validate plant FIXTURE | base FIXTURE N | sign FIXTURE | compare FIXTURE CASES LEDGER"
+            );
             ExitCode::from(2)
         }
     }
 }
 
-fn ledger(v: &Value) -> Ledger {
-    match v["ok"].as_bool() {
-        Some(true) => Ledger::Accepts,
-        _ => Ledger::Refuses(match &v["err"] {
-            Value::String(s) => s.clone(),
-            other => other.to_string(),
-        }),
+fn ledger(v: &Value) -> Option<Ledger> {
+    match (v.get("dump"), v.get("err")) {
+        (Some(_), None) => Some(Ledger::Accepts),
+        (None, Some(Value::String(e))) => Some(Ledger::Refuses(e.clone())),
+        _ => None,
     }
 }
 
@@ -79,7 +86,11 @@ fn compare(fx: &Fixture, cases: &Path, verdicts: &Path) -> ExitCode {
     };
     let (cases, verdicts) = (read(cases), read(verdicts));
     if cases.len() != verdicts.len() {
-        eprintln!("{} cases but {} ledger verdicts", cases.len(), verdicts.len());
+        eprintln!(
+            "{} cases but {} ledger verdicts",
+            cases.len(),
+            verdicts.len()
+        );
         return ExitCode::from(2);
     }
     let mut table = Table::default();
@@ -90,7 +101,10 @@ fn compare(fx: &Fixture, cases: &Path, verdicts: &Path) -> ExitCode {
         let kind = case["kind"].as_str().unwrap();
         let variant = case["variant"].as_str().unwrap();
         let hex = case["hex"].as_str().unwrap();
-        let l = ledger(verdict);
+        let Some(l) = ledger(verdict) else {
+            eprintln!("ledger line is neither a dump nor an err: {verdict}");
+            return ExitCode::from(2);
+        };
         let v = fx.validate(&hex::decode(hex).unwrap());
         let outcome = classify(&l, &v);
         if kind == "base" {
@@ -100,18 +114,35 @@ fn compare(fx: &Fixture, cases: &Path, verdicts: &Path) -> ExitCode {
             Ledger::Accepts => format!("ledger accepts | validator {}", validator(&v)),
             Ledger::Refuses(r) => format!("ledger {} | validator {}", short(r), validator(&v)),
         };
-        *variants.entry((kind.into(), variant.into())).or_default().entry(cell).or_default() += 1;
+        *variants
+            .entry((kind.into(), variant.into()))
+            .or_default()
+            .entry(cell)
+            .or_default() += 1;
         if let (Outcome::ValidatorAccepts, Ledger::Refuses(r)) = (&outcome, &l) {
-            accepted.entry(kind.into()).or_insert((variant.into(), r.clone(), hex.into()));
+            accepted
+                .entry(kind.into())
+                .or_insert((variant.into(), r.clone(), hex.into()));
         }
         table.add(kind, &outcome);
     }
-    println!("{:<28} {:>8} {:>10} {:>10} {:>9} {:>8}", "kind", "ledger", "validator", "validator", "validator", "ledger");
-    println!("{:<28} {:>8} {:>10} {:>10} {:>9} {:>8}", "", "refuses", "malformed", "other", "accepts", "accepts");
+    println!(
+        "{:<28} {:>8} {:>10} {:>10} {:>9} {:>8}",
+        "kind", "ledger", "validator", "validator", "validator", "ledger"
+    );
+    println!(
+        "{:<28} {:>8} {:>10} {:>10} {:>9} {:>8}",
+        "", "refuses", "malformed", "other", "accepts", "accepts"
+    );
     for (kind, c) in &table.kinds {
         println!(
             "{:<28} {:>8} {:>10} {:>10} {:>9} {:>8}",
-            kind, c.refused_by_ledger, c.refused_malformed, c.refused_other, c.accepted, c.ledger_accepts
+            kind,
+            c.refused_by_ledger,
+            c.refused_malformed,
+            c.refused_other,
+            c.accepted,
+            c.ledger_accepts
         );
     }
     println!();
@@ -128,7 +159,10 @@ fn compare(fx: &Fixture, cases: &Path, verdicts: &Path) -> ExitCode {
     }
     match (base_agrees, table.failed()) {
         (Some(true), true) => {
-            println!("\nFAIL: the validator accepts {} kinds the ledger refuses", accepted.len());
+            println!(
+                "\nFAIL: the validator accepts {} kinds the ledger refuses",
+                accepted.len()
+            );
             ExitCode::FAILURE
         }
         (Some(true), false) => {
@@ -156,8 +190,31 @@ mod tests {
     use std::path::PathBuf;
 
     fn fixture() -> Fixture {
-        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../conf/test_data/dijkstra-ttl");
+        let root =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../conf/test_data/dijkstra-ttl");
         Fixture::load(&root)
+    }
+
+    #[test]
+    fn a_ledger_dump_is_an_accept() {
+        assert_eq!(
+            ledger(&json!({ "dump": { "body": {} } })),
+            Some(Ledger::Accepts)
+        );
+    }
+
+    #[test]
+    fn a_ledger_err_is_a_refusal() {
+        assert_eq!(
+            ledger(&json!({ "err": "bad", "ok": false })),
+            Some(Ledger::Refuses("bad".into()))
+        );
+    }
+
+    #[test]
+    fn a_ledger_line_with_neither_or_both_is_no_verdict() {
+        assert_eq!(ledger(&json!({ "ok": true })), None);
+        assert_eq!(ledger(&json!({ "dump": {}, "err": "bad" })), None);
     }
 
     #[test]
@@ -175,8 +232,13 @@ mod tests {
         fixture::pay(body, -1);
         body.set(2, term::Term::Int(fixture::FEE + 1));
         let unsigned = term::write(&tx);
-        assert!(matches!(fx.validate(&unsigned), Validator::RefusesOther(e) if e.contains("Signature") || e.contains("Witness")));
-        assert_eq!(fx.validate(&fx.resign(&base, &unsigned)), Validator::Accepts);
+        assert!(
+            matches!(fx.validate(&unsigned), Validator::RefusesOther(e) if e.contains("Signature") || e.contains("Witness"))
+        );
+        assert_eq!(
+            fx.validate(&fx.resign(&base, &unsigned)),
+            Validator::Accepts
+        );
     }
 
     #[test]
@@ -192,7 +254,13 @@ mod tests {
     #[test]
     fn a_zero_pool_margin_denominator_is_refused_as_malformed() {
         let fx = fixture();
-        let p = plant::plants(&fx).into_iter().find(|p| p.variant == "pool margin 1/0").unwrap();
-        assert!(matches!(fx.validate(&term::write(&p.tx)), Validator::RefusesMalformed(_)));
+        let p = plant::plants(&fx)
+            .into_iter()
+            .find(|p| p.variant == "pool margin 1/0")
+            .unwrap();
+        assert!(matches!(
+            fx.validate(&term::write(&p.tx)),
+            Validator::RefusesMalformed(_)
+        ));
     }
 }

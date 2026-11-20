@@ -30,7 +30,9 @@ pub fn classify(ledger: &Ledger, validator: &Validator) -> Outcome {
     match (ledger, validator) {
         (Ledger::Accepts, v) => Outcome::LedgerAccepts(v.clone()),
         (Ledger::Refuses(_), Validator::RefusesMalformed(_)) => Outcome::BothRefuse,
-        (Ledger::Refuses(_), Validator::RefusesOther(e)) => Outcome::ValidatorRefusesOther(e.clone()),
+        (Ledger::Refuses(_), Validator::RefusesOther(e)) => {
+            Outcome::ValidatorRefusesOther(e.clone())
+        }
         (Ledger::Refuses(_), Validator::Accepts) => Outcome::ValidatorAccepts,
     }
 }
@@ -118,17 +120,36 @@ mod tests {
         table.add("k", &outcome);
         assert!(!table.failed());
         let c = &table.kinds["k"];
-        assert_eq!((c.refused_by_ledger, c.refused_malformed, c.refused_other, c.accepted), (1, 1, 0, 0));
+        assert_eq!(
+            (
+                c.refused_by_ledger,
+                c.refused_malformed,
+                c.refused_other,
+                c.accepted
+            ),
+            (1, 1, 0, 0)
+        );
     }
 
     #[test]
     fn another_reason_is_its_own_column_and_not_agreement() {
         let outcome = classify(&refuses(), &other());
-        assert_eq!(outcome, Outcome::ValidatorRefusesOther("PostAlonzo(FeeBelowMin)".into()));
+        assert_eq!(
+            outcome,
+            Outcome::ValidatorRefusesOther("PostAlonzo(FeeBelowMin)".into())
+        );
         let mut table = Table::default();
         table.add("k", &outcome);
         let c = &table.kinds["k"];
-        assert_eq!((c.refused_by_ledger, c.refused_malformed, c.refused_other, c.accepted), (1, 0, 1, 0));
+        assert_eq!(
+            (
+                c.refused_by_ledger,
+                c.refused_malformed,
+                c.refused_other,
+                c.accepted
+            ),
+            (1, 0, 1, 0)
+        );
         assert!(!table.failed());
     }
 
@@ -141,6 +162,14 @@ mod tests {
         table.add("k", &outcome);
         assert!(table.failed());
         let c = &table.kinds["k"];
-        assert_eq!((c.refused_by_ledger, c.refused_malformed, c.refused_other, c.accepted), (2, 1, 0, 1));
+        assert_eq!(
+            (
+                c.refused_by_ledger,
+                c.refused_malformed,
+                c.refused_other,
+                c.accepted
+            ),
+            (2, 1, 0, 1)
+        );
     }
 }

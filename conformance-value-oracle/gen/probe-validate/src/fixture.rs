@@ -1,4 +1,5 @@
-//! The captured Dijkstra transaction and its state, rebuilt so that a key this program holds signs it.
+//! The captured Dijkstra transaction and its state, rebuilt so that a key this
+//! program holds signs it.
 
 use std::path::Path;
 
@@ -24,7 +25,8 @@ pub const FUNDS: i128 = 10_000_000_000_000;
 pub const FEE: i128 = 400_000;
 /// The transaction id of the input that pays deposits.
 pub const FUNDING_TX: [u8; 32] = [0xff; 32];
-/// The transaction id of the input planted transactions read as a reference input.
+/// The transaction id of the input planted transactions read as a reference
+/// input.
 pub const REFERENCE_TX: [u8; 32] = [0xee; 32];
 
 /// The captured transaction, its spent outputs, parameters and time.
@@ -59,7 +61,8 @@ fn units(v: &Value) -> n::ExUnits {
 }
 
 impl Fixture {
-    /// Loads `confirmed-ttl` from the `dijkstra-ttl` test data directory `root`.
+    /// Loads `confirmed-ttl` from the `dijkstra-ttl` test data directory
+    /// `root`.
     pub fn load(root: &Path) -> Self {
         let case = root.join("confirmed-ttl");
         let json = |path: &Path| -> Value {
@@ -198,9 +201,12 @@ impl Fixture {
             ForecastHorizon::Slot(horizon),
         )
         .unwrap();
-        let transaction =
-            hex::decode(std::fs::read_to_string(case.join("transaction.hex")).unwrap().trim())
-                .unwrap();
+        let transaction = hex::decode(
+            std::fs::read_to_string(case.join("transaction.hex"))
+                .unwrap()
+                .trim(),
+        )
+        .unwrap();
         let inputs = json(&case.join("inputs.json"))
             .as_array()
             .unwrap()
@@ -251,16 +257,17 @@ impl Fixture {
         }
     }
 
-    /// The captured transaction with this program's key as its guard and signer, an input that pays deposits, and the fee `FEE`.
+    /// The captured transaction with this program's key as its guard and
+    /// signer, an input that pays deposits, and the fee `FEE`.
     pub fn base(&self) -> Term {
         let mut tx = term::read(&self.transaction).unwrap();
         let body = &mut tx.items_mut()[0];
         let credential = Term::Array(vec![Term::Int(0), Term::Bytes(self.key_hash())]);
         body.set(14, term::set(vec![credential]));
-        body.get_mut(0)
-            .unwrap()
-            .items_mut()
-            .push(Term::Array(vec![Term::Bytes(FUNDING_TX.to_vec()), Term::Int(0)]));
+        body.get_mut(0).unwrap().items_mut().push(Term::Array(vec![
+            Term::Bytes(FUNDING_TX.to_vec()),
+            Term::Int(0),
+        ]));
         let Some(Term::Int(fee)) = body.get_mut(2).cloned() else {
             panic!("no fee")
         };
@@ -281,7 +288,8 @@ impl Fixture {
         tx.items_mut()[1].set(0, term::set(vec![witness]));
     }
 
-    /// Signs transaction bytes whose body may be malformed, changing only the signature bytes of `base`.
+    /// Signs transaction bytes whose body may be malformed, changing only the
+    /// signature bytes of `base`.
     pub fn resign(&self, base: &[u8], bytes: &[u8]) -> Vec<u8> {
         let old = signature_of(base);
         let mut d = minicbor::Decoder::new(bytes);
@@ -293,7 +301,12 @@ impl Fixture {
             return bytes.to_vec();
         };
         let new = self.key.sign(Hasher::<256>::hash(&bytes[span]));
-        let at: Vec<usize> = bytes.windows(64).enumerate().filter(|(_, w)| *w == old.as_slice()).map(|(i, _)| i).collect();
+        let at: Vec<usize> = bytes
+            .windows(64)
+            .enumerate()
+            .filter(|(_, w)| *w == old.as_slice())
+            .map(|(i, _)| i)
+            .collect();
         let mut out = bytes.to_vec();
         if let [i] = at[..] {
             out[i..i + 64].copy_from_slice(new.as_ref());
@@ -301,7 +314,8 @@ impl Fixture {
         out
     }
 
-    /// The outputs the transactions spend or read, with the captured signer's outputs paid to this program's key.
+    /// The outputs the transactions spend or read, with the captured signer's
+    /// outputs paid to this program's key.
     fn outputs(&self) -> Vec<(n::TransactionInput, Vec<u8>)> {
         let old = self.captured_guard();
         let mut out: Vec<_> = self
@@ -311,8 +325,14 @@ impl Fixture {
             .collect();
         let own = |id: [u8; 32], coin: i128| {
             (
-                n::TransactionInput { transaction_id: Hash::new(id), index: 0 },
-                term::write(&Term::Array(vec![Term::Bytes(self.address()), Term::Int(coin)])),
+                n::TransactionInput {
+                    transaction_id: Hash::new(id),
+                    index: 0,
+                },
+                term::write(&Term::Array(vec![
+                    Term::Bytes(self.address()),
+                    Term::Int(coin),
+                ])),
             )
         };
         out.push(own(FUNDING_TX, FUNDS));
@@ -320,7 +340,8 @@ impl Fixture {
         out
     }
 
-    /// Runs Dijkstra phase one on `bytes` against the fixture outputs, with this program's stake account registered.
+    /// Runs Dijkstra phase one on `bytes` against the fixture outputs, with
+    /// this program's stake account registered.
     pub fn validate(&self, bytes: &[u8]) -> Validator {
         let tx = match MultiEraTx::decode_for_era(Era::Dijkstra, bytes) {
             Ok(tx) => tx,
@@ -338,7 +359,10 @@ impl Fixture {
             .collect();
         let mut state = CertState::default();
         let own = StakeCredential::AddrKeyhash(Hash::from(&self.key_hash()[..]));
-        let account = DijkstraAccount { balance: 0, deposit: 2_000_000 };
+        let account = DijkstraAccount {
+            balance: 0,
+            deposit: 2_000_000,
+        };
         state.dijkstra.accounts.insert(own, Some(account));
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             phase1::validate_tx_with_time(&tx, 0, &self.env, &utxos, &mut state, &self.time)
