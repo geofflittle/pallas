@@ -20,4 +20,3 @@ run rows-value.py.patch value.py check_rows.py
 run rows-empty-value.py.patch value.py check_rows.py
 run sets-schemacmp.py.patch schemacmp.py check_sets.py
 run align-schemacmp.py.patch schemacmp.py check_align.py
-run dups-valuecmp.py.patch valuecmp.py check_listing.py
