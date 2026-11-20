@@ -28,6 +28,15 @@ const EB_AS_THE_NODE_SENDS: Allowed = Allowed::new(
     },
 );
 
+/// The rules of `defs.cddl` no recorded value credits, with the reason none does.
+const UNCREDITED: &[(&str, &str)] = &[
+    ("language", "no rule refers to it"),
+    ("potential_languages", "no rule refers to it"),
+    ("signkey_kes", "no rule refers to it"),
+    ("eb_references", "pallas reads no value of it, see EB_AS_THE_NODE_SENDS"),
+    ("eb_reference", "pallas reads no value of it, see EB_AS_THE_NODE_SENDS"),
+];
+
 const LACKS: &str = "pallas lacks a leaf";
 const EXTRA: &str = "pallas has an extra leaf";
 const DIFFERS: &str = "a leaf differs";
@@ -1212,6 +1221,49 @@ fn difference(
     }
 }
 
+/// The rule names of a CDDL text, generic rules by the name before their parameters.
+fn rule_names(cddl: &str) -> Vec<String> {
+    cddl.lines()
+        .filter_map(|line| {
+            let name: String = line
+                .chars()
+                .take_while(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || *c == '_')
+                .collect();
+            let rest = line[name.len()..].trim_start();
+            let rest = match rest.strip_prefix('<') {
+                Some(r) => r.split_once('>')?.1.trim_start(),
+                None => rest,
+            };
+            (!name.is_empty() && rest.starts_with('=')).then_some(name)
+        })
+        .collect()
+}
+
+/// The failures of a rule credit, against the rules `defs.cddl` defines and the ones listed as uncredited.
+fn credit_failures(
+    rules: &[String],
+    credit: &BTreeMap<String, usize>,
+    uncredited: &[(&str, &str)],
+) -> Vec<String> {
+    let mut failures = Vec::new();
+    for rule in rules {
+        let credited = credit.get(rule).is_some_and(|n| *n > 0);
+        let listed = uncredited.iter().any(|(name, _)| name == rule);
+        match (credited, listed) {
+            (false, false) => failures.push(format!("no value credits {rule}")),
+            (true, true) => failures.push(format!("{rule} is credited, so it leaves UNCREDITED")),
+            _ => {}
+        }
+    }
+    for name in credit.keys().filter(|n| !rules.contains(n)) {
+        failures.push(format!("a value credits {name}, which defs.cddl does not define"));
+    }
+    for (name, _) in uncredited.iter().filter(|(n, _)| !rules.iter().any(|r| r == n)) {
+        failures.push(format!("UNCREDITED names {name}, which defs.cddl does not define"));
+    }
+    failures
+}
+
 fn run() {
     let cddl = read("pallas-primitives/src/dijkstra/defs.cddl");
     let pin = cddl_pin(&cddl).expect("defs.cddl names no ledger commit");
@@ -1220,6 +1272,7 @@ fn run() {
     assert_eq!(records.layer(), Layer::Decode);
     let mut tally = Tally::new(Layer::Decode, records.classes());
     let mut examples = BTreeMap::new();
+    let mut credit = BTreeMap::new();
     for row in records.rows() {
         let reference = match &row.reference {
             Reference::Accepts(dump) => Reference::Accepts(Decoded::of_ledger(dump)),
@@ -1232,17 +1285,33 @@ fn run() {
         };
         let allowed = (row.class == "eb").then_some(EB_AS_THE_NODE_SENDS);
         let outcome = judge(&reference, &answer, |_, _| false, allowed);
-        if outcome != Outcome::Agree {
+        if outcome == Outcome::Agree {
+            for rule in &row.rules {
+                *credit.entry(rule.clone()).or_insert(0) += 1;
+            }
+        } else {
             examples
                 .entry(row.class.clone())
                 .or_insert_with(|| difference(row, &reference, &answer));
         }
         tally.add(&row.class, &outcome);
     }
+    let rules = rule_names(&cddl);
+    let counts: Vec<String> = rules
+        .iter()
+        .map(|r| format!("{r}={}", credit.get(r).copied().unwrap_or(0)))
+        .collect();
     println!("records: {}", records.generator());
     println!("{tally}");
+    println!("rules {}: {}", rules.len(), counts.join(" "));
+    println!(
+        "rules credited {} of {}",
+        rules.iter().filter(|r| credit.contains_key(*r)).count(),
+        rules.len()
+    );
     examples.values().for_each(|e| println!("{e}"));
-    let failures = tally.failures();
+    let mut failures = tally.failures();
+    failures.extend(credit_failures(&rules, &credit, UNCREDITED));
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
@@ -1256,6 +1325,37 @@ fn pallas_decodes_what_the_ledger_writes() {
     if let Err(e) = outcome {
         std::panic::resume_unwind(e);
     }
+}
+
+#[test]
+fn rules_credited_and_listed_as_defs_names_them_pass() {
+    let rules = ["coin", "eb_reference", "language"].map(String::from);
+    let credit = BTreeMap::from([("coin".to_string(), 2)]);
+    let uncredited = [("eb_reference", "a reason"), ("language", "a reason")];
+    assert_eq!(credit_failures(&rules, &credit, &uncredited), Vec::<String>::new());
+}
+
+#[test]
+fn rules_credited_or_listed_against_defs_fail() {
+    let rules = ["coin", "eb_reference", "language"].map(String::from);
+    let credit = BTreeMap::from([("eb_reference".to_string(), 1), ("nonce".to_string(), 1)]);
+    let uncredited = [("eb_reference", "a reason"), ("signkey_kes", "a reason")];
+    assert_eq!(
+        credit_failures(&rules, &credit, &uncredited),
+        [
+            "no value credits coin",
+            "eb_reference is credited, so it leaves UNCREDITED",
+            "no value credits language",
+            "a value credits nonce, which defs.cddl does not define",
+            "UNCREDITED names signkey_kes, which defs.cddl does not define",
+        ]
+    );
+}
+
+#[test]
+fn rule_names_are_read_from_definitions() {
+    let cddl = "; a comment\nblock = [header]\nnonempty_set<a0> = #6.258([+ a0])\n  foo = 1\nhash32 = bytes .size 32\n";
+    assert_eq!(rule_names(cddl), ["block", "nonempty_set", "hash32"]);
 }
 
 #[test]
