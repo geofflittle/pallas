@@ -1347,7 +1347,7 @@ fn run() {
     let mut credit = BTreeMap::new();
     for row in records.rows() {
         let reference = match &row.reference {
-            Reference::Accepts(dump) => Reference::Accepts(Decoded::of_ledger(dump)),
+            Reference::Accepts(accepted) => Reference::Accepts(Decoded::of_ledger(&accepted.dump)),
             Reference::Refuses(reason) => Reference::Refuses(reason.clone()),
         };
         let answer = answer(row);
