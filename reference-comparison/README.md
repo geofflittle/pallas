@@ -10,7 +10,7 @@ Each layer's tests compare pallas with its reference on the inputs in `records/`
 
 An accepted row's reference is `{"accepts": DUMP, "encoding": HEX}`, where HEX is the reference's own encoding of the value it read. Decode rows carry it, and a refused row carries none.
 
-A test refuses records whose pin differs from the one the head's `pallas-primitives/src/dijkstra/defs.cddl` names. It fails on no judged observation, a declared class with none, a KIND with no input, a record class not declared, and any disagreement, panic, timeout or observation one side makes and the other does not. An allowed difference names what owns it and passes only when pallas's answer shows its reason.
+A test refuses records whose pin differs from the one the head's `pallas-primitives/src/dijkstra/defs.cddl` names. It fails on no judged observation, a declared class with none, a KIND with no input, a record class not declared, and any disagreement, panic, timeout or observation one side makes and the other does not. An allowed difference names what owns it and passes only when pallas's answer shows its reason. The decode test checks that every `defs.cddl` rule is credited only in a run of all the kinds.
 
 ```
 sh reference-comparison/run.sh HEAD git=https://github.com/geofflittle/dolos@REV decode

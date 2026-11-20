@@ -1376,13 +1376,17 @@ fn rule_names(cddl: &str) -> Vec<String> {
         .collect()
 }
 
-/// The failures of a rule credit, against the rules `defs.cddl` defines and the ones listed as uncredited.
+/// The failures of a rule credit, against the rules `defs.cddl` defines and the ones listed as uncredited, in a run of every kind.
 fn credit_failures(
     rules: &[String],
     credit: &BTreeMap<String, usize>,
     uncredited: &[(&str, &str)],
+    kinds: &[String],
 ) -> Vec<String> {
     let mut failures = Vec::new();
+    if !kinds.is_empty() {
+        return failures;
+    }
     for rule in rules {
         let credited = credit.get(rule).is_some_and(|n| *n > 0);
         let listed = uncredited.iter().any(|(name, _)| name == rule);
@@ -1413,7 +1417,8 @@ fn run() {
     let pin = cddl_pin(&cddl).expect("defs.cddl names no ledger commit");
     let records = Records::read(&read("test_data/reference-comparison/decode.jsonl"), pin)
         .unwrap_or_else(|e| panic!("{e}"));
-    let judged = comparison::compare(&Arc::new(Decoding), &records, &kinds_from_env());
+    let kinds = kinds_from_env();
+    let judged = comparison::compare(&Arc::new(Decoding), &records, &kinds);
     let mut examples = BTreeMap::new();
     let mut credit = BTreeMap::new();
     for j in &judged.judgements {
@@ -1438,14 +1443,19 @@ fn run() {
     print!("{coverage}");
     println!("rules {}: {}", rules.len(), counts.join(" "));
     println!(
-        "rules credited {} of {}",
+        "rules credited {} of {}{}",
         rules.iter().filter(|r| credit.contains_key(*r)).count(),
-        rules.len()
+        rules.len(),
+        if kinds.is_empty() {
+            ""
+        } else {
+            ", not checked in a run of the given kinds only"
+        }
     );
     examples.values().for_each(|e| println!("{e}"));
     let mut failures = judged.failures();
     failures.extend(coverage.failures(REQUIRED));
-    failures.extend(credit_failures(&rules, &credit, UNCREDITED));
+    failures.extend(credit_failures(&rules, &credit, UNCREDITED, &kinds));
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
@@ -1516,7 +1526,21 @@ fn rules_credited_and_listed_as_defs_names_them_pass() {
     let credit = BTreeMap::from([("coin".to_string(), 2)]);
     let uncredited = [("eb_reference", "a reason"), ("language", "a reason")];
     assert_eq!(
-        credit_failures(&rules, &credit, &uncredited),
+        credit_failures(&rules, &credit, &uncredited, &[]),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn rule_credit_is_judged_only_in_a_run_of_every_kind() {
+    let rules = ["coin"].map(String::from);
+    let credit = BTreeMap::new();
+    assert_eq!(
+        credit_failures(&rules, &credit, &[], &[]),
+        ["no value credits coin"]
+    );
+    assert_eq!(
+        credit_failures(&rules, &credit, &[], &["block".to_string()]),
         Vec::<String>::new()
     );
 }
@@ -1527,7 +1551,7 @@ fn rules_credited_or_listed_against_defs_fail() {
     let credit = BTreeMap::from([("eb_reference".to_string(), 1), ("nonce".to_string(), 1)]);
     let uncredited = [("eb_reference", "a reason"), ("signkey_kes", "a reason")];
     assert_eq!(
-        credit_failures(&rules, &credit, &uncredited),
+        credit_failures(&rules, &credit, &uncredited, &[]),
         [
             "no value credits coin",
             "eb_reference is credited, so it leaves UNCREDITED",
