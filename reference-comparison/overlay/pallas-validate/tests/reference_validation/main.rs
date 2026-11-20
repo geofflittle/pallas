@@ -10,7 +10,8 @@ use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
 
 use ledger_oracle_judge::comparison::{
-    Answer, Layer, Outcome, Records, Reference, Tally, catch, cddl_pin, judge,
+    Allowed, Answer, Commit, Disagreement, Layer, Outcome, Owner, Records, Reference, Tally, catch,
+    cddl_pin, judge,
 };
 
 /// Why phase one refuses a transaction.
@@ -23,6 +24,18 @@ pub enum Refusal {
 /// The class of the unchanged transaction, the one input the ledger accepts
 /// that phase one must accept.
 const BASE: &str = "base";
+
+/// The class of transactions with an extra element in a definite array.
+const EXTRA: &str = "generated extra";
+
+/// The extra array elements upstream main decodes and drops on purpose.
+const EXTRA_ELEMENTS: Allowed = Allowed::new(
+    "extra array elements",
+    Disagreement::Accepts,
+    Owner::Upstream {
+        commit: Commit::new("a8516e16bb38621eeb86b83bef0e146e6123b648"),
+    },
+);
 
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
@@ -63,7 +76,7 @@ fn phase_one_refuses_what_the_ledger_refuses() {
             &reference,
             &answer,
             |_, refusal| matches!(refusal, Refusal::Malformed(_)),
-            None,
+            (row.class == EXTRA).then_some(EXTRA_ELEMENTS),
         );
         if outcome != Outcome::Agree {
             examples.entry(row.class.clone()).or_insert_with(|| {

@@ -7,8 +7,8 @@ use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
 
 use ledger_oracle_judge::comparison::{
-    Allowed, Answer, Disagreement, Layer, Outcome, Records, Reference, Row, Tally, catch, cddl_pin,
-    judge,
+    Allowed, Answer, Disagreement, Layer, Outcome, Owner, Records, Reference, Row, Tally, catch,
+    cddl_pin, judge,
 };
 use pallas_codec::minicbor;
 use pallas_codec::utils::{KeepRaw, Nullable};
@@ -22,8 +22,10 @@ use serde_json::{Map, Value, json};
 const EB_AS_THE_NODE_SENDS: Allowed = Allowed::new(
     "endorser block references as the node sends them",
     Disagreement::Refuses,
-    Layer::Networking,
-    "pallas-primitives dijkstra::tests::endorser_block_isomorphic_decoding_encoding",
+    Owner::Check {
+        layer: Layer::Networking,
+        test: "pallas-primitives dijkstra::tests::endorser_block_isomorphic_decoding_encoding",
+    },
 );
 
 const LACKS: &str = "pallas lacks a leaf";
@@ -550,18 +552,40 @@ fn metadata(m: Option<&d::Metadata>) -> Value {
     map_cb(m.map(|x| x.iter()))
 }
 
+/// A native script as an auxiliary data field holds it, with or without its
+/// original bytes.
+trait AsNative {
+    fn native(&self) -> &d::NativeScript;
+}
+
+impl AsNative for d::NativeScript {
+    fn native(&self) -> &d::NativeScript {
+        self
+    }
+}
+
+impl AsNative for KeepRaw<'_, d::NativeScript> {
+    fn native(&self) -> &d::NativeScript {
+        self
+    }
+}
+
+fn natives<T: AsNative>(xs: Option<&Vec<T>>) -> Value {
+    Value::Array(
+        xs.into_iter()
+            .flatten()
+            .map(|x| native(x.native()))
+            .collect(),
+    )
+}
+
 fn aux(a: &d::AuxiliaryData) -> Value {
-    let natives = |xs: Option<&Vec<d::NativeScript>>| {
-        Value::Array(
-            xs.map(|x| &x[..])
-                .unwrap_or(&[])
-                .iter()
-                .map(native)
-                .collect(),
-        )
-    };
     let (md, ns, ps) = match a {
-        d::AuxiliaryData::Shelley(md) => (metadata(Some(md)), natives(None), map([])),
+        d::AuxiliaryData::Shelley(md) => (
+            metadata(Some(md)),
+            natives::<d::NativeScript>(None),
+            map([]),
+        ),
         d::AuxiliaryData::ShelleyMa(x) => (
             metadata(Some(&x.transaction_metadata)),
             natives(x.auxiliary_scripts.as_ref()),
