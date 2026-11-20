@@ -7,8 +7,8 @@ use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
 
 use ledger_oracle_judge::comparison::{
-    Allowed, Answer, Disagreement, Layer, Outcome, Owner, Records, Reference, Row, Tally, catch,
-    cddl_pin, judge,
+    Allowed, Answer, Coverage, Disagreement, Layer, Outcome, Owner, Records, Reference, Row, Tally,
+    catch, cddl_pin, judge,
 };
 use pallas_codec::minicbor;
 use pallas_codec::utils::{KeepRaw, Nullable};
@@ -33,8 +33,22 @@ const UNCREDITED: &[(&str, &str)] = &[
     ("language", "no rule refers to it"),
     ("potential_languages", "no rule refers to it"),
     ("signkey_kes", "no rule refers to it"),
-    ("eb_references", "pallas reads no value of it, see EB_AS_THE_NODE_SENDS"),
-    ("eb_reference", "pallas reads no value of it, see EB_AS_THE_NODE_SENDS"),
+    (
+        "eb_references",
+        "pallas reads no value of it, see EB_AS_THE_NODE_SENDS",
+    ),
+    (
+        "eb_reference",
+        "pallas reads no value of it, see EB_AS_THE_NODE_SENDS",
+    ),
+];
+
+/// The changes the records must make, each a rule and a kind of change.
+const REQUIRED: &[(&str, &str)] = &[
+    ("gov_action", "unknown-arm"),
+    ("voter", "unknown-arm"),
+    ("redeemer_tag", "unknown-arm"),
+    ("datum_option", "unknown-arm"),
 ];
 
 const LACKS: &str = "pallas lacks a leaf";
@@ -808,6 +822,51 @@ fn decode(kind: &str, bytes: &[u8]) -> Result<Decoded, String> {
     })
 }
 
+/// Pallas's reading of the value a recorded change was made to.
+#[derive(Debug, PartialEq)]
+enum Base {
+    Reads,
+    Refuses(String),
+    Unrecorded,
+}
+
+/// A refusal by pallas, with its reading of the value the change was made to.
+#[derive(Debug, PartialEq)]
+struct Refusal {
+    error: String,
+    base: Base,
+}
+
+/// The kind of value a row's input is, the first word of its class.
+fn value_kind(row: &Row) -> &str {
+    row.class.split(' ').next().unwrap_or_default()
+}
+
+/// Pallas's answer for a row, a refusal carrying its reading of the row's base.
+fn answer(row: &Row) -> Answer<Decoded, Refusal> {
+    let kind = value_kind(row);
+    match catch(AssertUnwindSafe(|| decode(kind, &row.input))) {
+        Ok(Ok(decoded)) => Answer::Accepts(decoded),
+        Ok(Err(error)) => {
+            let base = match &row.base {
+                None => Base::Unrecorded,
+                Some(bytes) => match catch(AssertUnwindSafe(|| reader(kind)(bytes))) {
+                    Ok(Ok(_)) => Base::Reads,
+                    Ok(Err(e)) | Err(e) => Base::Refuses(e),
+                },
+            };
+            Answer::Refuses(Refusal { error, base })
+        }
+        Err(message) => Answer::Panics(message),
+    }
+}
+
+/// Whether pallas refuses for the reference's reason, which holds when it
+/// reads the value the change was made to.
+fn same_reason(_: &str, refusal: &Refusal) -> bool {
+    refusal.base == Base::Reads
+}
+
 /// A value in the form two readings share exactly when they read the same value.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Normal {
@@ -1198,9 +1257,12 @@ fn read(path: &str) -> String {
 fn difference(
     row: &Row,
     reference: &Reference<Decoded>,
-    answer: &Answer<Decoded, String>,
+    answer: &Answer<Decoded, Refusal>,
 ) -> String {
-    let at = format!("{} {}", row.class, row.variant.as_deref().unwrap_or(""));
+    let mut at = format!("{} {}", row.class, row.variant.as_deref().unwrap_or(""));
+    if let (Some(site), Some(rule)) = (&row.site, &row.mutated) {
+        at.push_str(&format!(" ({rule} at {site})"));
+    }
     match (reference, answer) {
         (Reference::Accepts(want), Answer::Accepts(got)) => {
             let mut diff = Diff::default();
@@ -1213,9 +1275,12 @@ fn difference(
                 ),
             }
         }
-        (_, Answer::Refuses(e)) => format!("{at}: pallas refuses: {e}"),
+        (_, Answer::Refuses(Refusal { error, base })) => {
+            format!("{at}: pallas refuses: {error}, its base: {base:?}")
+        }
         (_, Answer::Panics(m)) => format!("{at}: pallas panics: {m}"),
         (Reference::Refuses(r), Answer::Accepts(_)) => {
+            let r: String = r.chars().take(160).collect();
             format!("{at}: the ledger refuses ({r}) and pallas accepts")
         }
     }
@@ -1256,10 +1321,17 @@ fn credit_failures(
         }
     }
     for name in credit.keys().filter(|n| !rules.contains(n)) {
-        failures.push(format!("a value credits {name}, which defs.cddl does not define"));
+        failures.push(format!(
+            "a value credits {name}, which defs.cddl does not define"
+        ));
     }
-    for (name, _) in uncredited.iter().filter(|(n, _)| !rules.iter().any(|r| r == n)) {
-        failures.push(format!("UNCREDITED names {name}, which defs.cddl does not define"));
+    for (name, _) in uncredited
+        .iter()
+        .filter(|(n, _)| !rules.iter().any(|r| r == n))
+    {
+        failures.push(format!(
+            "UNCREDITED names {name}, which defs.cddl does not define"
+        ));
     }
     failures
 }
@@ -1278,20 +1350,16 @@ fn run() {
             Reference::Accepts(dump) => Reference::Accepts(Decoded::of_ledger(dump)),
             Reference::Refuses(reason) => Reference::Refuses(reason.clone()),
         };
-        let answer = match catch(AssertUnwindSafe(|| decode(&row.class, &row.input))) {
-            Ok(Ok(decoded)) => Answer::Accepts(decoded),
-            Ok(Err(error)) => Answer::Refuses(error),
-            Err(message) => Answer::Panics(message),
-        };
+        let answer = answer(row);
         let allowed = (row.class == "eb").then_some(EB_AS_THE_NODE_SENDS);
-        let outcome = judge(&reference, &answer, |_, _| false, allowed);
+        let outcome = judge(&reference, &answer, same_reason, allowed);
         if outcome == Outcome::Agree {
             for rule in &row.rules {
                 *credit.entry(rule.clone()).or_insert(0) += 1;
             }
         } else {
             examples
-                .entry(row.class.clone())
+                .entry((row.class.clone(), row.mutated.clone()))
                 .or_insert_with(|| difference(row, &reference, &answer));
         }
         tally.add(&row.class, &outcome);
@@ -1301,8 +1369,10 @@ fn run() {
         .iter()
         .map(|r| format!("{r}={}", credit.get(r).copied().unwrap_or(0)))
         .collect();
+    let coverage = Coverage::new(Layer::Decode, records.targets(), records.rows());
     println!("records: {}", records.generator());
     println!("{tally}");
+    print!("{coverage}");
     println!("rules {}: {}", rules.len(), counts.join(" "));
     println!(
         "rules credited {} of {}",
@@ -1311,6 +1381,7 @@ fn run() {
     );
     examples.values().for_each(|e| println!("{e}"));
     let mut failures = tally.failures();
+    failures.extend(coverage.failures(REQUIRED));
     failures.extend(credit_failures(&rules, &credit, UNCREDITED));
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
@@ -1327,12 +1398,51 @@ fn pallas_decodes_what_the_ledger_writes() {
     }
 }
 
+fn refused_change(input: &[u8], base: Option<&[u8]>) -> Outcome {
+    let row = Row {
+        class: "wits unknown-arm".into(),
+        variant: None,
+        input: input.to_vec(),
+        reference: Reference::Refuses("unknown tag".into()),
+        rules: Vec::new(),
+        site: Some("transaction_witness_set 0".into()),
+        mutated: Some("vkeywitness".into()),
+        base: base.map(<[u8]>::to_vec),
+    };
+    judge(
+        &Reference::Refuses("unknown tag".into()),
+        &answer(&row),
+        same_reason,
+        None,
+    )
+}
+
+#[test]
+fn a_refused_change_to_a_value_pallas_reads_agrees() {
+    assert_eq!(refused_change(&[0xff], Some(&[0xa0])), Outcome::Agree);
+}
+
+#[test]
+fn a_refused_change_to_a_value_pallas_refuses_disagrees() {
+    assert_eq!(
+        refused_change(&[0xff], Some(&[0xff])),
+        Outcome::Disagree(Disagreement::OtherReason)
+    );
+    assert_eq!(
+        refused_change(&[0xff], None),
+        Outcome::Disagree(Disagreement::OtherReason)
+    );
+}
+
 #[test]
 fn rules_credited_and_listed_as_defs_names_them_pass() {
     let rules = ["coin", "eb_reference", "language"].map(String::from);
     let credit = BTreeMap::from([("coin".to_string(), 2)]);
     let uncredited = [("eb_reference", "a reason"), ("language", "a reason")];
-    assert_eq!(credit_failures(&rules, &credit, &uncredited), Vec::<String>::new());
+    assert_eq!(
+        credit_failures(&rules, &credit, &uncredited),
+        Vec::<String>::new()
+    );
 }
 
 #[test]

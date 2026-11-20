@@ -1,3 +1,0 @@
-# Phase one checks Plutus script well formedness only with the Dijkstra evaluator built in.
-[build]
-rustflags = ["--cfg", "pallas_dijkstra_evaluator"]
