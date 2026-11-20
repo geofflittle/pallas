@@ -1023,11 +1023,11 @@ pub(crate) mod guards_field {
         }
         d.decode_with(ctx).map(Some)
     }
+}
 
-    /// Returns no nil value, so the derived body decoder refuses guards with an unknown variant.
-    pub fn nil() -> Option<Option<Guards>> {
-        None
-    }
+/// Returns no nil value, so a derived decoder refuses an optional field holding an unknown variant.
+pub(crate) fn no_nil<T>() -> Option<T> {
+    None
 }
 
 pub type DirectDeposits = BTreeMap<RewardAccount, Coin>;
@@ -1169,7 +1169,7 @@ pub struct SubTransactionBody<'a> {
     pub script_data_hash: Option<Hash<32>>,
 
     #[n(14)]
-    #[cbor(decode_with = "guards_field::decode_option", nil = "guards_field::nil")]
+    #[cbor(decode_with = "guards_field::decode_option", nil = "no_nil")]
     pub guards: Option<Guards>,
 
     #[n(15)]
@@ -1179,9 +1179,11 @@ pub struct SubTransactionBody<'a> {
     pub reference_inputs: Option<NonEmptySet<TransactionInput>>,
 
     #[n(19)]
+    #[cbor(decode_with = "minicbor::Decode::decode", nil = "no_nil")]
     pub voting_procedures: Option<VotingProcedures>,
 
     #[n(20)]
+    #[cbor(decode_with = "minicbor::Decode::decode", nil = "no_nil")]
     pub proposal_procedures: Option<NonEmptySet<ProposalProcedure>>,
 
     #[n(21)]
@@ -1254,7 +1256,7 @@ pub struct TransactionBody<'a> {
     pub collateral: Option<NonEmptySet<TransactionInput>>,
 
     #[n(14)]
-    #[cbor(decode_with = "guards_field::decode_option", nil = "guards_field::nil")]
+    #[cbor(decode_with = "guards_field::decode_option", nil = "no_nil")]
     pub guards: Option<Guards>,
 
     #[n(15)]
@@ -1270,9 +1272,11 @@ pub struct TransactionBody<'a> {
     pub reference_inputs: Option<NonEmptySet<TransactionInput>>,
 
     #[n(19)]
+    #[cbor(decode_with = "minicbor::Decode::decode", nil = "no_nil")]
     pub voting_procedures: Option<VotingProcedures>,
 
     #[n(20)]
+    #[cbor(decode_with = "minicbor::Decode::decode", nil = "no_nil")]
     pub proposal_procedures: Option<NonEmptySet<ProposalProcedure>>,
 
     #[n(21)]

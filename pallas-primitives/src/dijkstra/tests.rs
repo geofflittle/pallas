@@ -1200,6 +1200,60 @@ fn a_guard_credential_with_an_unknown_tag_is_refused_in_either_body() {
     }
 }
 
+/// The proposal procedures field holding one proposal with the given governance action.
+fn proposals_field(action: &str) -> String {
+    let account = format!("581de0{}", "06".repeat(28));
+    format!(
+        "14d9010281841a000f4240{account}{action}82605820{}",
+        "07".repeat(32)
+    )
+}
+
+/// The voting procedures field holding one voter with the given tag and no votes.
+fn votes_field(tag: &str) -> String {
+    format!("13a182{tag}581c{}a0", "06".repeat(28))
+}
+
+#[test]
+fn a_governance_action_or_voter_with_a_known_tag_reads_as_present_in_either_body() {
+    for action in ["8106", "8203f6"] {
+        let field = proposals_field(action);
+        let top: TransactionBody = decode_all(body_ending(true, &field));
+        assert!(top.proposal_procedures.is_some(), "{action}");
+        let sub: SubTransactionBody = decode_all(body_ending(false, &field));
+        assert!(sub.proposal_procedures.is_some(), "{action}");
+    }
+    for tag in ["00", "04"] {
+        let field = votes_field(tag);
+        let top: TransactionBody = decode_all(body_ending(true, &field));
+        assert!(top.voting_procedures.is_some(), "{tag}");
+        let sub: SubTransactionBody = decode_all(body_ending(false, &field));
+        assert!(sub.voting_procedures.is_some(), "{tag}");
+    }
+}
+
+#[test]
+fn a_governance_action_or_voter_with_an_unknown_tag_is_refused_in_either_body() {
+    for action in ["8107", "811863"] {
+        let field = proposals_field(action);
+        let top: Result<TransactionBody, _> = minicbor::decode(body_ending(true, &field));
+        let top = top.map(|x| x.proposal_procedures);
+        assert!(top.is_err(), "{action} decoded as {top:?}");
+        let sub: Result<SubTransactionBody, _> = minicbor::decode(body_ending(false, &field));
+        let sub = sub.map(|x| x.proposal_procedures);
+        assert!(sub.is_err(), "{action} decoded as {sub:?}");
+    }
+    for tag in ["05", "1863"] {
+        let field = votes_field(tag);
+        let top: Result<TransactionBody, _> = minicbor::decode(body_ending(true, &field));
+        let top = top.map(|x| x.voting_procedures);
+        assert!(top.is_err(), "{tag} decoded as {top:?}");
+        let sub: Result<SubTransactionBody, _> = minicbor::decode(body_ending(false, &field));
+        let sub = sub.map(|x| x.voting_procedures);
+        assert!(sub.is_err(), "{tag} decoded as {sub:?}");
+    }
+}
+
 /// A type reaching Alonzo's native script from here would refuse a whole
 /// block over a guard clause in a transaction that used the array form.
 #[test]
