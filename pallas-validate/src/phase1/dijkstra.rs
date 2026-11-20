@@ -14,7 +14,11 @@ use pallas_addresses::{
     Address, Network, ShelleyDelegationPart, ShelleyPaymentPart, byron::ByronAddress,
 };
 use pallas_codec::{
-    minicbor,
+    minicbor::{
+        self,
+        data::{Tag, Token},
+        decode::Tokenizer,
+    },
     utils::{KeepRaw, Nullable},
 };
 use pallas_crypto::{
@@ -741,9 +745,73 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
     )?;
     check_output_encodings(b.outputs.iter().chain(b.collateral_return.iter()))?;
     check_guards(b.guards.as_ref())?;
+    check_distinct_certificates_and_proposals(
+        b.certificates.as_ref(),
+        b.proposal_procedures.as_ref(),
+    )?;
     check_rationals(b.certificates.as_ref(), b.proposal_procedures.as_ref())?;
     check_witness_fields(&tx.transaction_witness_set)?;
     check_auxiliary_encoding(&tx.auxiliary_data)
+}
+fn check_distinct_certificates_and_proposals(
+    certificates: Option<&NonEmptySet<Certificate>>,
+    proposals: Option<&NonEmptySet<ProposalProcedure>>,
+) -> ValidationResult {
+    let certificates = certificates.map(|x| x.as_slice()).unwrap_or_default();
+    if has_ledger_repeat(certificates)? {
+        return Err(DijkstraMalformed(MalformedField::DuplicateCertificates));
+    }
+    for certificate in certificates {
+        if let Certificate::PoolRegistration { pool_owners, .. } = certificate
+            && has_repeat(pool_owners)
+        {
+            return Err(DijkstraMalformed(MalformedField::DuplicatePoolOwners));
+        }
+    }
+    match has_ledger_repeat(proposals.map(|x| x.as_slice()).unwrap_or_default())? {
+        true => Err(DijkstraMalformed(MalformedField::DuplicateProposals)),
+        false => Ok(()),
+    }
+}
+// The ledger reads every rational in lowest terms, so it compares items with their rationals reduced.
+fn has_ledger_repeat<T: minicbor::Encode<()>>(items: &[T]) -> Result<bool, ValidationError> {
+    let encodings = items.iter().map(encode).collect::<Result<Vec<_>, _>>()?;
+    let reduced = encodings
+        .iter()
+        .map(|x| lowest_terms(x))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(has_repeat(&reduced))
+}
+fn lowest_terms(encoding: &[u8]) -> Result<Vec<Token<'_>>, ValidationError> {
+    let mut tokens = Tokenizer::new(encoding)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| PostAlonzo(UnknownTxSize))?;
+    for i in 0..tokens.len() {
+        if let [Token::Tag(tag), Token::Array(2), n, d, ..] = &mut tokens[i..]
+            && *tag == Tag::new(30)
+            && let (Some(x), Some(y)) = (unsigned(n), unsigned(d))
+            && y != 0
+        {
+            let (x, y) = reduce((x.into(), y.into()));
+            (*n, *d) = (Token::U64(x as u64), Token::U64(y as u64));
+        }
+    }
+    Ok(tokens)
+}
+fn unsigned(token: &Token<'_>) -> Option<u64> {
+    match *token {
+        Token::U8(x) => Some(x.into()),
+        Token::U16(x) => Some(x.into()),
+        Token::U32(x) => Some(x.into()),
+        Token::U64(x) => Some(x),
+        _ => None,
+    }
+}
+fn has_repeat<T: PartialEq>(items: &[T]) -> bool {
+    items
+        .iter()
+        .enumerate()
+        .any(|(i, x)| items[..i].contains(x))
 }
 fn check_distinct<'a>(
     inputs: impl IntoIterator<Item = &'a TransactionInput>,
@@ -871,6 +939,10 @@ fn check_sub_supported(tx: &SubTransaction<'_>) -> ValidationResult {
     )?;
     check_output_encodings(b.outputs.iter())?;
     check_guards(b.guards.as_ref())?;
+    check_distinct_certificates_and_proposals(
+        b.certificates.as_ref(),
+        b.proposal_procedures.as_ref(),
+    )?;
     check_rationals(b.certificates.as_ref(), b.proposal_procedures.as_ref())?;
     check_witness_fields(&tx.transaction_witness_set)?;
     check_auxiliary_encoding(&tx.auxiliary_data)

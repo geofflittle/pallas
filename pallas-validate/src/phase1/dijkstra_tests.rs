@@ -390,6 +390,136 @@ fn dijkstra_a_pool_margin_is_at_most_one() {
     });
 }
 #[test]
+fn dijkstra_repeated_certificates_pool_owners_and_proposals_are_malformed() {
+    synthetic(|tx, input| {
+        let operator = Hasher::<224>::hash(SecretKey::from([71; 32]).public_key().as_ref());
+        let mut account = vec![0xe0];
+        account.extend(operator.as_ref());
+        let mut e = env();
+        let MultiEraProtocolParameters::Dijkstra(ref mut pp) = e.prot_params else {
+            unreachable!()
+        };
+        pp.pool_deposit = 0;
+        pp.governance_action_deposit = 0;
+        let cost = pp.min_pool_cost;
+        let output = MultiEraOutput::from_dijkstra(&input);
+        let ratio = |numerator, denominator| n::RationalNumber {
+            numerator,
+            denominator,
+        };
+        let pool = |owners: Vec<n::AddrKeyhash>, margin| n::Certificate::PoolRegistration {
+            operator,
+            vrf_keyhash: [9; 32].into(),
+            bls_key: None,
+            pledge: 0,
+            cost,
+            margin,
+            reward_account: account.clone().into(),
+            pool_owners: owners.into(),
+            relays: vec![],
+            pool_metadata: None,
+        };
+        let action_proposal = |gov_action| n::ProposalProcedure {
+            deposit: 0,
+            reward_account: account.clone().into(),
+            gov_action,
+            anchor: n::Anchor {
+                url: "https://proposal.example".into(),
+                content_hash: [0; 32].into(),
+            },
+        };
+        let proposal = action_proposal(n::GovAction::Information);
+        let quorum = |numerator, denominator| {
+            action_proposal(n::GovAction::UpdateCommittee(
+                None,
+                vec![].into(),
+                Default::default(),
+                ratio(numerator, denominator),
+            ))
+        };
+        let expansion = |numerator, denominator| {
+            let update: n::ProtocolParamUpdate =
+                minicbor::decode(&[0xa1, 0x0a, 0xd8, 0x1e, 0x82, numerator, denominator]).unwrap();
+            action_proposal(n::GovAction::ParameterChange(None, Box::new(update), None))
+        };
+        let checked = |certificates: Vec<n::Certificate>, proposals: Vec<n::ProposalProcedure>| {
+            let mut tx = tx.clone();
+            tx.transaction_body.certificates = n::NonEmptySet::from_vec(certificates);
+            tx.transaction_body.proposal_procedures = n::NonEmptySet::from_vec(proposals);
+            sign(&mut tx);
+            dispatch(&tx, &output, &e)
+        };
+        let once = checked(vec![pool(vec![operator], ratio(0, 1))], vec![]);
+        assert!(once.is_ok(), "{once:?}");
+        let unavailable = "DijkstraLedgerStateUnavailable(\"AddrKeyhash(Hash<28>(\\\"9336f7dfa2b05df4c00e1be82fc36f9212396280e3434773aeeca01f\\\"))\")";
+        error(checked(vec![], vec![proposal.clone()]), unavailable);
+        error(
+            checked(
+                vec![pool(vec![], ratio(0, 1)), pool(vec![], ratio(0, 1))],
+                vec![],
+            ),
+            "DijkstraMalformed(\"duplicate certificates\")",
+        );
+        error(
+            checked(vec![pool(vec![operator, operator], ratio(0, 1))], vec![]),
+            "DijkstraMalformed(\"duplicate pool owners\")",
+        );
+        error(
+            checked(vec![], vec![proposal.clone(), proposal]),
+            "DijkstraMalformed(\"duplicate proposals\")",
+        );
+        let margins = checked(
+            vec![pool(vec![], ratio(1, 2)), pool(vec![], ratio(1, 3))],
+            vec![],
+        );
+        assert!(margins.is_ok(), "{margins:?}");
+        error(
+            checked(vec![], vec![quorum(1, 2), quorum(1, 3)]),
+            unavailable,
+        );
+        error(
+            checked(vec![], vec![expansion(1, 2), expansion(1, 3)]),
+            unavailable,
+        );
+        error(
+            checked(
+                vec![pool(vec![], ratio(1, 2)), pool(vec![], ratio(2, 4))],
+                vec![],
+            ),
+            "DijkstraMalformed(\"duplicate certificates\")",
+        );
+        error(
+            checked(vec![], vec![quorum(1, 2), quorum(2, 4)]),
+            "DijkstraMalformed(\"duplicate proposals\")",
+        );
+        error(
+            checked(vec![], vec![expansion(1, 2), expansion(2, 4)]),
+            "DijkstraMalformed(\"duplicate proposals\")",
+        );
+        let sub_bytes = hex::decode("83a200800180a0f6").unwrap();
+        let in_sub = |certificates: Vec<n::Certificate>| {
+            let mut sub: n::SubTransaction = minicbor::decode(&sub_bytes).unwrap();
+            sub.sub_transaction_body.certificates = n::NonEmptySet::from_vec(certificates);
+            let mut tx = tx.clone();
+            tx.transaction_body.sub_transactions = n::NonEmptySet::from_vec(vec![sub]);
+            sign(&mut tx);
+            dispatch(&tx, &output, &e)
+        };
+        error(
+            in_sub(vec![pool(vec![], ratio(0, 1))]),
+            "PostAlonzo(TxInsEmpty)",
+        );
+        error(
+            in_sub(vec![pool(vec![], ratio(0, 1)), pool(vec![], ratio(0, 1))]),
+            "DijkstraMalformed(\"duplicate certificates\")",
+        );
+        error(
+            in_sub(vec![pool(vec![], ratio(1, 2)), pool(vec![], ratio(2, 4))]),
+            "DijkstraMalformed(\"duplicate certificates\")",
+        );
+    });
+}
+#[test]
 fn dijkstra_collateral_without_redeemers_meets_only_the_rules_that_always_hold() {
     synthetic(|mut tx, input| {
         let collateral = n::TransactionInput {
