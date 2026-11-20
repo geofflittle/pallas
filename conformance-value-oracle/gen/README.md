@@ -32,7 +32,7 @@ Sources:
 - `given`: generates nothing and reads `OUT/KIND.given.gen.jsonl`, written by `given.py KIND FILES` from transaction corpora, block files and endorser block bodies.
 - `cuddle-cli-plain`, `cuddle-cli`: the cuddle 1.8.1.0 command line tool over the ledger CDDL file, through `gen-cuddle-cli.sh`.
 
-`valuecmp.py` compares the pallas value and re-encoding with the ledger's. `schemacmp.py` compares each schema field with the ledger value it maps, by the path tables in `schemas.py`: every bool, the transaction hash against the ledger transaction id, and a rational too wide for 32 bits only as its own leaf and only when the schema holds the nearest value that fits. With `SCHEMA_HELD` set it also writes the agreeing leaves per value, which the coverage check reads. It also compares the redeemer the v1 mapper attaches to each input, withdrawal and certificate with the one the ledger's order of that field names.
+`valuecmp.py` compares the pallas value and re-encoding with the ledger's. `schemacmp.py` compares each schema field with the ledger value it maps: every bool, the transaction hash against the ledger transaction id, and a rational too wide for 32 bits only as its own leaf and only when the schema holds the nearest value that fits. With `SCHEMA_HELD` set it also writes the agreeing leaves per value, which the coverage check reads. It also compares the redeemer the v1 mapper attaches to each input, withdrawal and certificate with the one the ledger's order of that field names.
 
 A difference `expected.py` names is counted as listed, not as a disagreement.
 
