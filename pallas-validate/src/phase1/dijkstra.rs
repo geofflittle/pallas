@@ -749,6 +749,7 @@ fn check_supported(tx: &BlockTransaction<'_>) -> ValidationResult {
         b.certificates.as_ref(),
         b.proposal_procedures.as_ref(),
     )?;
+    check_bls_keys(b.certificates.as_ref())?;
     check_rationals(b.certificates.as_ref(), b.proposal_procedures.as_ref())?;
     check_witness_fields(&tx.transaction_witness_set)?;
     check_auxiliary_encoding(&tx.auxiliary_data)
@@ -806,6 +807,19 @@ fn unsigned(token: &Token<'_>) -> Option<u64> {
         Token::U64(x) => Some(x),
         _ => None,
     }
+}
+fn check_bls_keys(certificates: Option<&NonEmptySet<Certificate>>) -> ValidationResult {
+    for certificate in certificates.iter().flat_map(|x| x.iter()) {
+        if let Certificate::PoolRegistration {
+            bls_key: Some(Nullable::Some(key)),
+            ..
+        } = certificate
+            && ledger::bls_points(key).is_none()
+        {
+            return Err(DijkstraMalformed(MalformedField::BlsKey));
+        }
+    }
+    Ok(())
 }
 fn has_repeat<T: PartialEq>(items: &[T]) -> bool {
     items
@@ -943,6 +957,7 @@ fn check_sub_supported(tx: &SubTransaction<'_>) -> ValidationResult {
         b.certificates.as_ref(),
         b.proposal_procedures.as_ref(),
     )?;
+    check_bls_keys(b.certificates.as_ref())?;
     check_rationals(b.certificates.as_ref(), b.proposal_procedures.as_ref())?;
     check_witness_fields(&tx.transaction_witness_set)?;
     check_auxiliary_encoding(&tx.auxiliary_data)

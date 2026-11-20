@@ -549,16 +549,24 @@ fn delegate_drep<S: DijkstraLedgerState + ?Sized>(
 
 const BLS_POP_DST: &[u8] = b"BLS_POP_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_";
 
-fn valid_possession_proof(key: &BlsKey) -> bool {
+/// Decodes a pool's BLS key and possession proof as compressed points in their groups.
+pub(super) fn bls_points(
+    key: &BlsKey,
+) -> Option<(blst::min_sig::PublicKey, blst::min_sig::Signature)> {
     use blst::min_sig::{PublicKey, Signature};
-    let (Ok(public), Ok(proof)) = (
-        PublicKey::from_bytes(&key.bls_pubkey),
-        Signature::from_bytes(&key.bls_possession_proof),
-    ) else {
-        return false;
-    };
-    proof.verify(true, &key.bls_pubkey, BLS_POP_DST, &[], &public, true)
-        == blst::BLST_ERROR::BLST_SUCCESS
+    let public = PublicKey::uncompress(&key.bls_pubkey).ok()?;
+    let proof = Signature::uncompress(&key.bls_possession_proof).ok()?;
+    (public.validate().is_ok() && proof.validate(true).is_ok()).then_some((public, proof))
+}
+
+fn check_possession_proof(key: &BlsKey) -> ValidationResult {
+    let (public, proof) = bls_points(key).ok_or(DijkstraMalformed(MalformedField::BlsKey))?;
+    match proof.verify(true, &key.bls_pubkey, BLS_POP_DST, &[], &public, true) {
+        blst::BLST_ERROR::BLST_SUCCESS => Ok(()),
+        _ => Err(DijkstraInvalidCertificate(
+            CertificateFailure::BlsProofOfPossession,
+        )),
+    }
 }
 
 fn certificate<S: DijkstraLedgerState + ?Sized>(
@@ -633,12 +641,8 @@ fn certificate<S: DijkstraLedgerState + ?Sized>(
                     CertificateFailure::PoolCostBelowMinimum,
                 ));
             }
-            if let Some(pallas_codec::utils::Nullable::Some(key)) = bls_key
-                && !valid_possession_proof(key)
-            {
-                return Err(DijkstraInvalidCertificate(
-                    CertificateFailure::BlsProofOfPossession,
-                ));
+            if let Some(pallas_codec::utils::Nullable::Some(key)) = bls_key {
+                check_possession_proof(key)?;
             }
             let count = state.vrf_count(vrf_keyhash)?;
             match state.pool(operator)? {

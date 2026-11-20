@@ -203,6 +203,7 @@ labels! {
 labels! {
     /// A Dijkstra transaction field whose encoding the ledger decoder refuses.
     pub enum MalformedField {
+        BlsKey => "BLS key",
         Body => "body",
         BootstrapWitness => "bootstrap witness",
         DuplicateBootstrapWitnesses => "duplicate bootstrap witnesses",

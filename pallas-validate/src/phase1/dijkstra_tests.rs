@@ -520,6 +520,100 @@ fn dijkstra_repeated_certificates_pool_owners_and_proposals_are_malformed() {
     });
 }
 #[test]
+fn dijkstra_a_pool_bls_key_or_proof_that_is_not_a_compressed_point_is_malformed() {
+    synthetic(|tx, input| {
+        let operator = Hasher::<224>::hash(SecretKey::from([71; 32]).public_key().as_ref());
+        let mut account = vec![0xe0];
+        account.extend(operator.as_ref());
+        let mut e = env();
+        let MultiEraProtocolParameters::Dijkstra(ref mut pp) = e.prot_params else {
+            unreachable!()
+        };
+        pp.pool_deposit = 0;
+        let cost = pp.min_pool_cost;
+        let output = MultiEraOutput::from_dijkstra(&input);
+        let with_key = |bls_pubkey: Vec<u8>, bls_possession_proof: Vec<u8>, cost| {
+            let mut tx = tx.clone();
+            tx.transaction_body.certificates =
+                n::NonEmptySet::from_vec(vec![n::Certificate::PoolRegistration {
+                    operator,
+                    vrf_keyhash: [9; 32].into(),
+                    bls_key: Some(pallas_codec::utils::Nullable::Some(n::BlsKey {
+                        bls_pubkey: bls_pubkey.into(),
+                        bls_possession_proof: bls_possession_proof.into(),
+                    })),
+                    pledge: 0,
+                    cost,
+                    margin: n::RationalNumber {
+                        numerator: 0,
+                        denominator: 1,
+                    },
+                    reward_account: account.clone().into(),
+                    pool_owners: vec![].into(),
+                    relays: vec![],
+                    pool_metadata: None,
+                }]);
+            sign(&mut tx);
+            tx
+        };
+        let registered = |bls_pubkey, bls_possession_proof| {
+            let tx = with_key(bls_pubkey, bls_possession_proof, cost);
+            dispatch(&tx, &output, &e)
+        };
+        let dst = b"BLS_POP_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_";
+        let secret = blst::min_sig::SecretKey::key_gen(&[5; 32], &[]).unwrap();
+        let public = secret.sk_to_pk();
+        let key = public.compress().to_vec();
+        let proof = secret.sign(&key, dst, &[]);
+        let other = secret
+            .sign(b"another message", dst, &[])
+            .compress()
+            .to_vec();
+        let valid = registered(key.clone(), proof.compress().to_vec());
+        assert!(valid.is_ok(), "{valid:?}");
+        error(
+            registered(key.clone(), other),
+            "DijkstraInvalidCertificate(\"BLS proof of possession\")",
+        );
+        let infinity = |size: usize| [vec![0xc0], vec![0; size - 1]].concat();
+        for (bls_pubkey, bls_possession_proof) in [
+            (vec![0xff; 96], proof.compress().to_vec()),
+            (key[..95].to_vec(), proof.compress().to_vec()),
+            (public.serialize().to_vec(), proof.compress().to_vec()),
+            (infinity(96), proof.compress().to_vec()),
+            (key.clone(), vec![0xff; 48]),
+            (key.clone(), proof.compress()[..47].to_vec()),
+            (key.clone(), proof.serialize().to_vec()),
+            (key.clone(), infinity(48)),
+        ] {
+            let sizes = (bls_pubkey.len(), bls_possession_proof.len());
+            let result = registered(bls_pubkey, bls_possession_proof);
+            assert_eq!(
+                format!("{result:?}"),
+                "Err(DijkstraMalformed(\"BLS key\"))",
+                "{sizes:?}"
+            );
+        }
+        let cheap = with_key(vec![0xff; 96], proof.compress().to_vec(), cost - 1);
+        error(
+            dispatch(&cheap, &output, &e),
+            "DijkstraMalformed(\"BLS key\")",
+        );
+        let MultiEraProtocolParameters::Dijkstra(pp) = &e.prot_params else {
+            unreachable!()
+        };
+        let state = crate::utils::dijkstra_state::DijkstraLedgerSnapshot::default();
+        let bad = with_key(vec![0xff; 96], proof.compress().to_vec(), cost);
+        error(
+            super::dijkstra::dijkstra_ledger_effects(&bad, pp, 0, &state).map(|_| ()),
+            "DijkstraMalformed(\"BLS key\")",
+        );
+        let good = with_key(key.clone(), proof.compress().to_vec(), cost);
+        let effects = super::dijkstra::dijkstra_ledger_effects(&good, pp, 0, &state);
+        assert!(effects.is_ok(), "{effects:?}");
+    });
+}
+#[test]
 fn dijkstra_collateral_without_redeemers_meets_only_the_rules_that_always_hold() {
     synthetic(|mut tx, input| {
         let collateral = n::TransactionInput {
