@@ -2,13 +2,12 @@
 
 The ledger value oracle, the schema comparer, the end to end comparer, the breaks that each must fail them, and the results of the 1000 per kind run and the whole chain end to end run. The decode layer of `reference-comparison/` compares the pallas value and re-encoding with the ledger's.
 
-The box layout these runners expect is /opt/build/value-oracle-1025 on the build host, with `gen/` as below, `run.sh` from `box/` at its root, the pallas tree under `conf/` and a scratch utxorpc server for the end to end run.
+The box layout these runners expect is /opt/build/value-oracle-1025 on the build host, with `gen/` as below, the pallas tree under `conf/` and a scratch utxorpc server for the end to end run.
 
 ## Layout
 
 - `gen/`: the generator, the Haskell oracle (`oracle/`, its image in `images/`), the walker (`probe-value/`), the schema comparer (`schemacmp.py`, with `value.py`), the end to end runner and comparer (`e2e-run.sh`, `e2e-plants.sh`, `e2e_values.py`, `e2e/served.py`, `e2e/ebcheck.py`) and the repro inputs (`repro/`).
 - `breaks/`: patches that break one comparer rule each, and `run-breaks.sh`.
-- `box/`: the container wrappers used on the build host.
 - `results/`: the logs and counts of the runs named in the report.
 
 ## Runners and expected verdicts
