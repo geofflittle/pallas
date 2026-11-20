@@ -1,6 +1,6 @@
 #!/bin/sh
 # Overlays the tests of LAYER on the pallas tree HEAD with the comparison crate from SOURCE and runs them, printing the layer's table, or checks the LAYER records in DIR with the comparison crate's check-records.
-# usage: run.sh HEAD SOURCE LAYER [KIND...] (SOURCE as for overlay.sh, LAYER is decode or validation, each KIND a class or kind of change the run is limited to)
+# usage: run.sh HEAD SOURCE LAYER [KIND...] (SOURCE as for overlay.sh, LAYER is validation, each KIND a class or kind of change the run is limited to)
 #        run.sh records SOURCE DIR LAYER [KIND...] (DIR is a records directory named by its reference pin, each KIND a kind or class the records must name)
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
@@ -28,11 +28,10 @@ shift 3
 kinds=$(IFS=,; echo "$*")
 rustflags=
 case "$layer" in
-  decode) crate=pallas-primitives test=reference_decode features=unstable toolchain=stable ;;
   validation)
     crate=pallas-validate test=reference_validation features=unstable,phase2
     toolchain=nightly-2026-09-04 rustflags="--cfg pallas_dijkstra_evaluator" ;;
-  *) echo "LAYER must be decode or validation" >&2; exit 2 ;;
+  *) echo "LAYER must be validation" >&2; exit 2 ;;
 esac
 sh "$here/overlay.sh" "$head" "$source" "$crate"
 cd "$head"
