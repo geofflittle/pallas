@@ -5,10 +5,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
 
 use ledger_oracle_judge::comparison::{
-    Allowed, Answer, Coverage, Disagreement, Layer, Outcome, Owner, Records, Reference, Row, Tally,
-    catch, cddl_pin, judge,
+    self, Allowance, Allowed, Answer, ComparedLayer, Coverage, Disagreement, Expected, Key, Layer,
+    Outcome, Owner, Records, Reference, Row, WholeInput, catch, cddl_pin, judge, kinds_from_env,
 };
 use pallas_codec::minicbor;
 use pallas_codec::utils::{KeepRaw, Nullable};
@@ -707,11 +709,19 @@ fn block(b: &d::Block) -> Value {
     ])
 }
 
-/// A value as pallas reads it, and the bytes pallas encodes it to.
-type Reading = Result<(Value, Vec<u8>), String>;
+/// A value as pallas reads it, the bytes pallas encodes it to and the number
+/// of bytes after it.
+type Reading = Result<(Value, Vec<u8>, usize), String>;
+
+/// Reads the first item of `bytes` and counts the bytes after it.
+fn item<'b, T: minicbor::Decode<'b, ()>>(bytes: &'b [u8]) -> Result<(T, usize), String> {
+    let mut decoder = minicbor::Decoder::new(bytes);
+    let value = decoder.decode().map_err(|e| e.to_string())?;
+    Ok((value, bytes.len() - decoder.position()))
+}
 
 fn read_tx(bytes: &[u8]) -> Reading {
-    let t: d::MempoolTransaction = minicbor::decode(bytes).map_err(|e| e.to_string())?;
+    let (t, leftover): (d::MempoolTransaction, _) = item(bytes)?;
     // A mempool transaction that decodes is phase two valid, since the decoder refuses `false`.
     let dump = tx(
         &t.transaction_body,
@@ -719,35 +729,36 @@ fn read_tx(bytes: &[u8]) -> Reading {
         true,
         &t.auxiliary_data,
     );
-    Ok((dump, enc(&t)))
+    Ok((dump, enc(&t), leftover))
 }
 
 fn read_body(bytes: &[u8]) -> Reading {
-    let b: d::TransactionBody = minicbor::decode(bytes).map_err(|e| e.to_string())?;
+    let (b, leftover): (d::TransactionBody, _) = item(bytes)?;
     let mut dump = body(&b);
-    dump["id"] = cb(&Hasher::<256>::hash(bytes));
-    Ok((dump, enc(&b)))
+    dump["id"] = cb(&Hasher::<256>::hash(&bytes[..bytes.len() - leftover]));
+    Ok((dump, enc(&b), leftover))
 }
 
 fn read_wits(bytes: &[u8]) -> Reading {
-    let w: d::WitnessSet = minicbor::decode(bytes).map_err(|e| e.to_string())?;
-    Ok((wits(&w), enc(&w)))
+    let (w, leftover): (d::WitnessSet, _) = item(bytes)?;
+    Ok((wits(&w), enc(&w), leftover))
 }
 
 fn read_ppu(bytes: &[u8]) -> Reading {
-    let u: d::ProtocolParamUpdate = minicbor::decode(bytes).map_err(|e| e.to_string())?;
+    let (u, leftover): (d::ProtocolParamUpdate, _) = item(bytes)?;
     let again = enc(&u);
-    Ok((raw(&again), again))
+    Ok((raw(&again), again, leftover))
 }
 
 fn read_block(bytes: &[u8]) -> Reading {
-    let b: d::Block = minicbor::decode(bytes).map_err(|e| e.to_string())?;
-    Ok((block(&b), enc(&b)))
+    let (b, leftover): (d::Block, _) = item(bytes)?;
+    Ok((block(&b), enc(&b), leftover))
 }
 
 fn read_eb(bytes: &[u8]) -> Reading {
-    let e: d::EndorserBlock = minicbor::decode(bytes).map_err(|e| e.to_string())?;
-    Ok((omap(e.iter().map(|(h, n)| (cb(h), cb(n)))), enc(&e)))
+    let (e, leftover): (d::EndorserBlock, _) = item(bytes)?;
+    let dump = omap(e.iter().map(|(h, n)| (cb(h), cb(n))));
+    Ok((dump, enc(&e), leftover))
 }
 
 fn reader(kind: &str) -> fn(&[u8]) -> Reading {
@@ -771,21 +782,24 @@ enum Reencoding {
 }
 
 /// A reading of one value: its normal form, the paths of the duplicates it
-/// holds and how its encoding reads back.
+/// holds, how its encoding reads back and the number of bytes after it.
 #[derive(Debug, PartialEq)]
 struct Decoded {
     value: Normal,
     duplicates: Vec<String>,
     reencoding: Reencoding,
+    leftover: usize,
 }
 
 impl Decoded {
-    /// The ledger's reading of a value, as its records write it.
+    /// The ledger's reading of a value, as its records write it, with no
+    /// bytes after it.
     fn of_ledger(dump: &Value) -> Decoded {
         Decoded {
             value: normal(dump, "", &mut Vec::new()),
             duplicates: Vec::new(),
             reencoding: Reencoding::Same,
+            leftover: 0,
         }
     }
 }
@@ -793,14 +807,14 @@ impl Decoded {
 /// Reads `bytes` as a value of `kind` with pallas and reads its encoding back.
 fn decode(kind: &str, bytes: &[u8]) -> Result<Decoded, String> {
     let read = reader(kind);
-    let (dump, again) = read(bytes)?;
+    let (dump, again, leftover) = read(bytes)?;
     let mut duplicates = Vec::new();
     let value = normal(&dump, "", &mut duplicates);
-    let reread = (again != bytes).then(|| read(&again));
+    let reread = (again != bytes[..bytes.len() - leftover]).then(|| read(&again));
     let reencoding = match reread {
         None => Reencoding::Same,
         Some(Err(e)) => Reencoding::Refused(e),
-        Some(Ok((dump, _))) => {
+        Some(Ok((dump, _, _))) => {
             let back = normal(&dump, "", &mut Vec::new());
             let mut diff = Diff::default();
             compare(
@@ -819,6 +833,7 @@ fn decode(kind: &str, bytes: &[u8]) -> Result<Decoded, String> {
         value,
         duplicates,
         reencoding,
+        leftover,
     })
 }
 
@@ -837,34 +852,91 @@ struct Refusal {
     base: Base,
 }
 
-/// The kind of value a row's input is, the first word of its class.
-fn value_kind(row: &Row) -> &str {
-    row.class.split(' ').next().unwrap_or_default()
+/// The bytes of one record, the kind of value they are read as and the bytes
+/// of the value the record's change was made to.
+struct Encoded {
+    kind: String,
+    bytes: Vec<u8>,
+    base: Option<Vec<u8>>,
 }
 
-/// Pallas's answer for a row, a refusal carrying its reading of the row's base.
-fn answer(row: &Row) -> Answer<Decoded, Refusal> {
-    let kind = value_kind(row);
-    match catch(AssertUnwindSafe(|| decode(kind, &row.input))) {
-        Ok(Ok(decoded)) => Answer::Accepts(decoded),
-        Ok(Err(error)) => {
-            let base = match &row.base {
-                None => Base::Unrecorded,
-                Some(bytes) => match catch(AssertUnwindSafe(|| reader(kind)(bytes))) {
-                    Ok(Ok(_)) => Base::Reads,
-                    Ok(Err(e)) | Err(e) => Base::Refuses(e),
-                },
-            };
-            Answer::Refuses(Refusal { error, base })
-        }
-        Err(message) => Answer::Panics(message),
-    }
+/// Pallas's reading of one record, a refusal with its reading of the
+/// record's base.
+fn reading(input: &Encoded) -> Result<Decoded, Refusal> {
+    let error = match decode(&input.kind, &input.bytes) {
+        Ok(decoded) => return Ok(decoded),
+        Err(error) => error,
+    };
+    let base = match &input.base {
+        None => Base::Unrecorded,
+        Some(bytes) => match catch(AssertUnwindSafe(|| reader(&input.kind)(bytes))) {
+            Ok(Ok(_)) => Base::Reads,
+            Ok(Err(e)) | Err(e) => Base::Refuses(e),
+        },
+    };
+    Err(Refusal { error, base })
 }
 
 /// Whether pallas refuses for the reference's reason, which holds when it
 /// reads the value the change was made to.
 fn same_reason(_: &str, refusal: &Refusal) -> bool {
     refusal.base == Base::Reads
+}
+
+/// Pallas's decoding of Dijkstra values.
+struct Decoding;
+
+impl ComparedLayer for Decoding {
+    const LAYER: Layer = Layer::Decode;
+    const TIME_LIMIT: Duration = Duration::from_secs(60);
+    type Input = Encoded;
+    type Axis = WholeInput;
+    type Value = Decoded;
+    type Refusal = Refusal;
+
+    fn input(&self, row: &Row) -> Encoded {
+        let key = Key {
+            class: row.class.clone(),
+            axis: WholeInput,
+        };
+        Encoded {
+            kind: key.value_kind().to_owned(),
+            bytes: row.input.clone(),
+            base: row.base.clone(),
+        }
+    }
+
+    fn reference(&self, row: &Row) -> Expected<WholeInput, Decoded> {
+        let reference = match &row.reference {
+            Reference::Accepts(accepted) => Reference::Accepts(Decoded::of_ledger(&accepted.dump)),
+            Reference::Refuses(reason) => Reference::Refuses(reason.clone()),
+        };
+        Expected::one(WholeInput, reference)
+    }
+
+    fn run(&self, input: &Encoded) -> Vec<(WholeInput, Result<Decoded, Refusal>)> {
+        vec![(WholeInput, reading(input))]
+    }
+
+    fn same_reason(&self, reason: &str, refusal: &Refusal) -> bool {
+        same_reason(reason, refusal)
+    }
+
+    fn allowance(&self, key: &Key<WholeInput>) -> Option<Allowance<Decoded, Refusal>> {
+        (key.class == "eb").then_some(Allowance {
+            allowed: EB_AS_THE_NODE_SENDS,
+            shown: |answer| matches!(answer, Answer::Refuses(r) if r.error.contains("expected map")),
+        })
+    }
+
+    fn detail(
+        &self,
+        row: &Row,
+        reference: &Reference<Decoded>,
+        answer: &Answer<Decoded, Refusal>,
+    ) -> String {
+        difference(row, reference, answer)
+    }
 }
 
 /// A value in the form two readings share exactly when they read the same value.
@@ -1270,8 +1342,8 @@ fn difference(
             match diff.differ.first() {
                 Some((class, path, detail)) => format!("{at}: {class} at {path}: {detail}"),
                 None => format!(
-                    "{at}: duplicates {:?}, reencoding {:?}",
-                    got.duplicates, got.reencoding
+                    "{at}: duplicates {:?}, reencoding {:?}, {} bytes after it",
+                    got.duplicates, got.reencoding, got.leftover
                 ),
             }
         }
@@ -1341,28 +1413,19 @@ fn run() {
     let pin = cddl_pin(&cddl).expect("defs.cddl names no ledger commit");
     let records = Records::read(&read("test_data/reference-comparison/decode.jsonl"), pin)
         .unwrap_or_else(|e| panic!("{e}"));
-    assert_eq!(records.layer(), Layer::Decode);
-    let mut tally = Tally::new(Layer::Decode, records.classes());
+    let judged = comparison::compare(&Arc::new(Decoding), &records, &kinds_from_env());
     let mut examples = BTreeMap::new();
     let mut credit = BTreeMap::new();
-    for row in records.rows() {
-        let reference = match &row.reference {
-            Reference::Accepts(accepted) => Reference::Accepts(Decoded::of_ledger(&accepted.dump)),
-            Reference::Refuses(reason) => Reference::Refuses(reason.clone()),
-        };
-        let answer = answer(row);
-        let allowed = (row.class == "eb").then_some(EB_AS_THE_NODE_SENDS);
-        let outcome = judge(&reference, &answer, same_reason, allowed);
-        if outcome == Outcome::Agree {
-            for rule in &row.rules {
+    for j in &judged.judgements {
+        if j.outcome == Outcome::Agree {
+            for rule in &j.row.rules {
                 *credit.entry(rule.clone()).or_insert(0) += 1;
             }
         } else {
             examples
-                .entry((row.class.clone(), row.mutated.clone()))
-                .or_insert_with(|| difference(row, &reference, &answer));
+                .entry((j.row.class.clone(), j.row.mutated.clone()))
+                .or_insert(&j.detail);
         }
-        tally.add(&row.class, &outcome);
     }
     let rules = rule_names(&cddl);
     let counts: Vec<String> = rules
@@ -1371,7 +1434,7 @@ fn run() {
         .collect();
     let coverage = Coverage::new(Layer::Decode, records.targets(), records.rows());
     println!("records: {}", records.generator());
-    println!("{tally}");
+    println!("{judged}");
     print!("{coverage}");
     println!("rules {}: {}", rules.len(), counts.join(" "));
     println!(
@@ -1380,7 +1443,7 @@ fn run() {
         rules.len()
     );
     examples.values().for_each(|e| println!("{e}"));
-    let mut failures = tally.failures();
+    let mut failures = judged.failures();
     failures.extend(coverage.failures(REQUIRED));
     failures.extend(credit_failures(&rules, &credit, UNCREDITED));
     assert!(failures.is_empty(), "{}", failures.join("\n"));
@@ -1399,22 +1462,35 @@ fn pallas_decodes_what_the_ledger_writes() {
 }
 
 fn refused_change(input: &[u8], base: Option<&[u8]>) -> Outcome {
-    let row = Row {
-        class: "wits unknown-arm".into(),
-        variant: None,
-        input: input.to_vec(),
-        reference: Reference::Refuses("unknown tag".into()),
-        rules: Vec::new(),
-        site: Some("transaction_witness_set 0".into()),
-        mutated: Some("vkeywitness".into()),
+    let input = Encoded {
+        kind: "wits".into(),
+        bytes: input.to_vec(),
         base: base.map(<[u8]>::to_vec),
+    };
+    let answer = match reading(&input) {
+        Ok(decoded) => Answer::Accepts(decoded),
+        Err(refusal) => Answer::Refuses(refusal),
     };
     judge(
         &Reference::Refuses("unknown tag".into()),
-        &answer(&row),
+        &answer,
         same_reason,
         None,
     )
+}
+
+#[test]
+fn the_bytes_after_a_value_are_counted() {
+    let leftover = |hex: &str| {
+        let bytes: Vec<u8> = (0..hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+            .collect();
+        decode("wits", &bytes).map(|d| d.leftover)
+    };
+    assert_eq!(leftover("a0"), Ok(0));
+    assert_eq!(leftover("a000"), Ok(1));
+    assert_eq!(leftover("a0a0ff"), Ok(2));
 }
 
 #[test]

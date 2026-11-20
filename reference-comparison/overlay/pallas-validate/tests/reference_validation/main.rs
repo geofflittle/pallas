@@ -6,12 +6,13 @@ mod fixture;
 mod term;
 
 use std::collections::BTreeMap;
-use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
 
 use ledger_oracle_judge::comparison::{
-    Allowed, Answer, Commit, Disagreement, Layer, Outcome, Owner, Records, Reference, Tally, catch,
-    cddl_pin, judge,
+    Allowance, Allowed, Answer, Commit, ComparedLayer, Disagreement, Expected, Key, Layer, Outcome,
+    Owner, Records, Reference, Row, WholeInput, cddl_pin, compare, kinds_from_env,
 };
 
 /// Why phase one refuses a transaction.
@@ -45,6 +46,57 @@ fn read(path: &str) -> String {
     std::fs::read_to_string(root().join(path)).unwrap_or_else(|e| panic!("{path}: {e}"))
 }
 
+/// Phase one over the fixture's ledger state.
+struct PhaseOne {
+    fixture: fixture::Fixture,
+}
+
+impl ComparedLayer for PhaseOne {
+    const LAYER: Layer = Layer::Validation;
+    const TIME_LIMIT: Duration = Duration::from_secs(60);
+    type Input = Vec<u8>;
+    type Axis = WholeInput;
+    type Value = ();
+    type Refusal = Refusal;
+
+    fn input(&self, row: &Row) -> Vec<u8> {
+        row.input.clone()
+    }
+
+    fn reference(&self, row: &Row) -> Expected<WholeInput, ()> {
+        match (&row.reference, row.class.as_str()) {
+            (Reference::Refuses(reason), _) => {
+                Expected::one(WholeInput, Reference::Refuses(reason.clone()))
+            }
+            (Reference::Accepts(_), BASE) => Expected::one(WholeInput, Reference::Accepts(())),
+            (Reference::Accepts(_), _) => Expected::NotJudged,
+        }
+    }
+
+    fn run(&self, input: &Vec<u8>) -> Vec<(WholeInput, Result<(), Refusal>)> {
+        vec![(WholeInput, self.fixture.validate(input))]
+    }
+
+    fn same_reason(&self, _: &str, refusal: &Refusal) -> bool {
+        matches!(refusal, Refusal::Malformed(_))
+    }
+
+    fn allowance(&self, key: &Key<WholeInput>) -> Option<Allowance<(), Refusal>> {
+        (key.class == EXTRA).then_some(Allowance {
+            allowed: EXTRA_ELEMENTS,
+            shown: |answer| matches!(answer, Answer::Accepts(())),
+        })
+    }
+
+    fn detail(&self, row: &Row, reference: &Reference<()>, answer: &Answer<(), Refusal>) -> String {
+        let variant = row.variant.as_deref().unwrap_or("");
+        format!(
+            "{} / {variant}: ledger {reference:?}, phase one {answer:?}",
+            row.class
+        )
+    }
+}
+
 #[test]
 fn phase_one_refuses_what_the_ledger_refuses() {
     let cddl = read("pallas-primitives/src/dijkstra/defs.cddl");
@@ -54,46 +106,19 @@ fn phase_one_refuses_what_the_ledger_refuses() {
         pin,
     )
     .unwrap_or_else(|e| panic!("{e}"));
-    assert_eq!(records.layer(), Layer::Validation);
     let fixture = fixture::Fixture::load(&root().join("test_data/dijkstra-ttl"));
-    let mut tally = Tally::new(Layer::Validation, records.classes());
+    let run = compare(&Arc::new(PhaseOne { fixture }), &records, &kinds_from_env());
     let mut examples = BTreeMap::new();
-    for row in records.rows() {
-        let reference = match (&row.reference, row.class.as_str()) {
-            (Reference::Refuses(reason), _) => Reference::Refuses(reason.clone()),
-            (Reference::Accepts(_), BASE) => Reference::Accepts(()),
-            (Reference::Accepts(_), class) => {
-                tally.not_judged(class);
-                continue;
-            }
-        };
-        let answer = match catch(AssertUnwindSafe(|| fixture.validate(&row.input))) {
-            Ok(Ok(())) => Answer::Accepts(()),
-            Ok(Err(refusal)) => Answer::Refuses(refusal),
-            Err(message) => Answer::Panics(message),
-        };
-        let outcome = judge(
-            &reference,
-            &answer,
-            |_, refusal| matches!(refusal, Refusal::Malformed(_)),
-            (row.class == EXTRA).then_some(EXTRA_ELEMENTS),
-        );
-        if outcome != Outcome::Agree {
-            examples.entry(row.class.clone()).or_insert_with(|| {
-                format!(
-                    "{} / {}: ledger {:?}, phase one {:?}",
-                    row.class,
-                    row.variant.as_deref().unwrap_or(""),
-                    reference,
-                    answer
-                )
-            });
-        }
-        tally.add(&row.class, &outcome);
+    for j in run
+        .judgements
+        .iter()
+        .filter(|j| j.outcome != Outcome::Agree)
+    {
+        examples.entry(j.key.class.clone()).or_insert(&j.detail);
     }
     println!("records: {}", records.generator());
-    println!("{tally}");
+    println!("{run}");
     examples.values().for_each(|e| println!("{e}"));
-    let failures = tally.failures();
+    let failures = run.failures();
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
