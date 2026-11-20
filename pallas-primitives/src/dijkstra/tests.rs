@@ -1178,6 +1178,28 @@ fn a_guards_value_that_is_not_a_set_is_refused_in_either_body() {
     assert!(sub.is_err());
 }
 
+#[test]
+fn a_guard_credential_with_a_known_tag_reads_as_that_credential_in_either_body() {
+    for tag in ["00", "01"] {
+        let one = format!("0ed901028182{tag}581c{}", "06".repeat(28));
+        let top: TransactionBody = decode_all(body_ending(true, &one));
+        assert!(matches!(top.guards, Some(Guards::Credentials(_))), "{tag}");
+        let sub: SubTransactionBody = decode_all(body_ending(false, &one));
+        assert!(matches!(sub.guards, Some(Guards::Credentials(_))), "{tag}");
+    }
+}
+
+#[test]
+fn a_guard_credential_with_an_unknown_tag_is_refused_in_either_body() {
+    for tag in ["02", "20"] {
+        let one = format!("0ed901028182{tag}581c{}", "06".repeat(28));
+        let top: Result<TransactionBody, _> = minicbor::decode(body_ending(true, &one));
+        assert!(top.is_err(), "{tag} decoded as {:?}", top.map(|x| x.guards));
+        let sub: Result<SubTransactionBody, _> = minicbor::decode(body_ending(false, &one));
+        assert!(sub.is_err(), "{tag} decoded as {:?}", sub.map(|x| x.guards));
+    }
+}
+
 /// A type reaching Alonzo's native script from here would refuse a whole
 /// block over a guard clause in a transaction that used the array form.
 #[test]
