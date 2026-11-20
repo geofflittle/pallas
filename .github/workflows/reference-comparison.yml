@@ -1,0 +1,61 @@
+name: Reference comparison
+
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: Repository that holds the pallas head
+        default: txpipe/pallas
+      head:
+        description: Commit of the pallas head to judge
+        required: true
+      dolos_rev:
+        description: Full commit hash of geofflittle/dolos that holds the comparison crate
+        required: true
+      layers:
+        description: Layers to run, separated by spaces
+        default: decode validation
+      overlay_ref:
+        description: Ref of geofflittle/pallas that holds the tests and records
+        default: feat/reference-comparison
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.head }}
+          path: head
+      - uses: actions/checkout@v4
+        with:
+          repository: geofflittle/pallas
+          ref: ${{ inputs.overlay_ref }}
+          path: comparison
+          sparse-checkout: reference-comparison
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-09-04
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: head
+          key: ${{ inputs.head }}-${{ inputs.dolos_rev }}
+      - name: Run each layer
+        shell: bash
+        env:
+          LAYERS: ${{ inputs.layers }}
+          SOURCE: git=https://github.com/geofflittle/dolos@${{ inputs.dolos_rev }}
+        run: |
+          status=0
+          for layer in $LAYERS; do
+            sh comparison/reference-comparison/run.sh head "$SOURCE" "$layer" 2>&1 | tee "$layer.out" || status=1
+            {
+              echo "### $layer"
+              echo '```'
+              sed -n '/^layer /,/^test result/p' "$layer.out"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          done
+          exit $status
