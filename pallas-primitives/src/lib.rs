@@ -65,6 +65,8 @@ mod array_record;
 #[cfg(feature = "unstable")]
 mod flat_enum;
 mod framework;
+#[cfg(feature = "unstable")]
+mod map_record;
 mod metadatum;
 mod native_script;
 mod plutus_data;
