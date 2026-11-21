@@ -10,12 +10,11 @@ use pallas_codec::utils::decode_array;
 pub use pallas_codec::codec_by_datatype;
 
 pub use crate::{
-    AddrKeyhash, AssetName, Bytes, Coin, CostModel, DnsName, Epoch, ExUnits, GenesisDelegateHash,
+    AddrKeyhash, AssetName, Bytes, Coin, CostModel, DnsName, Epoch, GenesisDelegateHash,
     Genesishash, Hash, IPv4, IPv6, KeepRaw, MaybeIndefArray, Metadata, Metadatum, MetadatumLabel,
     NetworkId, NonZeroInt, Nonce, NonceVariant, Nullable, PlutusScript, PolicyId, PoolKeyhash,
-    PoolMetadata, PoolMetadataHash, Port, PositiveCoin, PositiveInterval, ProtocolVersion,
-    RationalNumber, Relay, RewardAccount, ScriptHash, StakeCredential, TransactionInput,
-    UnitInterval, VrfCert, VrfKeyhash, plutus_data::*,
+    PoolMetadata, PoolMetadataHash, Port, PositiveInterval, RationalNumber, Relay, RewardAccount,
+    ScriptHash, StakeCredential, UnitInterval, VrfCert, VrfKeyhash, plutus_data::*,
 };
 
 use crate::{BTreeMap, KeyValuePairs};
@@ -260,6 +259,207 @@ impl<T> TryFrom<Vec<T>> for NonEmptySet<T> {
 
 tag_preserving_set!(NonEmptySet, "a nonempty set", 1);
 
+/// Implements the conversions and codec of a type that holds the values of `$shared` that `$holds` admits.
+macro_rules! bounded {
+    (@read $d:ident, $ctx:ident) => {
+        $d.decode_with($ctx)?
+    };
+    (@read $d:ident, $ctx:ident, $by:path) => {
+        $by($d, $ctx)?
+    };
+    ($name:ident, $shared:ty, $holds:expr $(, by $by:path)?) => {
+        impl TryFrom<$shared> for $name {
+            type Error = $shared;
+
+            fn try_from(value: $shared) -> Result<Self, Self::Error> {
+                let holds: fn(&$shared) -> bool = $holds;
+                if holds(&value) {
+                    Ok(Self(value))
+                } else {
+                    Err(value)
+                }
+            }
+        }
+
+        impl From<$name> for $shared {
+            fn from(value: $name) -> Self {
+                value.0
+            }
+        }
+
+        impl std::ops::Deref for $name {
+            type Target = $shared;
+
+            fn deref(&self) -> &$shared {
+                &self.0
+            }
+        }
+
+        impl<'b, C> minicbor::Decode<'b, C> for $name {
+            fn decode(
+                d: &mut minicbor::Decoder<'b>,
+                ctx: &mut C,
+            ) -> Result<Self, minicbor::decode::Error> {
+                let value: $shared = bounded!(@read d, ctx $(, $by)?);
+                Self::try_from(value).map_err(|value| {
+                    minicbor::decode::Error::message(format!(
+                        "decoding {value:?} as {}",
+                        stringify!($name)
+                    ))
+                })
+            }
+        }
+
+        impl<C> minicbor::Encode<C> for $name {
+            fn encode<W: minicbor::encode::Write>(
+                &self,
+                e: &mut minicbor::Encoder<W>,
+                ctx: &mut C,
+            ) -> Result<(), minicbor::encode::Error<W::Error>> {
+                e.encode_with(&self.0, ctx)?;
+                Ok(())
+            }
+        }
+    };
+}
+
+/// The largest count `ex_units` admits, `max_int64` (`defs.cddl`).
+const MAX_INT64: u64 = i64::MAX.unsigned_abs();
+
+/// `transaction_input` (`defs.cddl`), whose index is at most two bytes.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, std::hash::Hash)]
+#[serde(transparent)]
+pub struct TransactionInput(crate::TransactionInput);
+
+bounded!(TransactionInput, crate::TransactionInput, |input| {
+    input.index <= u64::from(u16::MAX)
+});
+
+impl TransactionInput {
+    /// The input that spends the output at an index of a transaction.
+    pub fn new(transaction_id: Hash<32>, index: u16) -> Self {
+        Self(crate::TransactionInput {
+            transaction_id,
+            index: u64::from(index),
+        })
+    }
+}
+
+/// `positive_coin` (`defs.cddl`), a coin of at least one.
+#[derive(
+    Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, std::hash::Hash,
+)]
+#[serde(transparent)]
+pub struct PositiveCoin(crate::PositiveCoin);
+
+bounded!(PositiveCoin, crate::PositiveCoin, |coin| u64::from(coin)
+    != 0);
+
+/// True when every asset quantity is at least one.
+fn every_quantity_positive<A: Copy + Into<u64>>(
+    assets: &BTreeMap<PolicyId, BTreeMap<AssetName, A>>,
+) -> bool {
+    assets
+        .values()
+        .all(|names| names.values().all(|quantity| (*quantity).into() != 0))
+}
+
+/// `value` (`defs.cddl`), whose every asset quantity is a `positive_coin`.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[serde(transparent)]
+pub struct Value(crate::conway::Value);
+
+bounded!(Value, crate::conway::Value, |value| match value {
+    crate::conway::Value::Coin(_) => true,
+    crate::conway::Value::Multiasset(_, assets) => every_quantity_positive(assets),
+});
+
+/// `alonzo_transaction_output` (`defs.cddl`), whose every asset quantity is a `positive_coin`.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[serde(transparent)]
+pub struct LegacyTransactionOutput(crate::alonzo::TransactionOutput);
+
+bounded!(
+    LegacyTransactionOutput,
+    crate::alonzo::TransactionOutput,
+    |output| match &output.amount {
+        crate::alonzo::Value::Coin(_) => true,
+        crate::alonzo::Value::Multiasset(_, assets) => every_quantity_positive(assets),
+    }
+);
+
+/// `gov_action_id` (`defs.cddl`), whose index is at most two bytes.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[serde(transparent)]
+pub struct GovActionId(crate::conway::GovActionId);
+
+bounded!(GovActionId, crate::conway::GovActionId, action_index_fits);
+
+impl GovActionId {
+    /// The id of the proposal at an index of a transaction.
+    pub fn new(transaction_id: Hash<32>, action_index: u16) -> Self {
+        Self(crate::conway::GovActionId {
+            transaction_id,
+            action_index: u32::from(action_index),
+        })
+    }
+}
+
+/// True when the index of the action is at most two bytes.
+fn action_index_fits(id: &crate::conway::GovActionId) -> bool {
+    id.action_index <= u32::from(u16::MAX)
+}
+
+/// `voting_procedures` (`defs.cddl`), whose every `gov_action_id` index is at most two bytes.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[serde(transparent)]
+pub struct VotingProcedures(crate::conway::VotingProcedures);
+
+bounded!(
+    VotingProcedures,
+    crate::conway::VotingProcedures,
+    |procedures| {
+        procedures
+            .values()
+            .all(|votes| votes.keys().all(action_index_fits))
+    }
+);
+
+/// The relays of `pool_params` (`defs.cddl`), whose every `port` is at most two bytes.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[serde(transparent)]
+pub struct Relays(Vec<Relay>);
+
+bounded!(Relays, Vec<Relay>, |relays| relays.iter().all(
+    |relay| match relay {
+        Relay::SingleHostAddr(port, ..) | Relay::SingleHostName(port, ..) => {
+            port.is_none_or(|port| port <= u32::from(u16::MAX))
+        }
+        Relay::MultiHostName(_) => true,
+    }
+));
+
+/// `protocol_version` (`defs.cddl`), a `major_protocol_version` and a minor version of at most four bytes.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
+#[serde(transparent)]
+pub struct ProtocolVersion(crate::ProtocolVersion);
+
+bounded!(
+    ProtocolVersion,
+    crate::ProtocolVersion,
+    |&(major, minor)| major <= 13 && minor <= u64::from(u32::MAX),
+    by crate::protocol_version::decode
+);
+
+/// `ex_units` (`defs.cddl`), whose memory and steps are each at most `max_int64`.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
+#[serde(transparent)]
+pub struct ExUnits(crate::ExUnits);
+
+bounded!(ExUnits, crate::ExUnits, |units| {
+    units.mem <= MAX_INT64 && units.steps <= MAX_INT64
+});
+
 pub use crate::babbage::OperationalCert;
 
 /// `header_version_info = [highest_supported_major_version : uint .size 4, self_reported_software_tag : uint .size 4]` (`defs.cddl`).
@@ -337,8 +537,6 @@ pub use crate::conway::Multiasset;
 
 pub use crate::conway::Mint;
 
-pub use crate::conway::Value;
-
 pub use crate::conway::Withdrawals;
 
 pub use crate::conway::DRep;
@@ -351,8 +549,6 @@ pub use crate::conway::CommitteeHotCredential;
 
 pub use crate::conway::Vote;
 
-pub use crate::conway::VotingProcedures;
-
 pub use crate::conway::VotingProcedure;
 
 pub use crate::conway::Constitution;
@@ -360,8 +556,6 @@ pub use crate::conway::Constitution;
 pub use crate::conway::Voter;
 
 pub use crate::conway::Anchor;
-
-pub use crate::conway::GovActionId;
 
 pub use crate::conway::PoolVotingThresholds;
 
@@ -376,8 +570,6 @@ pub use crate::conway::BootstrapWitness;
 pub use crate::conway::DatumHash;
 
 pub use crate::conway::DatumOption;
-
-pub use crate::conway::LegacyTransactionOutput;
 
 /// `eb_references_announcement = [eb_hash : hash32, eb_size : uint .size 4]` (`defs.cddl`).
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
@@ -437,7 +629,7 @@ pub enum Certificate {
         margin: UnitInterval,
         reward_account: RewardAccount,
         pool_owners: Set<AddrKeyhash>,
-        relays: Vec<Relay>,
+        relays: Relays,
         pool_metadata: Option<PoolMetadata>,
     },
     PoolRetirement(PoolKeyhash, Epoch),
@@ -722,17 +914,17 @@ pub struct CostModels {
     pub plutus_v4: Option<CostModel>,
 
     /// Cost models under the keys the CDDL wildcard permits, 4 to 255.
-    pub unknown: BTreeMap<u64, CostModel>,
+    pub unknown: BTreeMap<u8, CostModel>,
 }
 
 impl CostModels {
     /// Every key to write, ascending, a named field before the wildcard.
-    fn entries(&self) -> BTreeMap<u64, &CostModel> {
-        let mut entries: BTreeMap<u64, &CostModel> =
+    fn entries(&self) -> BTreeMap<u8, &CostModel> {
+        let mut entries: BTreeMap<u8, &CostModel> =
             self.unknown.iter().map(|(k, v)| (*k, v)).collect();
 
         let named = [
-            (0u64, &self.plutus_v1),
+            (0u8, &self.plutus_v1),
             (1, &self.plutus_v2),
             (2, &self.plutus_v3),
             (3, &self.plutus_v4),
@@ -758,7 +950,7 @@ impl<C> minicbor::Encode<C> for CostModels {
 
         e.map(entries.len() as u64)?;
         for (key, model) in entries {
-            e.u64(key)?;
+            e.u8(key)?;
             e.encode_with(model, ctx)?;
         }
 
@@ -768,13 +960,13 @@ impl<C> minicbor::Encode<C> for CostModels {
 
 impl<'b, C> minicbor::Decode<'b, C> for CostModels {
     fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
-        let models: BTreeMap<u64, CostModel> = d.decode_with(ctx)?;
+        let models: BTreeMap<u8, CostModel> = d.decode_with(ctx)?;
 
         let mut plutus_v1 = None;
         let mut plutus_v2 = None;
         let mut plutus_v3 = None;
         let mut plutus_v4 = None;
-        let mut unknown: Vec<(u64, CostModel)> = Vec::new();
+        let mut unknown: Vec<(u8, CostModel)> = Vec::new();
 
         for (k, v) in models.iter() {
             match k {
@@ -842,19 +1034,19 @@ pub struct ProtocolParamUpdate {
     #[n(1)]
     pub minfee_b: Option<u64>,
     #[n(2)]
-    pub max_block_body_size: Option<u64>,
+    pub max_block_body_size: Option<u32>,
     #[n(3)]
-    pub max_transaction_size: Option<u64>,
+    pub max_transaction_size: Option<u32>,
     #[n(4)]
-    pub max_block_header_size: Option<u64>,
+    pub max_block_header_size: Option<u16>,
     #[n(5)]
     pub key_deposit: Option<Coin>,
     #[n(6)]
     pub pool_deposit: Option<Coin>,
     #[n(7)]
-    pub maximum_epoch: Option<Epoch>,
+    pub maximum_epoch: Option<u32>,
     #[n(8)]
-    pub desired_number_of_stake_pools: Option<u64>,
+    pub desired_number_of_stake_pools: Option<u16>,
     #[n(9)]
     pub pool_pledge_influence: Option<RationalNumber>,
     #[n(10)]
@@ -875,38 +1067,38 @@ pub struct ProtocolParamUpdate {
     #[n(21)]
     pub max_block_ex_units: Option<ExUnits>,
     #[n(22)]
-    pub max_value_size: Option<u64>,
+    pub max_value_size: Option<u32>,
     #[n(23)]
-    pub collateral_percentage: Option<u64>,
+    pub collateral_percentage: Option<u16>,
     #[n(24)]
-    pub max_collateral_inputs: Option<u64>,
+    pub max_collateral_inputs: Option<u16>,
 
     #[n(25)]
     pub pool_voting_thresholds: Option<PoolVotingThresholds>,
     #[n(26)]
     pub drep_voting_thresholds: Option<DRepVotingThresholds>,
     #[n(27)]
-    pub min_committee_size: Option<u64>,
+    pub min_committee_size: Option<u16>,
     #[n(28)]
-    pub committee_term_limit: Option<Epoch>,
+    pub committee_term_limit: Option<u32>,
     #[n(29)]
-    pub governance_action_validity_period: Option<Epoch>,
+    pub governance_action_validity_period: Option<u32>,
     #[n(30)]
     pub governance_action_deposit: Option<Coin>,
     #[n(31)]
     pub drep_deposit: Option<Coin>,
     #[n(32)]
-    pub drep_inactivity_period: Option<Epoch>,
+    pub drep_inactivity_period: Option<u32>,
     #[n(33)]
     pub minfee_refscript_cost_per_byte: Option<UnitInterval>,
 
     // -- NEW IN DIJKSTRA
     #[n(34)]
-    pub max_ref_script_size_per_block: Option<u64>,
+    pub max_ref_script_size_per_block: Option<u32>,
     #[n(35)]
-    pub max_ref_script_size_per_tx: Option<u64>,
+    pub max_ref_script_size_per_tx: Option<u32>,
     #[n(36)]
-    pub ref_script_cost_stride: Option<u64>,
+    pub ref_script_cost_stride: Option<std::num::NonZeroU32>,
     #[n(37)]
     pub ref_script_cost_multiplier: Option<PositiveInterval>,
 
@@ -916,35 +1108,35 @@ pub struct ProtocolParamUpdate {
     #[n(39)]
     pub min_pool_margin: Option<UnitInterval>,
     #[n(40)]
-    pub leios_announcement_period_length: Option<u64>,
+    pub leios_announcement_period_length: Option<u32>,
     #[n(41)]
-    pub leios_vote_period_length: Option<u64>,
+    pub leios_vote_period_length: Option<u32>,
     #[n(42)]
-    pub leios_diffusion_period_length: Option<u64>,
+    pub leios_diffusion_period_length: Option<u32>,
     #[n(43)]
-    pub leios_committee_size: Option<u64>,
+    pub leios_committee_size: Option<u16>,
     #[n(44)]
     pub leios_quorum_stake_threshold: Option<UnitInterval>,
     #[n(45)]
-    pub max_endorser_block_references_size: Option<u64>,
+    pub max_endorser_block_references_size: Option<u32>,
     #[n(46)]
-    pub max_endorser_block_txs_size: Option<u64>,
+    pub max_endorser_block_txs_size: Option<u32>,
     #[n(47)]
     pub max_endorser_block_execution_units: Option<ExUnits>,
     #[n(48)]
-    pub max_ref_script_size_per_endorser_block: Option<u64>,
+    pub max_ref_script_size_per_endorser_block: Option<u32>,
     #[n(49)]
-    pub peras_min_candidate_block_age: Option<u64>,
+    pub peras_min_candidate_block_age: Option<u32>,
     #[n(50)]
     pub peras_healing_factor: Option<PositiveInterval>,
     #[n(51)]
-    pub peras_cert_boost: Option<u64>,
+    pub peras_cert_boost: Option<u16>,
     #[n(52)]
-    pub peras_target_committee_size: Option<u64>,
+    pub peras_target_committee_size: Option<u16>,
 
     /// `? 53 : nil/ uint .size 4` (cardano-ledger `9df9f98c`), so an explicit nil differs from an absent key.
     #[cbor(n(53), with = "nullable_value", has_nil)]
-    pub peras_bootstrap_round: Option<Nullable<u64>>,
+    pub peras_bootstrap_round: Option<Nullable<u32>>,
     #[n(54)]
     pub peras_quorum_threshold_safety_margin: Option<UnitInterval>,
     #[n(55)]
@@ -1019,7 +1211,7 @@ pub enum GovAction {
 
 crate::flat_enum::decode_flat_enum!(GovAction,
     0 => ParameterChange(previous, update, policy),
-    1 => HardForkInitiation(previous, version: crate::protocol_version::decode),
+    1 => HardForkInitiation(previous, version),
     2 => TreasuryWithdrawals(withdrawals, policy),
     3 => NoConfidence(previous),
     4 => UpdateCommittee(previous, removed, added, threshold),
@@ -1398,9 +1590,13 @@ pub struct TransactionBody<'a> {
 pub type PostAlonzoTransactionOutput<'b> =
     babbage::GenPostAlonzoTransactionOutput<'b, Value, ScriptRef<'b>>;
 
-pub type TransactionOutput<'b> = babbage::GenTransactionOutput<'b, PostAlonzoTransactionOutput<'b>>;
+/// `transaction_output` (`defs.cddl`), in the form it was read from.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+pub enum TransactionOutput<'b> {
+    Legacy(KeepRaw<'b, LegacyTransactionOutput>),
+    PostAlonzo(KeepRaw<'b, PostAlonzoTransactionOutput<'b>>),
+}
 
-// FIXME: Repeated since macro does not handle type generics yet.
 codec_by_datatype! {
     TransactionOutput<'b>,
     Array | ArrayIndef => Legacy,
