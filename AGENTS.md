@@ -76,9 +76,8 @@ cargo test --workspace
 Feature runs:
 
 ```sh
-cargo test -p pallas-network -p pallas-hardano --features unstable
 cargo test -p pallas-network -p pallas-network2 --features blueprint
-cargo test -p pallas-primitives -p pallas-traverse -p pallas-utxorpc --features unstable
+cargo test -p pallas-network -p pallas-primitives -p pallas-traverse -p pallas-utxorpc --features unstable
 cargo test -p pallas-primitives --features unstable,blueprint
 cargo check --workspace --all-targets --no-default-features
 cargo check --workspace --all-targets --all-features
@@ -177,7 +176,7 @@ Where to start for common jobs:
 `unstable` gates the Dijkstra era, whose APIs may change between minor releases:
 
 - `pallas-primitives/unstable` adds the `dijkstra` module.
-- `pallas-network/unstable` decodes a PlutusV4 script, and `pallas-hardano/unstable` displays it.
+- `pallas-network/unstable` adds the `queries_v16::dijkstra` module for Dijkstra UTxO replies.
 - `pallas-traverse/unstable` adds Dijkstra to the `MultiEra*` types and makes `MultiEraHeader`
   non-exhaustive, so a match over it needs a wildcard arm.
 - `pallas-utxorpc/unstable` maps Dijkstra through the accessors that can hold its types.

@@ -30,7 +30,6 @@ hardano = ["pallas-hardano"]
 unstable = [
   "hardano",
   "pallas-network/unstable",
-  "pallas-hardano/unstable",
   "pallas-traverse/unstable",
   "pallas-primitives/unstable",
   "pallas-utxorpc/unstable",
