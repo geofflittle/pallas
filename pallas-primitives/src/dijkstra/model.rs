@@ -756,10 +756,6 @@ mod nullable_value {
         v.encode(e, ctx)
     }
 
-    pub fn nil<T: Clone>() -> Option<Option<Nullable<T>>> {
-        Some(None)
-    }
-
     pub fn is_nil<T: Clone>(v: &Option<Nullable<T>>) -> bool {
         v.is_none()
     }
