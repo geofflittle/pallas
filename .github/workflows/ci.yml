@@ -59,18 +59,24 @@ jobs:
           key: ${{ hashFiles('Cargo.toml') }}
       - run: cargo doc --workspace --no-deps
 
-  small:
-    name: Small tests
+  # One job compiles the tests into nextest archives and each size runs from
+  # them, https://nexte.st/docs/ci-features/archiving/
+  build:
+    name: Build the tests
     runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash
+    outputs:
+      amaru-url: ${{ steps.amaru.outputs.url }}
+      amaru-commit: ${{ steps.amaru.outputs.commit }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
       - uses: dtolnay/rust-toolchain@stable
       - name: Read the amaru commit pallas-validate builds
+        id: amaru
         run: |
           source=$(cargo metadata --format-version 1 --all-features | jq -r '. as $m
             | ($m.packages[] | select(.name == "pallas-validate") | .id) as $validate
@@ -80,10 +86,13 @@ jobs:
             echo "::error::amaru_uplc_native resolves to '$source', not one git commit"
             exit 1
           fi
-          echo "AMARU_URL=${BASH_REMATCH[1]}" >> "$GITHUB_ENV"
-          echo "AMARU_COMMIT=${BASH_REMATCH[3]}" >> "$GITHUB_ENV"
+          echo "url=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          echo "commit=${BASH_REMATCH[3]}" >> "$GITHUB_OUTPUT"
           echo "amaru-uplc ${BASH_REMATCH[1]} ${BASH_REMATCH[3]}"
       - name: Fetch amaru at that commit
+        env:
+          AMARU_URL: ${{ steps.amaru.outputs.url }}
+          AMARU_COMMIT: ${{ steps.amaru.outputs.commit }}
         run: |
           git init -q amaru
           git -C amaru fetch -q --depth 1 "$AMARU_URL" "$AMARU_COMMIT"
@@ -100,49 +109,103 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest@0.9.152
-      - name: Build
-        run: cargo build --workspace --all-targets --profile test
+      # Each line is an archive name and the cargo arguments that select its tests.
+      - name: Archive the tests and run the doctests
+        run: |
+          while read -r name args; do
+            # shellcheck disable=SC2086
+            cargo nextest archive $args --archive-file "archives/$name.tar.zst"
+            # Doctests are small tests that nextest cannot archive.
+            # shellcheck disable=SC2086
+            CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='timeout 60' cargo test --doc $args
+          done <<'COMBINATIONS'
+          workspace --workspace
+          blueprint -p pallas-network -p pallas-network2 --features blueprint
+          unstable -p pallas-primitives -p pallas-traverse -p pallas-utxorpc -p pallas-network2 -p pallas-network -p pallas-hardano --features unstable
+          unstable-blueprint -p pallas-primitives --features unstable,blueprint
+          unstable-validate -p pallas-validate --features unstable
+          phase2 -p pallas-validate --features phase2
+          phase2-unstable -p pallas-validate --features phase2,unstable
+          COMBINATIONS
+      - name: Archive the amaru-uplc conformance suite
+        working-directory: amaru
+        run: cargo nextest archive --locked -p amaru-uplc --test conformance --archive-file "$GITHUB_WORKSPACE/archives/amaru-conformance.tar.zst"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nextest-archives
+          path: archives
+          retention-days: 1
+
+  small:
+    name: Small tests
+    needs: build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.152
+      - uses: actions/download-artifact@v4
+        with:
+          name: nextest-archives
+          path: archives
       - name: Test
         uses: ./.github/actions/sized-tests
         with:
           size: small
-          args: --workspace
+          archive: workspace
       - name: Test blueprint feature
         uses: ./.github/actions/sized-tests
         with:
           size: small
-          args: -p pallas-network -p pallas-network2 --features blueprint
+          archive: blueprint
       - name: Test unstable feature
         uses: ./.github/actions/sized-tests
         with:
           size: small
-          args: -p pallas-primitives -p pallas-traverse -p pallas-utxorpc -p pallas-network2 -p pallas-network -p pallas-hardano --features unstable
+          archive: unstable
       - name: Test unstable blueprint feature
         uses: ./.github/actions/sized-tests
         with:
           size: small
-          args: -p pallas-primitives --features unstable,blueprint
+          archive: unstable-blueprint
       - name: Test unstable validate feature
         uses: ./.github/actions/sized-tests
         with:
           size: small
-          args: -p pallas-validate --features unstable
+          archive: unstable-validate
       - name: Test validation with phase two enabled
         uses: ./.github/actions/sized-tests
         with:
           size: small
-          args: -p pallas-validate --features phase2
+          archive: phase2
       - name: Test native Dijkstra validation with phase two enabled
         uses: ./.github/actions/sized-tests
         with:
           size: small
-          args: -p pallas-validate --features phase2,unstable
+          archive: phase2-unstable
+      - name: Fetch amaru at the commit pallas-validate builds
+        env:
+          AMARU_URL: ${{ needs.build.outputs.amaru-url }}
+          AMARU_COMMIT: ${{ needs.build.outputs.amaru-commit }}
+        run: |
+          git init -q amaru
+          git -C amaru fetch -q --depth 1 "$AMARU_URL" "$AMARU_COMMIT"
+          git -C amaru checkout -q --detach FETCH_HEAD
       - name: Run the amaru-uplc conformance suite at the pinned commit
         working-directory: amaru
+        env:
+          AMARU_COMMIT: ${{ needs.build.outputs.amaru-commit }}
         run: |
-          cargo nextest run --locked --no-fail-fast --no-tests fail --color never \
+          cargo-nextest nextest run --archive-file "$GITHUB_WORKSPACE/archives/amaru-conformance.tar.zst" \
+            --no-fail-fast --no-tests fail --color never \
             --config-file "$GITHUB_WORKSPACE/.config/amaru-conformance.toml" -E 'group(small)' \
-            -p amaru-uplc --test conformance 2>&1 | tee "$RUNNER_TEMP/conformance.log"
+            2>&1 | tee "$RUNNER_TEMP/conformance.log"
           programs=$(find crates/amaru-uplc/tests/conformance -name '*.uplc' | wc -l)
           summary=$(grep -E '^ *Summary \[' "$RUNNER_TEMP/conformance.log" || true)
           pattern='Summary \[ *[0-9.]+s\] ([0-9]+) tests? run: ([0-9]+) passed, 0 skipped$'
@@ -154,80 +217,80 @@ jobs:
 
   medium:
     name: Medium tests
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('Cargo.toml') }}
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest@0.9.152
-      - name: Build
-        run: cargo build --workspace --all-targets --profile test
+      - uses: actions/download-artifact@v4
+        with:
+          name: nextest-archives
+          path: archives
       - name: Test
         uses: ./.github/actions/sized-tests
         with:
           size: medium
-          args: --workspace
+          archive: workspace
       - name: Test blueprint feature
         uses: ./.github/actions/sized-tests
         with:
           size: medium
-          args: -p pallas-network -p pallas-network2 --features blueprint
+          archive: blueprint
       - name: Test unstable feature
         uses: ./.github/actions/sized-tests
         with:
           size: medium
-          args: -p pallas-primitives -p pallas-traverse -p pallas-utxorpc -p pallas-network2 -p pallas-network -p pallas-hardano --features unstable
+          archive: unstable
       - name: Test unstable blueprint feature
         uses: ./.github/actions/sized-tests
         with:
           size: medium
-          args: -p pallas-primitives --features unstable,blueprint
+          archive: unstable-blueprint
       - name: Test unstable validate feature
         uses: ./.github/actions/sized-tests
         with:
           size: medium
-          args: -p pallas-validate --features unstable
+          archive: unstable-validate
       - name: Test native Dijkstra validation with phase two enabled
         uses: ./.github/actions/sized-tests
         with:
           size: medium
-          args: -p pallas-validate --features phase2,unstable
+          archive: phase2-unstable
 
   large:
     name: Large tests
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('Cargo.toml') }}
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest@0.9.152
+      - uses: actions/download-artifact@v4
+        with:
+          name: nextest-archives
+          path: archives
       - name: Test
         uses: ./.github/actions/sized-tests
         with:
           size: large
-          args: --workspace
+          archive: workspace
       - name: Test blueprint feature
         uses: ./.github/actions/sized-tests
         with:
           size: large
-          args: -p pallas-network -p pallas-network2 --features blueprint
+          archive: blueprint
       - name: Test unstable feature
         uses: ./.github/actions/sized-tests
         with:
           size: large
-          args: -p pallas-primitives -p pallas-traverse -p pallas-utxorpc -p pallas-network2 -p pallas-network -p pallas-hardano --features unstable
+          archive: unstable
 
   features:
     name: Features (${{ matrix.flags }})
@@ -353,6 +416,7 @@ jobs:
       - fmt
       - clippy
       - docs
+      - build
       - small
       - medium
       - large

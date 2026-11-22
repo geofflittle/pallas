@@ -1,9 +1,9 @@
 name: Sized tests
-description: Run the tests of one size under its time limit, and after the small tests the doctests.
+description: Run the tests of one size from one nextest archive under its time limit.
 
 inputs:
-  args:
-    description: The cargo package and feature arguments that select the tests.
+  archive:
+    description: The archive under archives/ that the build job wrote, without its extension.
     required: true
   size:
     description: The test group of .config/nextest.toml to run, small, medium or large.
@@ -15,17 +15,6 @@ runs:
     - name: Tests
       shell: bash
       env:
-        ARGS: ${{ inputs.args }}
+        ARCHIVE: ${{ inputs.archive }}
         SIZE: ${{ inputs.size }}
-      run: |
-        # shellcheck disable=SC2086
-        cargo nextest run --no-fail-fast --no-tests fail --run-ignored all -E "group($SIZE)" $ARGS
-    - name: Doctests
-      if: inputs.size == 'small'
-      shell: bash
-      env:
-        ARGS: ${{ inputs.args }}
-        CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER: timeout 60
-      run: |
-        # shellcheck disable=SC2086
-        cargo test --doc $ARGS
+      run: cargo-nextest nextest run --archive-file "archives/$ARCHIVE.tar.zst" --no-fail-fast --no-tests fail --run-ignored all -E "group($SIZE)"
