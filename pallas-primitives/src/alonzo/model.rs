@@ -89,11 +89,66 @@ pub enum Value {
     Multiasset(Coin, Multiasset<Coin>),
 }
 
+#[cfg(not(feature = "unstable"))]
 codec_by_datatype! {
     Value,
     U8 | U16 | U32 | U64 => Coin,
     (coin, multi => Multiasset)
 }
+
+/// Implements the codec of a value enum, reading its `Multiasset` variant from an array of either length form.
+#[cfg(feature = "unstable")]
+macro_rules! value_codec {
+    ($name:ident) => {
+        impl<'b, C> pallas_codec::minicbor::Decode<'b, C> for $name {
+            fn decode(
+                d: &mut pallas_codec::minicbor::Decoder<'b>,
+                ctx: &mut C,
+            ) -> Result<Self, pallas_codec::minicbor::decode::Error> {
+                use pallas_codec::minicbor::data::Type;
+                match d.datatype()? {
+                    Type::Array | Type::ArrayIndef => {
+                        let len = d.array()?;
+                        let value = $name::Multiasset(d.decode_with(ctx)?, d.decode_with(ctx)?);
+                        pallas_codec::utils::skip_array_rest(d, len, 2)?;
+                        Ok(value)
+                    }
+                    Type::U8 | Type::U16 | Type::U32 | Type::U64 => {
+                        Ok($name::Coin(d.decode_with(ctx)?))
+                    }
+                    _ => Err(pallas_codec::minicbor::decode::Error::message(
+                        "Unknown cbor data type for this macro-defined enum.",
+                    )),
+                }
+            }
+        }
+
+        impl<C> pallas_codec::minicbor::Encode<C> for $name {
+            fn encode<W: pallas_codec::minicbor::encode::Write>(
+                &self,
+                e: &mut pallas_codec::minicbor::Encoder<W>,
+                ctx: &mut C,
+            ) -> Result<(), pallas_codec::minicbor::encode::Error<W::Error>> {
+                match self {
+                    $name::Multiasset(coin, multi) => {
+                        e.array(2)?;
+                        e.encode_with(coin, ctx)?;
+                        e.encode_with(multi, ctx)?;
+                    }
+                    $name::Coin(coin) => {
+                        e.encode_with(coin, ctx)?;
+                    }
+                }
+                Ok(())
+            }
+        }
+    };
+}
+#[cfg(feature = "unstable")]
+pub(crate) use value_codec;
+
+#[cfg(feature = "unstable")]
+value_codec!(Value);
 
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
 pub struct TransactionOutput {
@@ -150,7 +205,7 @@ pub type Withdrawals = BTreeMap<RewardAccount, Coin>;
 
 pub type RequiredSigners = Vec<AddrKeyhash>;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Encode)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Encode, Decode)]
 #[cbor(flat)]
 pub enum Certificate {
     #[n(0)]
@@ -191,26 +246,6 @@ pub enum Certificate {
     #[n(6)]
     MoveInstantaneousRewardsCert(#[n(0)] MoveInstantaneousReward),
 }
-
-crate::flat_enum::decode_flat_enum!(Certificate,
-    0 => StakeRegistration(credential),
-    1 => StakeDeregistration(credential),
-    2 => StakeDelegation(credential, pool),
-    3 => PoolRegistration {
-        operator,
-        vrf_keyhash,
-        pledge,
-        cost,
-        margin,
-        reward_account,
-        pool_owners,
-        relays,
-        pool_metadata
-    },
-    4 => PoolRetirement(pool, epoch),
-    5 => GenesisKeyDelegation(genesis, delegate, vrf_keyhash),
-    6 => MoveInstantaneousRewardsCert(reward),
-);
 
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 #[cbor(index_only)]
@@ -256,7 +291,10 @@ pub struct ProtocolParamUpdate {
     #[n(13)]
     pub extra_entropy: Option<Nonce>,
     #[n(14)]
-    #[cbor(decode_with = "crate::protocol_version::decode_option")]
+    #[cfg_attr(
+        feature = "unstable",
+        cbor(decode_with = "crate::protocol_version::decode_option")
+    )]
     pub protocol_version: Option<ProtocolVersion>,
     #[n(16)]
     pub min_pool_cost: Option<Coin>,
@@ -533,34 +571,16 @@ mod tests {
 
     use crate::{Fragment, alonzo::PlutusData};
 
-    use super::{Block, Certificate, Header};
+    use super::{Block, Header};
     use crate::alonzo::NativeScript;
-    use crate::flat_enum::assert_reads_either_length_form;
 
     type BlockWrapper<'b> = (u16, Block<'b>);
 
-    const HASH: &str = "581c11111111111111111111111111111111111111111111111111111111";
-    const HASH32: &str = "58201111111111111111111111111111111111111111111111111111111111111111";
-    const REWARD: &str = "581de111111111111111111111111111111111111111111111111111111111";
-
-    #[test]
-    fn a_certificate_reads_either_length_form() {
-        let credential = format!("8200{HASH}");
-        assert_reads_either_length_form::<Certificate>(&[
-            format!("8200{credential}"),
-            format!("8201{credential}"),
-            format!("8302{credential}{HASH}"),
-            format!("8a03{HASH}{HASH32}0102d81e820102{REWARD}80808260{HASH32}"),
-            format!("8304{HASH}01"),
-            format!("8405{HASH}{HASH}{HASH32}"),
-            "8206820001".to_string(),
-        ]);
-    }
-
+    #[cfg(feature = "unstable")]
     #[test]
     fn a_native_script_reads_either_length_form() {
-        let script = format!("8200{HASH}");
-        assert_reads_either_length_form::<NativeScript>(&[
+        let script = format!("8200581c{}", "11".repeat(28));
+        crate::flat_enum::assert_reads_either_length_form::<NativeScript>(&[
             script.clone(),
             format!("820181{script}"),
             "820280".to_string(),
@@ -570,6 +590,7 @@ mod tests {
         ]);
     }
 
+    #[cfg(feature = "unstable")]
     #[test]
     fn a_native_script_with_extra_elements_reads_to_the_end_of_its_array() {
         for (bytes, expected) in [

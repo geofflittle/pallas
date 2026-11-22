@@ -37,11 +37,15 @@ pub enum Value {
     Multiasset(Coin, Multiasset<PositiveCoin>),
 }
 
+#[cfg(not(feature = "unstable"))]
 codec_by_datatype! {
     Value,
     U8 | U16 | U32 | U64 => Coin,
     (coin, multi => Multiasset)
 }
+
+#[cfg(feature = "unstable")]
+crate::alonzo::value_codec!(Value);
 
 pub use crate::alonzo::TransactionOutput as LegacyTransactionOutput;
 
@@ -49,7 +53,7 @@ pub type Withdrawals = BTreeMap<RewardAccount, Coin>;
 
 pub type RequiredSigners = NonEmptySet<AddrKeyhash>;
 
-#[derive(Encode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Encode, Decode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[cbor(flat)]
 pub enum Certificate {
     #[n(0)]
@@ -117,37 +121,8 @@ pub enum Certificate {
     UpdateDRepCert(#[n(0)] DRepCredential, #[n(1)] Option<Anchor>),
 }
 
-crate::flat_enum::decode_flat_enum!(Certificate,
-    0 => StakeRegistration(credential),
-    1 => StakeDeregistration(credential),
-    2 => StakeDelegation(credential, pool),
-    3 => PoolRegistration {
-        operator,
-        vrf_keyhash,
-        pledge,
-        cost,
-        margin,
-        reward_account,
-        pool_owners,
-        relays,
-        pool_metadata
-    },
-    4 => PoolRetirement(pool, epoch),
-    7 => Reg(credential, deposit),
-    8 => UnReg(credential, refund),
-    9 => VoteDeleg(credential, drep),
-    10 => StakeVoteDeleg(credential, pool, drep),
-    11 => StakeRegDeleg(credential, pool, deposit),
-    12 => VoteRegDeleg(credential, drep, deposit),
-    13 => StakeVoteRegDeleg(credential, pool, drep, deposit),
-    14 => AuthCommitteeHot(cold, hot),
-    15 => ResignCommitteeCold(cold, anchor),
-    16 => RegDRepCert(credential, deposit, anchor),
-    17 => UnRegDRepCert(credential, refund),
-    18 => UpdateDRepCert(credential, anchor),
-);
-
 #[derive(Encode, Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Ord, Clone)]
+#[cfg_attr(not(feature = "unstable"), derive(Decode))]
 #[cbor(flat)]
 pub enum DRep {
     #[n(0)]
@@ -160,6 +135,7 @@ pub enum DRep {
     NoConfidence,
 }
 
+#[cfg(feature = "unstable")]
 crate::flat_enum::decode_flat_enum!(DRep,
     0 => Key(hash),
     1 => Script(hash),
@@ -434,9 +410,12 @@ pub struct VotingProcedure {
     #[n(0)]
     pub vote: Vote,
     #[n(1)]
-    #[cbor(
-        encode_with = "minicbor::Encode::encode",
-        is_nil = "pallas_codec::utils::never_nil"
+    #[cfg_attr(
+        feature = "unstable",
+        cbor(
+            encode_with = "minicbor::Encode::encode",
+            is_nil = "pallas_codec::utils::never_nil"
+        )
     )]
     pub anchor: Option<Anchor>,
 }
@@ -453,7 +432,7 @@ pub struct ProposalProcedure {
     pub anchor: Anchor,
 }
 
-#[derive(Encode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Encode, Decode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[cbor(flat)]
 pub enum GovAction {
     #[n(0)]
@@ -484,29 +463,23 @@ pub enum GovAction {
     Information,
 }
 
-crate::flat_enum::decode_flat_enum!(GovAction,
-    0 => ParameterChange(previous, update, policy),
-    1 => HardForkInitiation(previous, version: crate::protocol_version::decode),
-    2 => TreasuryWithdrawals(withdrawals, policy),
-    3 => NoConfidence(previous),
-    4 => UpdateCommittee(previous, removed, added, threshold),
-    5 => NewConstitution(previous, constitution),
-    6 => Information,
-);
-
 #[derive(Encode, Decode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct Constitution {
     #[n(0)]
     pub anchor: Anchor,
     #[n(1)]
-    #[cbor(
-        encode_with = "minicbor::Encode::encode",
-        is_nil = "pallas_codec::utils::never_nil"
+    #[cfg_attr(
+        feature = "unstable",
+        cbor(
+            encode_with = "minicbor::Encode::encode",
+            is_nil = "pallas_codec::utils::never_nil"
+        )
     )]
     pub guardrail_script: Option<ScriptHash>,
 }
 
 #[derive(Encode, Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Ord, Clone)]
+#[cfg_attr(not(feature = "unstable"), derive(Decode))]
 #[cbor(flat)]
 pub enum Voter {
     #[n(1)]
@@ -521,6 +494,7 @@ pub enum Voter {
     StakePoolKey(#[n(0)] AddrKeyhash),
 }
 
+#[cfg(feature = "unstable")]
 crate::flat_enum::decode_flat_enum!(Voter,
     0 => ConstitutionalCommitteeKey(hash),
     1 => ConstitutionalCommitteeScript(hash),
@@ -717,7 +691,7 @@ pub type PlutusV3Script = PlutusScript<3>;
 
 // script = [0, native_script // 1, plutus_v1_script // 2, plutus_v2_script //
 // 3, plutus_v3_script]
-#[derive(Encode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Encode, Decode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[cbor(flat)]
 pub enum ScriptRef<'b> {
     #[n(0)]
@@ -729,13 +703,6 @@ pub enum ScriptRef<'b> {
     #[n(3)]
     PlutusV3Script(#[n(0)] PlutusScript<3>),
 }
-
-crate::flat_enum::decode_flat_enum!(ScriptRef<'b>,
-    0 => NativeScript(script),
-    1 => PlutusV1Script(script),
-    2 => PlutusV2Script(script),
-    3 => PlutusV3Script(script),
-);
 
 // TODO: Remove in favour of multierascriptref
 impl<'b> From<babbage::ScriptRef<'b>> for ScriptRef<'b> {
@@ -801,14 +768,8 @@ pub type MintedTx<'b> = Tx<'b>;
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        Anchor, Block, Certificate, Constitution, DRep, DatumOption, GovAction, NativeScript,
-        RationalNumber, Relay, ScriptRef, StakeCredential, TransactionBody, TransactionOutput,
-        Vote, Voter,
-    };
-    use crate::flat_enum::{assert_reads_either_length_form, decode_all};
+    use super::{Anchor, Block, Certificate, TransactionBody};
     use pallas_codec::minicbor;
-    use pallas_codec::utils::CborWrap;
 
     type BlockWrapper<'b> = (u16, Block<'b>);
 
@@ -823,221 +784,210 @@ mod tests {
         }
     }
 
-    const HASH: &str = "581c11111111111111111111111111111111111111111111111111111111";
-    const HASH32: &str = "58201111111111111111111111111111111111111111111111111111111111111111";
-    const REWARD: &str = "581de111111111111111111111111111111111111111111111111111111111";
+    #[cfg(feature = "unstable")]
+    mod unstable_build {
+        use super::super::{
+            Certificate, Constitution, DRep, DatumOption, GovAction, RationalNumber, Relay,
+            StakeCredential, TransactionBody, TransactionOutput, Value, Vote, Voter,
+        };
+        use crate::flat_enum::{assert_reads_either_length_form, decode_all};
+        use pallas_codec::minicbor;
+        use pallas_codec::utils::CborWrap;
 
-    #[test]
-    fn a_certificate_reads_either_length_form() {
-        let credential = format!("8200{HASH}");
-        let drep = format!("8200{HASH}");
-        let anchor = format!("8260{HASH32}");
-        assert_reads_either_length_form::<Certificate>(&[
-            format!("8200{credential}"),
-            format!("8201{credential}"),
-            format!("8302{credential}{HASH}"),
-            format!("8a03{HASH}{HASH32}0102d81e820102{REWARD}d9010280808260{HASH32}"),
-            format!("8304{HASH}01"),
-            format!("8307{credential}01"),
-            format!("8308{credential}01"),
-            format!("8309{credential}{drep}"),
-            format!("840a{credential}{HASH}{drep}"),
-            format!("840b{credential}{HASH}01"),
-            format!("840c{credential}{drep}01"),
-            format!("850d{credential}{HASH}{drep}01"),
-            format!("830e{credential}{credential}"),
-            format!("830f{credential}{anchor}"),
-            format!("8410{credential}01{anchor}"),
-            format!("8311{credential}01"),
-            format!("8312{credential}{anchor}"),
-        ]);
-    }
+        const HASH: &str = "581c11111111111111111111111111111111111111111111111111111111";
 
-    #[test]
-    fn a_drep_reads_either_length_form() {
-        assert_reads_either_length_form::<DRep>(&[
-            format!("8200{HASH}"),
-            format!("8201{HASH}"),
-            "8102".to_string(),
-            "8103".to_string(),
-        ]);
-    }
+        #[test]
+        fn a_value_reads_either_length_form_to_its_end() {
+            let multi = format!("a1{HASH}a14001");
+            let definite = format!("8201{multi}");
+            assert_reads_either_length_form::<Value>(std::slice::from_ref(&definite));
 
-    #[test]
-    fn a_gov_action_reads_either_length_form() {
-        let id = format!("82{HASH32}00");
-        let credential = format!("8200{HASH}");
-        assert_reads_either_length_form::<GovAction>(&[
-            format!("8400{id}a10001{HASH}"),
-            format!("8301{id}820a00"),
-            format!("8302a1{REWARD}01{HASH}"),
-            format!("8203{id}"),
-            format!("8504{id}d9010281{credential}a1{credential}01d81e820102"),
-            format!("8305{id}828260{HASH32}{HASH}"),
-            "8106".to_string(),
-        ]);
-    }
+            let expected: Value = decode_all(&hex::decode(&definite).unwrap());
+            let extra: Value = decode_all(&hex::decode(format!("8301{multi}00")).unwrap());
+            assert_eq!(extra, expected);
+        }
 
-    #[test]
-    fn a_voter_reads_either_length_form() {
-        assert_reads_either_length_form::<Voter>(&[
-            format!("8200{HASH}"),
-            format!("8201{HASH}"),
-            format!("8202{HASH}"),
-            format!("8203{HASH}"),
-            format!("8204{HASH}"),
-        ]);
-    }
+        #[test]
+        fn a_value_in_an_indefinite_array_short_of_its_fields_is_refused() {
+            assert!(minicbor::decode::<Value>(&hex::decode("9f01ff").unwrap()).is_err());
+        }
 
-    #[test]
-    fn a_script_reference_reads_either_length_form() {
-        assert_reads_either_length_form::<ScriptRef>(&[
-            format!("82008200{HASH}"),
-            "82014100".to_string(),
-            "82024100".to_string(),
-            "82034100".to_string(),
-        ]);
-    }
+        #[test]
+        fn a_drep_reads_either_length_form() {
+            assert_reads_either_length_form::<DRep>(&[
+                format!("8200{HASH}"),
+                format!("8201{HASH}"),
+                "8102".to_string(),
+                "8103".to_string(),
+            ]);
+        }
 
-    /// The bytes of one vector from `test_data/dijkstra-generated`.
-    fn generated(hex: &str) -> &'static [u8] {
-        Box::leak(hex::decode(hex).unwrap().into_boxed_slice())
-    }
+        #[test]
+        fn a_voter_reads_either_length_form() {
+            assert_reads_either_length_form::<Voter>(&[
+                format!("8200{HASH}"),
+                format!("8201{HASH}"),
+                format!("8202{HASH}"),
+                format!("8203{HASH}"),
+                format!("8204{HASH}"),
+            ]);
+        }
 
-    /// Decodes a generated transaction body that ends exactly where its bytes do.
-    fn generated_body(hex: &str) -> TransactionBody<'static> {
-        let bytes = generated(hex);
-        let mut d = minicbor::Decoder::new(bytes);
-        let body = d
-            .decode()
-            .unwrap_or_else(|e| panic!("the body must decode: {e}"));
-        assert_eq!(
-            d.position(),
-            bytes.len(),
-            "the body must be read to its end"
-        );
-        body
-    }
+        /// Decodes a generated transaction body that ends exactly where its bytes do.
+        fn generated_body(hex: &str) -> TransactionBody<'static> {
+            let bytes: &'static [u8] = Box::leak(hex::decode(hex).unwrap().into_boxed_slice());
+            let mut d = minicbor::Decoder::new(bytes);
+            let body = d
+                .decode()
+                .unwrap_or_else(|e| panic!("the body must decode: {e}"));
+            assert_eq!(
+                d.position(),
+                bytes.len(),
+                "the body must be read to its end"
+            );
+            body
+        }
 
-    #[test]
-    fn generated_enums_in_indefinite_arrays_decode() {
-        let body = generated_body(include_str!(
-            "../../../test_data/dijkstra-generated/body-credential-indefinite.hex"
-        ));
-        assert_eq!(
-            body.certificates.unwrap().to_vec(),
-            vec![Certificate::StakeDelegation(
-                StakeCredential::ScriptHash(
-                    "17ab434af5e4d2fcc4815897879f52d2068af2dc2630974ac0333a2b"
+        #[test]
+        fn generated_enums_in_indefinite_arrays_decode() {
+            let body = generated_body(include_str!(
+                "../../../test_data/dijkstra-generated/body-credential-indefinite.hex"
+            ));
+            assert_eq!(
+                body.certificates.unwrap().to_vec(),
+                vec![Certificate::StakeDelegation(
+                    StakeCredential::ScriptHash(
+                        "17ab434af5e4d2fcc4815897879f52d2068af2dc2630974ac0333a2b"
+                            .parse()
+                            .unwrap()
+                    ),
+                    "bc7069ba4ab9909c4b1517f3bd9ccbb45b075569c163820971dbe63e"
+                        .parse()
+                        .unwrap(),
+                )]
+            );
+
+            let body = generated_body(include_str!(
+                "../../../test_data/dijkstra-generated/body-drep-indefinite.hex"
+            ));
+            let dreps: Vec<_> = body
+                .certificates
+                .unwrap()
+                .to_vec()
+                .into_iter()
+                .map(|certificate| match certificate {
+                    Certificate::VoteRegDeleg(_, drep, _) => drep,
+                    other => panic!("{other:?} is not a vote delegation"),
+                })
+                .collect();
+            assert_eq!(dreps, vec![DRep::NoConfidence, DRep::Abstain]);
+
+            let body = generated_body(include_str!(
+                "../../../test_data/dijkstra-generated/body-datum-option-indefinite.hex"
+            ));
+            let datums: Vec<_> = body
+                .outputs
+                .iter()
+                .map(|output| match output {
+                    TransactionOutput::PostAlonzo(output) => output.datum_option.clone().unwrap(),
+                    TransactionOutput::Legacy(_) => panic!("the outputs are in map form"),
+                })
+                .collect();
+            assert!(matches!(
+                &*datums[0],
+                DatumOption::Hash(hash)
+                    if hash.to_string() == "f76479ff10b1f158e4b6c98049836b3bd0abe3fcceab1a5d646fdaa8f0d312fb"
+            ));
+            assert!(matches!(
+                &*datums[1],
+                DatumOption::Data(CborWrap(data)) if data.raw_cbor() == [0x80]
+            ));
+
+            let body = generated_body(include_str!(
+                "../../../test_data/dijkstra-generated/body-voter-indefinite.hex"
+            ));
+            let voters: Vec<_> = body.voting_procedures.unwrap().into_keys().collect();
+            assert_eq!(
+                voters,
+                vec![Voter::ConstitutionalCommitteeKey(
+                    "7ff244d677b8920e733c5117a58478eb164d06298ca4bde583ac1e76"
                         .parse()
                         .unwrap()
-                ),
-                "bc7069ba4ab9909c4b1517f3bd9ccbb45b075569c163820971dbe63e"
-                    .parse()
-                    .unwrap(),
-            )]
-        );
+                )]
+            );
+        }
 
-        let body = generated_body(include_str!(
-            "../../../test_data/dijkstra-generated/body-drep-indefinite.hex"
-        ));
-        let dreps: Vec<_> = body
-            .certificates
-            .unwrap()
-            .to_vec()
-            .into_iter()
-            .map(|certificate| match certificate {
-                Certificate::VoteRegDeleg(_, drep, _) => drep,
-                other => panic!("{other:?} is not a vote delegation"),
-            })
-            .collect();
-        assert_eq!(dreps, vec![DRep::NoConfidence, DRep::Abstain]);
+        #[test]
+        fn a_relay_in_an_indefinite_array_reads_to_its_break() {
+            let bytes = hex::decode(include_str!(
+                "../../../test_data/dijkstra-generated/relay-indefinite.hex"
+            ))
+            .unwrap();
+            let relay: Relay = decode_all(&bytes);
+            assert_eq!(
+                relay,
+                Relay::MultiHostName("\u{241a}\u{3bdc1}\u{d0}".to_string())
+            );
+        }
 
-        let body = generated_body(include_str!(
-            "../../../test_data/dijkstra-generated/body-datum-option-indefinite.hex"
-        ));
-        let datums: Vec<_> = body
-            .outputs
-            .iter()
-            .map(|output| match output {
-                TransactionOutput::PostAlonzo(output) => output.datum_option.clone().unwrap(),
-                TransactionOutput::Legacy(_) => panic!("the outputs are in map form"),
-            })
-            .collect();
-        assert!(matches!(
-            &*datums[0],
-            DatumOption::Hash(hash)
-                if hash.to_string() == "f76479ff10b1f158e4b6c98049836b3bd0abe3fcceab1a5d646fdaa8f0d312fb"
-        ));
-        assert!(matches!(
-            &*datums[1],
-            DatumOption::Data(CborWrap(data)) if data.raw_cbor() == [0x80]
-        ));
+        #[test]
+        fn a_rational_in_an_indefinite_array_reads_to_its_break() {
+            let ratio: RationalNumber = decode_all(&hex::decode("d81e9f0102ff").unwrap());
+            assert_eq!(
+                ratio,
+                RationalNumber {
+                    numerator: 1,
+                    denominator: 2
+                }
+            );
+        }
 
-        let body = generated_body(include_str!(
-            "../../../test_data/dijkstra-generated/body-gov-action-indefinite.hex"
-        ));
-        let proposals = body.proposal_procedures.unwrap().to_vec();
-        assert!(matches!(
-            &proposals[0].gov_action,
-            GovAction::TreasuryWithdrawals(withdrawals, None) if withdrawals.len() == 1
-        ));
+        #[test]
+        fn governance_ending_in_an_absent_value_reencodes_as_the_ledger_wrote_it() {
+            let bytes = hex::decode(include_str!(
+                "../../../test_data/dijkstra-generated/body-governance-ending-in-null.hex"
+            ))
+            .unwrap();
+            let body: TransactionBody = minicbor::decode(&bytes).unwrap();
 
-        let body = generated_body(include_str!(
-            "../../../test_data/dijkstra-generated/body-voter-indefinite.hex"
-        ));
-        let voters: Vec<_> = body.voting_procedures.unwrap().into_keys().collect();
-        assert_eq!(
-            voters,
-            vec![Voter::ConstitutionalCommitteeKey(
-                "7ff244d677b8920e733c5117a58478eb164d06298ca4bde583ac1e76"
-                    .parse()
-                    .unwrap()
-            )]
-        );
+            let votes = body.voting_procedures.as_ref().unwrap();
+            let (_, procedures) = votes.iter().next().unwrap();
+            let (id, procedure) = procedures.iter().next().unwrap();
+            assert_eq!(id.action_index, 41156);
+            assert_eq!(procedure.vote, Vote::Abstain);
+            assert_eq!(procedure.anchor, None);
 
-        let body = generated_body(include_str!(
-            "../../../test_data/dijkstra-generated/body-script-ref-indefinite.hex"
-        ));
-        let [TransactionOutput::PostAlonzo(output)] = &body.outputs[..] else {
-            panic!("the body holds one map form output");
-        };
-        assert!(matches!(
-            &output.script_ref,
-            Some(CborWrap(ScriptRef::NativeScript(script)))
-                if **script == NativeScript::InvalidHereafter(0x73e96a1328c7873b)
-        ));
-    }
-
-    #[test]
-    fn a_relay_in_an_indefinite_array_reads_to_its_break() {
-        let bytes = hex::decode(include_str!(
-            "../../../test_data/dijkstra-generated/relay-indefinite.hex"
-        ))
-        .unwrap();
-        let relay: Relay = decode_all(&bytes);
-        assert_eq!(
-            relay,
-            Relay::MultiHostName("\u{241a}\u{3bdc1}\u{d0}".to_string())
-        );
-    }
-
-    #[test]
-    fn a_rational_in_an_indefinite_array_reads_to_its_break() {
-        let ratio: RationalNumber = decode_all(&hex::decode("d81e9f0102ff").unwrap());
-        assert_eq!(
-            ratio,
-            RationalNumber {
-                numerator: 1,
-                denominator: 2
-            }
-        );
-    }
-
-    #[test]
-    fn a_hard_fork_version_in_an_indefinite_array_decodes() {
-        let action: GovAction = decode_all(&hex::decode("8301f69f031a8a26c280ff").unwrap());
-        assert_eq!(action, GovAction::HardForkInitiation(None, (3, 2317795968)));
+            let actions: Vec<_> = body
+                .proposal_procedures
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|proposal| &proposal.gov_action)
+                .collect();
+            assert!(matches!(
+                actions[0],
+                GovAction::NewConstitution(
+                    Some(_),
+                    Constitution {
+                        guardrail_script: None,
+                        ..
+                    }
+                )
+            ));
+            assert!(matches!(
+                actions[1],
+                GovAction::ParameterChange(None, _, None)
+            ));
+            assert!(matches!(
+                actions[2],
+                GovAction::TreasuryWithdrawals(_, None)
+            ));
+            assert!(matches!(actions[3], GovAction::NoConfidence(None)));
+            assert_eq!(
+                hex::encode(minicbor::to_vec(&body).unwrap()),
+                hex::encode(&bytes)
+            );
+        }
     }
 
     #[cfg(test)]
@@ -1149,53 +1099,6 @@ mod tests {
             certificates[3],
             Certificate::UpdateDRepCert(_, None)
         ));
-        assert_eq!(
-            hex::encode(minicbor::to_vec(&body).unwrap()),
-            hex::encode(&bytes)
-        );
-    }
-
-    #[test]
-    fn governance_ending_in_an_absent_value_reencodes_as_the_ledger_wrote_it() {
-        let bytes = hex::decode(include_str!(
-            "../../../test_data/dijkstra-generated/body-governance-ending-in-null.hex"
-        ))
-        .unwrap();
-        let body: TransactionBody = minicbor::decode(&bytes).unwrap();
-
-        let votes = body.voting_procedures.as_ref().unwrap();
-        let (_, procedures) = votes.iter().next().unwrap();
-        let (id, procedure) = procedures.iter().next().unwrap();
-        assert_eq!(id.action_index, 41156);
-        assert_eq!(procedure.vote, Vote::Abstain);
-        assert_eq!(procedure.anchor, None);
-
-        let actions: Vec<_> = body
-            .proposal_procedures
-            .as_ref()
-            .unwrap()
-            .iter()
-            .map(|proposal| &proposal.gov_action)
-            .collect();
-        assert!(matches!(
-            actions[0],
-            GovAction::NewConstitution(
-                Some(_),
-                Constitution {
-                    guardrail_script: None,
-                    ..
-                }
-            )
-        ));
-        assert!(matches!(
-            actions[1],
-            GovAction::ParameterChange(None, _, None)
-        ));
-        assert!(matches!(
-            actions[2],
-            GovAction::TreasuryWithdrawals(_, None)
-        ));
-        assert!(matches!(actions[3], GovAction::NoConfidence(None)));
         assert_eq!(
             hex::encode(minicbor::to_vec(&body).unwrap()),
             hex::encode(&bytes)

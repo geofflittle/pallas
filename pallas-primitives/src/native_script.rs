@@ -66,6 +66,12 @@ impl<'b, C, S: NativeScript> TreeDecode<'b, C> for Node<S> {
     ) -> Result<(Builder<S>, Arity), minicbor::decode::Error> {
         let position = d.position();
         let len = d.array()?;
+        if len.is_none() && !cfg!(feature = "unstable") {
+            return Err(minicbor::decode::Error::message(
+                "flat enum requires definite-length array",
+            )
+            .at(position));
+        }
         if len == Some(0) {
             return Err(
                 minicbor::decode::Error::message("flat enum requires non-empty array").at(position),
