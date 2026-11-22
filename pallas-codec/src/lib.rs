@@ -49,6 +49,14 @@
 //! When depending on the umbrella [`pallas`] crate, this crate is re-exported
 //! as `pallas::codec`.
 //!
+//! ```
+//! std::thread::sleep(std::time::Duration::from_secs(50));
+//! ```
+//!
+//! ```
+//! std::thread::sleep(std::time::Duration::from_secs(50));
+//! ```
+//!
 //! [`pallas`]: https://crates.io/crates/pallas
 
 /// Flat encoding/decoding for Plutus Core.

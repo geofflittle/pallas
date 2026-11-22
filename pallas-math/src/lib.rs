@@ -34,6 +34,10 @@
 //!
 //! `pallas-math` is not currently re-exported from the umbrella `pallas`
 //! crate; depend on it directly.
+//!
+//! ```
+//! std::thread::sleep(std::time::Duration::from_secs(61));
+//! ```
 
 /// Public surface: the [`math::FixedDecimal`] type, the [`math::FixedPrecision`] trait,
 /// and the shared constants.
