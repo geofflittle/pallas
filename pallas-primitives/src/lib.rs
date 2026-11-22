@@ -60,6 +60,7 @@
 //!
 //! [`pallas`]: https://crates.io/crates/pallas
 
+#[cfg(feature = "unstable")]
 mod flat_enum;
 mod framework;
 mod metadatum;
@@ -282,6 +283,7 @@ pub type PositiveInterval = RationalNumber;
 pub type ProtocolVersion = (u64, u64);
 
 /// Decoders for a [`ProtocolVersion`] field written as an array of either length form.
+#[cfg(feature = "unstable")]
 pub(crate) mod protocol_version {
     use super::ProtocolVersion;
     use pallas_codec::minicbor::{self, data::Type, decode::Error};
@@ -332,7 +334,9 @@ impl<'b, C> minicbor::decode::Decode<'b, C> for RationalNumber {
             numerator: d.decode_with(ctx)?,
             denominator: d.decode_with(ctx)?,
         };
-        skip_array_rest(d, len, 2)?;
+        if cfg!(feature = "unstable") {
+            skip_array_rest(d, len, 2)?;
+        }
         Ok(rational)
     }
 }
@@ -388,7 +392,9 @@ impl<'b, C> minicbor::decode::Decode<'b, C> for Relay {
             }
         };
 
-        skip_array_rest(d, len, read)?;
+        if cfg!(feature = "unstable") {
+            skip_array_rest(d, len, read)?;
+        }
         Ok(relay)
     }
 }
@@ -435,6 +441,7 @@ pub type RewardAccount = Bytes;
 pub type ScriptHash = Hash<28>;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Ord, Clone, Hash, Encode)]
+#[cfg_attr(not(feature = "unstable"), derive(Decode))]
 // !! NOTE / IMPORTANT !!
 // It is tempting to swap the order of the two constructors so that AddrKeyHash
 // comes first. This indeed nicely maps the binary representation which
@@ -456,6 +463,7 @@ pub enum StakeCredential {
     AddrKeyhash(#[n(0)] AddrKeyhash),
 }
 
+#[cfg(feature = "unstable")]
 flat_enum::decode_flat_enum!(StakeCredential,
     0 => AddrKeyhash(hash),
     1 => ScriptHash(hash),
@@ -541,5 +549,31 @@ mod tests {
         let rational: RationalNumber = d.decode().unwrap();
         assert_eq!((rational.numerator, rational.denominator), (1, 2));
         assert_eq!(d.position(), 5);
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_version_of_two_numbers_decodes_in_either_length_form() {
+        for version in ["82031a8a26c280", "9f031a8a26c280ff"] {
+            let raw = hex::decode(version).unwrap();
+            let mut d = minicbor::Decoder::new(&raw);
+            let decoded = super::protocol_version::decode(&mut d, &mut ()).unwrap();
+            assert_eq!(decoded, (3, 2317795968), "{version}");
+            assert_eq!(d.position(), raw.len(), "{version}");
+        }
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_version_of_three_numbers_is_refused_in_either_length_form() {
+        for version in ["83031a8a26c28000", "9f031a8a26c28000ff"] {
+            let raw = hex::decode(version).unwrap();
+            let mut d = minicbor::Decoder::new(&raw);
+            let error = super::protocol_version::decode(&mut d, &mut ()).unwrap_err();
+            assert!(
+                error.to_string().contains("invalid 2-tuple length"),
+                "{version}: {error}"
+            );
+        }
     }
 }
