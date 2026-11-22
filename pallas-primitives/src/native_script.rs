@@ -1,7 +1,7 @@
 //! Native scripts, shared across eras.
 //!
-//! Every era's `NativeScript` has the wire shape Shelley gave it: an array of
-//! `[variant, fields..]` where `ScriptAll`, `ScriptAny` and
+//! Every era's `NativeScript` has the wire shape Shelley gave it: a definite
+//! array of `[variant, fields..]` where `ScriptAll`, `ScriptAny` and
 //! `ScriptNOfK` end in a child list. Later eras only add leaf variants:
 //! Dijkstra's `ScriptRequireGuard`, for example. The tree may be arbitrarily
 //! deep within a small transaction, so nothing here recurses per nesting
@@ -66,6 +66,12 @@ impl<'b, C, S: NativeScript> TreeDecode<'b, C> for Node<S> {
     ) -> Result<(Builder<S>, Arity), minicbor::decode::Error> {
         let position = d.position();
         let len = d.array()?;
+        if len.is_none() && !cfg!(feature = "unstable") {
+            return Err(minicbor::decode::Error::message(
+                "flat enum requires definite-length array",
+            )
+            .at(position));
+        }
         if len == Some(0) {
             return Err(
                 minicbor::decode::Error::message("flat enum requires non-empty array").at(position),
