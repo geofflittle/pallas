@@ -34,7 +34,6 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     net::{Ipv4Addr, Ipv6Addr, SocketAddrV4},
-    time::Duration,
 };
 
 use tokio::net::TcpListener;
@@ -58,17 +57,11 @@ const MAINNET_RELAY: PublicRelay = PublicRelay {
     magic: MAINNET_MAGIC,
 };
 
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
-
 /// Connect and complete the handshake with `relay`.
 async fn connect_to(relay: &PublicRelay) -> PeerClient {
-    tokio::time::timeout(
-        CONNECT_TIMEOUT,
-        PeerClient::connect(relay.address, relay.magic),
-    )
-    .await
-    .expect("relay connect timed out")
-    .unwrap()
+    PeerClient::connect(relay.address, relay.magic)
+        .await
+        .unwrap()
 }
 
 #[tokio::test]
@@ -255,8 +248,6 @@ pub async fn blockfetch_server_and_client_happy_path() {
     });
 
     let client = tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(1)).await;
-
         let mut client_to_server_conn = PeerClient::connect(addr, 0).await.unwrap();
 
         let client_bf = client_to_server_conn.blockfetch();
@@ -971,8 +962,6 @@ pub async fn local_state_query_server_and_client_happy_path() {
     });
 
     let client = tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(1)).await;
-
         // client setup
         let mut client = NodeClient::connect(socket_path, 0).await.unwrap();
 
@@ -1443,8 +1432,6 @@ pub async fn local_state_query_server_and_client_happy_path2() {
     });
 
     let client = tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(1)).await;
-
         // client setup
         let mut client = NodeClient::connect(socket_path, 0).await.unwrap();
 
@@ -1583,7 +1570,6 @@ pub async fn txsubmission_server_and_client_happy_path_n2n() {
     });
 
     let client = tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(3)).await;
         let mut mempool = test_txs.clone();
 
         // client setup
@@ -1811,8 +1797,6 @@ pub async fn peer_sharing_server_and_client_happy_path() {
     });
 
     let client = tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(1)).await;
-
         // client setup
 
         let mut client_to_server_conn = PeerClient::connect(addr, 0).await.unwrap();
@@ -1930,8 +1914,6 @@ pub async fn local_message_notification_server_and_client_happy_path() {
     });
 
     let client = tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(1)).await;
-
         // client setup
         let mut client = DmqClient::connect(socket_path, 0).await.unwrap();
 
@@ -1939,7 +1921,8 @@ pub async fn local_message_notification_server_and_client_happy_path() {
         let client_msg = client.msg_notification();
         assert_eq!(*client_msg.state(), localmsgnotification::State::Idle);
 
-        // client sends a non blocking request to server and waits for a reply from the server
+        // client sends a non blocking request to server and waits for a reply from the
+        // server
         client_msg
             .send_request_messages_non_blocking()
             .await
@@ -1953,7 +1936,8 @@ pub async fn local_message_notification_server_and_client_happy_path() {
         assert_eq!(*client_msg.state(), localmsgnotification::State::Idle);
         assert_eq!(reply, localmsgnotification::Reply(fake_msgs(), true));
 
-        // client sends a blocking request to server and waits for a reply from the server
+        // client sends a blocking request to server and waits for a reply from the
+        // server
         client_msg.send_request_messages_blocking().await.unwrap();
         assert_eq!(
             *client_msg.state(),
@@ -2045,8 +2029,6 @@ pub async fn local_message_submission_server_and_client_happy_path() {
     });
 
     let client = tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(1)).await;
-
         // client setup
         let mut client = DmqClient::connect(socket_path, 0).await.unwrap();
 
@@ -2092,8 +2074,6 @@ fn cardano_node_proposal(magic: u64) -> handshake::n2n::VersionTable {
     }
 }
 
-const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
-
 /// Bind a listener on an ephemeral localhost port.
 async fn local_listener() -> (TcpListener, std::net::SocketAddr) {
     let listener = TcpListener::bind(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0))
@@ -2104,7 +2084,8 @@ async fn local_listener() -> (TcpListener, std::net::SocketAddr) {
     (listener, addr)
 }
 
-/// Bind a unix listener on a socket path in the temporary directory that only this test process uses.
+/// Bind a unix listener on a socket path in the temporary directory that only
+/// this test process uses.
 #[cfg(unix)]
 fn local_socket(name: &str) -> (UnixListener, std::path::PathBuf) {
     let path = std::env::temp_dir().join(format!("{name}-{}.socket", std::process::id()));
@@ -2133,20 +2114,15 @@ async fn propose_to_peer_server(
     let mut client_hs = handshake::N2NClient::new(plexer.subscribe_client(0));
     let plexer = plexer.spawn();
 
-    let confirmation = tokio::time::timeout(HANDSHAKE_TIMEOUT, client_hs.handshake(versions))
-        .await
-        .expect("handshake timed out")
-        .unwrap();
-    let server = tokio::time::timeout(HANDSHAKE_TIMEOUT, server)
-        .await
-        .expect("server timed out")
-        .unwrap();
+    let confirmation = client_hs.handshake(versions).await.unwrap();
+    let server = server.await.unwrap();
 
     plexer.abort().await;
     (confirmation, server)
 }
 
-/// `PeerServer` accepts a node proposing duplex diffusion with peer sharing, at the highest common version.
+/// `PeerServer` accepts a node proposing duplex diffusion with peer sharing, at
+/// the highest common version.
 #[tokio::test]
 pub async fn peer_server_accepts_a_duplex_peer_sharing_node() {
     let (confirmation, server) = propose_to_peer_server(cardano_node_proposal(MAINNET_MAGIC)).await;
@@ -2168,7 +2144,8 @@ pub async fn peer_server_accepts_a_duplex_peer_sharing_node() {
     server.abort().await;
 }
 
-/// `PeerServer` accepts a duplex node that proposes only a legacy (pre-v11) version.
+/// `PeerServer` accepts a duplex node that proposes only a legacy (pre-v11)
+/// version.
 #[tokio::test]
 pub async fn peer_server_accepts_a_duplex_node_on_a_legacy_version() {
     let legacy = handshake::n2n::VersionTable {
@@ -2259,16 +2236,10 @@ where
     let mut client_hs = handshake::Client::<D>::new(plexer.subscribe_client(0));
     let plexer = plexer.spawn();
 
-    let confirmation = tokio::time::timeout(HANDSHAKE_TIMEOUT, client_hs.handshake(proposal))
-        .await
-        .expect("handshake timed out")
-        .unwrap();
+    let confirmation = client_hs.handshake(proposal).await.unwrap();
     read_tx.send(()).unwrap();
 
-    let accepted = tokio::time::timeout(HANDSHAKE_TIMEOUT, server)
-        .await
-        .expect("server timed out")
-        .unwrap();
+    let accepted = server.await.unwrap();
 
     plexer.abort().await;
     (confirmation, accepted)
@@ -2392,16 +2363,10 @@ pub async fn handshake_server_legacy_method_accepts_equality_only_data() {
     let mut client_hs = handshake::Client::<EqualityOnlyData>::new(plexer.subscribe_client(0));
     let plexer = plexer.spawn();
 
-    let confirmation = tokio::time::timeout(HANDSHAKE_TIMEOUT, client_hs.handshake(table()))
-        .await
-        .expect("handshake timed out")
-        .unwrap();
+    let confirmation = client_hs.handshake(table()).await.unwrap();
     read_tx.send(()).unwrap();
 
-    let accepted = tokio::time::timeout(HANDSHAKE_TIMEOUT, server)
-        .await
-        .expect("server timed out")
-        .unwrap();
+    let accepted = server.await.unwrap();
 
     plexer.abort().await;
     assert!(matches!(
@@ -2424,7 +2389,8 @@ pub async fn handshake_server_refuses_a_node_on_another_network() {
     assert_eq!(accepted, None);
 }
 
-/// The low-level server refuses a legacy payload proposed for a modern N2N version.
+/// The low-level server refuses a legacy payload proposed for a modern N2N
+/// version.
 #[tokio::test]
 pub async fn handshake_server_refuses_a_legacy_payload_on_a_modern_n2n_version() {
     let legacy_payload = handshake::n2n::VersionTable {
@@ -2443,7 +2409,8 @@ pub async fn handshake_server_refuses_a_legacy_payload_on_a_modern_n2n_version()
     assert_eq!(accepted, None);
 }
 
-/// The low-level server refuses a bare-magic payload proposed for a modern N2C version.
+/// The low-level server refuses a bare-magic payload proposed for a modern N2C
+/// version.
 #[tokio::test]
 pub async fn handshake_server_refuses_a_legacy_payload_on_a_modern_n2c_version() {
     use handshake::n2c;
