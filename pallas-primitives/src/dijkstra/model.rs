@@ -432,7 +432,14 @@ fn decode_bootstrap_witnesses<'b, Ctx>(
     ctx: &mut Ctx,
 ) -> Result<Option<NonEmptySet<BootstrapWitness>>, minicbor::decode::Error> {
     crate::map_record::refuse_nil(d)?;
-    NonEmptySet::decode_by(d, ctx, decode_bootstrap_witness).map(Some)
+    let witnesses = NonEmptySet::decode_by(d, ctx, decode_bootstrap_witness)?;
+    // The ledger keys a bootstrap witness by the hash of its key, chain code and attributes.
+    let keys: Vec<_> = witnesses
+        .iter()
+        .map(|w| (&w.public_key, &w.chain_code, &w.attributes))
+        .collect();
+    distinct(&keys, "a bootstrap witness set")?;
+    Ok(Some(witnesses))
 }
 
 impl LeiosHeaderBody {
