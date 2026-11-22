@@ -18,12 +18,13 @@
 //! behavior emits back at the interface — leaving you to consume the
 //! behavior's external events.
 //!
-//! ```ignore
+//! ```no_run
 //! use pallas_network2::{
 //!     behavior::{AnyMessage, InitiatorBehavior, InitiatorCommand, InitiatorEvent},
 //!     interface::TcpInterface,
 //!     Manager, PeerId,
 //! };
+//! # async fn run() {
 //!
 //! let interface = TcpInterface::<AnyMessage>::new();
 //! let behavior  = InitiatorBehavior::default();
@@ -43,6 +44,7 @@
 //!         _ => {}
 //!     }
 //! }
+//! # }
 //! ```
 //!
 //! # Overview
