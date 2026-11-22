@@ -112,6 +112,7 @@ jobs:
       # Each line is an archive name and the cargo arguments that select its tests.
       - name: Archive the tests and run the doctests
         run: |
+          mkdir archives
           while read -r name args; do
             # shellcheck disable=SC2086
             cargo nextest archive $args --archive-file "archives/$name.tar.zst"
