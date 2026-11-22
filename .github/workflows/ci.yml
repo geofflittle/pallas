@@ -141,7 +141,7 @@ jobs:
         working-directory: amaru
         run: |
           cargo nextest run --locked --no-fail-fast --no-tests fail --color never \
-            --config-file "$GITHUB_WORKSPACE/.config/nextest.toml" -E 'group(small)' \
+            --config-file "$GITHUB_WORKSPACE/.config/amaru-conformance.toml" -E 'group(small)' \
             -p amaru-uplc --test conformance 2>&1 | tee "$RUNNER_TEMP/conformance.log"
           programs=$(find crates/amaru-uplc/tests/conformance -name '*.uplc' | wc -l)
           summary=$(grep -E '^ *Summary \[' "$RUNNER_TEMP/conformance.log" || true)
