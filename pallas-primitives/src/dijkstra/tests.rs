@@ -4740,6 +4740,62 @@ fn a_witness_set_refuses_an_empty_bootstrap_set_as_a_transaction_does() {
 }
 
 #[test]
+fn a_bootstrap_witness_repeats_when_its_key_chain_code_and_attributes_repeat() {
+    let repeated = "repeated element in a bootstrap witness set";
+    let filled = |head: &str, n: usize, byte: u8| format!("{head}{}", hex::encode(vec![byte; n]));
+    let bootstrap = |key: u8, signature: u8, chain_code: u8, attributes: &str| {
+        format!(
+            "84{}{}{}{attributes}",
+            filled("5820", 32, key),
+            filled("5840", 64, signature),
+            filled("5820", 32, chain_code)
+        )
+    };
+    let vkey = |key: u8, signature: u8| {
+        format!("82{}{}", filled("5820", 32, key), filled("5840", 64, signature))
+    };
+    let pair = |field: u8, a: String, b: String| format!("a1{field:02x}82{a}{b}");
+    let mut wrong = Vec::new();
+    for (case, hex, verdict) in [
+        (
+            "two bootstrap keys",
+            pair(2, bootstrap(1, 0, 0, "40"), bootstrap(2, 0, 0, "40")),
+            true,
+        ),
+        (
+            "one bootstrap key with two chain codes",
+            pair(2, bootstrap(1, 0, 0, "40"), bootstrap(1, 0, 1, "40")),
+            true,
+        ),
+        (
+            "one bootstrap key with two attributes",
+            pair(2, bootstrap(1, 0, 0, "40"), bootstrap(1, 0, 0, "41a0")),
+            true,
+        ),
+        (
+            "one key witness key with two signatures",
+            pair(0, vkey(1, 0), vkey(1, 1)),
+            true,
+        ),
+        (
+            "one bootstrap key with two signatures",
+            pair(2, bootstrap(1, 0, 0, "40"), bootstrap(1, 1, 0, "40")),
+            false,
+        ),
+    ] {
+        let got = read::<WitnessSet>(generated(&hex));
+        let right = match &got {
+            Ok(()) => verdict,
+            Err(err) => !verdict && err.to_string().contains(repeated),
+        };
+        if !right {
+            wrong.push(format!("{case}: {got:?}"));
+        }
+    }
+    assert_eq!(wrong, Vec::<String>::new());
+}
+
+#[test]
 fn auxiliary_data_as_an_array_refuses_null_scripts() {
     assert_eq!(read::<AuxiliaryData>(generated("82a080")).ok(), Some(()));
     assert!(read::<AuxiliaryData>(generated("82a0f6")).is_err());
