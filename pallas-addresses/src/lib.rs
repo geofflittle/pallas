@@ -891,6 +891,16 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn planted_small_test_over_its_limit() {
+        std::thread::sleep(std::time::Duration::from_secs(61));
+    }
+
+    #[test]
+    fn planted_small_test_under_its_limit() {
+        std::thread::sleep(std::time::Duration::from_secs(50));
+    }
+
     const MAINNET_TEST_VECTORS: &[(&str, u8)] = &[
         (
             "addr1qx2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3n0d3vllmyqwsx5wktcd8cc3sq835lu7drv2xwl2wywfgse35a3x",
