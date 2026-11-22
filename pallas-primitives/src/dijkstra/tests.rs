@@ -2128,6 +2128,18 @@ fn a_generated_hard_fork_version_in_an_indefinite_array_decodes() {
     );
 }
 
+#[test]
+fn a_hard_fork_version_of_three_numbers_is_refused_in_either_length_form() {
+    for version in ["83031a8a26c28000", "9f031a8a26c28000ff"] {
+        let raw = hex::decode(format!("8301f6{version}")).unwrap();
+        let error = minicbor::decode::<GovAction>(&raw).unwrap_err();
+        assert!(
+            error.to_string().contains("invalid 2-tuple length"),
+            "{version}: {error}"
+        );
+    }
+}
+
 /// Provenance for this fixture is in `test_data/dijkstra-generated.md`.
 const VERSION_INFO_BLOCK: &str =
     include_str!("../../../test_data/dijkstra-generated/block-header-version-info.hex");

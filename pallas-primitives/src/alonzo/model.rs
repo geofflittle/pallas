@@ -150,7 +150,7 @@ pub type Withdrawals = BTreeMap<RewardAccount, Coin>;
 
 pub type RequiredSigners = Vec<AddrKeyhash>;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Encode)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Encode, Decode)]
 #[cbor(flat)]
 pub enum Certificate {
     #[n(0)]
@@ -191,26 +191,6 @@ pub enum Certificate {
     #[n(6)]
     MoveInstantaneousRewardsCert(#[n(0)] MoveInstantaneousReward),
 }
-
-crate::flat_enum::decode_flat_enum!(Certificate,
-    0 => StakeRegistration(credential),
-    1 => StakeDeregistration(credential),
-    2 => StakeDelegation(credential, pool),
-    3 => PoolRegistration {
-        operator,
-        vrf_keyhash,
-        pledge,
-        cost,
-        margin,
-        reward_account,
-        pool_owners,
-        relays,
-        pool_metadata
-    },
-    4 => PoolRetirement(pool, epoch),
-    5 => GenesisKeyDelegation(genesis, delegate, vrf_keyhash),
-    6 => MoveInstantaneousRewardsCert(reward),
-);
 
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 #[cbor(index_only)]
@@ -256,7 +236,6 @@ pub struct ProtocolParamUpdate {
     #[n(13)]
     pub extra_entropy: Option<Nonce>,
     #[n(14)]
-    #[cbor(decode_with = "crate::protocol_version::decode_option")]
     pub protocol_version: Option<ProtocolVersion>,
     #[n(16)]
     pub min_pool_cost: Option<Coin>,
@@ -533,29 +512,13 @@ mod tests {
 
     use crate::{Fragment, alonzo::PlutusData};
 
-    use super::{Block, Certificate, Header};
+    use super::{Block, Header};
     use crate::alonzo::NativeScript;
     use crate::flat_enum::assert_reads_either_length_form;
 
     type BlockWrapper<'b> = (u16, Block<'b>);
 
     const HASH: &str = "581c11111111111111111111111111111111111111111111111111111111";
-    const HASH32: &str = "58201111111111111111111111111111111111111111111111111111111111111111";
-    const REWARD: &str = "581de111111111111111111111111111111111111111111111111111111111";
-
-    #[test]
-    fn a_certificate_reads_either_length_form() {
-        let credential = format!("8200{HASH}");
-        assert_reads_either_length_form::<Certificate>(&[
-            format!("8200{credential}"),
-            format!("8201{credential}"),
-            format!("8302{credential}{HASH}"),
-            format!("8a03{HASH}{HASH32}0102d81e820102{REWARD}80808260{HASH32}"),
-            format!("8304{HASH}01"),
-            format!("8405{HASH}{HASH}{HASH32}"),
-            "8206820001".to_string(),
-        ]);
-    }
 
     #[test]
     fn a_native_script_reads_either_length_form() {

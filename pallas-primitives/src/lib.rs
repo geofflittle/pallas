@@ -281,7 +281,8 @@ pub type PositiveInterval = RationalNumber;
 /// Protocol version: `(major, minor)`.
 pub type ProtocolVersion = (u64, u64);
 
-/// Decoders for a [`ProtocolVersion`] field written as an array of either length form.
+/// Decoder for a [`ProtocolVersion`] field written as an array of either length form.
+#[cfg(feature = "unstable")]
 pub(crate) mod protocol_version {
     use super::ProtocolVersion;
     use pallas_codec::minicbor::{self, data::Type, decode::Error};
@@ -299,18 +300,6 @@ pub(crate) mod protocol_version {
             }
             Ok(version)
         })
-    }
-
-    /// Decodes an optional [`ProtocolVersion`], reading a null as `None`.
-    pub fn decode_option<Ctx>(
-        d: &mut minicbor::Decoder<'_>,
-        ctx: &mut Ctx,
-    ) -> Result<Option<ProtocolVersion>, Error> {
-        if d.datatype()? == Type::Null {
-            d.skip()?;
-            return Ok(None);
-        }
-        decode(d, ctx).map(Some)
     }
 }
 
@@ -332,7 +321,9 @@ impl<'b, C> minicbor::decode::Decode<'b, C> for RationalNumber {
             numerator: d.decode_with(ctx)?,
             denominator: d.decode_with(ctx)?,
         };
-        skip_array_rest(d, len, 2)?;
+        if cfg!(feature = "unstable") {
+            skip_array_rest(d, len, 2)?;
+        }
         Ok(rational)
     }
 }
@@ -507,7 +498,7 @@ pub type VrfKeyhash = Hash<32>;
 
 #[cfg(test)]
 mod tests {
-    use super::{PoolMetadata, RationalNumber, Relay};
+    use super::{PoolMetadata, Relay};
     use pallas_codec::minicbor;
 
     const ABC: [&str; 2] = ["63616263", "7f6161626263ff"];
@@ -533,13 +524,5 @@ mod tests {
             let relay: Relay = minicbor::decode(&raw).unwrap();
             assert_eq!(relay, Relay::MultiHostName("abc".into()), "{name}");
         }
-    }
-
-    #[test]
-    fn a_rational_reads_its_denominator_past_the_end_of_a_short_definite_array() {
-        let mut d = minicbor::Decoder::new(&[0xd8, 0x1e, 0x81, 0x01, 0x02]);
-        let rational: RationalNumber = d.decode().unwrap();
-        assert_eq!((rational.numerator, rational.denominator), (1, 2));
-        assert_eq!(d.position(), 5);
     }
 }
