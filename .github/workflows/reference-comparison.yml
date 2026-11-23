@@ -1,0 +1,105 @@
+name: Reference comparison
+
+on:
+  workflow_dispatch:
+    inputs:
+      pallas_ref:
+        description: The pallas commit to compare and report on
+        required: true
+
+permissions:
+  contents: read
+  statuses: write
+
+env:
+  DOLOS_REF: 2749f33142d84f3f364e068a3c9dea979cfc0f5a
+  TOOLCHAIN: nightly-2026-09-04
+  RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+jobs:
+  compare:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [decode, mapping, networking, dataset]
+    env:
+      TARGET: ${{ matrix.target }}
+      CONTEXT: reference-comparison/${{ matrix.target }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.pallas_ref }}
+          path: pallas-head
+          persist-credentials: false
+      - name: Report the comparison as pending
+        id: commit
+        working-directory: pallas-head
+        run: |
+          sha=$(git rev-parse HEAD)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$sha" -f state=pending -f context="$CONTEXT" \
+            -f target_url="$RUN_URL" -f description="running at dolos ${DOLOS_REF:0:8}"
+      - uses: actions/checkout@v4
+        with:
+          repository: geofflittle/dolos
+          ref: ${{ env.DOLOS_REF }}
+          path: dolos
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.TOOLCHAIN }}
+      - name: Check that the comparison declares the target
+        id: declared
+        working-directory: dolos/reference-comparison
+        run: |
+          metadata=$(cargo metadata --no-deps --format-version 1)
+          if ! jq -e --arg t "$TARGET" '[.packages[].targets[] | select(.name == $t and (.kind | index("test")))] | length == 1' <<< "$metadata" > /dev/null; then
+            echo "::error::the Dolos comparison at $DOLOS_REF declares no $TARGET test target"
+            exit 1
+          fi
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.151
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: dolos/reference-comparison -> target
+          key: ${{ matrix.target }}
+      - name: Run the comparison
+        id: run
+        working-directory: dolos/reference-comparison
+        run: |
+          rc=0
+          cargo nextest run --no-fail-fast --run-ignored all --test "$TARGET" || rc=$?
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          exit "$rc"
+      # Exit codes from nextest-metadata's exit_codes.rs at cargo-nextest 0.9.151.
+      - name: Report the comparison's result
+        if: always() && steps.commit.outputs.sha != ''
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+          JOB: ${{ job.status }}
+          DECLARED: ${{ steps.declared.outcome }}
+          RC: ${{ steps.run.outputs.rc }}
+        run: |
+          at="at dolos ${DOLOS_REF:0:8}"
+          if [ "$JOB" = success ] && [ "$RC" = 0 ]; then
+            state=success description="nextest exited 0 $at"
+          elif [ "$JOB" = cancelled ]; then
+            state=error description="cancelled or timed out before a result $at"
+          elif [ "$DECLARED" = failure ]; then
+            state=failure description="no $TARGET test target $at"
+          else
+            case "$RC" in
+              '') state=error description="failed before nextest ran $at" ;;
+              4) state=failure description="nextest exited 4, no tests ran $at" ;;
+              100) state=failure description="nextest exited 100, a test failed $at" ;;
+              101) state=failure description="nextest exited 101, the build failed $at" ;;
+              *) state=failure description="nextest exited $RC $at" ;;
+            esac
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" -f state="$state" -f context="$CONTEXT" \
+            -f target_url="$RUN_URL" -f description="${description:0:140}"
