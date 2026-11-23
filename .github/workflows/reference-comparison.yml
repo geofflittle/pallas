@@ -9,13 +9,16 @@ on:
       pallas_ref:
         description: The pallas commit to compare and report on
         required: true
+      pallas_base:
+        description: The pallas commit pallas_ref builds on, which each stable comparison reads as its base
+        required: false
 
 permissions:
   contents: read
   statuses: write
 
 env:
-  DOLOS_REF: a26803698e4d6fc867f1e80a69e9612cd783a46f
+  DOLOS_REF: ef07ccbab701c1608ac373d009e36acad5ea40d9
   TOOLCHAIN: nightly-2026-09-04
   RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
@@ -28,6 +31,7 @@ jobs:
     outputs:
       sha: ${{ steps.commit.outputs.sha }}
       targets: ${{ steps.list.outputs.targets }}
+      stable: ${{ steps.list.outputs.stable }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -49,23 +53,28 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.TOOLCHAIN }}
+      # A target that requires the stable feature compares a build without unstable with a base build.
       - name: List the comparison's test targets
         id: list
         working-directory: dolos/reference-comparison
         run: |
-          targets=$(cargo metadata --no-deps --format-version 1 \
-            | jq -c '[.packages[] | select(.name == "reference-comparison") | .targets[] | select(.kind | index("test")) | .name]')
-          if [ "$(jq length <<< "$targets")" = 0 ]; then
-            echo "::error::the Dolos comparison at $DOLOS_REF declares no test target"
+          tests=$(cargo metadata --no-deps --format-version 1 \
+            | jq -c '[.packages[] | select(.name == "reference-comparison") | .targets[] | select(.kind | index("test"))]')
+          targets=$(jq -c '[.[] | select(.["required-features"] // [] | index("stable") | not) | .name]' <<< "$tests")
+          stable=$(jq -c '[.[] | select(.["required-features"] // [] | index("stable")) | .name]' <<< "$tests")
+          if [ "$(jq length <<< "$targets")" = 0 ] || [ "$(jq length <<< "$stable")" = 0 ]; then
+            echo "::error::the Dolos comparison at $DOLOS_REF declares no test target of a kind: $targets $stable"
             exit 1
           fi
           echo "targets=$targets" >> "$GITHUB_OUTPUT"
+          echo "stable=$stable" >> "$GITHUB_OUTPUT"
       - name: Report every target as pending
         env:
           SHA: ${{ steps.commit.outputs.sha }}
           TARGETS: ${{ steps.list.outputs.targets }}
+          STABLE: ${{ steps.list.outputs.stable }}
         run: |
-          for target in $(jq -r '.[]' <<< "$TARGETS"); do
+          for target in $(jq -r '.[]' <<< "$TARGETS") $(jq -r '.[]' <<< "$STABLE"); do
             gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" -f state=pending \
               -f context="reference-comparison/$target" -f target_url="$RUN_URL" \
               -f description="queued at dolos ${DOLOS_REF:0:8}"
@@ -161,6 +170,113 @@ jobs:
               100) state=failure description="nextest exited 100, a test failed $at" ;;
               101) state=failure description="nextest exited 101, the build failed $at" ;;
               *) state=failure description="nextest exited $RC $at" ;;
+            esac
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" -f state="$state" -f context="$CONTEXT" \
+            -f target_url="$RUN_URL" -f description="${description:0:140}"
+
+  stable:
+    name: ${{ matrix.target }}
+    needs: targets
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.targets.outputs.stable) }}
+    env:
+      TARGET: ${{ matrix.target }}
+      CONTEXT: reference-comparison/${{ matrix.target }}
+      SHA: ${{ needs.targets.outputs.sha }}
+      BASE: ${{ inputs.pallas_base }}
+      READINGS: ${{ github.workspace }}/base-readings.json
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Report the comparison as running
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" -f state=pending -f context="$CONTEXT" \
+            -f target_url="$RUN_URL" -f description="running at dolos ${DOLOS_REF:0:8}"
+      - name: Require a base
+        run: |
+          if [ -z "$BASE" ]; then
+            echo "::error::a stable comparison needs the pallas_base input"
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          repository: geofflittle/dolos
+          ref: ${{ env.DOLOS_REF }}
+          path: dolos
+          submodules: true
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.TOOLCHAIN }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.151
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: dolos/reference-comparison -> target
+          key: ${{ matrix.target }}
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BASE }}
+          path: pallas-head
+          persist-credentials: false
+      - name: Write the base's readings
+        id: base
+        working-directory: dolos/reference-comparison
+        run: |
+          echo "sha=$(git -C ../../pallas-head rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          STABLE_READINGS_WRITE="$READINGS" \
+            cargo nextest run --no-default-features --features stable --run-ignored all --test "$TARGET"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.targets.outputs.sha }}
+          path: pallas-head
+          persist-credentials: false
+      - name: Compare this build's readings with the base's
+        id: run
+        working-directory: dolos/reference-comparison
+        run: |
+          rc=0
+          STABLE_READINGS_BASE="$READINGS" \
+            cargo nextest run --no-fail-fast --no-default-features --features stable --run-ignored all \
+            --test "$TARGET" > "$RUNNER_TEMP/compare.out" 2>&1 || rc=$?
+          cat "$RUNNER_TEMP/compare.out"
+          differ=$(grep -oE '^stable [a-z]+: [0-9]+ of [0-9]+ samples differ$' "$RUNNER_TEMP/compare.out" | head -n 1 || true)
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          echo "differ=$differ" >> "$GITHUB_OUTPUT"
+          exit "$rc"
+      # Exit codes from nextest-metadata's exit_codes.rs at cargo-nextest 0.9.151.
+      - name: Report the comparison's result
+        if: always()
+        env:
+          JOB: ${{ job.status }}
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+          BASE_RESULT: ${{ steps.base.outcome }}
+          RC: ${{ steps.run.outputs.rc }}
+          DIFFER: ${{ steps.run.outputs.differ }}
+        run: |
+          at="from base ${BASE_SHA:0:8} at dolos ${DOLOS_REF:0:8}"
+          read_base=$(jq -r '.pallas // empty' "$READINGS" 2>/dev/null || true)
+          if [ "$JOB" = cancelled ]; then
+            state=error description="cancelled or timed out before a result $at"
+          elif [ -z "$BASE" ]; then
+            state=error description="no pallas_base input, so nothing was compared at dolos ${DOLOS_REF:0:8}"
+          elif [ "$BASE_RESULT" != success ] || [ -z "$BASE_SHA" ] || [ "$read_base" != "$BASE_SHA" ]; then
+            state=error description="the base's readings were not written $at"
+          elif [ "$RC" = 0 ] && [ "$JOB" = success ] && [[ "$DIFFER" =~ ^stable\ [a-z]+:\ 0\ of\ [1-9][0-9]*\ samples\ differ$ ]]; then
+            state=success description="$DIFFER $at"
+          elif [ -n "$DIFFER" ]; then
+            state=failure description="$DIFFER $at"
+          else
+            case "$RC" in
+              '') state=error description="failed before nextest ran $at" ;;
+              4) state=failure description="nextest exited 4, no tests ran $at" ;;
+              101) state=failure description="nextest exited 101, the build failed $at" ;;
+              *) state=failure description="nextest exited $RC with no count of differing samples $at" ;;
             esac
           fi
           gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" -f state="$state" -f context="$CONTEXT" \
