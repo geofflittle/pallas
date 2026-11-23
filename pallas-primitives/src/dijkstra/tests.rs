@@ -1829,6 +1829,27 @@ fn a_body_field_typed_nonempty_refuses_an_empty_array() {
 }
 
 #[test]
+fn an_empty_script_set_in_a_witness_set_is_refused() {
+    let err = minicbor::decode::<WitnessSet>(&[0xa1, 0x06, 0xd9, 0x01, 0x02, 0x80])
+        .expect_err("an empty plutus_v2_script set must not decode");
+    assert!(
+        err.to_string().contains("a nonempty set"),
+        "the empty script set was refused for some other reason: {err}"
+    );
+}
+
+#[test]
+fn an_empty_bootstrap_witness_set_is_read_as_written() {
+    let bytes = [0xa1, 0x02, 0xd9, 0x01, 0x02, 0x80];
+    let witnesses: WitnessSet = decode_all(&bytes);
+    assert_eq!(
+        witnesses.bootstrap_witness.as_deref().map(Vec::len),
+        Some(0)
+    );
+    assert_eq!(minicbor::to_vec(&witnesses).unwrap(), bytes);
+}
+
+#[test]
 fn cost_models_keeps_a_key_the_named_fields_do_not_cover() {
     // a2                      map of two keys
     //   00  82 01 02          key 0, the PlutusV1 model [1, 2]
