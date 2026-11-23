@@ -15,23 +15,20 @@ permissions:
   statuses: write
 
 env:
-  DOLOS_REF: 9ea30a58c71f9465403ef8bf02c2e77333f732c9
+  DOLOS_REF: ebcc33cfee6a0ece0b31c29f2ad8cb3f30608cdc
   TOOLCHAIN: nightly-2026-09-04
   RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
 jobs:
-  compare:
-    name: ${{ matrix.target }}
+  targets:
+    name: targets
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [decode, mapping, networking, dataset]
+    timeout-minutes: 10
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+      targets: ${{ steps.list.outputs.targets }}
     env:
-      TARGET: ${{ matrix.target }}
-      CONTEXT: reference-comparison/${{ matrix.target }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
@@ -39,13 +36,64 @@ jobs:
           ref: ${{ inputs.pallas_ref }}
           path: pallas-head
           persist-credentials: false
-      - name: Report the comparison as pending
+      - name: Resolve the pallas commit
         id: commit
         working-directory: pallas-head
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: geofflittle/dolos
+          ref: ${{ env.DOLOS_REF }}
+          path: dolos
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.TOOLCHAIN }}
+      - name: List the comparison's test targets
+        id: list
+        working-directory: dolos/reference-comparison
         run: |
-          sha=$(git rev-parse HEAD)
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          gh api "repos/$GITHUB_REPOSITORY/statuses/$sha" -f state=pending -f context="$CONTEXT" \
+          targets=$(cargo metadata --no-deps --format-version 1 \
+            | jq -c '[.packages[] | select(.name == "reference-comparison") | .targets[] | select(.kind | index("test")) | .name]')
+          if [ "$(jq length <<< "$targets")" = 0 ]; then
+            echo "::error::the Dolos comparison at $DOLOS_REF declares no test target"
+            exit 1
+          fi
+          echo "targets=$targets" >> "$GITHUB_OUTPUT"
+      - name: Report every target as pending
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+          TARGETS: ${{ steps.list.outputs.targets }}
+        run: |
+          for target in $(jq -r '.[]' <<< "$TARGETS"); do
+            gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" -f state=pending \
+              -f context="reference-comparison/$target" -f target_url="$RUN_URL" \
+              -f description="queued at dolos ${DOLOS_REF:0:8}"
+          done
+
+  compare:
+    name: ${{ matrix.target }}
+    needs: targets
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.targets.outputs.targets) }}
+    env:
+      TARGET: ${{ matrix.target }}
+      CONTEXT: reference-comparison/${{ matrix.target }}
+      SHA: ${{ needs.targets.outputs.sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.targets.outputs.sha }}
+          path: pallas-head
+          persist-credentials: false
+      - name: Report the comparison as running
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" -f state=pending -f context="$CONTEXT" \
             -f target_url="$RUN_URL" -f description="running at dolos ${DOLOS_REF:0:8}"
       - uses: actions/checkout@v4
         with:
@@ -57,15 +105,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.TOOLCHAIN }}
-      - name: Check that the comparison declares the target
-        id: declared
-        working-directory: dolos/reference-comparison
-        run: |
-          metadata=$(cargo metadata --no-deps --format-version 1)
-          if ! jq -e --arg t "$TARGET" '[.packages[].targets[] | select(.name == $t and (.kind | index("test")))] | length == 1' <<< "$metadata" > /dev/null; then
-            echo "::error::the Dolos comparison at $DOLOS_REF declares no $TARGET test target"
-            exit 1
-          fi
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest@0.9.151
@@ -81,22 +120,40 @@ jobs:
           cargo nextest run --no-fail-fast --run-ignored all --test "$TARGET" || rc=$?
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
           exit "$rc"
+      # The ledger commit pallas copied the era's CDDL from, and the one that wrote the era's samples.
+      - name: Read the era's ledger commits
+        id: ledger
+        if: always() && startsWith(matrix.target, 'dataset-')
+        run: |
+          era=${TARGET#dataset-}
+          cddl=$(head -n 1 "pallas-head/pallas-primitives/src/$era/defs.cddl" 2>/dev/null \
+            | grep -oE 'cardano-ledger commit [0-9a-f]{40}' | grep -oE '[0-9a-f]{40}' || true)
+          samples=$(jq -r '.implementation_commit // empty' \
+            "dolos/test_data/cardano-cbor-dataset/dataset/reports/$era/haskell-latest.json" 2>/dev/null \
+            | grep -xE '[0-9a-f]{40}' || true)
+          {
+            echo "era=$era"
+            echo "cddl=$cddl"
+            echo "samples=$samples"
+          } >> "$GITHUB_OUTPUT"
       # Exit codes from nextest-metadata's exit_codes.rs at cargo-nextest 0.9.151.
       - name: Report the comparison's result
-        if: always() && steps.commit.outputs.sha != ''
+        if: always()
         env:
-          SHA: ${{ steps.commit.outputs.sha }}
           JOB: ${{ job.status }}
-          DECLARED: ${{ steps.declared.outcome }}
           RC: ${{ steps.run.outputs.rc }}
+          ERA: ${{ steps.ledger.outputs.era }}
+          CDDL: ${{ steps.ledger.outputs.cddl }}
+          SAMPLES: ${{ steps.ledger.outputs.samples }}
         run: |
           at="at dolos ${DOLOS_REF:0:8}"
           if [ "$JOB" = success ] && [ "$RC" = 0 ]; then
             state=success description="nextest exited 0 $at"
           elif [ "$JOB" = cancelled ]; then
             state=error description="cancelled or timed out before a result $at"
-          elif [ "$DECLARED" = failure ]; then
-            state=failure description="no $TARGET test target $at"
+          elif [ "$RC" = 101 ] && [ -n "$CDDL" ] && [ -n "$SAMPLES" ]; then
+            state=failure
+            description="does not compile, pallas $ERA cddl from ledger ${CDDL:0:12}, samples from ${SAMPLES:0:12}, $at"
           else
             case "$RC" in
               '') state=error description="failed before nextest ran $at" ;;
