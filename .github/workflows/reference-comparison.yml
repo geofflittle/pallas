@@ -18,7 +18,7 @@ permissions:
   statuses: write
 
 env:
-  DOLOS_REF: ef07ccbab701c1608ac373d009e36acad5ea40d9
+  DOLOS_REF: 0c3afef80987bc47870dd44f45b0037733e2ec2b
   TOOLCHAIN: nightly-2026-09-04
   RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
