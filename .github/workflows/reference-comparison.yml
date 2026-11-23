@@ -15,7 +15,7 @@ permissions:
   statuses: write
 
 env:
-  DOLOS_REF: 2749f33142d84f3f364e068a3c9dea979cfc0f5a
+  DOLOS_REF: 9ea30a58c71f9465403ef8bf02c2e77333f732c9
   TOOLCHAIN: nightly-2026-09-04
   RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
@@ -52,6 +52,7 @@ jobs:
           repository: geofflittle/dolos
           ref: ${{ env.DOLOS_REF }}
           path: dolos
+          submodules: true
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@master
         with:
