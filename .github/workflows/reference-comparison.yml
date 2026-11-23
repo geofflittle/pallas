@@ -245,7 +245,7 @@ jobs:
             cargo nextest run --no-fail-fast --no-default-features --features stable --run-ignored all \
             --test "$TARGET" > "$RUNNER_TEMP/compare.out" 2>&1 || rc=$?
           cat "$RUNNER_TEMP/compare.out"
-          differ=$(grep -oE '^stable [a-z]+: [0-9]+ of [0-9]+ samples differ$' "$RUNNER_TEMP/compare.out" | head -n 1 || true)
+          differ=$(grep -oE 'stable [a-z]+: [0-9]+ of [0-9]+ samples differ$' "$RUNNER_TEMP/compare.out" | head -n 1 || true)
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
           echo "differ=$differ" >> "$GITHUB_OUTPUT"
           exit "$rc"
