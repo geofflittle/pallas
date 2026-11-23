@@ -1,6 +1,9 @@
 name: Reference comparison
 
+# GitHub dispatches a workflow off the default branch only after a run of it, which the push makes.
 on:
+  push:
+    paths: [.github/workflows/reference-comparison.yml]
   workflow_dispatch:
     inputs:
       pallas_ref:
@@ -19,6 +22,7 @@ env:
 jobs:
   compare:
     name: ${{ matrix.target }}
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
