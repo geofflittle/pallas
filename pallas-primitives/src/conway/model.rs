@@ -410,13 +410,6 @@ pub struct VotingProcedure {
     #[n(0)]
     pub vote: Vote,
     #[n(1)]
-    #[cfg_attr(
-        feature = "unstable",
-        cbor(
-            encode_with = "minicbor::Encode::encode",
-            is_nil = "pallas_codec::utils::never_nil"
-        )
-    )]
     pub anchor: Option<Anchor>,
 }
 
