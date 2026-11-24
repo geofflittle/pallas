@@ -870,7 +870,7 @@ impl<C> minicbor::Encode<C> for CostModels {
 
 impl<'b, C> minicbor::Decode<'b, C> for CostModels {
     fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
-        let models: BTreeMap<u64, CostModel> = d.decode_with(ctx)?;
+        let models: BTreeMap<u64, CostModel> = crate::distinct_map::decode(d, ctx)?;
 
         let mut plutus_v1 = None;
         let mut plutus_v2 = None;
@@ -1164,9 +1164,9 @@ pub enum GovAction {
 crate::flat_enum::decode_flat_enum!(GovAction,
     0 => ParameterChange(previous, update, policy),
     1 => HardForkInitiation(previous, version: crate::protocol_version::decode),
-    2 => TreasuryWithdrawals(withdrawals, policy),
+    2 => TreasuryWithdrawals(withdrawals: crate::distinct_map::decode, policy),
     3 => NoConfidence(previous),
-    4 => UpdateCommittee(previous, removed, added, threshold),
+    4 => UpdateCommittee(previous, removed, added: crate::distinct_map::decode, threshold),
     5 => NewConstitution(previous, constitution),
     6 => Information,
 );
@@ -1252,9 +1252,9 @@ pub(crate) mod guards_field {
 
 /// Decoders for the maps the ledger reads with at least one entry.
 pub(crate) mod nonempty_map {
-    use super::{AssetName, BTreeMap, Multiasset, Value};
-    use pallas_codec::minicbor::{self, Decode, Decoder, data::Type, decode::Error};
-    use pallas_codec::utils::decode_array;
+    use super::{BTreeMap, KeepRaw, LegacyTransactionOutput, Multiasset, Value};
+    use crate::distinct_map::{decode_by_key, decode_multiasset, refuse_empty};
+    use pallas_codec::minicbor::{Decode, Decoder, decode::Error};
 
     /// A map whose values are maps.
     type Nested<K, J, V> = BTreeMap<K, BTreeMap<J, V>>;
@@ -1268,45 +1268,9 @@ pub(crate) mod nonempty_map {
     where
         K: Decode<'b, Ctx> + Ord,
     {
-        decode_by_key(d, ctx, |d, ctx| d.decode_with(ctx), value)
-    }
-
-    /// Decodes a map of at least one entry and no repeated key, reading keys and values with the given decoders.
-    fn decode_by_key<'b, Ctx, K: Ord, V>(
-        d: &mut Decoder<'b>,
-        ctx: &mut Ctx,
-        key: fn(&mut Decoder<'b>, &mut Ctx) -> Result<K, Error>,
-        value: fn(&mut Decoder<'b>, &mut Ctx) -> Result<V, Error>,
-    ) -> Result<BTreeMap<K, V>, Error> {
         let at = d.position();
-        let len = d.map()?;
-        let mut map = BTreeMap::new();
-        let mut read = 0;
-        loop {
-            match len {
-                Some(len) if read == len => break,
-                None if d.datatype()? == Type::Break => {
-                    d.skip()?;
-                    break;
-                }
-                _ => {}
-            }
-            let key_at = d.position();
-            let key = key(d, ctx)?;
-            let entry = value(d, ctx)?;
-            if map.insert(key, entry).is_some() {
-                return Err(Error::message("repeated key in a map").at(key_at));
-            }
-            read += 1;
-        }
-        refuse_empty(map, at)
-    }
-
-    /// Refuses a map with no entry, reporting the position the map was read from.
-    fn refuse_empty<K, V>(map: BTreeMap<K, V>, at: usize) -> Result<BTreeMap<K, V>, Error> {
-        if map.is_empty() {
-            return Err(Error::message("empty map where an entry is required").at(at));
-        }
+        let map = decode_by_key(d, ctx, |d, ctx| d.decode_with(ctx), value)?;
+        refuse_empty(&map, at)?;
         Ok(map)
     }
 
@@ -1320,7 +1284,9 @@ pub(crate) mod nonempty_map {
         V: Decode<'b, Ctx>,
     {
         let at = d.position();
-        refuse_empty(d.decode_with(ctx)?, at)
+        let map = d.decode_with(ctx)?;
+        refuse_empty(&map, at)?;
+        Ok(map)
     }
 
     /// Decodes a map of at least one entry and no repeated key.
@@ -1360,23 +1326,7 @@ pub(crate) mod nonempty_map {
         decode_by(d, ctx, decode).map(Some)
     }
 
-    /// Decodes a map of at least one asset, whose names hold at most 32 bytes.
-    fn decode_assets<'b, Ctx, V>(
-        d: &mut Decoder<'b>,
-        ctx: &mut Ctx,
-    ) -> Result<BTreeMap<AssetName, V>, Error>
-    where
-        V: Decode<'b, Ctx>,
-    {
-        decode_by_key(
-            d,
-            ctx,
-            pallas_codec::utils::decode_bytes_sized::<0, 32, _>,
-            |d, ctx| d.decode_with(ctx),
-        )
-    }
-
-    /// Decodes an optional field holding a multiasset in which each policy holds at least one asset.
+    /// Decodes an optional field holding a multiasset of at least one policy.
     pub fn decode_multiasset_option<'b, Ctx, V>(
         d: &mut Decoder<'b>,
         ctx: &mut Ctx,
@@ -1384,19 +1334,33 @@ pub(crate) mod nonempty_map {
     where
         V: Decode<'b, Ctx>,
     {
-        decode_by(d, ctx, decode_assets).map(Some)
+        let at = d.position();
+        let multiasset = decode_multiasset(d, ctx, |d, ctx| d.decode_with(ctx))?;
+        refuse_empty(&multiasset, at)?;
+        Ok(Some(multiasset))
     }
 
-    /// Decodes a value whose multiasset holds at least one asset.
+    /// Decodes a value whose multiasset holds at least one policy.
     pub fn decode_value<'b, Ctx>(d: &mut Decoder<'b>, ctx: &mut Ctx) -> Result<Value, Error> {
-        match d.datatype()? {
-            Type::Array | Type::ArrayIndef => decode_array(d, |a| {
-                let coin = a.decode_with(ctx)?;
-                let multiasset = a.decode_by(ctx, |d, ctx| decode_by(d, ctx, decode_assets))?;
-                Ok(Value::Multiasset(coin, multiasset))
-            }),
-            _ => minicbor::Decode::decode(d, ctx),
+        let at = d.position();
+        let value = d.decode_with(ctx)?;
+        if let Value::Multiasset(_, multiasset) = &value {
+            refuse_empty(multiasset, at)?;
         }
+        Ok(value)
+    }
+
+    /// Decodes a legacy output whose multiasset holds at least one policy.
+    pub fn decode_legacy_output<'b, Ctx>(
+        d: &mut Decoder<'b>,
+        ctx: &mut Ctx,
+    ) -> Result<KeepRaw<'b, LegacyTransactionOutput>, Error> {
+        let at = d.position();
+        let output: KeepRaw<'b, LegacyTransactionOutput> = d.decode_with(ctx)?;
+        if let crate::alonzo::Value::Multiasset(_, multiasset) = &output.amount {
+            refuse_empty(multiasset, at)?;
+        }
+        Ok(output)
     }
 }
 
@@ -1757,12 +1721,31 @@ fn decode_script_ref<'b, Ctx>(
 
 pub type TransactionOutput<'b> = babbage::GenTransactionOutput<'b, PostAlonzoTransactionOutput<'b>>;
 
-// FIXME: Repeated since macro does not handle type generics yet.
-codec_by_datatype! {
-    TransactionOutput<'b>,
-    Array | ArrayIndef => Legacy,
-    Map | MapIndef => PostAlonzo,
-    ()
+impl<'b, C> minicbor::Decode<'b, C> for TransactionOutput<'b> {
+    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+        use minicbor::data::Type;
+        match d.datatype()? {
+            Type::Array | Type::ArrayIndef => {
+                nonempty_map::decode_legacy_output(d, ctx).map(Self::Legacy)
+            }
+            Type::Map | Type::MapIndef => d.decode_with(ctx).map(Self::PostAlonzo),
+            other => Err(minicbor::decode::Error::type_mismatch(other)),
+        }
+    }
+}
+
+impl<C> minicbor::Encode<C> for TransactionOutput<'_> {
+    fn encode<W: minicbor::encode::Write>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>> {
+        match self {
+            Self::Legacy(output) => e.encode_with(output, ctx)?,
+            Self::PostAlonzo(output) => e.encode_with(output, ctx)?,
+        };
+        Ok(())
+    }
 }
 
 /// `native_script` gains `script_require_guard = (6, credential)` (`defs.cddl`).
@@ -1932,7 +1915,7 @@ pub struct PostAlonzoAuxiliaryData {
 }
 
 crate::map_record::decode_map_record!(PostAlonzoAuxiliaryData, tag 259,
-    0 => metadata,
+    0 => metadata: crate::distinct_map::decode_option,
     1 => native_scripts,
     2 => plutus_v1_scripts,
     3 => plutus_v2_scripts,
@@ -1955,7 +1938,7 @@ impl<'b, C> minicbor::Decode<'b, C> for ShelleyMaAuxiliaryData {
     fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
         decode_array(d, |a| {
             Ok(ShelleyMaAuxiliaryData {
-                transaction_metadata: a.decode_with(ctx)?,
+                transaction_metadata: a.decode_by(ctx, crate::distinct_map::decode)?,
                 auxiliary_scripts: a.decode_with(ctx)?,
             })
         })
@@ -1970,12 +1953,31 @@ pub enum AuxiliaryData {
     PostAlonzo(PostAlonzoAuxiliaryData),
 }
 
-codec_by_datatype! {
-    AuxiliaryData,
-    Map | MapIndef => Shelley,
-    Array | ArrayIndef => ShelleyMa,
-    Tag => PostAlonzo,
-    ()
+impl<'b, C> minicbor::Decode<'b, C> for AuxiliaryData {
+    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+        use minicbor::data::Type;
+        match d.datatype()? {
+            Type::Map | Type::MapIndef => crate::distinct_map::decode(d, ctx).map(Self::Shelley),
+            Type::Array | Type::ArrayIndef => d.decode_with(ctx).map(Self::ShelleyMa),
+            Type::Tag => d.decode_with(ctx).map(Self::PostAlonzo),
+            other => Err(minicbor::decode::Error::type_mismatch(other)),
+        }
+    }
+}
+
+impl<C> minicbor::Encode<C> for AuxiliaryData {
+    fn encode<W: minicbor::encode::Write>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>> {
+        match self {
+            Self::Shelley(metadata) => e.encode_with(metadata, ctx)?,
+            Self::ShelleyMa(data) => e.encode_with(data, ctx)?,
+            Self::PostAlonzo(data) => e.encode_with(data, ctx)?,
+        };
+        Ok(())
+    }
 }
 
 /// `script` gains `// 4, plutus_v4_script` (`defs.cddl`), reached through

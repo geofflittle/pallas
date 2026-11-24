@@ -96,10 +96,10 @@ codec_by_datatype! {
     (coin, multi => Multiasset)
 }
 
-/// Implements the codec of a value enum, reading its `Multiasset` variant from an array of either length form.
+/// Implements the codec of a value enum, reading its `Multiasset` variant from an array of either length form and each amount with `$amount`.
 #[cfg(feature = "unstable")]
 macro_rules! value_codec {
-    ($name:ident) => {
+    ($name:ident, $amount:expr) => {
         impl<'b, C> pallas_codec::minicbor::Decode<'b, C> for $name {
             fn decode(
                 d: &mut pallas_codec::minicbor::Decoder<'b>,
@@ -109,7 +109,10 @@ macro_rules! value_codec {
                 match d.datatype()? {
                     Type::Array | Type::ArrayIndef => {
                         let len = d.array()?;
-                        let value = $name::Multiasset(d.decode_with(ctx)?, d.decode_with(ctx)?);
+                        let value = $name::Multiasset(
+                            d.decode_with(ctx)?,
+                            crate::distinct_map::decode_multiasset(d, ctx, $amount)?,
+                        );
                         pallas_codec::utils::end_array(d, len, 2)?;
                         Ok(value)
                     }
@@ -148,7 +151,7 @@ macro_rules! value_codec {
 pub(crate) use value_codec;
 
 #[cfg(feature = "unstable")]
-value_codec!(Value);
+value_codec!(Value, crate::distinct_map::decode_positive_amount);
 
 #[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(not(feature = "unstable"), derive(Decode))]

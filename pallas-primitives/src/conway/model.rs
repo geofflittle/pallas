@@ -45,7 +45,7 @@ codec_by_datatype! {
 }
 
 #[cfg(feature = "unstable")]
-crate::alonzo::value_codec!(Value);
+crate::alonzo::value_codec!(Value, |d, ctx| d.decode_with(ctx));
 
 pub use crate::alonzo::TransactionOutput as LegacyTransactionOutput;
 
