@@ -635,10 +635,10 @@ pub enum MultiEraScriptRef<'b> {
 /// The `AlonzoCompatible` variant carries the type every era through Conway
 /// shares. The `unstable` build adds a Dijkstra variant with a seventh clause.
 ///
-/// Each variant keeps a [`KeepRaw`], so a script read from a witness set or a
-/// reference script carries the bytes it arrived in and gives the hash the
-/// ledger keys it by. A script read from auxiliary data carries none, because
-/// the auxiliary data types hold a decoded script.
+/// Each variant keeps the bytes the script was read from in a [`KeepRaw`] and
+/// hashes them as the ledger does. A script read from auxiliary data before
+/// Dijkstra, or from inside another script, has no bytes of its own and hashes
+/// its re-encoding.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum MultiEraNativeScript<'b> {

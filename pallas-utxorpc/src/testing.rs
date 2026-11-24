@@ -127,7 +127,7 @@ pub const SCRIPT_REWARD_ACCOUNT: [u8; 29] = {
     account
 };
 
-/// A Conway transaction that withdraws from a key and a script reward account and carries one Reward redeemer at index 0.
+/// A Conway transaction that withdraws from a key and a script reward account and has one Reward redeemer at index 0.
 pub fn conway_tx_with_key_and_script_withdrawals() -> trv::MultiEraTx<'static> {
     let mut e = minicbor::Encoder::new(Vec::new());
     e.array(4).unwrap();

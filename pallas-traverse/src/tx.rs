@@ -930,7 +930,7 @@ impl<'b> MultiEraTx<'b> {
         }
     }
 
-    /// Returns whether the transaction carries auxiliary data.
+    /// Returns whether the transaction has auxiliary data.
     pub fn has_aux_data(&self) -> bool {
         #[cfg(feature = "unstable")]
         if matches!(self, MultiEraTx::Dijkstra(..) | MultiEraTx::DijkstraSub(..)) {

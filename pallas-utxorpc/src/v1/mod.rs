@@ -36,10 +36,6 @@ impl<C: LedgerContext> Mapper<C> {
     }
 
     /// Leaves `TxOutput.datum` unset on outputs with no datum.
-    ///
-    /// By default those outputs carry an empty `Datum` message. This applies to
-    /// every output this mapper produces, including those inside a mapped
-    /// transaction or block.
     pub fn omit_absent_datums(mut self) -> Self {
         self.omit_absent_datums = true;
         self
