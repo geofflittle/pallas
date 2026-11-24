@@ -63,6 +63,8 @@
 #[cfg(feature = "unstable")]
 mod array_record;
 #[cfg(feature = "unstable")]
+mod distinct_map;
+#[cfg(feature = "unstable")]
 mod flat_enum;
 mod framework;
 #[cfg(feature = "unstable")]
