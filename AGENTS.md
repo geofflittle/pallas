@@ -77,7 +77,7 @@ Feature runs:
 
 ```sh
 cargo test -p pallas-network -p pallas-network2 --features blueprint
-cargo test -p pallas-primitives -p pallas-traverse -p pallas-utxorpc --features unstable
+cargo test -p pallas-primitives -p pallas-traverse -p pallas-utxorpc -p pallas-network -p pallas-hardano --features unstable
 cargo test -p pallas-primitives --features unstable,blueprint
 cargo test -p pallas-validate --features unstable
 cargo check --workspace --all-targets --no-default-features
@@ -182,6 +182,10 @@ Where to start for common jobs:
 - `pallas-validate/unstable` adds the Dijkstra protocol parameters to `MultiEraProtocolParameters`.
 - `pallas-utxorpc/unstable` adds the `v1` module, which maps onto the v1 schema.
 - `pallas-utxorpc/unstable` maps Dijkstra through the accessors that can hold its types.
+- `pallas-network/unstable` decodes Dijkstra tx rejections: `ShelleyBasedEra::Dijkstra`,
+  `TxValidationError::DijkstraTxValidationError` and the `localtxsubmission::dijkstra` module.
+  Without it, a Dijkstra rejection fails to decode.
+- `pallas-hardano/unstable` renders those rejections in the submit-api JSON.
 - `pallas/unstable` turns on every crate's `unstable` feature and the umbrella's `hardano` feature.
 
 [`llms.txt`](llms.txt) is an index of the crate docs and examples.
