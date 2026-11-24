@@ -197,7 +197,7 @@ tag_preserving_set!(NonEmptySet, "a nonempty set", 1);
 pub use crate::babbage::OperationalCert;
 
 /// `header_version_info = [highest_supported_major_version : uint .size 4, self_reported_software_tag : uint .size 4]` (`defs.cddl`).
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct HeaderVersionInfo {
     #[n(0)]
     pub highest_supported_major_version: u32,
@@ -206,10 +206,15 @@ pub struct HeaderVersionInfo {
     pub self_reported_software_tag: u32,
 }
 
+crate::array_record::decode_array_record!(HeaderVersionInfo {
+    highest_supported_major_version,
+    self_reported_software_tag
+});
+
 pub use crate::babbage::HeaderBody as PraosHeaderBody;
 
 /// `header_body` (`defs.cddl`) has `header_version_info` where Conway's has `protocol_version`, and appends `block_body_contains_leios_cert` and `eb_references_announcement`.
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct LeiosHeaderBody {
     #[n(0)]
     pub block_number: u64,
@@ -248,6 +253,21 @@ pub struct LeiosHeaderBody {
     #[n(11)]
     pub eb_announcement: Nullable<EbAnnouncement>,
 }
+
+crate::array_record::decode_array_record!(LeiosHeaderBody {
+    block_number,
+    slot,
+    prev_hash,
+    issuer_vkey,
+    vrf_vkey,
+    vrf_result,
+    block_body_size,
+    block_body_hash,
+    operational_cert,
+    header_version_info,
+    block_body_contains_leios_cert,
+    eb_announcement
+});
 
 impl LeiosHeaderBody {
     pub fn leader_vrf_output(&self) -> Vec<u8> {
@@ -375,7 +395,7 @@ impl HeaderBody {
 }
 
 /// `header = [header_body, body_signature]` (`defs.cddl`).
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct Header {
     #[n(0)]
     pub header_body: HeaderBody,
@@ -383,6 +403,11 @@ pub struct Header {
     #[n(1)]
     pub body_signature: Bytes,
 }
+
+crate::array_record::decode_array_record!(Header {
+    header_body,
+    body_signature
+});
 
 pub use crate::conway::Multiasset;
 
@@ -431,7 +456,7 @@ pub use crate::conway::DatumOption;
 pub use crate::conway::LegacyTransactionOutput;
 
 /// `eb_references_announcement = [eb_hash : hash32, eb_size : uint .size 4]` (`defs.cddl`).
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct EbAnnouncement {
     #[n(0)]
     pub eb_hash: Hash<32>,
@@ -440,13 +465,15 @@ pub struct EbAnnouncement {
     pub eb_size: u32,
 }
 
+crate::array_record::decode_array_record!(EbAnnouncement { eb_hash, eb_size });
+
 /// `endorser_block = { + base.hash => base.word32 }`
 /// (leios-fetch `messages.cddl`), each key the blake2b-256 of a transaction's
 /// `block_transaction` encoding and each value the size of that encoding.
 pub type EndorserBlock = KeyValuePairs<Hash<32>, u32>;
 
 /// `bls_key = [bls_pubkey : bytes .size 96, bls_possession_proof : bytes .size 48]` (`defs.cddl`).
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct BlsKey {
     #[n(0)]
     pub bls_pubkey: Bytes,
@@ -455,11 +482,16 @@ pub struct BlsKey {
     pub bls_possession_proof: Bytes,
 }
 
+crate::array_record::decode_array_record!(BlsKey {
+    bls_pubkey,
+    bls_possession_proof
+});
+
 /// `leios_signature = bytes .size 48` (`defs.cddl`).
 pub type LeiosSignature = Bytes;
 
 /// `leios_certificate = [signers : bytes .size (0 .. 8192), signature : leios_signature]` (`defs.cddl`).
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct LeiosCertificate {
     /// Bitfield naming the signers.
     #[n(0)]
@@ -468,6 +500,8 @@ pub struct LeiosCertificate {
     #[n(1)]
     pub signature: LeiosSignature,
 }
+
+crate::array_record::decode_array_record!(LeiosCertificate { signers, signature });
 
 /// `peras_certificate = bytes` (`defs.cddl`).
 pub type PerasCertificate = Bytes;
@@ -1035,7 +1069,7 @@ crate::map_record::decode_map_record!(ProtocolParamUpdate,
 );
 
 /// No CDDL rule answers to this type. It mirrors [`crate::conway::Update`] over this era's `protocol_param_update`.
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct Update {
     #[n(0)]
     pub proposed_protocol_parameter_updates: BTreeMap<Genesishash, ProtocolParamUpdate>,
@@ -1044,8 +1078,13 @@ pub struct Update {
     pub epoch: Epoch,
 }
 
+crate::array_record::decode_array_record!(Update {
+    proposed_protocol_parameter_updates,
+    epoch
+});
+
 /// `proposal_procedure = [deposit : coin, reward_account, gov_action, anchor]` (`defs.cddl`).
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct ProposalProcedure {
     #[n(0)]
     pub deposit: Coin,
@@ -1059,6 +1098,13 @@ pub struct ProposalProcedure {
     #[n(3)]
     pub anchor: Anchor,
 }
+
+crate::array_record::decode_array_record!(ProposalProcedure {
+    deposit,
+    reward_account,
+    gov_action,
+    anchor
+});
 
 /// `gov_action` (`defs.cddl`). Its `parameter_change_action` arm reaches this era's `protocol_param_update`.
 #[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
@@ -1379,7 +1425,7 @@ crate::map_record::decode_map_record!(SubTransactionBody<'a>,
 );
 
 /// `sub_transaction = [sub_transaction_body, transaction_witness_set, auxiliary_data/ nil]` (`defs.cddl`).
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Clone)]
 pub struct SubTransaction<'b> {
     #[b(0)]
     pub sub_transaction_body: KeepRaw<'b, SubTransactionBody<'b>>,
@@ -1390,6 +1436,12 @@ pub struct SubTransaction<'b> {
     #[n(2)]
     pub auxiliary_data: Nullable<KeepRaw<'b, AuxiliaryData>>,
 }
+
+crate::array_record::decode_array_record!(SubTransaction<'b> {
+    sub_transaction_body,
+    transaction_witness_set,
+    auxiliary_data
+});
 
 /// `sub_transactions = nonempty_oset<sub_transaction>` (`defs.cddl`).
 pub type SubTransactions<'b> = NonEmptySet<SubTransaction<'b>>;
@@ -1583,7 +1635,7 @@ pub enum RedeemerTag {
     Guarding,
 }
 
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct RedeemersKey {
     #[n(0)]
     pub tag: RedeemerTag,
@@ -1591,13 +1643,17 @@ pub struct RedeemersKey {
     pub index: u32,
 }
 
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+crate::array_record::decode_array_record!(RedeemersKey { tag, index });
+
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct RedeemersValue {
     #[n(0)]
     pub data: PlutusData,
     #[n(1)]
     pub ex_units: ExUnits,
 }
+
+crate::array_record::decode_array_record!(RedeemersValue { data, ex_units });
 
 /// `redeemers` is map only in Dijkstra (`defs.cddl`). Conway's array arm and
 /// the `redeemer` rule behind it were deleted.
@@ -1775,7 +1831,7 @@ crate::babbage::decode_joined_script_ref!(
 /// `block_body` (`defs.cddl`). Dijkstra replaces Conway's segregated witness
 /// layout with complete inline transactions, and drops `invalid_transactions`
 /// and `transaction_index` because each transaction carries its own flag.
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Clone)]
 pub struct BlockBody<'b> {
     #[b(0)]
     pub transactions: MaybeIndefArray<BlockTransaction<'b>>,
@@ -1787,8 +1843,14 @@ pub struct BlockBody<'b> {
     pub peras_certificate: Nullable<PerasCertificate>,
 }
 
+crate::array_record::decode_array_record!(BlockBody<'b> {
+    transactions,
+    leios_certificate,
+    peras_certificate
+});
+
 /// `block = [header, block_body]` (`defs.cddl`).
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Clone)]
 pub struct Block<'b> {
     #[n(0)]
     pub header: KeepRaw<'b, Header>,
@@ -1797,10 +1859,12 @@ pub struct Block<'b> {
     pub block_body: BlockBody<'b>,
 }
 
+crate::array_record::decode_array_record!(Block<'b> { header, block_body });
+
 /// `block_transaction = [transaction_body, transaction_witness_set, auxiliary_data/ nil, bool]`
 /// (`defs.cddl`), the four element form a ranking block carries. Conway puts
 /// the flag at position 2, here it is last and is named `success` as in Conway.
-#[derive(Clone, Serialize, Deserialize, Encode, Decode, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Encode, Debug, PartialEq)]
 pub struct BlockTransaction<'b> {
     #[b(0)]
     pub transaction_body: KeepRaw<'b, TransactionBody<'b>>,
@@ -1815,6 +1879,13 @@ pub struct BlockTransaction<'b> {
     #[n(3)]
     pub success: bool,
 }
+
+crate::array_record::decode_array_record!(BlockTransaction<'b> {
+    transaction_body,
+    transaction_witness_set,
+    auxiliary_data,
+    success
+});
 
 impl Eq for BlockTransaction<'_> {}
 
