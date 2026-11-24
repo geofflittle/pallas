@@ -304,12 +304,24 @@ pub(crate) mod protocol_version {
     use pallas_codec::minicbor::{self, data::Type, decode::Error};
     use pallas_codec::utils::decode_array;
 
+    /// The highest major protocol version the ledger reads.
+    const MAX_MAJOR: u32 = 13;
+
     /// Decodes a [`ProtocolVersion`].
     pub fn decode<Ctx>(
         d: &mut minicbor::Decoder<'_>,
         ctx: &mut Ctx,
     ) -> Result<ProtocolVersion, Error> {
-        decode_array(d, |a| Ok((a.decode_with(ctx)?, a.decode_with(ctx)?)))
+        decode_array(d, |a| {
+            let major: u32 = a.decode_with(ctx)?;
+            if major > MAX_MAJOR {
+                return Err(Error::message(format!(
+                    "protocol version major {major} above {MAX_MAJOR}"
+                )));
+            }
+            let minor: u32 = a.decode_with(ctx)?;
+            Ok((major.into(), minor.into()))
+        })
     }
 
     /// Decodes an optional [`ProtocolVersion`], reading a null as `None`.
@@ -345,6 +357,11 @@ impl<'b, C> minicbor::decode::Decode<'b, C> for RationalNumber {
         };
         if cfg!(feature = "unstable") {
             end_array(d, len, 2)?;
+            if rational.denominator == 0 {
+                return Err(minicbor::decode::Error::message(
+                    "rational with a zero denominator",
+                ));
+            }
         }
         Ok(rational)
     }
@@ -499,8 +516,17 @@ pub struct TransactionInput {
 #[cfg(feature = "unstable")]
 array_record::decode_array_record!(TransactionInput {
     transaction_id,
-    index
+    index: decode_word16
 });
+
+/// Decodes an unsigned integer of at most 16 bits into a wider field.
+#[cfg(feature = "unstable")]
+pub(crate) fn decode_word16<Ctx, T: From<u16>>(
+    d: &mut minicbor::Decoder<'_>,
+    _ctx: &mut Ctx,
+) -> Result<T, minicbor::decode::Error> {
+    d.u16().map(T::from)
+}
 
 /// Rational number constrained to the closed interval [0, 1].
 pub type UnitInterval = RationalNumber;
@@ -577,5 +603,61 @@ mod tests {
                 "{version}: {error}"
             );
         }
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_version_reads_a_major_up_to_13_and_a_minor_of_32_bits() {
+        let decode = |version: &str| {
+            let raw = hex::decode(version).unwrap();
+            super::protocol_version::decode(&mut minicbor::Decoder::new(&raw), &mut ())
+        };
+        assert_eq!(decode("820d1affffffff").unwrap(), (13, u32::MAX as u64));
+        assert_eq!(decode("820000").unwrap(), (0, 0));
+
+        for version in ["820e00", "821a0001000000", "820d1b0000000100000000"] {
+            let error = decode(version).unwrap_err().to_string();
+            assert!(
+                error.contains("protocol version") || error.contains("overflow"),
+                "{version}: {error}"
+            );
+        }
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn an_output_or_action_index_is_read_in_16_bits() {
+        use crate::TransactionInput;
+        use crate::conway::GovActionId;
+
+        let id = "5820".to_string() + &"00".repeat(32);
+        let input: TransactionInput =
+            minicbor::decode(&hex::decode(format!("82{id}19ffff")).unwrap()).unwrap();
+        assert_eq!(input.index, 65535);
+        let action: GovActionId =
+            minicbor::decode(&hex::decode(format!("82{id}19ffff")).unwrap()).unwrap();
+        assert_eq!(action.action_index, 65535);
+
+        let over = hex::decode(format!("82{id}1a00010000")).unwrap();
+        for error in [
+            minicbor::decode::<TransactionInput>(&over).unwrap_err(),
+            minicbor::decode::<GovActionId>(&over).unwrap_err(),
+        ] {
+            assert!(error.to_string().contains("overflow"), "{error}");
+        }
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_rational_with_a_zero_denominator_is_refused() {
+        use super::RationalNumber;
+
+        let read: RationalNumber = minicbor::decode(&hex::decode("d81e820001").unwrap()).unwrap();
+        assert_eq!((read.numerator, read.denominator), (0, 1));
+
+        let error = minicbor::decode::<RationalNumber>(&hex::decode("d81e820100").unwrap())
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("zero denominator"), "{error}");
     }
 }
