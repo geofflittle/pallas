@@ -4436,3 +4436,38 @@ fn integers_read_only_within_the_width_the_ledger_reads() {
         wrong.join("\n")
     );
 }
+
+#[test]
+fn threshold_and_price_arrays_read_only_at_their_cddl_length() {
+    type Reader = fn(&'static [u8]) -> Result<(), minicbor::decode::Error>;
+    let fractions = |n: usize| format!("{:02x}{}", 0x80 + n, HALF.repeat(n));
+    let cases: [(&str, Reader, usize); 3] = [
+        (
+            "pool_voting_thresholds",
+            read::<super::PoolVotingThresholds>,
+            5,
+        ),
+        (
+            "drep_voting_thresholds",
+            read::<super::DRepVotingThresholds>,
+            10,
+        ),
+        ("ex_unit_prices", read::<super::ExUnitPrices>, 2),
+    ];
+
+    let mut wrong = Vec::new();
+    for (rule, read, len) in cases {
+        for (items, verdict) in [(len, true), (len + 1, false), (len - 1, false)] {
+            let got = read(generated(&fractions(items)));
+            if got.is_ok() != verdict {
+                wrong.push(format!("{rule} of {items} items: {got:?}"));
+            }
+        }
+    }
+    assert!(
+        wrong.is_empty(),
+        "{} differ from the ledger:\n{}",
+        wrong.len(),
+        wrong.join("\n")
+    );
+}
