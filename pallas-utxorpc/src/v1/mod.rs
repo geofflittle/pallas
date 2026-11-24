@@ -936,6 +936,30 @@ mod tests {
     }
 
     #[test]
+    fn a_dijkstra_block_under_a_praos_header_maps_no_leios_or_peras_field() {
+        let block = dijkstra_block(include_str!("../../../test_data/dijkstranet-153913.block"));
+        let mapped = Mapper::new(NoLedger).map_block(&block);
+
+        let header = mapped.header.unwrap();
+        assert_eq!((header.height, header.slot), (153913, 3178776));
+        assert_eq!(
+            hex::encode(&header.hash),
+            "3765872ae453542afb13ae96c731c6838edfbe8ae75fe313c762abaefc8ce211"
+        );
+        let body = mapped.body.unwrap();
+        assert_eq!(body.tx.len(), 1);
+        assert_eq!(
+            (
+                header.body_contains_leios_certificate,
+                header.endorser_block_announcement,
+                body.leios_certificate,
+                body.peras_certificate.to_vec(),
+            ),
+            (false, None, None, vec![])
+        );
+    }
+
+    #[test]
     fn a_dijkstra_block_maps_its_leios_certificate_and_announcement() {
         let block = dijkstra_block(include_str!("../../../test_data/dijkstra8.block"));
         let mapped = Mapper::new(NoLedger).map_block(&block);
