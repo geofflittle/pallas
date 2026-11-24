@@ -364,6 +364,30 @@ pub(crate) use decode_joined_script_ref;
 #[cfg(feature = "unstable")]
 decode_joined_script_ref!(ScriptRef, PlutusV1Script, PlutusV2Script);
 
+/// Decodes tag 24 and the bytes of either length form it wraps, which hold exactly one CBOR item.
+#[cfg(feature = "unstable")]
+fn decode_embedded<'b, Ctx>(
+    d: &mut minicbor::Decoder<'b>,
+    ctx: &mut Ctx,
+) -> Result<std::borrow::Cow<'b, [u8]>, minicbor::decode::Error> {
+    let tag_at = d.position();
+    let tag = d.tag()?;
+    if tag.as_u64() != 24 {
+        return Err(minicbor::decode::Error::tag_mismatch(tag)
+            .with_message("expected tag 24")
+            .at(tag_at));
+    }
+    let cbor = pallas_codec::utils::decode_bytes_def_or_indef(d, ctx)?;
+    let mut item = minicbor::Decoder::new(&cbor);
+    item.skip()?;
+    if item.position() != cbor.len() {
+        return Err(
+            minicbor::decode::Error::message("bytes left after the item tag 24 wraps").at(tag_at),
+        );
+    }
+    Ok(cbor)
+}
+
 /// Decodes an output's script reference, tagged bytes of either length form that hold the script's CBOR.
 #[cfg(feature = "unstable")]
 pub(crate) fn decode_script_ref<'b, Ctx, S>(
@@ -377,8 +401,7 @@ where
         d.skip()?;
         return Ok(None);
     }
-    d.tag()?;
-    let script = match pallas_codec::utils::decode_bytes_def_or_indef(d, ctx)? {
+    let script = match decode_embedded(d, ctx)? {
         std::borrow::Cow::Borrowed(cbor) => minicbor::decode_with(cbor, ctx)?,
         std::borrow::Cow::Owned(cbor) => S::decode_joined(&cbor, ctx)?,
     };
@@ -470,8 +493,7 @@ fn decode_inline_datum<'b, C>(
     d: &mut minicbor::Decoder<'b>,
     ctx: &mut C,
 ) -> Result<CborWrap<KeepRaw<'b, PlutusData>>, minicbor::decode::Error> {
-    d.tag()?;
-    let data = match pallas_codec::utils::decode_bytes_def_or_indef(d, ctx)? {
+    let data = match decode_embedded(d, ctx)? {
         std::borrow::Cow::Borrowed(cbor) => minicbor::decode_with(cbor, ctx)?,
         std::borrow::Cow::Owned(cbor) => {
             let data: KeepRaw<'_, PlutusData> = minicbor::decode_with(&cbor, ctx)?;
