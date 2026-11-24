@@ -206,9 +206,11 @@ pub struct HeaderVersionInfo {
     pub self_reported_software_tag: u32,
 }
 
+pub use crate::babbage::HeaderBody as PraosHeaderBody;
+
 /// `header_body` (`defs.cddl`) has `header_version_info` where Conway's has `protocol_version`, and appends `block_body_contains_leios_cert` and `eb_references_announcement`.
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
-pub struct HeaderBody {
+pub struct LeiosHeaderBody {
     #[n(0)]
     pub block_number: u64,
 
@@ -247,13 +249,128 @@ pub struct HeaderBody {
     pub eb_announcement: Nullable<EbAnnouncement>,
 }
 
-impl HeaderBody {
+impl LeiosHeaderBody {
     pub fn leader_vrf_output(&self) -> Vec<u8> {
         babbage::derive_tagged_vrf_output(&self.vrf_result.0, babbage::VrfDerivation::Leader)
     }
 
     pub fn nonce_vrf_output(&self) -> Vec<u8> {
         babbage::derive_tagged_vrf_output(&self.vrf_result.0, babbage::VrfDerivation::Nonce)
+    }
+}
+
+/// A header body in the Praos form of ten fields or the Leios form of twelve.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+pub enum HeaderBody {
+    Praos(PraosHeaderBody),
+    Leios(LeiosHeaderBody),
+}
+
+/// The number of fields of the Praos form.
+const PRAOS_HEADER_BODY_FIELDS: u64 = 10;
+
+/// The number of elements of the array at the decoder's position, in either length form.
+fn array_len(d: &mut minicbor::Decoder<'_>) -> Result<u64, minicbor::decode::Error> {
+    let mut probe = d.probe();
+    match probe.array()? {
+        Some(len) => Ok(len),
+        None => {
+            let mut len = 0;
+            while probe.datatype()? != minicbor::data::Type::Break {
+                probe.skip()?;
+                len += 1;
+            }
+            Ok(len)
+        }
+    }
+}
+
+impl<'b, C> minicbor::Decode<'b, C> for HeaderBody {
+    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+        if array_len(d)? == PRAOS_HEADER_BODY_FIELDS {
+            Ok(HeaderBody::Praos(d.decode_with(ctx)?))
+        } else {
+            Ok(HeaderBody::Leios(d.decode_with(ctx)?))
+        }
+    }
+}
+
+impl<C> minicbor::Encode<C> for HeaderBody {
+    fn encode<W: minicbor::encode::Write>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>> {
+        match self {
+            HeaderBody::Praos(x) => e.encode_with(x, ctx)?,
+            HeaderBody::Leios(x) => e.encode_with(x, ctx)?,
+        };
+        Ok(())
+    }
+}
+
+impl HeaderBody {
+    pub fn block_number(&self) -> u64 {
+        match self {
+            HeaderBody::Praos(x) => x.block_number,
+            HeaderBody::Leios(x) => x.block_number,
+        }
+    }
+
+    pub fn slot(&self) -> u64 {
+        match self {
+            HeaderBody::Praos(x) => x.slot,
+            HeaderBody::Leios(x) => x.slot,
+        }
+    }
+
+    pub fn prev_hash(&self) -> Option<Hash<32>> {
+        match self {
+            HeaderBody::Praos(x) => x.prev_hash,
+            HeaderBody::Leios(x) => x.prev_hash,
+        }
+    }
+
+    pub fn issuer_vkey(&self) -> &Bytes {
+        match self {
+            HeaderBody::Praos(x) => &x.issuer_vkey,
+            HeaderBody::Leios(x) => &x.issuer_vkey,
+        }
+    }
+
+    pub fn vrf_vkey(&self) -> &Bytes {
+        match self {
+            HeaderBody::Praos(x) => &x.vrf_vkey,
+            HeaderBody::Leios(x) => &x.vrf_vkey,
+        }
+    }
+
+    pub fn block_body_size(&self) -> u64 {
+        match self {
+            HeaderBody::Praos(x) => x.block_body_size,
+            HeaderBody::Leios(x) => x.block_body_size,
+        }
+    }
+
+    pub fn block_body_hash(&self) -> Hash<32> {
+        match self {
+            HeaderBody::Praos(x) => x.block_body_hash,
+            HeaderBody::Leios(x) => x.block_body_hash,
+        }
+    }
+
+    pub fn leader_vrf_output(&self) -> Vec<u8> {
+        match self {
+            HeaderBody::Praos(x) => x.leader_vrf_output(),
+            HeaderBody::Leios(x) => x.leader_vrf_output(),
+        }
+    }
+
+    pub fn nonce_vrf_output(&self) -> Vec<u8> {
+        match self {
+            HeaderBody::Praos(x) => x.nonce_vrf_output(),
+            HeaderBody::Leios(x) => x.nonce_vrf_output(),
+        }
     }
 }
 
