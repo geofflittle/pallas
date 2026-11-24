@@ -4236,3 +4236,203 @@ fn a_fraction_below_the_positive_minimum_is_refused_only_as_a_positive_interval(
         false,
     );
 }
+
+#[test]
+fn integers_read_only_within_the_width_the_ledger_reads() {
+    let key = |k: u64| match k {
+        0..=23 => format!("{k:02x}"),
+        _ => format!("18{k:02x}"),
+    };
+    type Reader = fn(&'static [u8]) -> Result<(), minicbor::decode::Error>;
+    let mut cases: Vec<(String, Reader, String, bool)> = Vec::new();
+    for k in [4, 8, 23, 24, 27, 43, 51, 52] {
+        for (value, verdict) in [("19ffff", true), ("1a00010000", false)] {
+            cases.push((
+                format!("update key {k} {value}"),
+                read::<ProtocolParamUpdate>,
+                format!("a1{}{value}", key(k)),
+                verdict,
+            ));
+        }
+    }
+    for k in [
+        2, 3, 7, 22, 28, 29, 32, 34, 35, 36, 40, 41, 42, 45, 46, 48, 49, 53,
+    ] {
+        for (value, verdict) in [("1affffffff", true), ("1b0000000100000000", false)] {
+            cases.push((
+                format!("update key {k} {value}"),
+                read::<ProtocolParamUpdate>,
+                format!("a1{}{value}", key(k)),
+                verdict,
+            ));
+        }
+    }
+    for (case, reader, hex, verdict) in [
+        (
+            "update key 53 null",
+            read::<ProtocolParamUpdate> as Reader,
+            "a11835f6",
+            true,
+        ),
+        (
+            "update key 36 zero",
+            read::<ProtocolParamUpdate>,
+            "a1182400",
+            false,
+        ),
+        ("cost models language 4", read::<CostModels>, "a10480", true),
+        (
+            "cost models language 255",
+            read::<CostModels>,
+            "a118ff80",
+            true,
+        ),
+        (
+            "cost models language 256",
+            read::<CostModels>,
+            "a119010080",
+            false,
+        ),
+        ("relay port 65535", read::<Relay>, "830119ffff6161", true),
+        (
+            "relay port 65536",
+            read::<Relay>,
+            "83011a000100006161",
+            false,
+        ),
+        (
+            "single host addr port 65536",
+            read::<Relay>,
+            "84001a00010000f6f6",
+            false,
+        ),
+    ] {
+        cases.push((case.into(), reader, hex.into(), verdict));
+    }
+
+    let filled = |n: usize| match n {
+        0..=23 => format!("{:02x}{}", 0x40 + n, "11".repeat(n)),
+        _ => format!("58{n:02x}{}", "11".repeat(n)),
+    };
+    let header_body = |body_size: &str| {
+        format!(
+            "8c0000f6{}{}82{}{}{body_size}{}84{}0000{}820000f4f6",
+            filled(32),
+            filled(32),
+            filled(64),
+            filled(80),
+            filled(32),
+            filled(32),
+            filled(64),
+        )
+    };
+    let id = filled(32);
+    for (case, reader, hex, verdict) in [
+        (
+            "transaction_input index 65535",
+            read::<super::TransactionInput> as Reader,
+            format!("82{id}19ffff"),
+            true,
+        ),
+        (
+            "transaction_input index 65536",
+            read::<super::TransactionInput>,
+            format!("82{id}1a00010000"),
+            false,
+        ),
+        (
+            "gov_action_id index 65535",
+            read::<super::GovActionId>,
+            format!("82{id}19ffff"),
+            true,
+        ),
+        (
+            "gov_action_id index 65536",
+            read::<super::GovActionId>,
+            format!("82{id}1a00010000"),
+            false,
+        ),
+        (
+            "hard fork protocol_version minor 4294967295",
+            read::<GovAction>,
+            "8301f6820d1affffffff".into(),
+            true,
+        ),
+        (
+            "hard fork protocol_version minor 4294967296",
+            read::<GovAction>,
+            "8301f6820d1b0000000100000000".into(),
+            false,
+        ),
+        (
+            "hard fork protocol_version major 14",
+            read::<GovAction>,
+            "8301f6820e00".into(),
+            false,
+        ),
+        (
+            "ex_units mem max_int64",
+            read::<super::ExUnits>,
+            "821b7fffffffffffffff00".into(),
+            true,
+        ),
+        (
+            "ex_units mem max_int64 plus one",
+            read::<super::ExUnits>,
+            "821b800000000000000000".into(),
+            false,
+        ),
+        (
+            "ex_units steps max_int64 plus one",
+            read::<super::ExUnits>,
+            "82001b8000000000000000".into(),
+            false,
+        ),
+        (
+            "eb_references_announcement size 4294967296",
+            read::<super::EbAnnouncement>,
+            format!("82{id}1b0000000100000000"),
+            false,
+        ),
+        (
+            "header_version_info major 4294967296",
+            read::<super::HeaderVersionInfo>,
+            "821b000000010000000000".into(),
+            false,
+        ),
+        (
+            "header_body block_body_size 4294967295",
+            read::<super::HeaderBody>,
+            header_body("1affffffff"),
+            true,
+        ),
+        (
+            "header_body block_body_size 4294967296",
+            read::<super::HeaderBody>,
+            header_body("1b0000000100000000"),
+            false,
+        ),
+        (
+            "redeemers index 4294967296",
+            read::<super::Redeemers>,
+            "a182001b00000001000000008200820000".into(),
+            false,
+        ),
+    ] {
+        cases.push((case.into(), reader, hex, verdict));
+    }
+
+    let wrong: Vec<String> = cases
+        .into_iter()
+        .filter_map(|(case, read, hex, verdict)| {
+            let got = read(generated(&hex));
+            (got.is_ok() != verdict).then(|| format!("{case}: {got:?}"))
+        })
+        .collect();
+    assert!(
+        wrong.is_empty(),
+        "{} differ from the ledger:\n{}",
+        wrong.len(),
+        wrong.join("\n")
+    );
+}

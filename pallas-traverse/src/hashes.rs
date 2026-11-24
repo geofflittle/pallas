@@ -653,7 +653,7 @@ mod tests {
 
             assert_eq!(
                 body.len() as u64,
-                inner.header.header_body.block_body_size,
+                u64::from(inner.header.header_body.block_body_size),
                 "{name}: re-encoded body length against the size the header names"
             );
             assert_eq!(
