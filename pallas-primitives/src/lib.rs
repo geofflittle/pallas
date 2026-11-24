@@ -140,7 +140,20 @@ pub struct ExUnits {
 }
 
 #[cfg(feature = "unstable")]
-array_record::decode_array_record!(ExUnits { mem, steps });
+array_record::decode_array_record!(ExUnits {
+    mem: decode_nonnegative_int64,
+    steps: decode_nonnegative_int64
+});
+
+/// Decodes an unsigned integer of at most `i64::MAX`.
+#[cfg(feature = "unstable")]
+fn decode_nonnegative_int64<Ctx>(
+    d: &mut minicbor::Decoder<'_>,
+    _ctx: &mut Ctx,
+) -> Result<u64, minicbor::decode::Error> {
+    u64::try_from(d.i64()?)
+        .map_err(|_| minicbor::decode::Error::message("negative execution units"))
+}
 
 /// Per-unit prices used to convert [`ExUnits`] into fee lovelace.
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
@@ -404,14 +417,14 @@ impl<'b, C> minicbor::decode::Decode<'b, C> for Relay {
         let (relay, read) = match variant {
             0 => (
                 Relay::SingleHostAddr(
-                    d.decode_with(ctx)?,
+                    decode_port(d, ctx)?,
                     decode_ip::<4, _>(d, ctx)?,
                     decode_ip::<16, _>(d, ctx)?,
                 ),
                 4,
             ),
             1 => (
-                Relay::SingleHostName(d.decode_with(ctx)?, decode_dns_name(d, ctx)?),
+                Relay::SingleHostName(decode_port(d, ctx)?, decode_dns_name(d, ctx)?),
                 3,
             ),
             2 => (Relay::MultiHostName(decode_dns_name(d, ctx)?), 2),
@@ -427,6 +440,25 @@ impl<'b, C> minicbor::decode::Decode<'b, C> for Relay {
         }
         Ok(relay)
     }
+}
+
+/// Decode a relay's port of at most 65535, or the null that stands for none.
+#[cfg(feature = "unstable")]
+fn decode_port<C>(
+    d: &mut minicbor::Decoder<'_>,
+    ctx: &mut C,
+) -> Result<Option<Port>, minicbor::decode::Error> {
+    d.decode_with::<_, Option<u16>>(ctx)
+        .map(|port| port.map(Port::from))
+}
+
+/// Decode a relay's port, or the null that stands for none.
+#[cfg(not(feature = "unstable"))]
+fn decode_port<C>(
+    d: &mut minicbor::Decoder<'_>,
+    ctx: &mut C,
+) -> Result<Option<Port>, minicbor::decode::Error> {
+    d.decode_with(ctx)
 }
 
 /// Decode a relay's IP address of `SIZE` bytes, or the null that stands for none.

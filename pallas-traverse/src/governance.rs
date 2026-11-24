@@ -296,26 +296,26 @@ impl MultiEraParamUpdate<'_> {
     // -- NEW IN DIJKSTRA
     // keys 34 to 56
 
-    dijkstra_param!(max_ref_script_size_per_block: u64);
-    dijkstra_param!(max_ref_script_size_per_tx: u64);
-    dijkstra_param!(ref_script_cost_stride: u64);
+    dijkstra_param!(max_ref_script_size_per_block: u32);
+    dijkstra_param!(max_ref_script_size_per_tx: u32);
+    dijkstra_param!(ref_script_cost_stride: std::num::NonZeroU32);
     dijkstra_param!(ref_script_cost_multiplier: dijkstra::PositiveInterval);
     dijkstra_param!(max_pledge_leverage: Nullable<dijkstra::NonNegativeInterval>);
     dijkstra_param!(min_pool_margin: dijkstra::UnitInterval);
-    dijkstra_param!(leios_announcement_period_length: u64);
-    dijkstra_param!(leios_vote_period_length: u64);
-    dijkstra_param!(leios_diffusion_period_length: u64);
-    dijkstra_param!(leios_committee_size: u64);
+    dijkstra_param!(leios_announcement_period_length: u32);
+    dijkstra_param!(leios_vote_period_length: u32);
+    dijkstra_param!(leios_diffusion_period_length: u32);
+    dijkstra_param!(leios_committee_size: u16);
     dijkstra_param!(leios_quorum_stake_threshold: dijkstra::UnitInterval);
-    dijkstra_param!(max_endorser_block_references_size: u64);
-    dijkstra_param!(max_endorser_block_txs_size: u64);
+    dijkstra_param!(max_endorser_block_references_size: u32);
+    dijkstra_param!(max_endorser_block_txs_size: u32);
     dijkstra_param!(max_endorser_block_execution_units: ExUnits);
-    dijkstra_param!(max_ref_script_size_per_endorser_block: u64);
-    dijkstra_param!(peras_min_candidate_block_age: u64);
+    dijkstra_param!(max_ref_script_size_per_endorser_block: u32);
+    dijkstra_param!(peras_min_candidate_block_age: u32);
     dijkstra_param!(peras_healing_factor: dijkstra::PositiveInterval);
-    dijkstra_param!(peras_cert_boost: u64);
-    dijkstra_param!(peras_target_committee_size: u64);
-    dijkstra_param!(peras_bootstrap_round: Nullable<u64>);
+    dijkstra_param!(peras_cert_boost: u16);
+    dijkstra_param!(peras_target_committee_size: u16);
+    dijkstra_param!(peras_bootstrap_round: Nullable<u32>);
     dijkstra_param!(peras_quorum_threshold_safety_margin: dijkstra::UnitInterval);
     dijkstra_param!(ref_inputs_cost_per_multi_asset_policy: u64);
     dijkstra_param!(ref_inputs_cost_per_datum_byte: u64);

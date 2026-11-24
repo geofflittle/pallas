@@ -362,7 +362,7 @@ pub struct LeiosHeaderBody {
     pub vrf_result: VrfCert,
 
     #[n(6)]
-    pub block_body_size: u64,
+    pub block_body_size: u32,
 
     #[n(7)]
     pub block_body_hash: Hash<32>,
@@ -495,7 +495,7 @@ impl HeaderBody {
     pub fn block_body_size(&self) -> u64 {
         match self {
             HeaderBody::Praos(x) => x.block_body_size,
-            HeaderBody::Leios(x) => x.block_body_size,
+            HeaderBody::Leios(x) => u64::from(x.block_body_size),
         }
     }
 
@@ -1018,17 +1018,17 @@ pub struct CostModels {
     pub plutus_v4: Option<CostModel>,
 
     /// Cost models under the keys the CDDL wildcard permits, 4 to 255.
-    pub unknown: BTreeMap<u64, CostModel>,
+    pub unknown: BTreeMap<u8, CostModel>,
 }
 
 impl CostModels {
     /// Every key to write, ascending, a named field before the wildcard.
-    fn entries(&self) -> BTreeMap<u64, &CostModel> {
-        let mut entries: BTreeMap<u64, &CostModel> =
+    fn entries(&self) -> BTreeMap<u8, &CostModel> {
+        let mut entries: BTreeMap<u8, &CostModel> =
             self.unknown.iter().map(|(k, v)| (*k, v)).collect();
 
         let named = [
-            (0u64, &self.plutus_v1),
+            (0u8, &self.plutus_v1),
             (1, &self.plutus_v2),
             (2, &self.plutus_v3),
             (3, &self.plutus_v4),
@@ -1054,7 +1054,7 @@ impl<C> minicbor::Encode<C> for CostModels {
 
         e.map(entries.len() as u64)?;
         for (key, model) in entries {
-            e.u64(key)?;
+            e.u8(key)?;
             e.encode_with(model, ctx)?;
         }
 
@@ -1064,13 +1064,13 @@ impl<C> minicbor::Encode<C> for CostModels {
 
 impl<'b, C> minicbor::Decode<'b, C> for CostModels {
     fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
-        let models: BTreeMap<u64, CostModel> = crate::distinct_map::decode(d, ctx)?;
+        let models: BTreeMap<u8, CostModel> = crate::distinct_map::decode(d, ctx)?;
 
         let mut plutus_v1 = None;
         let mut plutus_v2 = None;
         let mut plutus_v3 = None;
         let mut plutus_v4 = None;
-        let mut unknown: Vec<(u64, CostModel)> = Vec::new();
+        let mut unknown: Vec<(u8, CostModel)> = Vec::new();
 
         for (k, v) in models.iter() {
             match k {
@@ -1112,19 +1112,19 @@ pub struct ProtocolParamUpdate {
     #[n(1)]
     pub minfee_b: Option<u64>,
     #[n(2)]
-    pub max_block_body_size: Option<u64>,
+    pub max_block_body_size: Option<u32>,
     #[n(3)]
-    pub max_transaction_size: Option<u64>,
+    pub max_transaction_size: Option<u32>,
     #[n(4)]
-    pub max_block_header_size: Option<u64>,
+    pub max_block_header_size: Option<u16>,
     #[n(5)]
     pub key_deposit: Option<Coin>,
     #[n(6)]
     pub pool_deposit: Option<Coin>,
     #[n(7)]
-    pub maximum_epoch: Option<Epoch>,
+    pub maximum_epoch: Option<u32>,
     #[n(8)]
-    pub desired_number_of_stake_pools: Option<u64>,
+    pub desired_number_of_stake_pools: Option<u16>,
     #[n(9)]
     pub pool_pledge_influence: Option<NonNegativeInterval>,
     #[n(10)]
@@ -1145,38 +1145,38 @@ pub struct ProtocolParamUpdate {
     #[n(21)]
     pub max_block_ex_units: Option<ExUnits>,
     #[n(22)]
-    pub max_value_size: Option<u64>,
+    pub max_value_size: Option<u32>,
     #[n(23)]
-    pub collateral_percentage: Option<u64>,
+    pub collateral_percentage: Option<u16>,
     #[n(24)]
-    pub max_collateral_inputs: Option<u64>,
+    pub max_collateral_inputs: Option<u16>,
 
     #[n(25)]
     pub pool_voting_thresholds: Option<PoolVotingThresholds>,
     #[n(26)]
     pub drep_voting_thresholds: Option<DRepVotingThresholds>,
     #[n(27)]
-    pub min_committee_size: Option<u64>,
+    pub min_committee_size: Option<u16>,
     #[n(28)]
-    pub committee_term_limit: Option<Epoch>,
+    pub committee_term_limit: Option<u32>,
     #[n(29)]
-    pub governance_action_validity_period: Option<Epoch>,
+    pub governance_action_validity_period: Option<u32>,
     #[n(30)]
     pub governance_action_deposit: Option<Coin>,
     #[n(31)]
     pub drep_deposit: Option<Coin>,
     #[n(32)]
-    pub drep_inactivity_period: Option<Epoch>,
+    pub drep_inactivity_period: Option<u32>,
     #[n(33)]
     pub minfee_refscript_cost_per_byte: Option<NonNegativeInterval>,
 
     // -- NEW IN DIJKSTRA
     #[n(34)]
-    pub max_ref_script_size_per_block: Option<u64>,
+    pub max_ref_script_size_per_block: Option<u32>,
     #[n(35)]
-    pub max_ref_script_size_per_tx: Option<u64>,
+    pub max_ref_script_size_per_tx: Option<u32>,
     #[n(36)]
-    pub ref_script_cost_stride: Option<u64>,
+    pub ref_script_cost_stride: Option<std::num::NonZeroU32>,
     #[n(37)]
     pub ref_script_cost_multiplier: Option<PositiveInterval>,
 
@@ -1186,35 +1186,35 @@ pub struct ProtocolParamUpdate {
     #[n(39)]
     pub min_pool_margin: Option<UnitInterval>,
     #[n(40)]
-    pub leios_announcement_period_length: Option<u64>,
+    pub leios_announcement_period_length: Option<u32>,
     #[n(41)]
-    pub leios_vote_period_length: Option<u64>,
+    pub leios_vote_period_length: Option<u32>,
     #[n(42)]
-    pub leios_diffusion_period_length: Option<u64>,
+    pub leios_diffusion_period_length: Option<u32>,
     #[n(43)]
-    pub leios_committee_size: Option<u64>,
+    pub leios_committee_size: Option<u16>,
     #[n(44)]
     pub leios_quorum_stake_threshold: Option<UnitInterval>,
     #[n(45)]
-    pub max_endorser_block_references_size: Option<u64>,
+    pub max_endorser_block_references_size: Option<u32>,
     #[n(46)]
-    pub max_endorser_block_txs_size: Option<u64>,
+    pub max_endorser_block_txs_size: Option<u32>,
     #[n(47)]
     pub max_endorser_block_execution_units: Option<ExUnits>,
     #[n(48)]
-    pub max_ref_script_size_per_endorser_block: Option<u64>,
+    pub max_ref_script_size_per_endorser_block: Option<u32>,
     #[n(49)]
-    pub peras_min_candidate_block_age: Option<u64>,
+    pub peras_min_candidate_block_age: Option<u32>,
     #[n(50)]
     pub peras_healing_factor: Option<PositiveInterval>,
     #[n(51)]
-    pub peras_cert_boost: Option<u64>,
+    pub peras_cert_boost: Option<u16>,
     #[n(52)]
-    pub peras_target_committee_size: Option<u64>,
+    pub peras_target_committee_size: Option<u16>,
 
     /// `? 53 : nil/ uint .size 4` (`defs.cddl`), so an explicit nil differs from an absent key.
     #[n(53)]
-    pub peras_bootstrap_round: Option<Nullable<u64>>,
+    pub peras_bootstrap_round: Option<Nullable<u32>>,
     #[n(54)]
     pub peras_quorum_threshold_safety_margin: Option<UnitInterval>,
     #[n(55)]
