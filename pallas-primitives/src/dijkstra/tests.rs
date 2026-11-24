@@ -3221,7 +3221,10 @@ fn an_unknown_map_key_is_refused() {
     );
 }
 
-/// Each map record with a key written twice and with a nil at a key whose rule has none, and the redeemers map empty and with a key twice, beside the readable form, paired with the reason the refusal gives.
+/// A redeemers entry for spending input 0 with the integer datum 0 and no budget.
+const REDEEMER: &str = "8200008200820000";
+
+/// Each map record with a key written twice and with a nil at a key whose rule has none, and an empty redeemers map, beside the readable form, paired with the reason the refusal gives.
 fn record_keys() -> Vec<(Refusal, &'static str)> {
     type Read = fn(&'static [u8]) -> Result<(), minicbor::decode::Error>;
     type Record<'a> = &'a dyn Fn(&[&str]) -> String;
@@ -3295,20 +3298,13 @@ fn record_keys() -> Vec<(Refusal, &'static str)> {
         cases.push((nil, "a nil"));
     }
 
-    let redeemer = "8200008200820000";
-    let redeemers = |entries: &str| format!("a105{entries}");
-    for (refused, reason) in [
-        ("a0".to_string(), "empty map"),
-        (format!("a2{redeemer}{redeemer}"), "repeated key"),
-    ] {
-        let case = Refusal {
-            class: "redeemers",
-            read: read::<WitnessSet>,
-            refused: redeemers(&refused),
-            known: redeemers(&format!("a1{redeemer}")),
-        };
-        cases.push((case, reason));
-    }
+    let redeemers = Refusal {
+        class: "redeemers",
+        read: read::<WitnessSet>,
+        refused: "a105a0".to_string(),
+        known: format!("a105a1{REDEEMER}"),
+    };
+    cases.push((redeemers, "empty map"));
     let script_ref = Refusal {
         class: "transaction_output script_ref",
         read: read::<TransactionOutput>,
@@ -3320,13 +3316,16 @@ fn record_keys() -> Vec<(Refusal, &'static str)> {
 }
 
 #[test]
-fn each_record_reads_its_key_once_and_a_nil_where_its_rule_has_one() {
+fn each_record_reads_the_forms_the_ledger_reads() {
     for update in ["a11826f6", "a11835f6"] {
         assert!(
             read::<ProtocolParamUpdate>(generated(update)).is_ok(),
             "{update}"
         );
     }
+    let twice = format!("a105a2{REDEEMER}{REDEEMER}");
+    let read = read::<WitnessSet>(generated(&twice));
+    assert!(read.is_ok(), "redeemers with a key twice: {read:?}");
     for (case, _) in record_keys() {
         let read = (case.read)(generated(&case.known));
         assert!(read.is_ok(), "{} {}: {read:?}", case.class, case.known);
@@ -3336,7 +3335,7 @@ fn each_record_reads_its_key_once_and_a_nil_where_its_rule_has_one() {
 #[test]
 fn a_record_with_a_key_twice_or_a_nil_where_its_rule_has_none_is_refused() {
     let cases = record_keys();
-    assert_eq!(cases.len(), 15);
+    assert_eq!(cases.len(), 14);
 
     let failed: Vec<_> = cases
         .iter()
