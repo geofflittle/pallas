@@ -1247,11 +1247,11 @@ pub(crate) mod guards_field {
     }
 }
 
-/// Decoders for the maps the ledger reads with at least one entry and the quantities it reads above zero.
+/// Decoders for the maps the ledger reads with at least one entry.
 pub(crate) mod nonempty_map {
     use super::{BTreeMap, Value};
     use pallas_codec::minicbor::{self, Decode, Decoder, data::Type, decode::Error};
-    use pallas_codec::utils::{PositiveCoin, decode_array};
+    use pallas_codec::utils::decode_array;
 
     /// A map whose values are maps.
     type Nested<K, J, V> = BTreeMap<K, BTreeMap<J, V>>;
@@ -1347,32 +1347,12 @@ pub(crate) mod nonempty_map {
         decode_by(d, ctx, decode).map(Some)
     }
 
-    /// Decodes a quantity of at least one.
-    pub fn decode_positive_coin<Ctx>(
-        d: &mut Decoder<'_>,
-        _ctx: &mut Ctx,
-    ) -> Result<PositiveCoin, Error> {
-        let at = d.position();
-        PositiveCoin::try_from(d.u64()?)
-            .map_err(|_| Error::message("zero where a positive quantity is required").at(at))
-    }
-
-    /// Decodes an optional field holding a quantity of at least one.
-    pub fn decode_option_positive_coin<Ctx>(
-        d: &mut Decoder<'_>,
-        ctx: &mut Ctx,
-    ) -> Result<Option<PositiveCoin>, Error> {
-        decode_positive_coin(d, ctx).map(Some)
-    }
-
-    /// Decodes a value whose multiasset holds at least one asset, each of a positive quantity.
+    /// Decodes a value whose multiasset holds at least one asset.
     pub fn decode_value<'b, Ctx>(d: &mut Decoder<'b>, ctx: &mut Ctx) -> Result<Value, Error> {
         match d.datatype()? {
             Type::Array | Type::ArrayIndef => decode_array(d, |a| {
                 let coin = a.decode_with(ctx)?;
-                let multiasset = a.decode_by(ctx, |d, ctx| {
-                    decode_by(d, ctx, |d, ctx| decode_by(d, ctx, decode_positive_coin))
-                })?;
+                let multiasset = a.decode_by(ctx, |d, ctx| decode_by(d, ctx, decode))?;
                 Ok(Value::Multiasset(coin, multiasset))
             }),
             _ => minicbor::Decode::decode(d, ctx),
@@ -1565,7 +1545,7 @@ crate::map_record::decode_map_record!(SubTransactionBody<'a>,
     19 => voting_procedures: nonempty_map::decode_nested_option,
     20 => proposal_procedures,
     21 => treasury_value,
-    22 => donation: nonempty_map::decode_option_positive_coin,
+    22 => donation,
     24 => required_top_level_guards: nonempty_map::decode_option,
     25 => direct_deposits: nonempty_map::decode_option,
     26 => account_balance_intervals: nonempty_map::decode_option,
@@ -1694,7 +1674,7 @@ crate::map_record::decode_map_record!(TransactionBody<'a>,
     19 => voting_procedures: nonempty_map::decode_nested_option,
     20 => proposal_procedures,
     21 => treasury_value,
-    22 => donation: nonempty_map::decode_option_positive_coin,
+    22 => donation,
     23 => sub_transactions,
     24 => required_top_level_guards: nonempty_map::decode_option,
     25 => direct_deposits: nonempty_map::decode_option,

@@ -993,12 +993,20 @@ impl From<&AnyUInt> for u64 {
 
 /// Introduced in Conway
 /// positive_coin = 1 .. 18446744073709551615
-#[derive(
-    Encode, Decode, Debug, PartialEq, Copy, Clone, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Encode, Debug, PartialEq, Copy, Clone, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(not(feature = "unstable"), derive(Decode))]
 #[serde(transparent)]
 #[cbor(transparent)]
 pub struct PositiveCoin(u64);
+
+#[cfg(feature = "unstable")]
+impl<'b, C> minicbor::decode::Decode<'b, C> for PositiveCoin {
+    fn decode(d: &mut minicbor::Decoder<'b>, _ctx: &mut C) -> Result<Self, Error> {
+        let at = d.position();
+        Self::try_from(d.u64()?)
+            .map_err(|_| Error::message("zero where a positive quantity is required").at(at))
+    }
+}
 
 impl TryFrom<u64> for PositiveCoin {
     type Error = u64;
@@ -1353,6 +1361,12 @@ where
                 d.null()?;
                 Ok(Self::Null)
             }
+            #[cfg(feature = "unstable")]
+            minicbor::data::Type::Undefined => Err(minicbor::decode::Error::message(
+                "undefined where a value or null is required",
+            )
+            .at(d.position())),
+            #[cfg(not(feature = "unstable"))]
             minicbor::data::Type::Undefined => {
                 d.undefined()?;
                 Ok(Self::Undefined)
@@ -1935,5 +1949,29 @@ mod tests {
             assert_eq!(decode_text_def_or_indef(&mut d, &mut ()).unwrap(), "abc");
             assert_eq!(d.position(), raw.len(), "{hex}");
         }
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_nullable_reads_null_and_refuses_undefined() {
+        assert_eq!(
+            minicbor::decode::<Nullable<u8>>(&[0xf6]).unwrap(),
+            Nullable::Null
+        );
+        assert_eq!(
+            minicbor::decode::<Nullable<u8>>(&[0x01]).unwrap(),
+            Nullable::Some(1)
+        );
+        assert!(minicbor::decode::<Nullable<u8>>(&[0xf7]).is_err());
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_positive_coin_refuses_zero() {
+        assert_eq!(
+            minicbor::decode::<PositiveCoin>(&[0x01]).map(u64::from).unwrap(),
+            1
+        );
+        assert!(minicbor::decode::<PositiveCoin>(&[0x00]).is_err());
     }
 }
