@@ -21,6 +21,21 @@ use crate::{
 #[cfg(feature = "unstable")]
 use crate::probe;
 
+/// Decodes the bytes as one value that ends where they end.
+#[cfg(feature = "unstable")]
+fn decode_whole<'b, T: minicbor::Decode<'b, ()>>(
+    cbor: &'b [u8],
+) -> Result<T, minicbor::decode::Error> {
+    let mut d = minicbor::Decoder::new(cbor);
+    let value = d.decode()?;
+    if d.position() != cbor.len() {
+        return Err(
+            minicbor::decode::Error::message("bytes left after the transaction").at(d.position()),
+        );
+    }
+    Ok(value)
+}
+
 impl<'b> MultiEraTx<'b> {
     pub fn from_byron(tx: &'b byron::TxPayload<'b>) -> Self {
         Self::Byron(Box::new(Cow::Borrowed(tx)))
@@ -90,13 +105,13 @@ impl<'b> MultiEraTx<'b> {
             #[cfg(feature = "unstable")]
             Era::Dijkstra => match probe::tx_shape(cbor) {
                 probe::TxShape::DijkstraMempool | probe::TxShape::ValidityThird => {
-                    let tx: dijkstra::MempoolTransaction = minicbor::decode(cbor)?;
+                    let tx: dijkstra::MempoolTransaction = decode_whole(cbor)?;
                     Ok(MultiEraTx::Dijkstra(Box::new(Cow::Owned(
                         dijkstra::BlockTransaction::from(tx),
                     ))))
                 }
                 probe::TxShape::DijkstraBlock | probe::TxShape::Other => {
-                    let tx = minicbor::decode(cbor)?;
+                    let tx = decode_whole(cbor)?;
                     let tx = Box::new(Cow::Owned(tx));
                     Ok(MultiEraTx::Dijkstra(tx))
                 }
@@ -1059,6 +1074,29 @@ mod tests {
         );
         assert_eq!(tx.inputs().len(), 1);
         assert_eq!(tx.fee(), Some(1_000));
+    }
+
+    #[test]
+    fn a_dijkstra_transaction_with_bytes_after_it_is_refused() {
+        let mempool = testing::dijkstra_mempool_tx(
+            &testing::minimal_body(),
+            &testing::empty_witness_set(),
+            None,
+        );
+        let block = chain_sub_transaction_tx();
+
+        for (form, cbor) in [("mempool", mempool), ("block", block)] {
+            MultiEraTx::decode_for_era(Era::Dijkstra, &cbor)
+                .unwrap_or_else(|err| panic!("the {form} form was refused: {err}"));
+
+            let mut trailing = cbor.clone();
+            trailing.push(0x00);
+            match MultiEraTx::decode_for_era(Era::Dijkstra, &trailing) {
+                Err(err) if err.to_string().contains("bytes left") => {}
+                Err(err) => panic!("the {form} form was refused for another reason: {err}"),
+                Ok(_) => panic!("the {form} form with a byte after it was read"),
+            }
+        }
     }
 
     #[test]
