@@ -638,7 +638,9 @@ fn tx(
 }
 
 fn block(b: &d::Block) -> Value {
-    let h = &b.header.header_body;
+    let d::HeaderBody::Leios(h) = &b.header.header_body else {
+        panic!("a ledger vector block has a twelve field header body");
+    };
     let header = obj(vec![
         ("block_no", cb(&h.block_number)),
         ("slot", cb(&h.slot)),

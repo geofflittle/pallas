@@ -510,6 +510,26 @@ mod tests {
 
     #[cfg(feature = "unstable")]
     #[test]
+    fn a_block_under_a_praos_header_reads_its_transactions() {
+        let cbor = dijkstra_block(include_str!("../../test_data/dijkstranet-126727.block"));
+        let block = MultiEraBlock::decode(&cbor).expect("invalid cbor");
+
+        assert_eq!(block.era(), Era::Dijkstra);
+        assert_eq!(block.number(), 126727);
+        assert_eq!(block.header().block_body_contains_leios_cert(), None);
+
+        let hashes: Vec<_> = block.txs().iter().map(|tx| tx.hash().to_string()).collect();
+        assert_eq!(
+            hashes,
+            [
+                "5aded5626162eeba270690e57a4741c1be9a37e62d9c7af938f5c5a2d6b7f4ad",
+                "c8ef3e0d778120a05b2ec806bd10a6127bb12e00db9cdd84b48e563a0cf4e6d9",
+            ]
+        );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
     fn a_certifying_block_from_local_chain_sync_carries_the_certified_transactions() {
         let cbor = dijkstra_block(include_str!(
             "../../test_data/dijkstra-rc-2026w45-23123.block"

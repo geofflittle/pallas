@@ -1,9 +1,10 @@
 use super::{
     AccountBalanceInterval, AccountBalanceIntervals, AuxiliaryData, Block, BlockTransaction,
     Certificate, CostModels, DRep, DatumOption, EndorserBlock, GovAction, Guards, Header,
-    MempoolTransaction, NativeScript, NonEmptySet, PlutusData, ProposalProcedure,
-    ProtocolParamUpdate, ProtocolVersion, RationalNumber, Relay, ScriptRef, Set, SetArm,
-    StakeCredential, SubTransactionBody, TransactionBody, TransactionOutput, Voter, WitnessSet,
+    HeaderBody, LeiosHeaderBody, MempoolTransaction, NativeScript, NonEmptySet, PlutusData,
+    ProposalProcedure, ProtocolParamUpdate, ProtocolVersion, RationalNumber, Relay, ScriptRef, Set,
+    SetArm, StakeCredential, SubTransactionBody, TransactionBody, TransactionOutput, Voter,
+    WitnessSet,
 };
 use crate::flat_enum::{assert_reads_either_length_form, decode_all};
 use pallas_codec::minicbor;
@@ -130,6 +131,13 @@ fn block_of(name: &str) -> Block<'static> {
 fn header_of(name: &str) -> Header {
     let block = block_of(name);
     minicbor::decode(block.header.raw_cbor()).unwrap()
+}
+
+fn leios(header: &Header) -> &LeiosHeaderBody {
+    match &header.header_body {
+        HeaderBody::Leios(body) => body,
+        HeaderBody::Praos(_) => panic!("expected the twelve field Leios header body"),
+    }
 }
 
 #[test]
@@ -309,6 +317,173 @@ fn transactions_with_indefinite_length_byte_strings_decode_and_keep_their_ids() 
     }
 }
 
+/// Dijkstranet blocks with their header hash and transaction ids, provenance in `test_data/dijkstra-fixtures.md`.
+const DIJKSTRANET_BLOCKS: &[(&str, &str, &str, &[&str])] = &[
+    (
+        "dijkstranet-66086",
+        include_str!("../../../test_data/dijkstranet-66086.block"),
+        "3ca025672aea5bbb68cc38eedb4c55a640c0e723b3c9eaf927bcd911b50fefd7",
+        &["d43fe27b4a7343dc74708d8249721feac1fca1715403abd37b6b47f4a4f70514"],
+    ),
+    (
+        "dijkstranet-66639",
+        include_str!("../../../test_data/dijkstranet-66639.block"),
+        "c3e155c67cd0bb2830e24818d5f4caa1e0385706d7f2eeccea6dccede162a6b6",
+        &["1a0f3695f4a2eb8ccc81cef4907fb2fb417656353afce622a9c4366eff8e109c"],
+    ),
+    (
+        "dijkstranet-67128",
+        include_str!("../../../test_data/dijkstranet-67128.block"),
+        "998efaf41f50d590f398192e6743e087acd644c5f26dca294a09bc6ae7836766",
+        &["44c8e0fb792791b5fc62c23ec1e0628d7ebe4bc9a405010297cb9110498683f1"],
+    ),
+    (
+        "dijkstranet-68330",
+        include_str!("../../../test_data/dijkstranet-68330.block"),
+        "b4ec9af31fcd284f3af54c18020ba8227bd81c0cbf36badc248d539a57b76d32",
+        &["395c71f98f21dffd5483e952e35bef29262f51c95e85eb03508fbc8e86cba346"],
+    ),
+    (
+        "dijkstranet-83548",
+        include_str!("../../../test_data/dijkstranet-83548.block"),
+        "330f81d235c2a5ea7d2a681f8b0b015bac8e1b1779906725f2939769cd365dd2",
+        &["31afb7ab7cda6aa98bebf8b253c8fa490d6ddf61b77517c2b2d40527ee4d75c0"],
+    ),
+    (
+        "dijkstranet-100887",
+        include_str!("../../../test_data/dijkstranet-100887.block"),
+        "0a4cee04726609c227aa3eecca86262b002229d332d7ae1238ac0cad3b8ddd63",
+        &["0af0fec1ce41f40f4547492ff2e2abbfcca0a80b2a4cd77a60184005af8aa5d4"],
+    ),
+    (
+        "dijkstranet-100930",
+        include_str!("../../../test_data/dijkstranet-100930.block"),
+        "71048c26f77c44dd7edc5344364ee75fbab6cce3c4481646e9f5ae36d085d532",
+        &["0266f3298ea1db321eb5972d1579ebff9fc7be489300bd8cf7e399d659d5133e"],
+    ),
+    (
+        "dijkstranet-100933",
+        include_str!("../../../test_data/dijkstranet-100933.block"),
+        "fb19d3b8563c307b4d9e9721f481434b7e0590a240cc0d2696953a968adc33ba",
+        &["306735fd4f18141d55d609499980c2c3dc14cb3479c7c1468bab6d7961dd7bef"],
+    ),
+    (
+        "dijkstranet-101244",
+        include_str!("../../../test_data/dijkstranet-101244.block"),
+        "6cdc9f838a7b666a49ee2d7a775afe93a081ae0578577714f7fc6fee28bbf474",
+        &["f86e2ad6b52d61a4e88cf0547a1d1af59a19c278f56af50593090becb86fb1ed"],
+    ),
+    (
+        "dijkstranet-101801",
+        include_str!("../../../test_data/dijkstranet-101801.block"),
+        "18d6c6cacb5d6d482926b13045e6b9ebf7a1fc7399a69c9583e733c7e3105146",
+        &["1777608f1e9ce0d46c5edef8ab86d44aa1cefdaf1657f6a699808c69e216569d"],
+    ),
+    (
+        "dijkstranet-101807",
+        include_str!("../../../test_data/dijkstranet-101807.block"),
+        "e34b2cffd4d15d8582fc2924fcc8369918da19d4c730b169ae79a0c45e91831a",
+        &["53d78059eb3ef662f533d373b16b7f54d9c5cb67d31efed3636564cf05c3faa7"],
+    ),
+    (
+        "dijkstranet-101810",
+        include_str!("../../../test_data/dijkstranet-101810.block"),
+        "be5e06fe75dae3392e6a9c1d25cda513b1b91ea4241e4486f6171f7df7ad7074",
+        &["ddb3a4f0227b1e8fbdc17f269ef4b347aa367381660bdf17318fc99ecc4e188e"],
+    ),
+    (
+        "dijkstranet-101816",
+        include_str!("../../../test_data/dijkstranet-101816.block"),
+        "d7c8f5fab5bd38c16f36e704901795c93bf4bf34e6fedf1a7b5870e2c98cf68f",
+        &["d47a1a3065882d0a61d19e71d937eb9a45ece43ae59f14ec594d4fc23782695b"],
+    ),
+    (
+        "dijkstranet-101821",
+        include_str!("../../../test_data/dijkstranet-101821.block"),
+        "4c77c2ffa373c77e4e9330e86b1e0d3d76de2137b8ed35d5952740c01d0a84e1",
+        &["c651a23cb67c2434d1768c6e0e457b4e88f121637c17d082c01827adaf3ee0d8"],
+    ),
+    (
+        "dijkstranet-104912",
+        include_str!("../../../test_data/dijkstranet-104912.block"),
+        "0a6c6ddcc753782a7a1ee49e21fb744a86f6b552a662043ad06241dd76681634",
+        &["3ea15dba4b39188058f449e4b02c8d034fc04754a7c45690a0e5c603cda63998"],
+    ),
+    (
+        "dijkstranet-105251",
+        include_str!("../../../test_data/dijkstranet-105251.block"),
+        "fcaedf7e2c6950a54a8d4a3857ec018414c37f8870c9d5ebc8c2522c7e0a369f",
+        &["509983f270ef14f28779045a5a62e64507ba97e1eda371a82a475dce85919b5b"],
+    ),
+    (
+        "dijkstranet-108317",
+        include_str!("../../../test_data/dijkstranet-108317.block"),
+        "a446ce788b8af3428cf4d2f23f3461a21c65bcb8780cc467fae56a385fd5eeb5",
+        &["34f7777ec0618f637bf31c34d1a74288f83452b57fd86edeef8469aea11a9bda"],
+    ),
+    (
+        "dijkstranet-126727",
+        include_str!("../../../test_data/dijkstranet-126727.block"),
+        "6f89073e92c8703ebc7267660172ffe5c9399f53bd0b81ac6174f1a7cbce9a6d",
+        &[
+            "5aded5626162eeba270690e57a4741c1be9a37e62d9c7af938f5c5a2d6b7f4ad",
+            "c8ef3e0d778120a05b2ec806bd10a6127bb12e00db9cdd84b48e563a0cf4e6d9",
+        ],
+    ),
+    (
+        "dijkstranet-153913",
+        include_str!("../../../test_data/dijkstranet-153913.block"),
+        "3765872ae453542afb13ae96c731c6838edfbe8ae75fe313c762abaefc8ce211",
+        &["94ac9a72722a64b9f96e14051c3ec528548aa166cc8277ffd33d1c9aa03ae7c8"],
+    ),
+];
+
+#[test]
+fn dijkstranet_blocks_decode_with_their_ids_and_reencode() {
+    for (name, block_hex, header_hash, tx_ids) in DIJKSTRANET_BLOCKS {
+        let bytes = hex::decode(block_hex).unwrap();
+
+        let (era, block): BlockWrapper = minicbor::decode(&bytes)
+            .unwrap_or_else(|e| panic!("{name} should decode as a Dijkstra block: {e}"));
+        assert_eq!(era, 8, "{name}: block wrapper tag");
+
+        assert_eq!(
+            hex::encode(Hasher::<256>::hash(block.header.raw_cbor())),
+            *header_hash,
+            "{name}: header hash"
+        );
+
+        let HeaderBody::Praos(body) = &block.header.header_body else {
+            panic!("{name}: a Dijkstranet header body has the ten field Praos form");
+        };
+        assert_eq!(
+            Some(body.block_number.to_string().as_str()),
+            name.strip_prefix("dijkstranet-"),
+            "{name}: block number"
+        );
+        let minor = if *name == "dijkstranet-101801" { 69 } else { 0 };
+        assert_eq!(
+            body.protocol_version,
+            (12, minor),
+            "{name}: protocol version"
+        );
+
+        let ids: Vec<String> = block
+            .block_body
+            .transactions
+            .iter()
+            .map(|tx| hex::encode(Hasher::<256>::hash(tx.transaction_body.raw_cbor())))
+            .collect();
+        assert_eq!(ids, *tx_ids, "{name}: transaction ids");
+
+        assert_eq!(
+            hex::encode(minicbor::to_vec((era, &block)).unwrap()),
+            *block_hex,
+            "{name}: the block should re-encode to the bytes it was read from"
+        );
+    }
+}
+
 /// Transactions holding a PlutusV4 witness script, in their own witness set or a sub transaction's.
 const V4_WITNESS_TXS: &[(&str, &str)] = &[
     (
@@ -392,10 +567,10 @@ fn dijkstra_header_is_not_a_babbage_header() {
 
         let as_dijkstra: Header = minicbor::decode(raw).unwrap();
 
-        let leios_tail = minicbor::to_vec(as_dijkstra.header_body.block_body_contains_leios_cert)
+        let leios_tail = minicbor::to_vec(leios(&as_dijkstra).block_body_contains_leios_cert)
             .unwrap()
             .len()
-            + minicbor::to_vec(&as_dijkstra.header_body.eb_announcement)
+            + minicbor::to_vec(&leios(&as_dijkstra).eb_announcement)
                 .unwrap()
                 .len();
         assert_eq!(
@@ -408,24 +583,20 @@ fn dijkstra_header_is_not_a_babbage_header() {
     }
 
     let empty: Header = header_of("dijkstra1");
-    assert!(!empty.header_body.block_body_contains_leios_cert);
+    assert!(!leios(&empty).block_body_contains_leios_cert);
     assert!(matches!(
-        empty.header_body.eb_announcement,
+        leios(&empty).eb_announcement,
         crate::Nullable::Null
     ));
 
     let populated: Header = header_of("dijkstra8");
-    assert!(populated.header_body.block_body_contains_leios_cert);
+    assert!(leios(&populated).block_body_contains_leios_cert);
     assert!(matches!(
-        populated.header_body.eb_announcement,
+        leios(&populated).eb_announcement,
         crate::Nullable::Some(_)
     ));
 
-    let width = |h: &Header| {
-        minicbor::to_vec(&h.header_body.eb_announcement)
-            .unwrap()
-            .len()
-    };
+    let width = |h: &Header| minicbor::to_vec(&leios(h).eb_announcement).unwrap().len();
     assert_eq!(width(&empty), 1, "a nil announcement is one byte");
     assert!(
         width(&populated) > 32,
@@ -913,16 +1084,109 @@ fn every_leios_fetch_citation_matches_the_leios_fetch_messages() {
 }
 
 #[test]
-fn conway_header_is_refused_as_dijkstra() {
+fn an_eleven_field_header_body_is_refused() {
+    let header = header_of("dijkstra1");
+    let body = leios(&header);
+
+    let mut e = minicbor::Encoder::new(Vec::new());
+    e.array(2).unwrap();
+    e.array(11).unwrap();
+    e.encode(body.block_number).unwrap();
+    e.encode(body.slot).unwrap();
+    e.encode(body.prev_hash).unwrap();
+    e.encode(&body.issuer_vkey).unwrap();
+    e.encode(&body.vrf_vkey).unwrap();
+    e.encode(&body.vrf_result).unwrap();
+    e.encode(body.block_body_size).unwrap();
+    e.encode(body.block_body_hash).unwrap();
+    e.encode(&body.operational_cert).unwrap();
+    e.encode(&body.header_version_info).unwrap();
+    e.encode(body.block_body_contains_leios_cert).unwrap();
+    e.encode(&header.body_signature).unwrap();
+    let raw = e.into_writer();
+
+    let mut full = minicbor::Encoder::new(Vec::new());
+    full.array(2).unwrap();
+    full.array(12).unwrap();
+    full.encode(body.block_number).unwrap();
+    full.encode(body.slot).unwrap();
+    full.encode(body.prev_hash).unwrap();
+    full.encode(&body.issuer_vkey).unwrap();
+    full.encode(&body.vrf_vkey).unwrap();
+    full.encode(&body.vrf_result).unwrap();
+    full.encode(body.block_body_size).unwrap();
+    full.encode(body.block_body_hash).unwrap();
+    full.encode(&body.operational_cert).unwrap();
+    full.encode(&body.header_version_info).unwrap();
+    full.encode(body.block_body_contains_leios_cert).unwrap();
+    full.encode(&body.eb_announcement).unwrap();
+    full.encode(&header.body_signature).unwrap();
+    assert_eq!(
+        full.into_writer(),
+        minicbor::to_vec(&header).unwrap(),
+        "the hand built twelve field header should equal the fixture's header"
+    );
+
+    let decoded: Result<Header, _> = minicbor::decode(&raw);
+    let err = decoded.expect_err("an eleven field header body must not decode");
+    assert!(
+        err.to_string().contains("missing value at index 11"),
+        "refused for another reason: {err}"
+    );
+}
+
+/// Rewrites a header's body array with an indefinite length head and a break.
+fn with_indefinite_header_body(raw: &[u8]) -> Vec<u8> {
+    let mut d = minicbor::Decoder::new(raw);
+    d.array().unwrap();
+    let start = d.position();
+    let fields = d.array().unwrap().unwrap();
+    let contents = d.position();
+    for _ in 0..fields {
+        d.skip().unwrap();
+    }
+    let end = d.position();
+
+    let mut out = raw[..start].to_vec();
+    out.push(0x9f);
+    out.extend_from_slice(&raw[contents..end]);
+    out.push(0xff);
+    out.extend_from_slice(&raw[end..]);
+    out
+}
+
+#[test]
+fn a_header_body_in_an_indefinite_array_reads_by_its_element_count() {
+    let conway = hex::decode(include_str!("../../../test_data/conway1.block")).unwrap();
+    let (_, block): (u16, crate::conway::Block) = minicbor::decode(&conway).unwrap();
+    let praos = with_indefinite_header_body(block.header.raw_cbor());
+    let header: Header = minicbor::decode(&praos).unwrap();
+    let HeaderBody::Praos(body) = &header.header_body else {
+        panic!("ten fields to a break should read as the Praos form");
+    };
+    assert_eq!(body, &block.header.header_body);
+
+    let dijkstra = block_of("dijkstra1");
+    let leios_raw = with_indefinite_header_body(dijkstra.header.raw_cbor());
+    let header: Header = minicbor::decode(&leios_raw).unwrap();
+    let HeaderBody::Leios(body) = &header.header_body else {
+        panic!("twelve fields to a break should read as the Leios form");
+    };
+    assert_eq!(body, leios(&header_of("dijkstra1")));
+}
+
+#[test]
+fn a_ten_field_header_body_reads_as_the_praos_form() {
     let conway = hex::decode(include_str!("../../../test_data/conway1.block")).unwrap();
     let (_, block): (u16, crate::conway::Block) = minicbor::decode(&conway).unwrap();
     let raw = block.header.raw_cbor();
 
-    let decoded: Result<KeepRaw<'_, Header>, _> = minicbor::decode(raw);
-    assert!(
-        decoded.is_err(),
-        "a ten field Conway header must not decode as a Dijkstra header"
-    );
+    let header: Header = minicbor::decode(raw).unwrap();
+    let HeaderBody::Praos(body) = &header.header_body else {
+        panic!("a ten field header body should read as the Praos form");
+    };
+    assert_eq!(body, &block.header.header_body);
+    assert_eq!(minicbor::to_vec(&header).unwrap(), raw);
 }
 
 /// A `proposal_procedure` whose `gov_action` is a `parameter_change_action`
@@ -1343,7 +1607,7 @@ fn a_block_carrying_both_leios_fields_reads_both() {
 
     // The header's flag and the body's slot are independent, and they agree.
     assert!(
-        header.header_body.block_body_contains_leios_cert,
+        leios(&header).block_body_contains_leios_cert,
         "dijkstra8 is a block whose header says it carries a certificate"
     );
 
@@ -1366,7 +1630,7 @@ fn a_block_carrying_both_leios_fields_reads_both() {
         "a BLS12-381 signature is 48 bytes"
     );
 
-    let crate::Nullable::Some(announcement) = &header.header_body.eb_announcement else {
+    let crate::Nullable::Some(announcement) = &leios(&header).eb_announcement else {
         panic!("dijkstra8 must carry an endorser block announcement");
     };
     assert_eq!(
@@ -1390,9 +1654,9 @@ fn a_certificate_travels_without_an_announcement() {
     let block = block_of("dijkstra9");
     let header = header_of("dijkstra9");
 
-    assert!(header.header_body.block_body_contains_leios_cert);
+    assert!(leios(&header).block_body_contains_leios_cert);
     assert!(
-        matches!(header.header_body.eb_announcement, crate::Nullable::Null),
+        matches!(leios(&header).eb_announcement, crate::Nullable::Null),
         "dijkstra9 is the block that certifies without announcing"
     );
 
@@ -1423,15 +1687,12 @@ fn a_certificate_travels_without_an_announcement() {
         plain.block_body.leios_certificate,
         crate::Nullable::Null
     ));
+    let plain_header = header_of("dijkstra11");
     assert!(matches!(
-        header_of("dijkstra11").header_body.eb_announcement,
+        leios(&plain_header).eb_announcement,
         crate::Nullable::Null
     ));
-    assert!(
-        !header_of("dijkstra11")
-            .header_body
-            .block_body_contains_leios_cert
-    );
+    assert!(!leios(&plain_header).block_body_contains_leios_cert);
 }
 
 /// `eb_references_announcement = [eb_hash : hash32, eb_size : uint .size 4]` (`defs.cddl`).
@@ -1451,7 +1712,7 @@ fn an_announced_size_reaches_the_five_byte_uint() {
         let block = block_of(name);
         let header = header_of(name);
 
-        let crate::Nullable::Some(announcement) = &header.header_body.eb_announcement else {
+        let crate::Nullable::Some(announcement) = &leios(&header).eb_announcement else {
             panic!("{name} must carry an endorser block announcement");
         };
         assert_eq!(announcement.eb_size, size, "{name}: the announced size");
@@ -2151,7 +2412,7 @@ fn a_version_info_in_an_indefinite_array_reads_to_its_break() {
     let mut d = minicbor::Decoder::new(&bytes);
     let header: Header = d.decode().expect("an indefinite version info must decode");
     assert_eq!(d.position(), bytes.len());
-    let info = &header.header_body.header_version_info;
+    let info = &leios(&header).header_version_info;
     assert_eq!(info.highest_supported_major_version, 1004951745);
     assert_eq!(info.self_reported_software_tag, 3942894501);
 }
