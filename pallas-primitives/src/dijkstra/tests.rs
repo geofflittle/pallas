@@ -1084,7 +1084,7 @@ fn every_leios_fetch_citation_matches_the_leios_fetch_messages() {
 }
 
 #[test]
-fn an_eleven_field_header_body_is_refused() {
+fn a_header_body_of_eleven_or_thirteen_fields_is_refused() {
     let header = header_of("dijkstra1");
     let body = leios(&header);
 
@@ -1130,7 +1130,35 @@ fn an_eleven_field_header_body_is_refused() {
     let decoded: Result<Header, _> = minicbor::decode(&raw);
     let err = decoded.expect_err("an eleven field header body must not decode");
     assert!(
-        err.to_string().contains("missing value at index 11"),
+        err.to_string()
+            .contains("array has no element left for a required field"),
+        "refused for another reason: {err}"
+    );
+
+    let mut long = minicbor::Encoder::new(Vec::new());
+    long.array(2).unwrap();
+    long.array(13).unwrap();
+    long.encode(body.block_number).unwrap();
+    long.encode(body.slot).unwrap();
+    long.encode(body.prev_hash).unwrap();
+    long.encode(&body.issuer_vkey).unwrap();
+    long.encode(&body.vrf_vkey).unwrap();
+    long.encode(&body.vrf_result).unwrap();
+    long.encode(body.block_body_size).unwrap();
+    long.encode(body.block_body_hash).unwrap();
+    long.encode(&body.operational_cert).unwrap();
+    long.encode(&body.header_version_info).unwrap();
+    long.encode(body.block_body_contains_leios_cert).unwrap();
+    long.encode(&body.eb_announcement).unwrap();
+    long.null().unwrap();
+    long.encode(&header.body_signature).unwrap();
+    let long = long.into_writer();
+
+    let decoded: Result<Header, _> = minicbor::decode(&long);
+    let err = decoded.expect_err("a thirteen field header body must not decode");
+    assert!(
+        err.to_string()
+            .contains("array of length 13 has more elements than the 12 fields read"),
         "refused for another reason: {err}"
     );
 }
