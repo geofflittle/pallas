@@ -99,13 +99,12 @@ macro_rules! tag_preserving_set {
             }
         }
 
-        impl<'b, C, T> minicbor::decode::Decode<'b, C> for $name<T>
-        where
-            T: Decode<'b, C> + PartialEq,
-        {
-            fn decode(
+        impl<T: PartialEq> $name<T> {
+            /// Decodes the set, reading each element with the item decoder.
+            pub(crate) fn decode_by<'b, C>(
                 d: &mut minicbor::Decoder<'b>,
                 ctx: &mut C,
+                item: impl Fn(&mut minicbor::Decoder<'b>, &mut C) -> Result<T, minicbor::decode::Error>,
             ) -> Result<Self, minicbor::decode::Error> {
                 let arm = if d.datatype()? == minicbor::data::Type::Tag {
                     let found = d.tag()?;
@@ -120,11 +119,29 @@ macro_rules! tag_preserving_set {
                     SetArm::Bare
                 };
 
-                let items: Vec<T> = d.decode_with(ctx)?;
+                let items = pallas_codec::utils::decode_array(d, |a| {
+                    let mut items = Vec::new();
+                    while a.datatype()? != minicbor::data::Type::Break {
+                        items.push(a.decode_by(ctx, &item)?);
+                    }
+                    Ok(items)
+                })?;
                 at_least(items.len(), $minimum, $rule)?;
                 distinct(&items, $rule)?;
 
                 Ok(Self { arm, items })
+            }
+        }
+
+        impl<'b, C, T> minicbor::decode::Decode<'b, C> for $name<T>
+        where
+            T: Decode<'b, C> + PartialEq,
+        {
+            fn decode(
+                d: &mut minicbor::Decoder<'b>,
+                ctx: &mut C,
+            ) -> Result<Self, minicbor::decode::Error> {
+                Self::decode_by(d, ctx, |d, ctx| d.decode_with(ctx))
             }
         }
 
@@ -387,7 +404,7 @@ crate::array_record::decode_array_record!(LeiosHeaderBody {
     prev_hash,
     issuer_vkey: pallas_codec::utils::decode_bytes_sized::<32, 32, _>,
     vrf_vkey: pallas_codec::utils::decode_bytes_sized::<32, 32, _>,
-    vrf_result,
+    vrf_result: decode_vrf_cert,
     block_body_size,
     block_body_hash,
     operational_cert,
@@ -395,6 +412,28 @@ crate::array_record::decode_array_record!(LeiosHeaderBody {
     block_body_contains_leios_cert,
     eb_announcement
 });
+
+// The Dijkstra ledger bounds the VRF output and the chain code, which the Conway ledger reads at any size.
+crate::array_record::decode_array_record!(fn decode_vrf_cert for VrfCert(
+    output: pallas_codec::utils::decode_bytes_sized::<64, 64, _>,
+    proof: pallas_codec::utils::decode_bytes_sized::<80, 80, _>,
+));
+
+crate::array_record::decode_array_record!(fn decode_bootstrap_witness for BootstrapWitness {
+    public_key: pallas_codec::utils::decode_bytes_sized::<32, 32, _>,
+    signature: pallas_codec::utils::decode_bytes_sized::<64, 64, _>,
+    chain_code: pallas_codec::utils::decode_bytes_sized::<32, 32, _>,
+    attributes
+});
+
+/// Decodes the bootstrap witnesses of a witness set.
+fn decode_bootstrap_witnesses<'b, Ctx>(
+    d: &mut minicbor::Decoder<'b>,
+    ctx: &mut Ctx,
+) -> Result<Option<NonEmptySet<BootstrapWitness>>, minicbor::decode::Error> {
+    crate::map_record::refuse_nil(d)?;
+    NonEmptySet::decode_by(d, ctx, decode_bootstrap_witness).map(Some)
+}
 
 impl LeiosHeaderBody {
     pub fn leader_vrf_output(&self) -> Vec<u8> {
@@ -2100,7 +2139,7 @@ pub struct WitnessSet<'b> {
 crate::map_record::decode_map_record!(WitnessSet<'b>,
     0 => vkeywitness,
     1 => native_script,
-    2 => bootstrap_witness,
+    2 => bootstrap_witness: decode_bootstrap_witnesses,
     3 => plutus_v1_script,
     4 => plutus_data,
     5 => redeemer,
