@@ -1130,6 +1130,121 @@ pub(crate) mod guards_field {
     }
 }
 
+/// Decoders for the maps and quantities the ledger reads with at least one entry, no repeated key and no zero.
+pub(crate) mod nonempty_map {
+    use super::{BTreeMap, Value};
+    use pallas_codec::minicbor::{self, Decode, Decoder, data::Type, decode::Error};
+    use pallas_codec::utils::{PositiveCoin, decode_array};
+
+    /// A map whose values are maps.
+    type Nested<K, J, V> = BTreeMap<K, BTreeMap<J, V>>;
+
+    /// Decodes a map of at least one entry, reading each value with `value`.
+    fn decode_by<'b, Ctx, K, V>(
+        d: &mut Decoder<'b>,
+        ctx: &mut Ctx,
+        value: fn(&mut Decoder<'b>, &mut Ctx) -> Result<V, Error>,
+    ) -> Result<BTreeMap<K, V>, Error>
+    where
+        K: Decode<'b, Ctx> + Ord,
+    {
+        let at = d.position();
+        let len = d.map()?;
+        let mut map = BTreeMap::new();
+        let mut read = 0;
+        loop {
+            match len {
+                Some(len) if read == len => break,
+                None if d.datatype()? == Type::Break => {
+                    d.skip()?;
+                    break;
+                }
+                _ => {}
+            }
+            let key_at = d.position();
+            let key = d.decode_with(ctx)?;
+            let entry = value(d, ctx)?;
+            if map.insert(key, entry).is_some() {
+                return Err(Error::message("repeated key in a map").at(key_at));
+            }
+            read += 1;
+        }
+        if map.is_empty() {
+            return Err(Error::message("empty map where an entry is required").at(at));
+        }
+        Ok(map)
+    }
+
+    /// Decodes a map of at least one entry.
+    pub fn decode<'b, Ctx, K, V>(
+        d: &mut Decoder<'b>,
+        ctx: &mut Ctx,
+    ) -> Result<BTreeMap<K, V>, Error>
+    where
+        K: Decode<'b, Ctx> + Ord,
+        V: Decode<'b, Ctx>,
+    {
+        decode_by(d, ctx, |d, ctx| d.decode_with(ctx))
+    }
+
+    /// Decodes an optional field holding a map of at least one entry.
+    pub fn decode_option<'b, Ctx, K, V>(
+        d: &mut Decoder<'b>,
+        ctx: &mut Ctx,
+    ) -> Result<Option<BTreeMap<K, V>>, Error>
+    where
+        K: Decode<'b, Ctx> + Ord,
+        V: Decode<'b, Ctx>,
+    {
+        decode(d, ctx).map(Some)
+    }
+
+    /// Decodes an optional field holding a map of maps, each of at least one entry.
+    pub fn decode_nested_option<'b, Ctx, K, J, V>(
+        d: &mut Decoder<'b>,
+        ctx: &mut Ctx,
+    ) -> Result<Option<Nested<K, J, V>>, Error>
+    where
+        K: Decode<'b, Ctx> + Ord,
+        J: Decode<'b, Ctx> + Ord,
+        V: Decode<'b, Ctx>,
+    {
+        decode_by(d, ctx, decode).map(Some)
+    }
+
+    /// Decodes a quantity of at least one.
+    pub fn decode_positive_coin<Ctx>(
+        d: &mut Decoder<'_>,
+        _ctx: &mut Ctx,
+    ) -> Result<PositiveCoin, Error> {
+        let at = d.position();
+        PositiveCoin::try_from(d.u64()?)
+            .map_err(|_| Error::message("zero where a positive quantity is required").at(at))
+    }
+
+    /// Decodes an optional field holding a quantity of at least one.
+    pub fn decode_option_positive_coin<Ctx>(
+        d: &mut Decoder<'_>,
+        ctx: &mut Ctx,
+    ) -> Result<Option<PositiveCoin>, Error> {
+        decode_positive_coin(d, ctx).map(Some)
+    }
+
+    /// Decodes a value whose multiasset holds at least one asset, each of a positive quantity.
+    pub fn decode_value<'b, Ctx>(d: &mut Decoder<'b>, ctx: &mut Ctx) -> Result<Value, Error> {
+        match d.datatype()? {
+            Type::Array | Type::ArrayIndef => decode_array(d, |a| {
+                let coin = a.decode_with(ctx)?;
+                let multiasset = a.decode_by(ctx, |d, ctx| {
+                    decode_by(d, ctx, |d, ctx| decode_by(d, ctx, decode_positive_coin))
+                })?;
+                Ok(Value::Multiasset(coin, multiasset))
+            }),
+            _ => minicbor::Decode::decode(d, ctx),
+        }
+    }
+}
+
 pub type DirectDeposits = BTreeMap<RewardAccount, Coin>;
 
 pub type RequiredTopLevelGuards = BTreeMap<StakeCredential, Nullable<PlutusData>>;
@@ -1304,21 +1419,21 @@ crate::map_record::decode_map_record!(SubTransactionBody<'a>,
     1 => outputs,
     3 => ttl,
     4 => certificates,
-    5 => withdrawals,
+    5 => withdrawals: nonempty_map::decode_option,
     7 => auxiliary_data_hash,
     8 => validity_interval_start,
-    9 => mint,
+    9 => mint: nonempty_map::decode_nested_option,
     11 => script_data_hash,
     14 => guards: guards_field::decode_option,
     15 => network_id,
     18 => reference_inputs,
-    19 => voting_procedures,
+    19 => voting_procedures: nonempty_map::decode_nested_option,
     20 => proposal_procedures,
     21 => treasury_value,
-    22 => donation,
-    24 => required_top_level_guards,
-    25 => direct_deposits,
-    26 => account_balance_intervals,
+    22 => donation: nonempty_map::decode_option_positive_coin,
+    24 => required_top_level_guards: nonempty_map::decode_option,
+    25 => direct_deposits: nonempty_map::decode_option,
+    26 => account_balance_intervals: nonempty_map::decode_option,
 );
 
 /// `sub_transaction = [sub_transaction_body, transaction_witness_set, auxiliary_data/ nil]` (`defs.cddl`).
@@ -1430,10 +1545,10 @@ crate::map_record::decode_map_record!(TransactionBody<'a>,
     2 => fee,
     3 => ttl,
     4 => certificates,
-    5 => withdrawals,
+    5 => withdrawals: nonempty_map::decode_option,
     7 => auxiliary_data_hash,
     8 => validity_interval_start,
-    9 => mint,
+    9 => mint: nonempty_map::decode_nested_option,
     11 => script_data_hash,
     13 => collateral,
     14 => guards: guards_field::decode_option,
@@ -1441,15 +1556,15 @@ crate::map_record::decode_map_record!(TransactionBody<'a>,
     16 => collateral_return,
     17 => total_collateral,
     18 => reference_inputs,
-    19 => voting_procedures,
+    19 => voting_procedures: nonempty_map::decode_nested_option,
     20 => proposal_procedures,
     21 => treasury_value,
-    22 => donation,
+    22 => donation: nonempty_map::decode_option_positive_coin,
     23 => sub_transactions,
-    24 => required_top_level_guards,
-    25 => direct_deposits,
-    26 => account_balance_intervals,
-    27 => starting_account_balance_intervals,
+    24 => required_top_level_guards: nonempty_map::decode_option,
+    25 => direct_deposits: nonempty_map::decode_option,
+    26 => account_balance_intervals: nonempty_map::decode_option,
+    27 => starting_account_balance_intervals: nonempty_map::decode_option,
 );
 
 /// `babbage_transaction_output` (`defs.cddl`), the map form of an output.
@@ -1471,7 +1586,7 @@ pub struct PostAlonzoTransactionOutput<'b> {
 
 crate::map_record::decode_map_record!(PostAlonzoTransactionOutput<'b>,
     0 => address,
-    1 => value,
+    1 => value: nonempty_map::decode_value,
     2 => datum_option,
     3 => script_ref: babbage::decode_script_ref,
 );
