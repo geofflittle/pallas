@@ -1577,14 +1577,20 @@ pub struct ArrayFields<'a, 'b> {
 }
 
 impl<'b> ArrayFields<'_, 'b> {
-    /// Decodes the next element, or the absent value of `T` when the array has no element left.
+    /// Decodes the next element, which the array must hold.
     pub fn decode_with<C, T: Decode<'b, C>>(&mut self, ctx: &mut C) -> Result<T, Error> {
-        if self.datatype()? == Type::Break
-            && let Some(nil) = T::nil()
-        {
-            return Ok(nil);
-        }
         self.decode_by(ctx, |d, ctx| d.decode_with(ctx))
+    }
+
+    /// Decodes the next element of an optional trailing member, `None` when the array has no element left.
+    pub fn decode_optional<C, T: Decode<'b, C>>(
+        &mut self,
+        ctx: &mut C,
+    ) -> Result<Option<T>, Error> {
+        if self.datatype()? == Type::Break {
+            return Ok(None);
+        }
+        self.decode_with(ctx).map(Some)
     }
 
     /// Decodes the next element with `decode`, which the array must hold.
@@ -1612,7 +1618,7 @@ impl<'b> ArrayFields<'_, 'b> {
     }
 }
 
-/// Decodes one CBOR array of either length form with `fields`, then skips the elements it left unread.
+/// Decodes one CBOR array of either length form with `fields`, which must read every element.
 pub fn decode_array<'b, T>(
     d: &mut minicbor::Decoder<'b>,
     fields: impl FnOnce(&mut ArrayFields<'_, 'b>) -> Result<T, Error>,
@@ -1621,43 +1627,35 @@ pub fn decode_array<'b, T>(
     let mut array = ArrayFields { d, len, read: 0 };
     let value = fields(&mut array)?;
     let read = array.read;
-    skip_array_rest(d, len, read)?;
+    end_array(d, len, read)?;
     Ok(value)
 }
 
-/// Skips the elements of an array of length `len` after its first `read`, and the break of an indefinite one, refusing a definite length below `read`.
-pub fn skip_array_rest(
-    d: &mut minicbor::Decoder<'_>,
-    len: Option<u64>,
-    read: u64,
-) -> Result<(), Error> {
+/// Reads the end of an array of length `len` whose first `read` elements are decoded, refusing a length other than `read`.
+pub fn end_array(d: &mut minicbor::Decoder<'_>, len: Option<u64>, read: u64) -> Result<(), Error> {
     match len {
-        Some(len) if len < read => {
-            return Err(Error::message(format!(
-                "array of length {len} is shorter than the {read} fields read"
-            ))
-            .at(d.position()));
-        }
-        Some(len) => {
-            for _ in read..len {
-                d.skip()?;
-            }
-        }
-        None => {
-            while d.datatype()? != Type::Break {
-                d.skip()?;
-            }
-            d.skip()?;
-        }
+        Some(len) if len < read => Err(Error::message(format!(
+            "array of length {len} is shorter than the {read} fields read"
+        ))
+        .at(d.position())),
+        Some(len) if len > read => Err(Error::message(format!(
+            "array of length {len} has more elements than the {read} fields read"
+        ))
+        .at(d.position())),
+        Some(_) => Ok(()),
+        None if d.datatype()? == Type::Break => d.skip(),
+        None => Err(Error::message(format!(
+            "indefinite array has more elements than the {read} fields read"
+        ))
+        .at(d.position())),
     }
-    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// A required and an optional field.
+    /// A required field and a `T / nil` field.
     type Pair = (u8, Option<u8>);
 
     /// Decodes `bytes` as a `Pair` with `decode_array`, and the position it stopped at.
@@ -1671,23 +1669,13 @@ mod tests {
 
     #[test]
     fn decode_array_reads_either_length_form_to_its_end() {
-        let cases: [(&str, &[u8], Pair); 6] = [
+        let cases: [(&str, &[u8], Pair); 4] = [
             ("definite", &[0x82, 0x01, 0x02], (1, Some(2))),
             ("indefinite", &[0x9f, 0x01, 0x02, 0xff], (1, Some(2))),
+            ("definite with a null", &[0x82, 0x01, 0xf6], (1, None)),
             (
-                "definite with extras",
-                &[0x84, 0x01, 0x02, 0x81, 0x03, 0x04],
-                (1, Some(2)),
-            ),
-            (
-                "indefinite with extras",
-                &[0x9f, 0x01, 0x02, 0x9f, 0xff, 0x04, 0xff],
-                (1, Some(2)),
-            ),
-            ("definite without the optional", &[0x81, 0x01], (1, None)),
-            (
-                "indefinite without the optional",
-                &[0x9f, 0x01, 0xff],
+                "indefinite with a null",
+                &[0x9f, 0x01, 0xf6, 0xff],
                 (1, None),
             ),
         ];
@@ -1704,10 +1692,29 @@ mod tests {
     }
 
     #[test]
+    fn decode_array_refuses_an_array_with_more_elements_than_its_fields() {
+        for (name, bytes) in [
+            ("definite", &[0x84, 0x01, 0x02, 0x81, 0x03, 0x04][..]),
+            (
+                "indefinite",
+                &[0x9f, 0x01, 0x02, 0x9f, 0xff, 0x04, 0xff][..],
+            ),
+        ] {
+            let err = decode_pair(bytes).expect_err("an extra element must not decode");
+            assert!(
+                err.to_string().contains("more elements than"),
+                "the {name} array was refused for some other reason: {err}"
+            );
+        }
+    }
+
+    #[test]
     fn decode_array_refuses_an_array_without_a_required_field() {
         for (name, bytes) in [
             ("definite", &[0x80, 0x01][..]),
             ("indefinite", &[0x9f, 0xff][..]),
+            ("definite without the nullable", &[0x81, 0x01][..]),
+            ("indefinite without the nullable", &[0x9f, 0x01, 0xff][..]),
         ] {
             let err = decode_pair(bytes).expect_err("a missing required field must not decode");
             assert!(
@@ -1718,18 +1725,53 @@ mod tests {
     }
 
     #[test]
-    fn skip_array_rest_refuses_a_definite_array_shorter_than_the_fields_read() {
-        let mut d = minicbor::Decoder::new(&[]);
-        let err = skip_array_rest(&mut d, Some(1), 2)
-            .expect_err("an array of one element cannot hold two fields");
-        assert!(
-            err.to_string().contains("shorter than the"),
-            "refused for some other reason: {err}"
-        );
+    fn end_array_refuses_a_definite_length_other_than_the_fields_read() {
+        for (len, read, reason) in [(1, 2, "shorter than the"), (3, 2, "more elements than")] {
+            let err = end_array(&mut minicbor::Decoder::new(&[]), Some(len), read)
+                .expect_err("a length other than the fields read must not decode");
+            assert!(
+                err.to_string().contains(reason),
+                "length {len} for {read} fields was refused for some other reason: {err}"
+            );
+        }
         for (len, read) in [(2, 2), (0, 0)] {
-            skip_array_rest(&mut minicbor::Decoder::new(&[]), Some(len), read)
+            end_array(&mut minicbor::Decoder::new(&[]), Some(len), read)
                 .unwrap_or_else(|e| panic!("an array of {len} elements holds {read} fields: {e}"));
         }
+    }
+
+    /// Decodes `bytes` as a required field and an optional trailing member.
+    fn decode_with_optional(bytes: &[u8]) -> Result<(u8, Option<u8>), Error> {
+        decode_array(&mut minicbor::Decoder::new(bytes), |a| {
+            Ok((a.decode_with(&mut ())?, a.decode_optional(&mut ())?))
+        })
+    }
+
+    #[test]
+    fn decode_optional_reads_an_absent_trailing_member_as_none() {
+        for (name, bytes, expected) in [
+            (
+                "definite with the member",
+                &[0x82, 0x01, 0x02][..],
+                (1, Some(2)),
+            ),
+            (
+                "indefinite with the member",
+                &[0x9f, 0x01, 0x02, 0xff][..],
+                (1, Some(2)),
+            ),
+            ("definite without the member", &[0x81, 0x01][..], (1, None)),
+            (
+                "indefinite without the member",
+                &[0x9f, 0x01, 0xff][..],
+                (1, None),
+            ),
+        ] {
+            let value =
+                decode_with_optional(bytes).unwrap_or_else(|e| panic!("the {name} array: {e}"));
+            assert_eq!(value, expected, "the {name} array");
+        }
+        decode_with_optional(&[0x82, 0x01, 0xf6]).expect_err("an optional member is not nullable");
     }
 
     /// A required field followed by a `T / nil` field.
