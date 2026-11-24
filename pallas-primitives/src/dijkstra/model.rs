@@ -1130,7 +1130,7 @@ pub(crate) mod guards_field {
     }
 }
 
-/// Decoders for the maps and quantities the ledger reads with at least one entry, no repeated key and no zero.
+/// Decoders for the maps the ledger reads with at least one entry and the quantities it reads above zero.
 pub(crate) mod nonempty_map {
     use super::{BTreeMap, Value};
     use pallas_codec::minicbor::{self, Decode, Decoder, data::Type, decode::Error};
@@ -1169,10 +1169,28 @@ pub(crate) mod nonempty_map {
             }
             read += 1;
         }
+        refuse_empty(map, at)
+    }
+
+    /// Refuses a map with no entry, reporting the position the map was read from.
+    fn refuse_empty<K, V>(map: BTreeMap<K, V>, at: usize) -> Result<BTreeMap<K, V>, Error> {
         if map.is_empty() {
             return Err(Error::message("empty map where an entry is required").at(at));
         }
         Ok(map)
+    }
+
+    /// Decodes a map of at least one entry in which a repeated key keeps its last value.
+    pub fn decode_keeping_last<'b, Ctx, K, V>(
+        d: &mut Decoder<'b>,
+        ctx: &mut Ctx,
+    ) -> Result<BTreeMap<K, V>, Error>
+    where
+        K: Decode<'b, Ctx> + Ord,
+        V: Decode<'b, Ctx>,
+    {
+        let at = d.position();
+        refuse_empty(d.decode_with(ctx)?, at)
     }
 
     /// Decodes a map of at least one entry.
@@ -1687,7 +1705,7 @@ impl<'b, Ctx> minicbor::Decode<'b, Ctx> for Redeemers {
         d: &mut minicbor::Decoder<'b>,
         ctx: &mut Ctx,
     ) -> Result<Self, minicbor::decode::Error> {
-        nonempty_map::decode(d, ctx).map(Redeemers)
+        nonempty_map::decode_keeping_last(d, ctx).map(Redeemers)
     }
 }
 
