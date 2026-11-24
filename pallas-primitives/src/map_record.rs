@@ -1,10 +1,16 @@
 //! Decoding of structs written as a map from integer keys to fields.
 
-/// Implements `Decode` for a struct from a table of each field's key, refusing a key the table lacks.
+/// Implements `Decode` for a struct from a table of each field's key, refusing a key the table lacks, a key written twice and a nil the field's own decoder does not read.
 macro_rules! decode_map_record {
-    (@field $d:ident, $ctx:ident) => {
+    (@field $d:ident, $ctx:ident) => {{
+        if $d.datatype()? == pallas_codec::minicbor::data::Type::Null {
+            return Err(pallas_codec::minicbor::decode::Error::message(
+                "a nil where the field's rule has none",
+            )
+            .at($d.position()));
+        }
         $d.decode_with($ctx)?
-    };
+    }};
     (@field $d:ident, $ctx:ident, $by:path) => {
         $by($d, $ctx)?
     };
@@ -48,7 +54,17 @@ macro_rules! decode_map_record {
                     }
                     let key_at = d.position();
                     match d.i64()? {
-                        $( $key => $field = Some($crate::map_record::decode_map_record!(@field d, ctx $(, $by)?)), )+
+                        $( $key => {
+                            if $field.is_some() {
+                                return Err(Error::message(format!(
+                                    "repeated key {} in {}",
+                                    $key,
+                                    stringify!($name)
+                                ))
+                                .at(key_at));
+                            }
+                            $field = Some($crate::map_record::decode_map_record!(@field d, ctx $(, $by)?));
+                        } )+
                         key => {
                             return Err(Error::message(format!(
                                 "unknown key {key} in {}",

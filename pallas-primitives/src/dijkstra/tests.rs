@@ -3482,6 +3482,123 @@ fn an_unknown_map_key_is_refused() {
     );
 }
 
+/// Each map record with a key written twice and with a nil at a key whose rule has none, beside the same record with that key once, paired with the reason the refusal gives.
+fn record_keys() -> Vec<(Refusal, &'static str)> {
+    type Read = fn(&'static [u8]) -> Result<(), minicbor::decode::Error>;
+    type Record<'a> = &'a dyn Fn(&[&str]) -> String;
+    let map = |entries: &[&str]| format!("{:02x}{}", 0xa0 + entries.len(), entries.concat());
+    let auxiliary = |entries: &[&str]| format!("d90103{}", map(entries));
+    let top = |entries: &[&str]| body_with(true, entries);
+    let sub = |entries: &[&str]| body_with(false, entries);
+    let output = |entries: &[&str]| output_with(entries);
+    let output_entry = format!("028200{HASH32}");
+    let records: [(&'static str, Read, Record, &str, &str); 6] = [
+        (
+            "transaction_body",
+            read::<TransactionBody>,
+            &top,
+            "0300",
+            "03f6",
+        ),
+        (
+            "sub_transaction_body",
+            read::<SubTransactionBody>,
+            &sub,
+            "0300",
+            "03f6",
+        ),
+        (
+            "transaction_witness_set",
+            read::<WitnessSet>,
+            &map,
+            "03814100",
+            "03f6",
+        ),
+        (
+            "auxiliary_data_map",
+            read::<AuxiliaryData>,
+            &auxiliary,
+            "0280",
+            "02f6",
+        ),
+        (
+            "transaction_output",
+            read::<TransactionOutput>,
+            &output,
+            &output_entry,
+            "02f6",
+        ),
+        (
+            "protocol_param_update",
+            read::<ProtocolParamUpdate>,
+            &map,
+            "0000",
+            "00f6",
+        ),
+    ];
+
+    let mut cases = Vec::new();
+    for (class, read, record, entry, nil) in records {
+        let known = record(&[entry]);
+        let twice = Refusal {
+            class,
+            read,
+            refused: record(&[entry, entry]),
+            known: known.clone(),
+        };
+        let nil = Refusal {
+            class,
+            read,
+            refused: record(&[nil]),
+            known,
+        };
+        cases.push((twice, "repeated key"));
+        cases.push((nil, "a nil"));
+    }
+    cases
+}
+
+#[test]
+fn each_record_reads_its_key_once_and_a_nil_where_its_rule_has_one() {
+    for update in ["a11826f6", "a11835f6"] {
+        assert!(
+            read::<ProtocolParamUpdate>(generated(update)).is_ok(),
+            "{update}"
+        );
+    }
+    for (case, _) in record_keys() {
+        let read = (case.read)(generated(&case.known));
+        assert!(read.is_ok(), "{} {}: {read:?}", case.class, case.known);
+    }
+}
+
+#[test]
+fn a_record_with_a_key_twice_or_a_nil_where_its_rule_has_none_is_refused() {
+    let cases = record_keys();
+    assert_eq!(cases.len(), 12);
+
+    let failed: Vec<_> = cases
+        .iter()
+        .filter_map(
+            |(case, reason)| match (case.read)(generated(&case.refused)) {
+                Err(err) if err.to_string().contains(reason) => None,
+                Err(err) => Some(format!(
+                    "{} {} refused for another reason: {err}",
+                    case.class, case.refused
+                )),
+                Ok(()) => Some(format!("{} {} read", case.class, case.refused)),
+            },
+        )
+        .collect();
+    assert!(
+        failed.is_empty(),
+        "{} of {} not refused:\n{}",
+        failed.len(),
+        cases.len(),
+        failed.join("\n")
+    );
+}
+
 /// Asserts with [`crate::array_record::assert_holds_exactly`] on the array of the given hex elements.
 fn assert_holds_exactly_hex<T>(elements: &[&str])
 where
