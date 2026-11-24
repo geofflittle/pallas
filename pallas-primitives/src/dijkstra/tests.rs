@@ -2970,6 +2970,45 @@ fn map_values() -> Vec<(Refusal, &'static str)> {
     cases
 }
 
+#[test]
+fn an_embedded_item_needs_tag_24_and_ends_with_its_bytes() {
+    let cases = [
+        (
+            "script_ref",
+            "03d818458200820400",
+            "03d819458200820400",
+            "expected tag 24",
+        ),
+        (
+            "script_ref",
+            "03d818458200820400",
+            "03d81846820082040000",
+            "bytes left",
+        ),
+        (
+            "inline datum",
+            "028201d8184100",
+            "028201d8194100",
+            "expected tag 24",
+        ),
+        (
+            "inline datum",
+            "028201d8184100",
+            "028201d818420000",
+            "bytes left",
+        ),
+    ];
+    for (field, known, refused, reason) in cases {
+        read::<TransactionOutput>(generated(&output_with(&[known])))
+            .unwrap_or_else(|err| panic!("the {field} with one item was refused: {err}"));
+        match read::<TransactionOutput>(generated(&output_with(&[refused]))) {
+            Err(err) if err.to_string().contains(reason) => {}
+            Err(err) => panic!("the {field} {refused} was refused for another reason: {err}"),
+            Ok(()) => panic!("the {field} {refused} was read"),
+        }
+    }
+}
+
 const MAP_VALUE_CLASSES: &[&str] = &[
     "transaction_body.withdrawals empty",
     "transaction_body.withdrawals repeated",
