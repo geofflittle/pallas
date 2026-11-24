@@ -393,7 +393,10 @@ pub struct VKeyWitness {
 }
 
 #[cfg(feature = "unstable")]
-crate::array_record::decode_array_record!(VKeyWitness { vkey, signature });
+crate::array_record::decode_array_record!(VKeyWitness {
+    vkey: pallas_codec::utils::decode_bytes_sized::<32, 32, _>,
+    signature: pallas_codec::utils::decode_bytes_sized::<64, 64, _>
+});
 
 /// A native script tree with stack-safe CBOR, clone, equality and drop operations.
 ///
@@ -475,9 +478,9 @@ pub struct BootstrapWitness {
 
 #[cfg(feature = "unstable")]
 crate::array_record::decode_array_record!(BootstrapWitness {
-    public_key,
-    signature,
-    chain_code,
+    public_key: pallas_codec::utils::decode_bytes_sized::<32, 32, _>,
+    signature: pallas_codec::utils::decode_bytes_sized::<64, 64, _>,
+    chain_code: pallas_codec::utils::decode_bytes_sized::<32, 32, _>,
     attributes
 });
 

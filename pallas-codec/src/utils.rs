@@ -993,7 +993,9 @@ impl From<&AnyUInt> for u64 {
 
 /// Introduced in Conway
 /// positive_coin = 1 .. 18446744073709551615
-#[derive(Encode, Debug, PartialEq, Copy, Clone, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Encode, Debug, PartialEq, Copy, Clone, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize,
+)]
 #[cfg_attr(not(feature = "unstable"), derive(Decode))]
 #[serde(transparent)]
 #[cbor(transparent)]
@@ -1459,6 +1461,58 @@ pub fn decode_text_def_or_indef<'b, C>(
     } else {
         d.str().map(String::from)
     }
+}
+
+/// Decode a CBOR byte string in either length form whose size is between `MIN` and `MAX` bytes.
+#[cfg(feature = "unstable")]
+pub fn decode_bytes_sized<const MIN: usize, const MAX: usize, C>(
+    d: &mut minicbor::Decoder<'_>,
+    ctx: &mut C,
+) -> Result<Bytes, Error> {
+    let at = d.position();
+    let bytes = decode_bytes_def_or_indef(d, ctx)?;
+    refuse_size(bytes.len(), MIN, MAX, at)?;
+    Ok(Bytes::from(bytes.into_owned()))
+}
+
+/// Decode a CBOR text string in either length form whose size is between `MIN` and `MAX` bytes.
+#[cfg(feature = "unstable")]
+pub fn decode_text_sized<const MIN: usize, const MAX: usize, C>(
+    d: &mut minicbor::Decoder<'_>,
+    ctx: &mut C,
+) -> Result<String, Error> {
+    let at = d.position();
+    let text = decode_text_def_or_indef(d, ctx)?;
+    refuse_size(text.len(), MIN, MAX, at)?;
+    Ok(text)
+}
+
+/// Decode a CBOR byte string in either length form whose definite form or each of whose chunks holds at most `MAX` bytes.
+#[cfg(feature = "unstable")]
+pub fn decode_bytes_chunks_at_most<const MAX: usize, C>(
+    d: &mut minicbor::Decoder<'_>,
+    _ctx: &mut C,
+) -> Result<Vec<u8>, Error> {
+    let at = d.position();
+    let mut joined = Vec::new();
+    for chunk in d.bytes_iter()? {
+        let chunk = chunk?;
+        refuse_size(chunk.len(), 0, MAX, at)?;
+        joined.extend_from_slice(chunk);
+    }
+    Ok(joined)
+}
+
+/// Refuses a size outside `min..=max`, reporting the position the string was read from.
+#[cfg(feature = "unstable")]
+fn refuse_size(size: usize, min: usize, max: usize, at: usize) -> Result<(), Error> {
+    if size < min || size > max {
+        return Err(Error::message(format!(
+            "a string of {size} bytes where the rule allows {min} to {max}"
+        ))
+        .at(at));
+    }
+    Ok(())
 }
 
 /// Returns false for any `Option`, so a derived array encoder writes a `None` field as a null even when it is the last field.
@@ -1969,7 +2023,9 @@ mod tests {
     #[test]
     fn a_positive_coin_refuses_zero() {
         assert_eq!(
-            minicbor::decode::<PositiveCoin>(&[0x01]).map(u64::from).unwrap(),
+            minicbor::decode::<PositiveCoin>(&[0x01])
+                .map(u64::from)
+                .unwrap(),
             1
         );
         assert!(minicbor::decode::<PositiveCoin>(&[0x00]).is_err());

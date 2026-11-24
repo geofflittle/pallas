@@ -5,7 +5,9 @@ use pallas_codec::tree::{
     Arity, IndexedNode, MAX_DECODE_DEPTH, TreeDecode, Visit, cmp_tree, decode_tree_with_max_depth,
     fold_tree, walk_tree,
 };
-use pallas_codec::utils::{KeyValuePairs, decode_text_def_or_indef};
+use pallas_codec::utils::KeyValuePairs;
+#[cfg(not(feature = "unstable"))]
+use pallas_codec::utils::decode_text_def_or_indef;
 
 use crate::{Bytes, Metadatum};
 
@@ -211,7 +213,25 @@ impl<'b, C> TreeDecode<'b, C> for Node {
             | Type::I32
             | Type::I64
             | Type::Int => leaf(Metadatum::Int(d.decode_with(ctx)?)),
+            #[cfg(feature = "unstable")]
+            Type::Bytes | Type::BytesIndef => {
+                leaf(Metadatum::Bytes(pallas_codec::utils::decode_bytes_sized::<
+                    0,
+                    64,
+                    _,
+                >(d, ctx)?))
+            }
+            #[cfg(not(feature = "unstable"))]
             Type::Bytes | Type::BytesIndef => leaf(Metadatum::Bytes(d.decode_with(ctx)?)),
+            #[cfg(feature = "unstable")]
+            Type::String | Type::StringIndef => {
+                leaf(Metadatum::Text(pallas_codec::utils::decode_text_sized::<
+                    0,
+                    64,
+                    _,
+                >(d, ctx)?))
+            }
+            #[cfg(not(feature = "unstable"))]
             Type::String | Type::StringIndef => {
                 leaf(Metadatum::Text(decode_text_def_or_indef(d, ctx)?))
             }

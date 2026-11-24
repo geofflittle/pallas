@@ -551,7 +551,7 @@ pub struct Anchor {
 
 #[cfg(feature = "unstable")]
 crate::array_record::decode_array_record!(Anchor {
-    url: pallas_codec::utils::decode_text_def_or_indef,
+    url: pallas_codec::utils::decode_text_sized::<0, 128, _>,
     content_hash
 });
 

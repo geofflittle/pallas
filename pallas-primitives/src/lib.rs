@@ -95,7 +95,9 @@ pub use pallas_codec::utils::{
 pub use pallas_crypto::hash::Hash;
 
 use pallas_codec::minicbor::{self, Decode, Encode, data::Tag};
-use pallas_codec::utils::{decode_text_def_or_indef, end_array};
+#[cfg(not(feature = "unstable"))]
+use pallas_codec::utils::decode_text_def_or_indef;
+use pallas_codec::utils::end_array;
 use serde::{Deserialize, Serialize};
 
 use std::collections::BTreeMap;
@@ -281,7 +283,7 @@ pub struct PoolMetadata {
 
 #[cfg(feature = "unstable")]
 array_record::decode_array_record!(PoolMetadata {
-    url: decode_text_def_or_indef,
+    url: pallas_codec::utils::decode_text_sized::<0, 128, _>,
     hash
 });
 
@@ -401,16 +403,16 @@ impl<'b, C> minicbor::decode::Decode<'b, C> for Relay {
             0 => (
                 Relay::SingleHostAddr(
                     d.decode_with(ctx)?,
-                    d.decode_with(ctx)?,
-                    d.decode_with(ctx)?,
+                    decode_ip::<4, _>(d, ctx)?,
+                    decode_ip::<16, _>(d, ctx)?,
                 ),
                 4,
             ),
             1 => (
-                Relay::SingleHostName(d.decode_with(ctx)?, decode_text_def_or_indef(d, ctx)?),
+                Relay::SingleHostName(d.decode_with(ctx)?, decode_dns_name(d, ctx)?),
                 3,
             ),
-            2 => (Relay::MultiHostName(decode_text_def_or_indef(d, ctx)?), 2),
+            2 => (Relay::MultiHostName(decode_dns_name(d, ctx)?), 2),
             _ => {
                 return Err(minicbor::decode::Error::message(
                     "invalid variant id for Relay",
@@ -423,6 +425,46 @@ impl<'b, C> minicbor::decode::Decode<'b, C> for Relay {
         }
         Ok(relay)
     }
+}
+
+/// Decode a relay's IP address of `SIZE` bytes, or the null that stands for none.
+#[cfg(feature = "unstable")]
+fn decode_ip<const SIZE: usize, C>(
+    d: &mut minicbor::Decoder<'_>,
+    ctx: &mut C,
+) -> Result<Option<Bytes>, minicbor::decode::Error> {
+    if d.datatype()? == minicbor::data::Type::Null {
+        d.null()?;
+        return Ok(None);
+    }
+    pallas_codec::utils::decode_bytes_sized::<SIZE, SIZE, _>(d, ctx).map(Some)
+}
+
+/// Decode a relay's IP address, or the null that stands for none.
+#[cfg(not(feature = "unstable"))]
+fn decode_ip<const SIZE: usize, C>(
+    d: &mut minicbor::Decoder<'_>,
+    ctx: &mut C,
+) -> Result<Option<Bytes>, minicbor::decode::Error> {
+    d.decode_with(ctx)
+}
+
+/// Decode a relay's DNS name of at most 128 bytes.
+#[cfg(feature = "unstable")]
+fn decode_dns_name<C>(
+    d: &mut minicbor::Decoder<'_>,
+    ctx: &mut C,
+) -> Result<DnsName, minicbor::decode::Error> {
+    pallas_codec::utils::decode_text_sized::<0, 128, _>(d, ctx)
+}
+
+/// Decode a relay's DNS name.
+#[cfg(not(feature = "unstable"))]
+fn decode_dns_name<C>(
+    d: &mut minicbor::Decoder<'_>,
+    ctx: &mut C,
+) -> Result<DnsName, minicbor::decode::Error> {
+    decode_text_def_or_indef(d, ctx)
 }
 
 impl<C> minicbor::encode::Encode<C> for Relay {
@@ -544,7 +586,12 @@ pub struct VrfCert(
 );
 
 #[cfg(feature = "unstable")]
-array_record::decode_array_record!(VrfCert(output, proof));
+array_record::decode_array_record!(
+    VrfCert(
+        output: pallas_codec::utils::decode_bytes_sized::<64, 64, _>,
+        proof: pallas_codec::utils::decode_bytes_sized::<80, 80, _>,
+    )
+);
 
 /// Hash of a VRF verification key (Blake2b-256).
 pub type VrfKeyhash = Hash<32>;

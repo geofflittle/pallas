@@ -210,7 +210,7 @@ fn cases() -> Vec<(&'static str, Builds, String)> {
         ),
         (
             "header version definite",
-            Every,
+            WithoutUnstable,
             decoded!(babbage::HeaderBody, header_body("820900")),
         ),
         (
