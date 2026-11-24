@@ -241,7 +241,7 @@ impl<'b> MultiEraOutput<'b> {
             }
             #[cfg(feature = "unstable")]
             Era::Dijkstra => {
-                let tx = minicbor::decode(cbor)?;
+                let tx = crate::support::decode_whole(cbor)?;
                 let tx = Box::new(Cow::Owned(tx));
                 Ok(Self::Dijkstra(tx))
             }

@@ -73,7 +73,7 @@ impl<'b> MultiEraBlock<'b> {
     #[cfg(feature = "unstable")]
     pub fn decode_dijkstra(cbor: &'b [u8]) -> Result<Self, Error> {
         let (_, block): BlockWrapper<dijkstra::Block> =
-            minicbor::decode(cbor).map_err(Error::invalid_cbor)?;
+            support::decode_whole(cbor).map_err(Error::invalid_cbor)?;
 
         Ok(Self::Dijkstra(Box::new(block)))
     }
@@ -378,6 +378,24 @@ mod tests {
         assert!(block.header().eb_announcement().is_none());
         assert!(block.leios_certificate().is_none());
         assert!(block.peras_certificate().is_none());
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_dijkstra_block_with_bytes_after_it_is_refused() {
+        let mut cbor = dijkstra_block(include_str!("../../test_data/dijkstra1.block"));
+        cbor.push(0x00);
+
+        for (entry, decoded) in [
+            ("decode", MultiEraBlock::decode(&cbor)),
+            ("decode_dijkstra", MultiEraBlock::decode_dijkstra(&cbor)),
+        ] {
+            match decoded {
+                Err(err) if err.to_string().contains("bytes left") => {}
+                Err(err) => panic!("{entry} refused the block for another reason: {err}"),
+                Ok(_) => panic!("{entry} read the block with a byte after it"),
+            }
+        }
     }
 
     #[cfg(feature = "unstable")]
