@@ -53,6 +53,61 @@ macro_rules! decode_array_record {
 
 pub(crate) use decode_array_record;
 
+/// The array of `elements` in the definite form when `definite`, the indefinite form otherwise.
+#[cfg(test)]
+fn array_of(elements: &[&[u8]], definite: bool) -> &'static [u8] {
+    let mut e = pallas_codec::minicbor::Encoder::new(Vec::new());
+    if definite {
+        e.array(elements.len() as u64).unwrap();
+    } else {
+        e.begin_array().unwrap();
+    }
+    for element in elements {
+        e.writer_mut().extend_from_slice(element);
+    }
+    if !definite {
+        e.end().unwrap();
+    }
+    Box::leak(e.into_writer().into_boxed_slice())
+}
+
+/// Asserts that `T` decodes the definite array `encoding` and refuses it with one element more or one fewer, in either length form.
+#[cfg(test)]
+pub(crate) fn assert_holds_exactly<T>(encoding: &[u8])
+where
+    T: pallas_codec::minicbor::Decode<'static, ()> + std::fmt::Debug,
+{
+    use pallas_codec::minicbor;
+
+    let name = std::any::type_name::<T>();
+    let mut d = minicbor::Decoder::new(encoding);
+    let len = d.array().unwrap().expect("a definite array");
+    let mut elements = Vec::new();
+    for _ in 0..len {
+        let start = d.position();
+        d.skip().unwrap();
+        elements.push(&encoding[start..d.position()]);
+    }
+    assert_eq!(d.position(), encoding.len(), "{name} is one array");
+    let with_extra = [&elements[..], &[&[0x00][..]]].concat();
+    let short = &elements[..elements.len() - 1];
+    for definite in [true, false] {
+        crate::flat_enum::decode_all::<T>(array_of(&elements, definite));
+        for (case, elements, reason) in [
+            ("an extra element", &with_extra[..], "more elements than"),
+            ("its last element missing", short, "required field"),
+        ] {
+            match minicbor::decode::<T>(array_of(elements, definite)) {
+                Ok(value) => panic!("{name} with {case} must be refused, read as {value:?}"),
+                Err(error) => assert!(
+                    error.to_string().contains(reason),
+                    "{name} with {case} was refused for some other reason: {error}"
+                ),
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::alonzo::TransactionOutput;
@@ -84,27 +139,9 @@ mod tests {
     /// Asserts that `T` decodes the array of `elements` and refuses it with one element more or one fewer, in either length form.
     fn assert_holds_exactly<T>(elements: &[&str])
     where
-        T: for<'b> minicbor::Decode<'b, ()> + std::fmt::Debug,
+        T: minicbor::Decode<'static, ()> + std::fmt::Debug,
     {
-        let name = std::any::type_name::<T>();
-        let with_extra = [elements, &["00"]].concat();
-        let short = &elements[..elements.len() - 1];
-        for definite in [true, false] {
-            decode_all::<T>(&array(elements, definite));
-            for (case, elements, reason) in [
-                ("an extra element", &with_extra[..], "more elements than"),
-                ("its last element missing", short, "required field"),
-            ] {
-                let bytes = array(elements, definite);
-                match minicbor::decode::<T>(&bytes) {
-                    Ok(value) => panic!("{name} with {case} must be refused, read as {value:?}"),
-                    Err(error) => assert!(
-                        error.to_string().contains(reason),
-                        "{name} with {case} was refused for some other reason: {error}"
-                    ),
-                }
-            }
-        }
+        super::assert_holds_exactly::<T>(Box::leak(array(elements, true).into_boxed_slice()));
     }
 
     #[test]

@@ -2557,7 +2557,7 @@ fn unknown_arms() -> Vec<Refusal> {
     let body_fields = [
         (
             "certificates",
-            arms(format!("048183098200{HASH}82ARM00"), "05", "02"),
+            arms(format!("048183098200{HASH}81ARM"), "05", "02"),
         ),
         ("guards", arms(format!("0e8182ARM{HASH}"), "02", "00")),
         ("network_id", arms("0fARM".to_string(), "05", "01")),
@@ -2924,4 +2924,66 @@ fn an_unknown_map_key_is_refused() {
         cases.len(),
         failed.join("\n")
     );
+}
+
+/// Asserts with [`crate::array_record::assert_holds_exactly`] on the array of the given hex elements.
+fn assert_holds_exactly_hex<T>(elements: &[&str])
+where
+    T: minicbor::Decode<'static, ()> + std::fmt::Debug,
+{
+    let mut e = minicbor::Encoder::new(Vec::new());
+    e.array(elements.len() as u64).unwrap();
+    for element in elements {
+        e.writer_mut()
+            .extend_from_slice(&hex::decode(element).unwrap());
+    }
+    crate::array_record::assert_holds_exactly::<T>(Box::leak(e.into_writer().into_boxed_slice()));
+}
+
+/// Asserts with [`crate::array_record::assert_holds_exactly`] on the encoding of `value`.
+fn assert_encoding_holds_exactly<T>(value: &impl minicbor::Encode<()>)
+where
+    T: minicbor::Decode<'static, ()> + std::fmt::Debug,
+{
+    let bytes: &'static [u8] = Box::leak(minicbor::to_vec(value).unwrap().into_boxed_slice());
+    crate::array_record::assert_holds_exactly::<T>(bytes);
+}
+
+#[test]
+fn a_dijkstra_record_holds_exactly_its_fields() {
+    const HASH32: &str = "58201111111111111111111111111111111111111111111111111111111111111111";
+    const ANCHOR: &str =
+        "826361626358201111111111111111111111111111111111111111111111111111111111111111";
+    let bls_pubkey = format!("5860{}", "00".repeat(96));
+    let bls_signature = format!("5830{}", "00".repeat(48));
+    let reward_account = format!("581de0{}", "11".repeat(28));
+
+    assert_holds_exactly_hex::<super::HeaderVersionInfo>(&["01", "02"]);
+    assert_holds_exactly_hex::<super::EbAnnouncement>(&[HASH32, "01"]);
+    assert_holds_exactly_hex::<super::BlsKey>(&[&bls_pubkey, &bls_signature]);
+    assert_holds_exactly_hex::<super::LeiosCertificate>(&["40", &bls_signature]);
+    assert_holds_exactly_hex::<super::Update>(&["a0", "01"]);
+    assert_holds_exactly_hex::<ProposalProcedure>(&["00", &reward_account, "8106", ANCHOR]);
+    assert_holds_exactly_hex::<super::RedeemersKey>(&["00", "00"]);
+    assert_holds_exactly_hex::<super::RedeemersValue>(&["00", "820102"]);
+
+    let block = block_of(TEST_BLOCKS[WITH_TRANSACTIONS].0);
+    let header = header_of(TEST_BLOCKS[WITH_TRANSACTIONS].0);
+    assert_encoding_holds_exactly::<Block>(&block);
+    assert_encoding_holds_exactly::<super::BlockBody>(&block.block_body);
+    assert_encoding_holds_exactly::<BlockTransaction>(&block.block_body.transactions[0]);
+    assert_encoding_holds_exactly::<Header>(&header);
+    assert_encoding_holds_exactly::<super::HeaderBody>(&header.header_body);
+
+    let bytes: &'static [u8] =
+        Box::leak(hex::decode(V4_WITNESS_TXS[1].1).unwrap().into_boxed_slice());
+    let tx: BlockTransaction = minicbor::decode(bytes).unwrap();
+    let sub = tx
+        .transaction_body
+        .sub_transactions
+        .iter()
+        .flat_map(|subs| subs.iter())
+        .next()
+        .expect("a sub transaction");
+    assert_encoding_holds_exactly::<super::SubTransaction>(sub);
 }
