@@ -1441,12 +1441,34 @@ fn an_empty_guards_set_in_either_body_reads_as_no_guards() {
 }
 
 #[test]
+fn a_body_without_guards_reads_as_no_guards() {
+    let top: TransactionBody = decode_all(generated("a3008001800200"));
+    assert_eq!(top.guards, None);
+    let sub: SubTransactionBody = decode_all(generated("a200800180"));
+    assert_eq!(sub.guards, None);
+}
+
+#[test]
 fn a_guards_set_with_a_key_in_either_body_reads_as_that_key() {
-    let one = format!("0ed9010281581c{}", "06".repeat(28));
-    let top: TransactionBody = decode_all(body_ending(true, &one));
-    assert!(matches!(top.guards, Some(Guards::AddrKeyhashes(_))));
-    let sub: SubTransactionBody = decode_all(body_ending(false, &one));
-    assert!(matches!(sub.guards, Some(Guards::AddrKeyhashes(_))));
+    let key = format!("581c{}", "06".repeat(28));
+    for set in [
+        format!("81{key}"),
+        format!("d9010281{key}"),
+        format!("9f{key}ff"),
+        format!("d901029f{key}ff"),
+    ] {
+        let one = format!("0e{set}");
+        let top: TransactionBody = decode_all(body_ending(true, &one));
+        assert!(
+            matches!(top.guards, Some(Guards::AddrKeyhashes(_))),
+            "{set}"
+        );
+        let sub: SubTransactionBody = decode_all(body_ending(false, &one));
+        assert!(
+            matches!(sub.guards, Some(Guards::AddrKeyhashes(_))),
+            "{set}"
+        );
+    }
 }
 
 #[test]
@@ -1455,6 +1477,40 @@ fn a_guards_value_that_is_not_a_set_is_refused_in_either_body() {
     assert!(top.is_err());
     let sub: Result<SubTransactionBody, _> = minicbor::decode(body_ending(false, "0e01"));
     assert!(sub.is_err());
+}
+
+/// The error each body gives for the given hex keys at its end.
+fn refusals_in_either_body(rest: &str) -> [String; 2] {
+    let top = minicbor::decode::<TransactionBody>(body_ending(true, rest)).map(|b| b.guards);
+    let sub = minicbor::decode::<SubTransactionBody>(body_ending(false, rest)).map(|b| b.guards);
+    [top, sub].map(|decoded| match decoded {
+        Ok(guards) => panic!("{rest} decoded with guards {guards:?}"),
+        Err(error) => error.to_string(),
+    })
+}
+
+#[test]
+fn an_empty_guards_set_under_a_tag_other_than_258_is_refused_in_either_body() {
+    for rest in ["0ed680", "0ed69fff"] {
+        for error in refusals_in_either_body(rest) {
+            assert!(error.contains("Tag(22)"), "{rest}: {error}");
+        }
+    }
+}
+
+#[test]
+fn a_guards_set_with_a_key_under_a_tag_other_than_258_is_refused_in_either_body() {
+    let rest = format!("0ed681581c{}", "06".repeat(28));
+    for error in refusals_in_either_body(&rest) {
+        assert!(error.contains("Tag(22)"), "{error}");
+    }
+}
+
+#[test]
+fn a_null_guards_value_is_refused_in_either_body() {
+    for error in refusals_in_either_body("0ef6") {
+        assert!(error.contains("null"), "{error}");
+    }
 }
 
 /// A type reaching Alonzo's native script from here would refuse a whole
