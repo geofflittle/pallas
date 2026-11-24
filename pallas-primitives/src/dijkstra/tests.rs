@@ -1265,10 +1265,7 @@ fn the_array_form_of_auxiliary_data_carries_this_eras_native_scripts() {
     let AuxiliaryData::ShelleyMa(inner) = &decoded else {
         panic!("an array must decode as the ShelleyMa arm, found {decoded:?}");
     };
-    let scripts = inner
-        .auxiliary_scripts
-        .as_ref()
-        .expect("a guard clause must not make the whole auxiliary scripts field read as absent");
+    let scripts = &inner.auxiliary_scripts;
     assert_eq!(scripts.len(), 1);
     assert!(
         matches!(scripts[0], NativeScript::ScriptRequireGuard(_)),
@@ -1802,7 +1799,7 @@ fn the_array_form_still_carries_a_clause_every_era_has() {
     let AuxiliaryData::ShelleyMa(inner) = &decoded else {
         panic!("an array must decode as the ShelleyMa arm")
     };
-    let scripts = inner.auxiliary_scripts.as_ref().expect("readable");
+    let scripts = &inner.auxiliary_scripts;
     assert_eq!(scripts.len(), 1);
     assert!(matches!(scripts[0], NativeScript::ScriptPubkey(_)));
 
@@ -4451,6 +4448,12 @@ fn a_witness_set_refuses_an_empty_bootstrap_set_as_a_transaction_does() {
         }
     }
     assert_eq!(wrong, Vec::<String>::new());
+}
+
+#[test]
+fn auxiliary_data_as_an_array_refuses_null_scripts() {
+    assert_eq!(read::<AuxiliaryData>(generated("82a080")).ok(), Some(()));
+    assert!(read::<AuxiliaryData>(generated("82a0f6")).is_err());
 }
 
 #[test]
