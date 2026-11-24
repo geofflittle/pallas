@@ -73,7 +73,19 @@ macro_rules! impl_cardano_mapper_before_v1 {
             tx
         }
 
+        /// Returns the redeemer's own encoding, which is the original CBOR this schema maps for it.
+        fn redeemer_cbor(
+            x: &pallas_traverse::MultiEraRedeemer,
+            _: &pallas_traverse::MultiEraTx,
+        ) -> Vec<u8> {
+            x.encode()
+        }
+
         impl<C: $crate::LedgerContext> Mapper<C> {
+            pub fn map_redeemer(&self, x: &pallas_traverse::MultiEraRedeemer) -> u5c::Redeemer {
+                self.map_redeemer_with_cbor(x, x.encode())
+            }
+
             #[deprecated(
                 since = "1.5.0",
                 note = "use map_multi_era_purpose. This method cannot represent the Dijkstra Guarding tag"

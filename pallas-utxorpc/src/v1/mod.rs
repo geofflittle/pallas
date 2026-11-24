@@ -94,6 +94,143 @@ fn witnessed_datum_cbor(raw: &[u8]) -> Option<Vec<u8>> {
     Some(raw.to_vec())
 }
 
+/// The original CBOR this schema maps for a redeemer of `tx`, with a map entry's key and value bytes in a two element array.
+fn redeemer_cbor(x: &trv::MultiEraRedeemer, tx: &trv::MultiEraTx) -> Vec<u8> {
+    use pallas_codec::minicbor::to_vec;
+    use pallas_primitives::{alonzo, conway, dijkstra};
+    use trv::MultiEraRedeemer as R;
+
+    let alonzo_field = |field: Vec<u8>| {
+        listed_redeemer(
+            &field,
+            |r: &alonzo::Redeemer| R::from_alonzo_compatible(r),
+            x,
+        )
+    };
+    let conway_field = |field: Vec<u8>| {
+        listed_redeemer(
+            &field,
+            |r: &conway::Redeemer| R::from_conway_deprecated(r),
+            x,
+        )
+        .or_else(|| {
+            mapped_redeemer(
+                &field,
+                |k: &conway::RedeemersKey, v: &conway::RedeemersValue| R::from_conway(k, v),
+                x,
+            )
+        })
+    };
+    let dijkstra_field = |field: Vec<u8>| {
+        mapped_redeemer(
+            &field,
+            |k: &dijkstra::RedeemersKey, v: &dijkstra::RedeemersValue| R::from_dijkstra(k, v),
+            x,
+        )
+    };
+
+    let found = match tx {
+        trv::MultiEraTx::AlonzoCompatible(t, _) => to_vec(&t.transaction_witness_set)
+            .ok()
+            .and_then(|w| redeemers_field(&w))
+            .and_then(alonzo_field),
+        trv::MultiEraTx::Babbage(t) => to_vec(&t.transaction_witness_set)
+            .ok()
+            .and_then(|w| redeemers_field(&w))
+            .and_then(alonzo_field),
+        trv::MultiEraTx::Conway(t) => t
+            .transaction_witness_set
+            .redeemer
+            .as_ref()
+            .and_then(|f| to_vec(f).ok())
+            .and_then(conway_field),
+        trv::MultiEraTx::Dijkstra(t) => t
+            .transaction_witness_set
+            .redeemer
+            .as_ref()
+            .and_then(|f| to_vec(f).ok())
+            .and_then(dijkstra_field),
+        trv::MultiEraTx::DijkstraSub(t, _) => t
+            .transaction_witness_set
+            .redeemer
+            .as_ref()
+            .and_then(|f| to_vec(f).ok())
+            .and_then(dijkstra_field),
+        _ => None,
+    };
+
+    found.expect("a redeemer of a transaction is among those its witness set holds")
+}
+
+/// The bytes a witness set holds under the key of its redeemers field.
+fn redeemers_field(witness_set: &[u8]) -> Option<Vec<u8>> {
+    use pallas_codec::{minicbor::Decoder, utils::AnyCbor};
+
+    let entries = Decoder::new(witness_set)
+        .map_iter::<i64, AnyCbor>()
+        .ok()?
+        .collect::<Result<Vec<_>, _>>()
+        .ok()?;
+
+    // The witness set decoder keeps the last value of a repeated key.
+    entries
+        .into_iter()
+        .rev()
+        .find(|(k, _)| *k == 5)
+        .map(|(_, v)| v.unwrap())
+}
+
+/// Whether two redeemers have the same purpose, index, data and execution units.
+fn same_redeemer(a: &trv::MultiEraRedeemer, b: &trv::MultiEraRedeemer) -> bool {
+    a.multi_era_tag() == b.multi_era_tag()
+        && a.index() == b.index()
+        && a.data() == b.data()
+        && a.ex_units() == b.ex_units()
+}
+
+/// The bytes of the first redeemer in the list `field` that is the same as `x`.
+fn listed_redeemer<'b, T>(
+    field: &'b [u8],
+    view: impl for<'a> Fn(&'a T) -> trv::MultiEraRedeemer<'a>,
+    x: &trv::MultiEraRedeemer,
+) -> Option<Vec<u8>>
+where
+    T: pallas_codec::minicbor::Decode<'b, ()>,
+{
+    use pallas_codec::{minicbor::Decoder, utils::KeepRaw};
+
+    Decoder::new(field)
+        .array_iter::<KeepRaw<T>>()
+        .ok()?
+        .collect::<Result<Vec<_>, _>>()
+        .ok()?
+        .into_iter()
+        .find(|r| same_redeemer(&view(r), x))
+        .map(|r| r.raw_cbor().to_vec())
+}
+
+/// The key and value bytes, in a two element array, of the first entry in the map `field` that is the same as `x`.
+fn mapped_redeemer<'b, K, V>(
+    field: &'b [u8],
+    view: impl for<'a> Fn(&'a K, &'a V) -> trv::MultiEraRedeemer<'a>,
+    x: &trv::MultiEraRedeemer,
+) -> Option<Vec<u8>>
+where
+    K: pallas_codec::minicbor::Decode<'b, ()>,
+    V: pallas_codec::minicbor::Decode<'b, ()>,
+{
+    use pallas_codec::{minicbor::Decoder, utils::KeepRaw};
+
+    Decoder::new(field)
+        .map_iter::<KeepRaw<K>, KeepRaw<V>>()
+        .ok()?
+        .collect::<Result<Vec<_>, _>>()
+        .ok()?
+        .into_iter()
+        .find(|(k, v)| same_redeemer(&view(k, v), x))
+        .map(|(k, v)| [&[0x82], k.raw_cbor(), v.raw_cbor()].concat())
+}
+
 /// The withdrawals of a transaction in the order the ledger indexes their redeemers.
 fn withdrawals_in_ledger_order<'a>(tx: &'a trv::MultiEraTx) -> Vec<(&'a [u8], u64)> {
     let mut withdrawals = tx.withdrawals_sorted_set();
@@ -443,7 +580,7 @@ impl<C: LedgerContext> Mapper<C> {
                 redeemers: tx
                     .redeemers()
                     .iter()
-                    .map(|x| self.map_redeemer(x))
+                    .map(|x| self.map_tx_redeemer(x, tx))
                     .collect(),
                 bootstrap_witnesses: tx
                     .bootstrap_witnesses()
@@ -1547,6 +1684,75 @@ mod tests {
             u5c::RedeemerPurpose::Guarding,
             "a guarding redeemer maps to the purpose of the same name"
         );
+    }
+
+    /// The `original_cbor` of the redeemer the input of `tx` maps with, and of each redeemer its witness set maps to.
+    fn redeemer_cbor_of(tx: &trv::MultiEraTx) -> (Option<Vec<u8>>, Vec<Vec<u8>>) {
+        let mapped = Mapper::new(NoLedger).map_tx(tx);
+        let mapped = common(&mapped);
+
+        (
+            mapped.inputs[0]
+                .redeemer
+                .as_ref()
+                .map(|x| x.original_cbor.to_vec()),
+            mapped
+                .witnesses
+                .iter()
+                .flat_map(|x| x.redeemers.iter())
+                .map(|x| x.original_cbor.to_vec())
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn a_listed_conway_redeemer_maps_the_bytes_its_witness_set_holds() {
+        let witness_set = hex::decode("a10581840300182a820101").unwrap();
+
+        assert_eq!(
+            redeemer_cbor_of(&tx_with_witness_set(trv::Era::Conway, &witness_set)),
+            (None, vec![hex::decode("840300182a820101").unwrap()]),
+            "a Reward redeemer in the list form maps the four element array it is written as"
+        );
+    }
+
+    #[test]
+    fn a_babbage_redeemer_maps_the_bytes_its_witness_set_holds() {
+        let witness_set = hex::decode("a10581840000182a82180101").unwrap();
+        let written = hex::decode("840000182a82180101").unwrap();
+
+        assert_eq!(
+            redeemer_cbor_of(&tx_with_witness_set(trv::Era::Babbage, &witness_set)),
+            (Some(written.clone()), vec![written]),
+            "a Spend redeemer with a two byte memory count maps the bytes it is written as"
+        );
+    }
+
+    #[test]
+    fn a_babbage_redeemer_maps_the_bytes_of_the_redeemers_field_the_decoder_keeps() {
+        let witness_set = hex::decode("a320000581840000182a8201010581840000182b82180101").unwrap();
+        let written = hex::decode("840000182b82180101").unwrap();
+
+        assert_eq!(
+            redeemer_cbor_of(&tx_with_witness_set(trv::Era::Babbage, &witness_set)),
+            (Some(written.clone()), vec![written]),
+            "beside a key of -1, the second of two redeemers fields is the one decoded and mapped"
+        );
+    }
+
+    #[test]
+    fn a_redeemer_map_entry_maps_its_key_and_value_bytes_as_a_pair() {
+        let witness_set = hex::decode("a105a282000082182a8218010182010082182a820101").unwrap();
+        let spend = hex::decode("8282000082182a82180101").unwrap();
+        let mint = hex::decode("8282010082182a820101").unwrap();
+
+        for era in [trv::Era::Conway, trv::Era::Dijkstra] {
+            assert_eq!(
+                redeemer_cbor_of(&tx_with_witness_set(era, &witness_set)),
+                (Some(spend.clone()), vec![spend.clone(), mint.clone()]),
+                "in {era}, each entry maps its own key and value bytes, the Spend entry with its two byte memory count"
+            );
+        }
     }
 
     #[test]

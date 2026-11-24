@@ -650,4 +650,23 @@ mod tests {
             "with the top level datum changed from 43 to 42, no datum in the batch hashes to the output's hash"
         );
     }
+
+    #[test]
+    fn a_listed_redeemer_maps_its_key_and_value_encoding() {
+        let tx = format!(
+            "84a300d9010281825820{}000180021903e8a10581840300182a820101f5f6",
+            "19".repeat(32)
+        );
+        let tx = hex::decode(tx).unwrap();
+        let tx = trv::MultiEraTx::decode_for_era(trv::Era::Conway, &tx).unwrap();
+        let mapped = Mapper::new(NoLedger).map_tx(&tx);
+
+        assert_eq!(
+            mapped.witnesses.unwrap().redeemers[0]
+                .original_cbor
+                .to_vec(),
+            hex::decode("8282030082182a820101").unwrap(),
+            "a redeemer written as 840300182a820101 maps to the encoding of its key and value"
+        );
+    }
 }

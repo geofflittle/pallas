@@ -147,7 +147,11 @@ macro_rules! impl_cardano_mapper_shared {
                 }
             }
 
-            pub fn map_redeemer(&self, x: &pallas_traverse::MultiEraRedeemer) -> u5c::Redeemer {
+            fn map_redeemer_with_cbor(
+                &self,
+                x: &pallas_traverse::MultiEraRedeemer,
+                original_cbor: Vec<u8>,
+            ) -> u5c::Redeemer {
                 u5c::Redeemer {
                     purpose: self.map_multi_era_purpose(&x.multi_era_tag()).into(),
                     payload: self.map_plutus_datum(x.data()).into(),
@@ -156,8 +160,16 @@ macro_rules! impl_cardano_mapper_shared {
                         steps: x.ex_units().steps,
                         memory: x.ex_units().mem,
                     }),
-                    original_cbor: x.encode().into(),
+                    original_cbor: original_cbor.into(),
                 }
+            }
+
+            fn map_tx_redeemer(
+                &self,
+                x: &pallas_traverse::MultiEraRedeemer,
+                tx: &pallas_traverse::MultiEraTx,
+            ) -> u5c::Redeemer {
+                self.map_redeemer_with_cbor(x, redeemer_cbor(x, tx))
             }
 
             fn decode_resolved_utxo(
@@ -189,7 +201,9 @@ macro_rules! impl_cardano_mapper_shared {
                     tx_hash: input.hash().to_vec().into(),
                     output_index: input.index() as u32,
                     as_output: self.decode_resolved_utxo(resolved, input, tx),
-                    redeemer: tx.find_spend_redeemer(order).map(|x| self.map_redeemer(&x)),
+                    redeemer: tx
+                        .find_spend_redeemer(order)
+                        .map(|x| self.map_tx_redeemer(&x, tx)),
                 }
             }
 
@@ -386,7 +400,7 @@ macro_rules! impl_cardano_mapper_shared {
                     coin: u64_to_bigint(x.1),
                     redeemer: tx
                         .find_withdrawal_redeemer(order)
-                        .map(|x| self.map_redeemer(&x)),
+                        .map(|x| self.map_tx_redeemer(&x, tx)),
                 }
             }
 
@@ -1242,7 +1256,7 @@ macro_rules! impl_cardano_mapper_shared {
                     certificate: inner,
                     redeemer: tx
                         .find_certificate_redeemer(order)
-                        .map(|r| self.map_redeemer(&r)),
+                        .map(|r| self.map_tx_redeemer(&r, tx)),
                 }
             }
 

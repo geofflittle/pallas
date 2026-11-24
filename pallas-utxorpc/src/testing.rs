@@ -586,6 +586,39 @@ pub fn dijkstra_tx_with_aux_plutus_scripts() -> trv::MultiEraTx<'static> {
     trv::MultiEraTx::decode_for_era(trv::Era::Dijkstra, cbor).unwrap()
 }
 
+/// A transaction of `era` that spends one input and whose witness set is written as `witness_set`.
+pub fn tx_with_witness_set(era: trv::Era, witness_set: &[u8]) -> trv::MultiEraTx<'static> {
+    let mut e = minicbor::Encoder::new(Vec::new());
+    e.array(4).unwrap();
+
+    e.map(3).unwrap();
+    e.u8(0).unwrap();
+    if !matches!(era, trv::Era::Babbage) {
+        e.tag(Tag::new(258)).unwrap();
+    }
+    e.array(1).unwrap();
+    e.array(2).unwrap();
+    e.bytes(&[0x19; 32]).unwrap();
+    e.u8(0).unwrap();
+    e.u8(1).unwrap();
+    e.array(0).unwrap();
+    e.u8(2).unwrap();
+    e.u32(1_000).unwrap();
+
+    e.writer_mut().extend_from_slice(witness_set);
+
+    if matches!(era, trv::Era::Dijkstra) {
+        e.null().unwrap();
+        e.bool(true).unwrap();
+    } else {
+        e.bool(true).unwrap();
+        e.null().unwrap();
+    }
+
+    let cbor: &'static [u8] = Box::leak(e.into_writer().into_boxed_slice());
+    trv::MultiEraTx::decode_for_era(era, cbor).unwrap()
+}
+
 /// A Conway parameter update read from the CBOR map given.
 pub fn conway_update(update_cbor: &[u8]) -> pallas_primitives::conway::ProtocolParamUpdate {
     minicbor::decode(update_cbor).expect("a parameter update map decodes")
