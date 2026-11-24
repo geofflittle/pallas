@@ -139,13 +139,14 @@ mod tests {
     }
 
     #[test]
-    fn a_credential_with_extra_elements_reads_to_the_end_of_its_array() {
+    fn a_credential_with_extra_elements_is_refused() {
         for bytes in [format!("8300{HASH}00"), format!("9f00{HASH}9f00ff00ff")] {
-            let bytes = hex::decode(&bytes).unwrap();
-            let mut d = minicbor::Decoder::new(&bytes);
-            let credential: StakeCredential = d.decode().unwrap();
-            assert!(matches!(credential, StakeCredential::AddrKeyhash(_)));
-            assert_eq!(d.position(), bytes.len());
+            let error = minicbor::decode::<StakeCredential>(&hex::decode(&bytes).unwrap())
+                .expect_err("an extra element must not decode");
+            assert!(
+                error.to_string().contains("more elements than"),
+                "{bytes} was refused for some other reason: {error}"
+            );
         }
     }
 
