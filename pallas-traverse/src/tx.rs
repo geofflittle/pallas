@@ -19,22 +19,7 @@ use crate::{
 };
 
 #[cfg(feature = "unstable")]
-use crate::probe;
-
-/// Decodes the bytes as one value that ends where they end.
-#[cfg(feature = "unstable")]
-fn decode_whole<'b, T: minicbor::Decode<'b, ()>>(
-    cbor: &'b [u8],
-) -> Result<T, minicbor::decode::Error> {
-    let mut d = minicbor::Decoder::new(cbor);
-    let value = d.decode()?;
-    if d.position() != cbor.len() {
-        return Err(
-            minicbor::decode::Error::message("bytes left after the transaction").at(d.position()),
-        );
-    }
-    Ok(value)
-}
+use crate::{probe, support::decode_whole};
 
 impl<'b> MultiEraTx<'b> {
     pub fn from_byron(tx: &'b byron::TxPayload<'b>) -> Self {
@@ -1095,6 +1080,36 @@ mod tests {
                 Err(err) if err.to_string().contains("bytes left") => {}
                 Err(err) => panic!("the {form} form was refused for another reason: {err}"),
                 Ok(_) => panic!("the {form} form with a byte after it was read"),
+            }
+        }
+    }
+
+    #[test]
+    fn a_dijkstra_output_or_script_reference_with_bytes_after_it_is_refused() {
+        let output = hex::decode(format!("82581d61{}01", "11".repeat(28))).unwrap();
+        let script = testing::script_ref_plutus_v4(&[0x01]);
+        type Decode = fn(&[u8]) -> Result<(), String>;
+        let cases: [(&str, Vec<u8>, Decode); 2] = [
+            ("output", output, |cbor| {
+                crate::MultiEraOutput::decode(Era::Dijkstra, cbor)
+                    .map(|_| ())
+                    .map_err(|err| err.to_string())
+            }),
+            ("script reference", script, |cbor| {
+                crate::MultiEraScriptRef::decode(Era::Dijkstra, cbor)
+                    .map(|_| ())
+                    .map_err(|err| err.to_string())
+            }),
+        ];
+        for (entry, cbor, decode) in cases {
+            decode(&cbor).unwrap_or_else(|err| panic!("the {entry} was refused: {err}"));
+
+            let mut trailing = cbor.clone();
+            trailing.push(0x00);
+            match decode(&trailing) {
+                Err(err) if err.contains("bytes left") => {}
+                Err(err) => panic!("the {entry} was refused for another reason: {err}"),
+                Ok(()) => panic!("the {entry} with a byte after it was read"),
             }
         }
     }
