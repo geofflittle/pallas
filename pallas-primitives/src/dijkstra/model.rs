@@ -1252,7 +1252,7 @@ pub(crate) mod guards_field {
 
 /// Decoders for the maps the ledger reads with at least one entry.
 pub(crate) mod nonempty_map {
-    use super::{BTreeMap, Value};
+    use super::{AssetName, BTreeMap, Multiasset, Value};
     use pallas_codec::minicbor::{self, Decode, Decoder, data::Type, decode::Error};
     use pallas_codec::utils::decode_array;
 
@@ -1268,6 +1268,16 @@ pub(crate) mod nonempty_map {
     where
         K: Decode<'b, Ctx> + Ord,
     {
+        decode_by_key(d, ctx, |d, ctx| d.decode_with(ctx), value)
+    }
+
+    /// Decodes a map of at least one entry and no repeated key, reading keys and values with the given decoders.
+    fn decode_by_key<'b, Ctx, K: Ord, V>(
+        d: &mut Decoder<'b>,
+        ctx: &mut Ctx,
+        key: fn(&mut Decoder<'b>, &mut Ctx) -> Result<K, Error>,
+        value: fn(&mut Decoder<'b>, &mut Ctx) -> Result<V, Error>,
+    ) -> Result<BTreeMap<K, V>, Error> {
         let at = d.position();
         let len = d.map()?;
         let mut map = BTreeMap::new();
@@ -1282,7 +1292,7 @@ pub(crate) mod nonempty_map {
                 _ => {}
             }
             let key_at = d.position();
-            let key = d.decode_with(ctx)?;
+            let key = key(d, ctx)?;
             let entry = value(d, ctx)?;
             if map.insert(key, entry).is_some() {
                 return Err(Error::message("repeated key in a map").at(key_at));
@@ -1350,12 +1360,39 @@ pub(crate) mod nonempty_map {
         decode_by(d, ctx, decode).map(Some)
     }
 
+    /// Decodes a map of at least one asset, whose names hold at most 32 bytes.
+    fn decode_assets<'b, Ctx, V>(
+        d: &mut Decoder<'b>,
+        ctx: &mut Ctx,
+    ) -> Result<BTreeMap<AssetName, V>, Error>
+    where
+        V: Decode<'b, Ctx>,
+    {
+        decode_by_key(
+            d,
+            ctx,
+            pallas_codec::utils::decode_bytes_sized::<0, 32, _>,
+            |d, ctx| d.decode_with(ctx),
+        )
+    }
+
+    /// Decodes an optional field holding a multiasset in which each policy holds at least one asset.
+    pub fn decode_multiasset_option<'b, Ctx, V>(
+        d: &mut Decoder<'b>,
+        ctx: &mut Ctx,
+    ) -> Result<Option<Multiasset<V>>, Error>
+    where
+        V: Decode<'b, Ctx>,
+    {
+        decode_by(d, ctx, decode_assets).map(Some)
+    }
+
     /// Decodes a value whose multiasset holds at least one asset.
     pub fn decode_value<'b, Ctx>(d: &mut Decoder<'b>, ctx: &mut Ctx) -> Result<Value, Error> {
         match d.datatype()? {
             Type::Array | Type::ArrayIndef => decode_array(d, |a| {
                 let coin = a.decode_with(ctx)?;
-                let multiasset = a.decode_by(ctx, |d, ctx| decode_by(d, ctx, decode))?;
+                let multiasset = a.decode_by(ctx, |d, ctx| decode_by(d, ctx, decode_assets))?;
                 Ok(Value::Multiasset(coin, multiasset))
             }),
             _ => minicbor::Decode::decode(d, ctx),
@@ -1540,7 +1577,7 @@ crate::map_record::decode_map_record!(SubTransactionBody<'a>,
     5 => withdrawals: nonempty_map::decode_option,
     7 => auxiliary_data_hash,
     8 => validity_interval_start,
-    9 => mint: nonempty_map::decode_nested_option,
+    9 => mint: nonempty_map::decode_multiasset_option,
     11 => script_data_hash,
     14 => guards: guards_field::decode_option,
     15 => network_id,
@@ -1666,7 +1703,7 @@ crate::map_record::decode_map_record!(TransactionBody<'a>,
     5 => withdrawals: nonempty_map::decode_option,
     7 => auxiliary_data_hash,
     8 => validity_interval_start,
-    9 => mint: nonempty_map::decode_nested_option,
+    9 => mint: nonempty_map::decode_multiasset_option,
     11 => script_data_hash,
     13 => collateral,
     14 => guards: guards_field::decode_option,

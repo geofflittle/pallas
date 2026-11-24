@@ -3919,6 +3919,22 @@ fn bounded_strings() -> Vec<Bounded> {
             128,
         ),
         bounded(
+            "value asset_name",
+            read::<TransactionOutput>,
+            format!("a200581d61{}018200a1{HASH}a1F01", "11".repeat(28)),
+            bytes_of,
+            0,
+            32,
+        ),
+        bounded(
+            "mint asset_name",
+            read::<TransactionBody>,
+            body_with(true, &[&format!("09a1{HASH}a1F01")]),
+            bytes_of,
+            0,
+            32,
+        ),
+        bounded(
             "metadatum bytes",
             read::<super::Metadatum>,
             "F".to_string(),
