@@ -515,7 +515,7 @@ pub type VrfKeyhash = Hash<32>;
 
 #[cfg(test)]
 mod tests {
-    use super::{PoolMetadata, RationalNumber, Relay};
+    use super::{PoolMetadata, Relay};
     use pallas_codec::minicbor;
 
     const ABC: [&str; 2] = ["63616263", "7f6161626263ff"];
@@ -541,14 +541,6 @@ mod tests {
             let relay: Relay = minicbor::decode(&raw).unwrap();
             assert_eq!(relay, Relay::MultiHostName("abc".into()), "{name}");
         }
-    }
-
-    #[test]
-    fn a_rational_reads_its_denominator_past_the_end_of_a_short_definite_array() {
-        let mut d = minicbor::Decoder::new(&[0xd8, 0x1e, 0x81, 0x01, 0x02]);
-        let rational: RationalNumber = d.decode().unwrap();
-        assert_eq!((rational.numerator, rational.denominator), (1, 2));
-        assert_eq!(d.position(), 5);
     }
 
     #[cfg(feature = "unstable")]

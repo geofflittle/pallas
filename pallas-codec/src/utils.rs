@@ -1625,13 +1625,19 @@ pub fn decode_array<'b, T>(
     Ok(value)
 }
 
-/// Skips the elements of an array of length `len` after its first `read`, and the break of an indefinite one.
+/// Skips the elements of an array of length `len` after its first `read`, and the break of an indefinite one, refusing a definite length below `read`.
 pub fn skip_array_rest(
     d: &mut minicbor::Decoder<'_>,
     len: Option<u64>,
     read: u64,
 ) -> Result<(), Error> {
     match len {
+        Some(len) if len < read => {
+            return Err(Error::message(format!(
+                "array of length {len} is shorter than the {read} fields read"
+            ))
+            .at(d.position()));
+        }
         Some(len) => {
             for _ in read..len {
                 d.skip()?;
@@ -1708,6 +1714,21 @@ mod tests {
                 err.to_string().contains("required field"),
                 "the {name} array was refused for some other reason: {err}"
             );
+        }
+    }
+
+    #[test]
+    fn skip_array_rest_refuses_a_definite_array_shorter_than_the_fields_read() {
+        let mut d = minicbor::Decoder::new(&[]);
+        let err = skip_array_rest(&mut d, Some(1), 2)
+            .expect_err("an array of one element cannot hold two fields");
+        assert!(
+            err.to_string().contains("shorter than the"),
+            "refused for some other reason: {err}"
+        );
+        for (len, read) in [(2, 2), (0, 0)] {
+            skip_array_rest(&mut minicbor::Decoder::new(&[]), Some(len), read)
+                .unwrap_or_else(|e| panic!("an array of {len} elements holds {read} fields: {e}"));
         }
     }
 

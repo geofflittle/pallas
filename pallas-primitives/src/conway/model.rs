@@ -790,7 +790,9 @@ mod tests {
             Certificate, Constitution, DRep, DatumOption, GovAction, RationalNumber, Relay,
             StakeCredential, TransactionBody, TransactionOutput, Value, Vote, Voter,
         };
-        use crate::flat_enum::{assert_reads_either_length_form, decode_all};
+        use crate::flat_enum::{
+            assert_reads_either_length_form, assert_short_header_refused, decode_all,
+        };
         use pallas_codec::minicbor;
         use pallas_codec::utils::CborWrap;
 
@@ -810,6 +812,25 @@ mod tests {
         #[test]
         fn a_value_in_an_indefinite_array_short_of_its_fields_is_refused() {
             assert!(minicbor::decode::<Value>(&hex::decode("9f01ff").unwrap()).is_err());
+        }
+
+        #[test]
+        fn a_value_with_a_definite_header_short_of_its_fields_is_refused() {
+            let multi = format!("a1{HASH}a1416101");
+            let (short, full) = (format!("8101{multi}"), format!("8201{multi}"));
+            assert_short_header_refused::<Value>(&short, &full);
+            assert_short_header_refused::<crate::alonzo::Value>(&short, &full);
+        }
+
+        #[test]
+        fn a_relay_with_a_definite_header_short_of_its_fields_is_refused() {
+            assert_short_header_refused::<Relay>("8201f6627231", "8301f6627231");
+            assert_short_header_refused::<Relay>("8102627231", "8202627231");
+        }
+
+        #[test]
+        fn a_rational_with_a_definite_header_short_of_its_fields_is_refused() {
+            assert_short_header_refused::<RationalNumber>("d81e810102", "d81e820102");
         }
 
         #[test]
