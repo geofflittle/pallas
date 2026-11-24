@@ -104,6 +104,24 @@ where
     }
 }
 
+/// Asserts that `T` decodes `full` and refuses `short`, whose definite array header names fewer elements than `T` reads.
+#[cfg(test)]
+pub(crate) fn assert_short_header_refused<T>(short: &str, full: &str)
+where
+    T: minicbor::Decode<'static, ()> + std::fmt::Debug,
+{
+    let full: &'static [u8] = Box::leak(hex::decode(full).unwrap().into_boxed_slice());
+    decode_all::<T>(full);
+    let short_bytes: &'static [u8] = Box::leak(hex::decode(short).unwrap().into_boxed_slice());
+    match minicbor::decode::<T>(short_bytes) {
+        Ok(value) => panic!("{short} must be refused, read as {value:?}"),
+        Err(error) => assert!(
+            error.to_string().contains("shorter than the"),
+            "{short} was refused for some other reason: {error}"
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::assert_reads_either_length_form;

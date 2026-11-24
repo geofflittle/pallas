@@ -1332,6 +1332,21 @@ fn a_pool_registration_re_encodes_each_bls_key_state() {
     );
 }
 
+#[test]
+fn a_pool_registration_with_a_relay_header_short_of_its_fields_is_refused() {
+    let pool = format!(
+        "8a03581c{}5820{}0000d81e820102581de0{}d9010281581c{}",
+        "11".repeat(28),
+        "22".repeat(32),
+        "33".repeat(28),
+        "44".repeat(28)
+    );
+    crate::flat_enum::assert_short_header_refused::<Certificate>(
+        &format!("{pool}828300f6f6f68202627231f6"),
+        &format!("{pool}828400f6f6f68202627231f6"),
+    );
+}
+
 /// No fixture carries either shape, so without this the encoder's four
 /// element branch and the decoder's refusal of `false` run nowhere.
 #[test]
