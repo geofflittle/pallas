@@ -1588,8 +1588,17 @@ crate::map_record::decode_map_record!(PostAlonzoTransactionOutput<'b>,
     0 => address,
     1 => value: nonempty_map::decode_value,
     2 => datum_option,
-    3 => script_ref: babbage::decode_script_ref,
+    3 => script_ref: decode_script_ref,
 );
+
+/// Decodes `script_ref`, whose rule has no nil.
+fn decode_script_ref<'b, Ctx>(
+    d: &mut minicbor::Decoder<'b>,
+    ctx: &mut Ctx,
+) -> Result<Option<CborWrap<ScriptRef<'b>>>, minicbor::decode::Error> {
+    crate::map_record::refuse_nil(d)?;
+    babbage::decode_script_ref(d, ctx)
+}
 
 pub type TransactionOutput<'b> = babbage::GenTransactionOutput<'b, PostAlonzoTransactionOutput<'b>>;
 
@@ -1669,9 +1678,18 @@ crate::array_record::decode_array_record!(RedeemersValue { data, ex_units });
 
 /// `redeemers` is map only in Dijkstra (`defs.cddl`). Conway's array arm and
 /// the `redeemer` rule behind it were deleted.
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 #[cbor(transparent)]
 pub struct Redeemers(pub BTreeMap<RedeemersKey, RedeemersValue>);
+
+impl<'b, Ctx> minicbor::Decode<'b, Ctx> for Redeemers {
+    fn decode(
+        d: &mut minicbor::Decoder<'b>,
+        ctx: &mut Ctx,
+    ) -> Result<Self, minicbor::decode::Error> {
+        nonempty_map::decode(d, ctx).map(Redeemers)
+    }
+}
 
 impl From<BTreeMap<RedeemersKey, RedeemersValue>> for Redeemers {
     fn from(value: BTreeMap<RedeemersKey, RedeemersValue>) -> Self {
