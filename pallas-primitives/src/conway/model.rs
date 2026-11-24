@@ -567,7 +567,7 @@ pub struct GovActionId {
 #[cfg(feature = "unstable")]
 crate::array_record::decode_array_record!(GovActionId {
     transaction_id,
-    action_index
+    action_index: crate::decode_word16
 });
 
 pub type PostAlonzoTransactionOutput<'b> =
