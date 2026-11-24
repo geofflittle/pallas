@@ -483,7 +483,7 @@ pub struct BootstrapWitness {
 crate::array_record::decode_array_record!(BootstrapWitness {
     public_key: pallas_codec::utils::decode_bytes_sized::<32, 32, _>,
     signature: pallas_codec::utils::decode_bytes_sized::<64, 64, _>,
-    chain_code: pallas_codec::utils::decode_bytes_sized::<32, 32, _>,
+    chain_code,
     attributes
 });
 

@@ -849,6 +849,30 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_vrf_output_or_chain_code_of_any_size_is_read_as_the_conway_ledger_does() {
+        let bytes = |size: usize| format!("58{size:02x}{}", "11".repeat(size));
+        for output in [23, 63, 64] {
+            let raw = hex::decode(format!("82{}{}", bytes(output), bytes(80))).unwrap();
+            let cert: Result<crate::VrfCert, _> = minicbor::decode(&raw);
+            assert!(cert.is_ok(), "a VRF output of {output} bytes: {cert:?}");
+        }
+        for chain_code in [31, 32] {
+            let raw = hex::decode(format!(
+                "84{}{}{}40",
+                bytes(32),
+                bytes(64),
+                bytes(chain_code)
+            ))
+            .unwrap();
+            let witness: Result<super::BootstrapWitness, _> = minicbor::decode(&raw);
+            assert!(
+                witness.is_ok(),
+                "a chain code of {chain_code} bytes: {witness:?}"
+            );
+        }
+    }
+
     #[cfg(feature = "unstable")]
     mod unstable_build {
         use super::super::{

@@ -621,10 +621,7 @@ pub struct VrfCert(
 
 #[cfg(feature = "unstable")]
 array_record::decode_array_record!(
-    VrfCert(
-        output: pallas_codec::utils::decode_bytes_sized::<64, 64, _>,
-        proof: pallas_codec::utils::decode_bytes_sized::<80, 80, _>,
-    )
+    VrfCert(output, proof: pallas_codec::utils::decode_bytes_sized::<80, 80, _>)
 );
 
 /// Hash of a VRF verification key (Blake2b-256).

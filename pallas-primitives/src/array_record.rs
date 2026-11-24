@@ -1,6 +1,6 @@
 //! Decoding of structs written as an array of their fields in order.
 
-/// Implements `Decode` for a struct from its fields in array order, reading an array of either length form that holds exactly those fields, where a field marked `#[optional]` is a trailing member the array may leave out.
+/// Implements `Decode` for a struct, or with `fn name for` defines a function `name` that decodes it, from its fields in array order, reading an array of either length form that holds exactly those fields, where a field marked `#[optional]` is a trailing member the array may leave out.
 macro_rules! decode_array_record {
     (@field $a:ident, $ctx:ident, optional $field:ident) => {
         $a.decode_optional($ctx)?
@@ -24,30 +24,50 @@ macro_rules! decode_array_record {
         }
     };
     (
-        $name:ident $(<$lt:lifetime>)? {
+        @value $a:ident, $ctx:ident, $name:ident {
             $( $(#[$marker:ident])? $field:ident $(: $by:path)? ),+ $(,)?
         }
     ) => {
-        $crate::array_record::decode_array_record!(@impl $name $(<$lt>)?, |a, ctx| $name {
+        $name {
             $(
                 $field: $crate::array_record::decode_array_record!(
-                    @field a, ctx, $($marker)? $field $(, $by)?
+                    @field $a, $ctx, $($marker)? $field $(, $by)?
                 ),
             )+
-        });
+        }
     };
     (
-        $name:ident $(<$lt:lifetime>)? (
+        @value $a:ident, $ctx:ident, $name:ident (
             $( $(#[$marker:ident])? $field:ident $(: $by:path)? ),+ $(,)?
         )
     ) => {
-        $crate::array_record::decode_array_record!(@impl $name $(<$lt>)?, |a, ctx| $name(
+        $name(
             $(
                 $crate::array_record::decode_array_record!(
-                    @field a, ctx, $($marker)? $field $(, $by)?
+                    @field $a, $ctx, $($marker)? $field $(, $by)?
                 ),
             )+
-        ));
+        )
+    };
+    (fn $fname:ident for $name:ident $fields:tt) => {
+        fn $fname<Ctx>(
+            d: &mut pallas_codec::minicbor::Decoder<'_>,
+            ctx: &mut Ctx,
+        ) -> Result<$name, pallas_codec::minicbor::decode::Error> {
+            pallas_codec::utils::decode_array(d, |a| {
+                Ok($crate::array_record::decode_array_record!(@value a, ctx, $name $fields))
+            })
+        }
+    };
+    ($name:ident <$lt:lifetime> $fields:tt) => {
+        $crate::array_record::decode_array_record!(@impl $name<$lt>, |a, ctx| {
+            $crate::array_record::decode_array_record!(@value a, ctx, $name $fields)
+        });
+    };
+    ($name:ident $fields:tt) => {
+        $crate::array_record::decode_array_record!(@impl $name, |a, ctx| {
+            $crate::array_record::decode_array_record!(@value a, ctx, $name $fields)
+        });
     };
 }
 
