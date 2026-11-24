@@ -43,6 +43,19 @@ fn at_least(len: usize, minimum: usize, rule: &str) -> Result<(), minicbor::deco
     Ok(())
 }
 
+/// Refuses a set whose elements are not pairwise distinct.
+fn distinct<T: PartialEq>(items: &[T], rule: &str) -> Result<(), minicbor::decode::Error> {
+    for (i, item) in items.iter().enumerate() {
+        if items[..i].contains(item) {
+            return Err(minicbor::decode::Error::message(format!(
+                "repeated element in {rule} at index {i}"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
 macro_rules! tag_preserving_set {
     ($name:ident, $rule:literal, $minimum:expr) => {
         impl<T> $name<T> {
@@ -88,7 +101,7 @@ macro_rules! tag_preserving_set {
 
         impl<'b, C, T> minicbor::decode::Decode<'b, C> for $name<T>
         where
-            T: Decode<'b, C>,
+            T: Decode<'b, C> + PartialEq,
         {
             fn decode(
                 d: &mut minicbor::Decoder<'b>,
@@ -109,6 +122,7 @@ macro_rules! tag_preserving_set {
 
                 let items: Vec<T> = d.decode_with(ctx)?;
                 at_least(items.len(), $minimum, $rule)?;
+                distinct(&items, $rule)?;
 
                 Ok(Self { arm, items })
             }

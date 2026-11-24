@@ -2115,6 +2115,38 @@ fn an_empty_array_is_not_a_nonempty_set() {
 }
 
 #[test]
+fn a_set_holding_an_element_twice_is_refused() {
+    let distinct: &[(&str, &[u8])] = &[
+        ("tagged", &[0xd9, 0x01, 0x02, 0x82, 0x01, 0x02]),
+        ("bare indefinite", &[0x9f, 0x01, 0x02, 0xff]),
+    ];
+    for (arm, bytes) in distinct {
+        let set: Set<u64> = decode_all(bytes);
+        assert_eq!(set.len(), 2, "the {arm} set of distinct elements");
+        let set: NonEmptySet<u64> = decode_all(bytes);
+        assert_eq!(set.len(), 2, "the {arm} nonempty set of distinct elements");
+    }
+
+    let repeated: &[(&str, &[u8])] = &[
+        ("tagged", &[0xd9, 0x01, 0x02, 0x82, 0x01, 0x01]),
+        ("bare indefinite", &[0x9f, 0x02, 0x01, 0x02, 0xff]),
+        ("non shortest", &[0x82, 0x01, 0x18, 0x01]),
+    ];
+    for (arm, bytes) in repeated {
+        for err in [
+            minicbor::decode::<Set<u64>>(bytes).map(drop),
+            minicbor::decode::<NonEmptySet<u64>>(bytes).map(drop),
+        ] {
+            let err = err.expect_err("a set with a repeated element must not decode");
+            assert!(
+                err.to_string().contains("repeated element"),
+                "the {arm} set was refused for some other reason: {err}"
+            );
+        }
+    }
+}
+
+#[test]
 fn a_body_field_typed_nonempty_refuses_an_empty_array() {
     let top: &[u8] = &[0xa3, 0x00, 0x80, 0x01, 0x80, 0x02, 0x00];
     let sub: &[u8] = &[0xa2, 0x00, 0x80, 0x01, 0x80];
