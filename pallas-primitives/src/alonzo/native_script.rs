@@ -167,13 +167,16 @@ mod tests {
                 ScriptAll(vec![InvalidBefore(0), InvalidHereafter(1)]),
                 "820182820400820501",
             ),
+        ];
+        #[cfg(not(feature = "unstable"))]
+        let cases = cases.into_iter().chain([
             ("830400f6", InvalidBefore(0), "820400"),
             (
                 "830181830501f68100",
                 ScriptAll(vec![InvalidHereafter(1)]),
                 "820181820501",
             ),
-        ];
+        ]);
         for (input, expected, canonical) in cases {
             let bytes = hex::decode(input).unwrap();
             let mut d = Decoder::new(&bytes);

@@ -61,6 +61,8 @@
 //! [`pallas`]: https://crates.io/crates/pallas
 
 #[cfg(feature = "unstable")]
+mod array_record;
+#[cfg(feature = "unstable")]
 mod flat_enum;
 mod framework;
 mod metadatum;
@@ -91,7 +93,7 @@ pub use pallas_codec::utils::{
 pub use pallas_crypto::hash::Hash;
 
 use pallas_codec::minicbor::{self, Decode, Encode, data::Tag};
-use pallas_codec::utils::{decode_text_def_or_indef, skip_array_rest};
+use pallas_codec::utils::{decode_text_def_or_indef, end_array};
 use serde::{Deserialize, Serialize};
 
 use std::collections::BTreeMap;
@@ -120,7 +122,8 @@ pub type DnsName = String;
 pub type Epoch = u64;
 
 /// Plutus script execution budget: memory and step units.
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(not(feature = "unstable"), derive(Decode))]
 pub struct ExUnits {
     /// Memory units consumed.
     #[n(0)]
@@ -129,6 +132,9 @@ pub struct ExUnits {
     #[n(1)]
     pub steps: u64,
 }
+
+#[cfg(feature = "unstable")]
+array_record::decode_array_record!(ExUnits { mem, steps });
 
 /// Per-unit prices used to convert [`ExUnits`] into fee lovelace.
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
@@ -258,7 +264,8 @@ pub type PolicyId = Hash<28>;
 pub type PoolKeyhash = Hash<28>;
 
 /// Stake pool metadata reference: URL plus the hash of the pointed-to JSON.
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(not(feature = "unstable"), derive(Decode))]
 pub struct PoolMetadata {
     /// URL serving the pool metadata JSON.
     #[n(0)]
@@ -269,6 +276,12 @@ pub struct PoolMetadata {
     #[n(1)]
     pub hash: PoolMetadataHash,
 }
+
+#[cfg(feature = "unstable")]
+array_record::decode_array_record!(PoolMetadata {
+    url: decode_text_def_or_indef,
+    hash
+});
 
 /// Hash of stake pool metadata (Blake2b-256).
 pub type PoolMetadataHash = Bytes;
@@ -294,13 +307,7 @@ pub(crate) mod protocol_version {
         d: &mut minicbor::Decoder<'_>,
         ctx: &mut Ctx,
     ) -> Result<ProtocolVersion, Error> {
-        decode_array(d, |a| {
-            let version = (a.decode_with(ctx)?, a.decode_with(ctx)?);
-            if a.datatype()? != Type::Break {
-                return Err(Error::message("invalid 2-tuple length"));
-            }
-            Ok(version)
-        })
+        decode_array(d, |a| Ok((a.decode_with(ctx)?, a.decode_with(ctx)?)))
     }
 
     /// Decodes an optional [`ProtocolVersion`], reading a null as `None`.
@@ -335,7 +342,7 @@ impl<'b, C> minicbor::decode::Decode<'b, C> for RationalNumber {
             denominator: d.decode_with(ctx)?,
         };
         if cfg!(feature = "unstable") {
-            skip_array_rest(d, len, 2)?;
+            end_array(d, len, 2)?;
         }
         Ok(rational)
     }
@@ -393,7 +400,7 @@ impl<'b, C> minicbor::decode::Decode<'b, C> for Relay {
         };
 
         if cfg!(feature = "unstable") {
-            skip_array_rest(d, len, read)?;
+            end_array(d, len, read)?;
         }
         Ok(relay)
     }
@@ -474,18 +481,9 @@ pub type TransactionIndex = u32;
 
 /// Reference to a transaction output: `(tx_hash, output_index)`.
 #[derive(
-    Serialize,
-    Deserialize,
-    Encode,
-    Decode,
-    Debug,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Clone,
-    std::hash::Hash,
+    Serialize, Deserialize, Encode, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, std::hash::Hash,
 )]
+#[cfg_attr(not(feature = "unstable"), derive(Decode))]
 pub struct TransactionInput {
     /// Hash of the transaction that produced the output.
     #[n(0)]
@@ -496,11 +494,18 @@ pub struct TransactionInput {
     pub index: u64,
 }
 
+#[cfg(feature = "unstable")]
+array_record::decode_array_record!(TransactionInput {
+    transaction_id,
+    index
+});
+
 /// Rational number constrained to the closed interval [0, 1].
 pub type UnitInterval = RationalNumber;
 
 /// VRF certificate: the output bytes followed by the proof bytes.
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(not(feature = "unstable"), derive(Decode))]
 pub struct VrfCert(
     /// VRF output bytes.
     #[n(0)]
@@ -509,6 +514,9 @@ pub struct VrfCert(
     #[n(1)]
     pub Bytes,
 );
+
+#[cfg(feature = "unstable")]
+array_record::decode_array_record!(VrfCert(output, proof));
 
 /// Hash of a VRF verification key (Blake2b-256).
 pub type VrfKeyhash = Hash<32>;
@@ -563,7 +571,7 @@ mod tests {
             let mut d = minicbor::Decoder::new(&raw);
             let error = super::protocol_version::decode(&mut d, &mut ()).unwrap_err();
             assert!(
-                error.to_string().contains("invalid 2-tuple length"),
+                error.to_string().contains("more elements than"),
                 "{version}: {error}"
             );
         }

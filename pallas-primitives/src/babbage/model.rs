@@ -59,7 +59,8 @@ pub struct HeaderBody {
     pub protocol_version: ProtocolVersion,
 }
 
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Encode, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(not(feature = "unstable"), derive(Decode))]
 pub struct OperationalCert {
     #[n(0)]
     pub operational_cert_hot_vkey: Bytes,
@@ -73,6 +74,14 @@ pub struct OperationalCert {
     #[n(3)]
     pub operational_cert_sigma: Bytes,
 }
+
+#[cfg(feature = "unstable")]
+crate::array_record::decode_array_record!(OperationalCert {
+    operational_cert_hot_vkey,
+    operational_cert_sequence_number,
+    operational_cert_kes_period,
+    operational_cert_sigma
+});
 
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
 pub struct Header {
