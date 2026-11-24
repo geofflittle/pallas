@@ -1927,17 +1927,6 @@ fn an_empty_script_set_in_a_witness_set_is_refused() {
 }
 
 #[test]
-fn an_empty_bootstrap_witness_set_is_read_as_written() {
-    let bytes = [0xa1, 0x02, 0xd9, 0x01, 0x02, 0x80];
-    let witnesses: WitnessSet = decode_all(&bytes);
-    assert_eq!(
-        witnesses.bootstrap_witness.as_deref().map(Vec::len),
-        Some(0)
-    );
-    assert_eq!(minicbor::to_vec(&witnesses).unwrap(), bytes);
-}
-
-#[test]
 fn cost_models_keeps_a_key_the_named_fields_do_not_cover() {
     // a2                      map of two keys
     //   00  82 01 02          key 0, the PlutusV1 model [1, 2]
@@ -4435,6 +4424,33 @@ fn integers_read_only_within_the_width_the_ledger_reads() {
         wrong.len(),
         wrong.join("\n")
     );
+}
+
+#[test]
+fn a_witness_set_refuses_an_empty_bootstrap_set_as_a_transaction_does() {
+    let filled = |head: &str, n: usize| format!("{head}{}", "11".repeat(n));
+    let witness = format!(
+        "84{}{}{}40",
+        filled("5820", 32),
+        filled("5840", 64),
+        filled("5820", 32)
+    );
+    let mut wrong = Vec::new();
+    for (case, hex, verdict) in [
+        ("one bootstrap witness", format!("a10281{witness}"), true),
+        ("empty bootstrap set", "a10280".to_string(), false),
+        (
+            "empty tagged bootstrap set",
+            "a102d9010280".to_string(),
+            false,
+        ),
+    ] {
+        let got = read::<WitnessSet>(generated(&hex));
+        if got.is_ok() != verdict {
+            wrong.push(format!("{case}: {got:?}"));
+        }
+    }
+    assert_eq!(wrong, Vec::<String>::new());
 }
 
 #[test]
