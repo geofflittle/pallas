@@ -270,8 +270,8 @@ crate::array_record::decode_array_record!(HeaderBody {
     block_number,
     slot,
     prev_hash,
-    issuer_vkey,
-    vrf_vkey,
+    issuer_vkey: pallas_codec::utils::decode_bytes_sized::<32, 32, _>,
+    vrf_vkey: pallas_codec::utils::decode_bytes_sized::<32, 32, _>,
     vrf_result,
     block_body_size,
     block_body_hash,
@@ -303,7 +303,7 @@ pub struct Header {
 
 crate::array_record::decode_array_record!(Header {
     header_body,
-    body_signature
+    body_signature: pallas_codec::utils::decode_bytes_sized::<448, 448, _>
 });
 
 pub use crate::conway::Multiasset;
@@ -380,8 +380,8 @@ pub struct BlsKey {
 }
 
 crate::array_record::decode_array_record!(BlsKey {
-    bls_pubkey,
-    bls_possession_proof
+    bls_pubkey: pallas_codec::utils::decode_bytes_sized::<96, 96, _>,
+    bls_possession_proof: pallas_codec::utils::decode_bytes_sized::<48, 48, _>
 });
 
 /// `leios_signature = bytes .size 48` (`defs.cddl`).
@@ -398,7 +398,10 @@ pub struct LeiosCertificate {
     pub signature: LeiosSignature,
 }
 
-crate::array_record::decode_array_record!(LeiosCertificate { signers, signature });
+crate::array_record::decode_array_record!(LeiosCertificate {
+    signers: pallas_codec::utils::decode_bytes_sized::<0, 8192, _>,
+    signature: pallas_codec::utils::decode_bytes_sized::<48, 48, _>
+});
 
 /// `peras_certificate = bytes` (`defs.cddl`).
 pub type PerasCertificate = Bytes;

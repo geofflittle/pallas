@@ -3420,3 +3420,366 @@ fn a_dijkstra_record_holds_exactly_its_fields() {
         .expect("a sub transaction");
     assert_encoding_holds_exactly::<super::SubTransaction>(sub);
 }
+
+/// The hex of the CBOR head of a major type and its argument.
+fn head(major: u8, n: usize) -> String {
+    let m = major << 5;
+    match n {
+        0..24 => format!("{:02x}", m | n as u8),
+        24..256 => format!("{:02x}{n:02x}", m | 24),
+        256..65536 => format!("{:02x}{n:04x}", m | 25),
+        _ => format!("{:02x}{n:08x}", m | 26),
+    }
+}
+
+/// The hex of a byte string of `size` bytes.
+fn bytes_of(size: usize) -> String {
+    format!("{}{}", head(2, size), "11".repeat(size))
+}
+
+/// The hex of a text string of `size` bytes.
+fn text_of(size: usize) -> String {
+    format!("{}{}", head(3, size), "61".repeat(size))
+}
+
+/// A string field the CDDL bounds, as a record whose `F` is the field.
+struct Bounded {
+    field: &'static str,
+    read: fn(&'static [u8]) -> Result<(), minicbor::decode::Error>,
+    record: String,
+    string: fn(usize) -> String,
+    min: usize,
+    max: usize,
+}
+
+impl Bounded {
+    /// Whether the record holds a BLS key or signature, whose 0x11 filled bytes the ledger refuses as a point and pallas reads.
+    fn holds_a_bls_point(&self) -> bool {
+        self.field.starts_with("bls_key") || self.field.starts_with("leios_certificate")
+    }
+}
+
+/// Every string field the Dijkstra CDDL gives a size, other than an address or a reward account.
+fn bounded_strings() -> Vec<Bounded> {
+    let b = |n| bytes_of(n);
+    let (vkey, sig, vrf) = (b(32), b(64), format!("82{}{}", b(64), b(80)));
+    let opcert = format!("84{}0000{}", b(32), b(64));
+    let header_body = |f: [&str; 4]| {
+        format!(
+            "8c0000f6{}{}{}00{HASH32}{}{VERSION_INFO}f4f6",
+            f[0], f[1], f[2], f[3]
+        )
+    };
+    type Read = fn(&'static [u8]) -> Result<(), minicbor::decode::Error>;
+    let bounded =
+        |field, read: Read, record: String, string: fn(usize) -> String, min, max| Bounded {
+            field,
+            read,
+            record,
+            string,
+            min,
+            max,
+        };
+    vec![
+        bounded(
+            "vkeywitness vkey",
+            read::<super::VKeyWitness>,
+            format!("82F{sig}"),
+            bytes_of,
+            32,
+            32,
+        ),
+        bounded(
+            "vkeywitness signature",
+            read::<super::VKeyWitness>,
+            format!("82{vkey}F"),
+            bytes_of,
+            64,
+            64,
+        ),
+        bounded(
+            "bootstrap_witness public_key",
+            read::<super::BootstrapWitness>,
+            format!("84F{sig}{vkey}40"),
+            bytes_of,
+            32,
+            32,
+        ),
+        bounded(
+            "bootstrap_witness signature",
+            read::<super::BootstrapWitness>,
+            format!("84{vkey}F{vkey}40"),
+            bytes_of,
+            64,
+            64,
+        ),
+        bounded(
+            "bootstrap_witness chain_code",
+            read::<super::BootstrapWitness>,
+            format!("84{vkey}{sig}F40"),
+            bytes_of,
+            32,
+            32,
+        ),
+        bounded(
+            "operational_cert hot_vkey",
+            read::<super::OperationalCert>,
+            format!("84F0000{sig}"),
+            bytes_of,
+            32,
+            32,
+        ),
+        bounded(
+            "operational_cert sigma",
+            read::<super::OperationalCert>,
+            format!("84{vkey}0000F"),
+            bytes_of,
+            64,
+            64,
+        ),
+        bounded(
+            "vrf_cert output",
+            read::<super::VrfCert>,
+            format!("82F{}", b(80)),
+            bytes_of,
+            64,
+            64,
+        ),
+        bounded(
+            "vrf_cert proof",
+            read::<super::VrfCert>,
+            format!("82{}F", b(64)),
+            bytes_of,
+            80,
+            80,
+        ),
+        bounded(
+            "header_body issuer_vkey",
+            read::<super::HeaderBody>,
+            header_body(["F", &vkey, &vrf, &opcert]),
+            bytes_of,
+            32,
+            32,
+        ),
+        bounded(
+            "header_body vrf_vkey",
+            read::<super::HeaderBody>,
+            header_body([&vkey, "F", &vrf, &opcert]),
+            bytes_of,
+            32,
+            32,
+        ),
+        bounded(
+            "header body_signature",
+            read::<Header>,
+            format!("82{}F", header_body([&vkey, &vkey, &vrf, &opcert])),
+            bytes_of,
+            448,
+            448,
+        ),
+        bounded(
+            "bls_key bls_pubkey",
+            read::<super::BlsKey>,
+            format!("82F{}", b(48)),
+            bytes_of,
+            96,
+            96,
+        ),
+        bounded(
+            "bls_key bls_possession_proof",
+            read::<super::BlsKey>,
+            format!("82{}F", b(96)),
+            bytes_of,
+            48,
+            48,
+        ),
+        bounded(
+            "leios_certificate signers",
+            read::<super::LeiosCertificate>,
+            format!("82F{}", b(48)),
+            bytes_of,
+            0,
+            8192,
+        ),
+        bounded(
+            "leios_certificate signature",
+            read::<super::LeiosCertificate>,
+            "8240F".to_string(),
+            bytes_of,
+            48,
+            48,
+        ),
+        bounded(
+            "relay ipv4",
+            read::<Relay>,
+            "8400f6Ff6".to_string(),
+            bytes_of,
+            4,
+            4,
+        ),
+        bounded(
+            "relay ipv6",
+            read::<Relay>,
+            "8400f6f6F".to_string(),
+            bytes_of,
+            16,
+            16,
+        ),
+        bounded(
+            "relay single_host_name dns_name",
+            read::<Relay>,
+            "8301f6F".to_string(),
+            text_of,
+            0,
+            128,
+        ),
+        bounded(
+            "relay multi_host_name dns_name",
+            read::<Relay>,
+            "8202F".to_string(),
+            text_of,
+            0,
+            128,
+        ),
+        bounded(
+            "pool_metadata url",
+            read::<super::PoolMetadata>,
+            format!("82F{HASH32}"),
+            text_of,
+            0,
+            128,
+        ),
+        bounded(
+            "anchor url",
+            read::<super::Anchor>,
+            format!("82F{HASH32}"),
+            text_of,
+            0,
+            128,
+        ),
+        bounded(
+            "metadatum bytes",
+            read::<super::Metadatum>,
+            "F".to_string(),
+            bytes_of,
+            0,
+            64,
+        ),
+        bounded(
+            "metadatum text",
+            read::<super::Metadatum>,
+            "F".to_string(),
+            text_of,
+            0,
+            64,
+        ),
+        bounded(
+            "plutus_data bytes",
+            read::<PlutusData>,
+            "F".to_string(),
+            bytes_of,
+            0,
+            64,
+        ),
+        bounded(
+            "plutus_data big_uint",
+            read::<PlutusData>,
+            "c2F".to_string(),
+            bytes_of,
+            0,
+            64,
+        ),
+    ]
+}
+
+#[test]
+fn each_bounded_string_reads_at_its_bounds() {
+    let failed: Vec<_> = bounded_strings()
+        .iter()
+        .filter(|c| !c.holds_a_bls_point())
+        .flat_map(|c| [c.min, c.max].map(|size| (c, size)))
+        .filter_map(|(c, size)| {
+            (c.read)(generated(&c.record.replace("F", &(c.string)(size))))
+                .err()
+                .map(|err| format!("{} of {size}: {err}", c.field))
+        })
+        .collect();
+    assert!(
+        failed.is_empty(),
+        "{} refused:\n{}",
+        failed.len(),
+        failed.join("\n")
+    );
+}
+
+#[test]
+fn a_bounded_string_outside_its_size_is_refused() {
+    let failed: Vec<_> = bounded_strings()
+        .iter()
+        .flat_map(|c| {
+            let below = c.min.checked_sub(1);
+            [below, Some(c.max + 1)]
+                .into_iter()
+                .flatten()
+                .map(move |size| (c, size))
+        })
+        .filter_map(|(c, size)| {
+            match (c.read)(generated(&c.record.replace("F", &(c.string)(size)))) {
+                Err(err) if err.to_string().contains("where the rule allows") => None,
+                Err(err) => Some(format!(
+                    "{} of {size} refused for another reason: {err}",
+                    c.field
+                )),
+                Ok(()) => Some(format!("{} of {size} read", c.field)),
+            }
+        })
+        .collect();
+    assert!(
+        failed.is_empty(),
+        "{} not refused for their size:\n{}",
+        failed.len(),
+        failed.join("\n")
+    );
+}
+
+#[test]
+fn plutus_bytes_bound_each_chunk_and_metadata_bounds_the_whole_string() {
+    let indefinite = |chunks: &[usize]| {
+        format!(
+            "5f{}ff",
+            chunks.iter().map(|&n| bytes_of(n)).collect::<String>()
+        )
+    };
+    for (read, hex, verdict) in [
+        (read::<PlutusData> as fn(_) -> _, indefinite(&[64, 1]), true),
+        (read::<PlutusData>, indefinite(&[40, 40]), true),
+        (
+            read::<PlutusData>,
+            format!("c2{}", indefinite(&[40, 40])),
+            true,
+        ),
+        (read::<PlutusData>, indefinite(&[65]), false),
+        (
+            read::<PlutusData>,
+            format!("c2{}", indefinite(&[65])),
+            false,
+        ),
+        (read::<super::Metadatum>, indefinite(&[40, 40]), false),
+        (read::<super::Metadatum>, indefinite(&[64, 1]), false),
+        (
+            read::<super::Metadatum>,
+            format!("7f{}{}ff", text_of(40), text_of(40)),
+            false,
+        ),
+        (read::<super::Metadatum>, indefinite(&[32, 32]), true),
+    ] {
+        let got = read(generated(&hex));
+        assert_eq!(got.is_ok(), verdict, "{hex}: {got:?}");
+        if let Err(err) = got {
+            assert!(
+                err.to_string().contains("where the rule allows"),
+                "{hex}: {err}"
+            );
+        }
+    }
+}

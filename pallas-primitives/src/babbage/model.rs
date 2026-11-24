@@ -77,10 +77,10 @@ pub struct OperationalCert {
 
 #[cfg(feature = "unstable")]
 crate::array_record::decode_array_record!(OperationalCert {
-    operational_cert_hot_vkey,
+    operational_cert_hot_vkey: pallas_codec::utils::decode_bytes_sized::<32, 32, _>,
     operational_cert_sequence_number,
     operational_cert_kes_period,
-    operational_cert_sigma
+    operational_cert_sigma: pallas_codec::utils::decode_bytes_sized::<64, 64, _>
 });
 
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
