@@ -76,6 +76,11 @@ fn cases() -> Vec<(&'static str, Builds, String)> {
             decoded!(Relay, "83026361626300"),
         ),
         (
+            "relay with a short header",
+            WithoutUnstable,
+            decoded!(Relay, "8102627231"),
+        ),
+        (
             "rational definite",
             Every,
             decoded!(RationalNumber, "d81e820102"),
@@ -89,6 +94,11 @@ fn cases() -> Vec<(&'static str, Builds, String)> {
             "rational of three numbers",
             WithoutUnstable,
             decoded!(RationalNumber, "d81e83010203"),
+        ),
+        (
+            "rational with a short header",
+            WithoutUnstable,
+            decoded!(RationalNumber, "d81e810102"),
         ),
         (
             "native script definite",
@@ -158,6 +168,11 @@ fn cases() -> Vec<(&'static str, Builds, String)> {
             decoded!(alonzo::Value, format!("8301a1{HASH}a1400100")),
         ),
         (
+            "alonzo value with a short header",
+            WithoutUnstable,
+            decoded!(alonzo::Value, format!("8101a1{HASH}a14001")),
+        ),
+        (
             "conway value definite",
             Every,
             decoded!(conway::Value, format!("8201a1{HASH}a14001")),
@@ -172,6 +187,11 @@ fn cases() -> Vec<(&'static str, Builds, String)> {
             "conway value with an extra element",
             WithoutUnstable,
             decoded!(conway::Value, format!("8301a1{HASH}a1400100")),
+        ),
+        (
+            "conway value with a short header",
+            WithoutUnstable,
+            decoded!(conway::Value, format!("8101a1{HASH}a14001")),
         ),
         (
             "datum option definite",
@@ -329,6 +349,10 @@ const EXPECTED: &[(&str, &str)] = &[
         "Ok(MultiHostName(\"abc\")) at 6",
     ),
     (
+        "relay with a short header",
+        "Ok(MultiHostName(\"r1\")) at 5",
+    ),
+    (
         "rational definite",
         "Ok(RationalNumber { numerator: 1, denominator: 2 }) at 5",
     ),
@@ -338,6 +362,10 @@ const EXPECTED: &[(&str, &str)] = &[
     ),
     (
         "rational of three numbers",
+        "Ok(RationalNumber { numerator: 1, denominator: 2 }) at 5",
+    ),
+    (
+        "rational with a short header",
         "Ok(RationalNumber { numerator: 1, denominator: 2 }) at 5",
     ),
     ("native script definite", "Ok(InvalidHereafter(1)) at 3"),
@@ -389,6 +417,10 @@ const EXPECTED: &[(&str, &str)] = &[
         "Ok(Multiasset(1, {Hash<28>(\"11111111111111111111111111111111111111111111111111111111\"): {Bytes(ByteVec([])): 1}})) at 36",
     ),
     (
+        "alonzo value with a short header",
+        "Ok(Multiasset(1, {Hash<28>(\"11111111111111111111111111111111111111111111111111111111\"): {Bytes(ByteVec([])): 1}})) at 36",
+    ),
+    (
         "conway value definite",
         "Ok(Multiasset(1, {Hash<28>(\"11111111111111111111111111111111111111111111111111111111\"): {Bytes(ByteVec([])): PositiveCoin(1)}})) at 36",
     ),
@@ -399,6 +431,10 @@ const EXPECTED: &[(&str, &str)] = &[
     ),
     (
         "conway value with an extra element",
+        "Ok(Multiasset(1, {Hash<28>(\"11111111111111111111111111111111111111111111111111111111\"): {Bytes(ByteVec([])): PositiveCoin(1)}})) at 36",
+    ),
+    (
+        "conway value with a short header",
         "Ok(Multiasset(1, {Hash<28>(\"11111111111111111111111111111111111111111111111111111111\"): {Bytes(ByteVec([])): PositiveCoin(1)}})) at 36",
     ),
     (
