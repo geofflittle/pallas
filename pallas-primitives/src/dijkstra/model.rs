@@ -1139,7 +1139,7 @@ pub(crate) mod nonempty_map {
     /// A map whose values are maps.
     type Nested<K, J, V> = BTreeMap<K, BTreeMap<J, V>>;
 
-    /// Decodes a map of at least one entry, reading each value with `value`.
+    /// Decodes a map of at least one entry and no repeated key, reading each value with `value`.
     fn decode_by<'b, Ctx, K, V>(
         d: &mut Decoder<'b>,
         ctx: &mut Ctx,
@@ -1193,7 +1193,7 @@ pub(crate) mod nonempty_map {
         refuse_empty(d.decode_with(ctx)?, at)
     }
 
-    /// Decodes a map of at least one entry.
+    /// Decodes a map of at least one entry and no repeated key.
     pub fn decode<'b, Ctx, K, V>(
         d: &mut Decoder<'b>,
         ctx: &mut Ctx,
