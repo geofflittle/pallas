@@ -997,27 +997,17 @@ impl<C> minicbor::Encode<C> for Guards {
 
 /// Decoders for a body's optional [`Guards`] field, where an empty set is no guards.
 pub(crate) mod guards_field {
-    use super::Guards;
-    use pallas_codec::minicbor::{self, data::Type, decode::Error};
+    use super::{Guards, Set};
+    use pallas_codec::minicbor::{self, decode::Error};
+    use pallas_codec::utils::AnyCbor;
 
-    /// Decodes a body's guards, reading null or an empty set as `None`.
+    /// Decodes a body's guards, reading an empty set as `None`.
     pub fn decode_option<Ctx>(
         d: &mut minicbor::Decoder<'_>,
         ctx: &mut Ctx,
     ) -> Result<Option<Guards>, Error> {
-        let mut probe = minicbor::Decoder::new(&d.input()[d.position()..]);
-        if probe.datatype()? == Type::Null {
-            d.skip()?;
-            return Ok(None);
-        }
-        if probe.datatype()? == Type::Tag {
-            probe.tag()?;
-        }
-        let empty = match probe.array()? {
-            Some(len) => len == 0,
-            None => probe.datatype()? == Type::Break,
-        };
-        if empty {
+        let set: Set<AnyCbor> = d.probe().decode_with(ctx)?;
+        if set.is_empty() {
             d.skip()?;
             return Ok(None);
         }
