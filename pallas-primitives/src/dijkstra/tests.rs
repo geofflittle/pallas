@@ -3095,6 +3095,230 @@ fn unknown_keys() -> Vec<Refusal> {
     cases
 }
 
+/// Every map the ledger reads with at least one entry and no repeated key, each empty, with a key twice and with a zero quantity, beside the same map with one entry, paired with the reason the refusal gives.
+fn map_values() -> Vec<(Refusal, &'static str)> {
+    let voter = format!("8200{HASH}");
+    let action = format!("82{HASH32}00");
+    let vote = format!("{action}8201f6");
+    let one_asset = format!("{HASH}a14001");
+    let maps = [
+        (
+            "withdrawals",
+            "05",
+            format!("a1{REWARD}00"),
+            vec![
+                ("empty", "a0".to_string()),
+                ("repeated", format!("a2{REWARD}00{REWARD}01")),
+            ],
+        ),
+        (
+            "mint",
+            "09",
+            format!("a1{one_asset}"),
+            vec![
+                ("empty", "a0".to_string()),
+                ("inner empty", format!("a1{HASH}a0")),
+                ("repeated", format!("a2{one_asset}{one_asset}")),
+                ("inner repeated", format!("a1{HASH}a240014002")),
+            ],
+        ),
+        (
+            "voting_procedures",
+            "13",
+            format!("a1{voter}a1{vote}"),
+            vec![
+                ("empty", "a0".to_string()),
+                ("inner empty", format!("a1{voter}a0")),
+                ("repeated", format!("a2{voter}a1{vote}{voter}a1{vote}")),
+                ("inner repeated", format!("a1{voter}a2{vote}{vote}")),
+            ],
+        ),
+        (
+            "required_top_level_guards",
+            "1818",
+            format!("a1{voter}f6"),
+            vec![
+                ("empty", "a0".to_string()),
+                ("repeated", format!("a2{voter}f6{voter}f6")),
+            ],
+        ),
+        (
+            "direct_deposits",
+            "1819",
+            format!("a1{REWARD}00"),
+            vec![
+                ("empty", "a0".to_string()),
+                ("repeated", format!("a2{REWARD}00{REWARD}01")),
+            ],
+        ),
+        (
+            "account_balance_intervals",
+            "181a",
+            format!("a1{REWARD}8200f6"),
+            vec![
+                ("empty", "a0".to_string()),
+                ("repeated", format!("a2{REWARD}8200f6{REWARD}8201f6")),
+            ],
+        ),
+        (
+            "starting_account_balance_intervals",
+            "181b",
+            format!("a1{REWARD}8200f6"),
+            vec![
+                ("empty", "a0".to_string()),
+                ("repeated", format!("a2{REWARD}8200f6{REWARD}8201f6")),
+            ],
+        ),
+        (
+            "donation",
+            "16",
+            "01".to_string(),
+            vec![("zero", "00".to_string())],
+        ),
+    ];
+    let reason = |variant: &str| match variant {
+        "empty" | "inner empty" => "empty map",
+        "repeated" | "inner repeated" => "repeated key",
+        _ => "zero",
+    };
+    let mut cases = Vec::new();
+
+    for (top, record, read) in [
+        (
+            true,
+            "transaction_body",
+            read::<TransactionBody> as fn(_) -> _,
+        ),
+        (false, "sub_transaction_body", read::<SubTransactionBody>),
+    ] {
+        for (field, key, known, refused) in &maps {
+            if !top && *field == "starting_account_balance_intervals" {
+                continue;
+            }
+            for (variant, map) in refused {
+                cases.push((
+                    Refusal {
+                        class: Box::leak(format!("{record}.{field} {variant}").into_boxed_str()),
+                        read,
+                        refused: body_with(top, &[&format!("{key}{map}")]),
+                        known: body_with(top, &[&format!("{key}{known}")]),
+                    },
+                    reason(variant),
+                ));
+            }
+        }
+    }
+
+    let output = |value: &str| format!("a200581d61{}01{value}", "11".repeat(28));
+    for (variant, multiasset) in [
+        ("empty", "a0".to_string()),
+        ("inner empty", format!("a1{HASH}a0")),
+        ("repeated", format!("a2{one_asset}{one_asset}")),
+        ("inner repeated", format!("a1{HASH}a240014002")),
+        ("zero", format!("a1{HASH}a14000")),
+    ] {
+        cases.push((
+            Refusal {
+                class: Box::leak(format!("transaction_output.value {variant}").into_boxed_str()),
+                read: read::<TransactionOutput>,
+                refused: output(&format!("8200{multiasset}")),
+                known: output(&format!("8200a1{one_asset}")),
+            },
+            reason(variant),
+        ));
+    }
+
+    cases
+}
+
+const MAP_VALUE_CLASSES: &[&str] = &[
+    "transaction_body.withdrawals empty",
+    "transaction_body.withdrawals repeated",
+    "transaction_body.mint empty",
+    "transaction_body.mint inner empty",
+    "transaction_body.mint repeated",
+    "transaction_body.mint inner repeated",
+    "transaction_body.voting_procedures empty",
+    "transaction_body.voting_procedures inner empty",
+    "transaction_body.voting_procedures repeated",
+    "transaction_body.voting_procedures inner repeated",
+    "transaction_body.required_top_level_guards empty",
+    "transaction_body.required_top_level_guards repeated",
+    "transaction_body.direct_deposits empty",
+    "transaction_body.direct_deposits repeated",
+    "transaction_body.account_balance_intervals empty",
+    "transaction_body.account_balance_intervals repeated",
+    "transaction_body.starting_account_balance_intervals empty",
+    "transaction_body.starting_account_balance_intervals repeated",
+    "transaction_body.donation zero",
+    "sub_transaction_body.withdrawals empty",
+    "sub_transaction_body.withdrawals repeated",
+    "sub_transaction_body.mint empty",
+    "sub_transaction_body.mint inner empty",
+    "sub_transaction_body.mint repeated",
+    "sub_transaction_body.mint inner repeated",
+    "sub_transaction_body.voting_procedures empty",
+    "sub_transaction_body.voting_procedures inner empty",
+    "sub_transaction_body.voting_procedures repeated",
+    "sub_transaction_body.voting_procedures inner repeated",
+    "sub_transaction_body.required_top_level_guards empty",
+    "sub_transaction_body.required_top_level_guards repeated",
+    "sub_transaction_body.direct_deposits empty",
+    "sub_transaction_body.direct_deposits repeated",
+    "sub_transaction_body.account_balance_intervals empty",
+    "sub_transaction_body.account_balance_intervals repeated",
+    "sub_transaction_body.donation zero",
+    "transaction_output.value empty",
+    "transaction_output.value inner empty",
+    "transaction_output.value repeated",
+    "transaction_output.value inner repeated",
+    "transaction_output.value zero",
+];
+
+#[test]
+fn each_map_reads_with_one_entry() {
+    let cases: Vec<Refusal> = map_values().into_iter().map(|(case, _)| case).collect();
+    assert_classes(&cases, MAP_VALUE_CLASSES);
+
+    let failed: Vec<_> = cases
+        .iter()
+        .filter_map(|case| {
+            (case.read)(generated(&case.known))
+                .err()
+                .map(|err| format!("{} {}: {err}", case.class, case.known))
+        })
+        .collect();
+    assert!(
+        failed.is_empty(),
+        "{} refused:\n{}",
+        failed.len(),
+        failed.join("\n")
+    );
+}
+
+#[test]
+fn an_empty_map_a_repeated_key_or_a_zero_quantity_is_refused() {
+    let cases = map_values();
+
+    let failed: Vec<_> = cases
+        .iter()
+        .filter_map(
+            |(case, reason)| match (case.read)(generated(&case.refused)) {
+                Err(err) if err.to_string().contains(reason) => None,
+                Err(err) => Some(format!("{} refused for another reason: {err}", case.class)),
+                Ok(()) => Some(format!("{} read", case.class)),
+            },
+        )
+        .collect();
+    assert!(
+        failed.is_empty(),
+        "{} of {} not refused for their reason:\n{}",
+        failed.len(),
+        cases.len(),
+        failed.join("\n")
+    );
+}
+
 /// Asserts that the cases hold at least one case of each expected class and of no other class.
 fn assert_classes(cases: &[Refusal], expected: &[&str]) {
     let mut counts = std::collections::BTreeMap::new();
