@@ -2150,7 +2150,7 @@ pub struct ShelleyMaAuxiliaryData {
     pub transaction_metadata: Metadata,
 
     #[n(1)]
-    pub auxiliary_scripts: Option<Vec<NativeScript>>,
+    pub auxiliary_scripts: Vec<NativeScript>,
 }
 
 impl<'b, C> minicbor::Decode<'b, C> for ShelleyMaAuxiliaryData {
