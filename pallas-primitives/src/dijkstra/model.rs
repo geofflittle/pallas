@@ -567,7 +567,7 @@ pub use crate::conway::Anchor;
 pub use crate::conway::GovActionId;
 
 /// `pool_voting_thresholds` (`defs.cddl`).
-#[derive(Encode, Decode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Encode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct PoolVotingThresholds {
     #[n(0)]
     pub motion_no_confidence: UnitInterval,
@@ -580,6 +580,14 @@ pub struct PoolVotingThresholds {
     #[n(4)]
     pub security_voting_threshold: UnitInterval,
 }
+
+crate::array_record::decode_array_record!(PoolVotingThresholds {
+    motion_no_confidence,
+    committee_normal,
+    committee_no_confidence,
+    hard_fork_initiation,
+    security_voting_threshold
+});
 
 impl From<PoolVotingThresholds> for crate::conway::PoolVotingThresholds {
     fn from(value: PoolVotingThresholds) -> Self {
@@ -594,7 +602,7 @@ impl From<PoolVotingThresholds> for crate::conway::PoolVotingThresholds {
 }
 
 /// `drep_voting_thresholds` (`defs.cddl`).
-#[derive(Encode, Decode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Encode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct DRepVotingThresholds {
     #[n(0)]
     pub motion_no_confidence: UnitInterval,
@@ -618,6 +626,19 @@ pub struct DRepVotingThresholds {
     pub treasury_withdrawal: UnitInterval,
 }
 
+crate::array_record::decode_array_record!(DRepVotingThresholds {
+    motion_no_confidence,
+    committee_normal,
+    committee_no_confidence,
+    update_constitution,
+    hard_fork_initiation,
+    pp_network_group,
+    pp_economic_group,
+    pp_technical_group,
+    pp_governance_group,
+    treasury_withdrawal
+});
+
 impl From<DRepVotingThresholds> for crate::conway::DRepVotingThresholds {
     fn from(value: DRepVotingThresholds) -> Self {
         Self {
@@ -636,13 +657,18 @@ impl From<DRepVotingThresholds> for crate::conway::DRepVotingThresholds {
 }
 
 /// `ex_unit_prices` (`defs.cddl`).
-#[derive(Encode, Decode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Encode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct ExUnitPrices {
     #[n(0)]
     pub mem_price: NonNegativeInterval,
     #[n(1)]
     pub step_price: NonNegativeInterval,
 }
+
+crate::array_record::decode_array_record!(ExUnitPrices {
+    mem_price,
+    step_price
+});
 
 impl From<ExUnitPrices> for crate::conway::ExUnitPrices {
     fn from(value: ExUnitPrices) -> Self {
