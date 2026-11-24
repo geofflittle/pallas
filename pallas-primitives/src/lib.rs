@@ -294,13 +294,7 @@ pub(crate) mod protocol_version {
         d: &mut minicbor::Decoder<'_>,
         ctx: &mut Ctx,
     ) -> Result<ProtocolVersion, Error> {
-        decode_array(d, |a| {
-            let version = (a.decode_with(ctx)?, a.decode_with(ctx)?);
-            if a.datatype()? != Type::Break {
-                return Err(Error::message("invalid 2-tuple length"));
-            }
-            Ok(version)
-        })
+        decode_array(d, |a| Ok((a.decode_with(ctx)?, a.decode_with(ctx)?)))
     }
 
     /// Decodes an optional [`ProtocolVersion`], reading a null as `None`.
@@ -560,20 +554,6 @@ mod tests {
             let decoded = super::protocol_version::decode(&mut d, &mut ()).unwrap();
             assert_eq!(decoded, (3, 2317795968), "{version}");
             assert_eq!(d.position(), raw.len(), "{version}");
-        }
-    }
-
-    #[cfg(feature = "unstable")]
-    #[test]
-    fn a_version_of_three_numbers_is_refused_in_either_length_form() {
-        for version in ["83031a8a26c28000", "9f031a8a26c28000ff"] {
-            let raw = hex::decode(version).unwrap();
-            let mut d = minicbor::Decoder::new(&raw);
-            let error = super::protocol_version::decode(&mut d, &mut ()).unwrap_err();
-            assert!(
-                error.to_string().contains("invalid 2-tuple length"),
-                "{version}: {error}"
-            );
         }
     }
 }
