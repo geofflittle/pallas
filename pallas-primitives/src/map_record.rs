@@ -3,12 +3,7 @@
 /// Implements `Decode` for a struct from a table of each field's key, refusing a key the table lacks, a key written twice and a nil the field's own decoder does not read.
 macro_rules! decode_map_record {
     (@field $d:ident, $ctx:ident) => {{
-        if $d.datatype()? == pallas_codec::minicbor::data::Type::Null {
-            return Err(pallas_codec::minicbor::decode::Error::message(
-                "a nil where the field's rule has none",
-            )
-            .at($d.position()));
-        }
+        $crate::map_record::refuse_nil($d)?;
         $d.decode_with($ctx)?
     }};
     (@field $d:ident, $ctx:ident, $by:path) => {
@@ -94,3 +89,16 @@ macro_rules! decode_map_record {
 }
 
 pub(crate) use decode_map_record;
+
+/// Refuses a nil at the decoder's position, for a field whose rule has none.
+pub(crate) fn refuse_nil(
+    d: &pallas_codec::minicbor::Decoder<'_>,
+) -> Result<(), pallas_codec::minicbor::decode::Error> {
+    if d.datatype()? == pallas_codec::minicbor::data::Type::Null {
+        return Err(pallas_codec::minicbor::decode::Error::message(
+            "a nil where the field's rule has none",
+        )
+        .at(d.position()));
+    }
+    Ok(())
+}

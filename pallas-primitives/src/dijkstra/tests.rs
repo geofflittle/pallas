@@ -3221,7 +3221,7 @@ fn an_unknown_map_key_is_refused() {
     );
 }
 
-/// Each map record with a key written twice and with a nil at a key whose rule has none, beside the same record with that key once, paired with the reason the refusal gives.
+/// Each map record with a key written twice and with a nil at a key whose rule has none, and the redeemers map empty and with a key twice, beside the readable form, paired with the reason the refusal gives.
 fn record_keys() -> Vec<(Refusal, &'static str)> {
     type Read = fn(&'static [u8]) -> Result<(), minicbor::decode::Error>;
     type Record<'a> = &'a dyn Fn(&[&str]) -> String;
@@ -3294,6 +3294,28 @@ fn record_keys() -> Vec<(Refusal, &'static str)> {
         cases.push((twice, "repeated key"));
         cases.push((nil, "a nil"));
     }
+
+    let redeemer = "8200008200820000";
+    let redeemers = |entries: &str| format!("a105{entries}");
+    for (refused, reason) in [
+        ("a0".to_string(), "empty map"),
+        (format!("a2{redeemer}{redeemer}"), "repeated key"),
+    ] {
+        let case = Refusal {
+            class: "redeemers",
+            read: read::<WitnessSet>,
+            refused: redeemers(&refused),
+            known: redeemers(&format!("a1{redeemer}")),
+        };
+        cases.push((case, reason));
+    }
+    let script_ref = Refusal {
+        class: "transaction_output script_ref",
+        read: read::<TransactionOutput>,
+        refused: output(&["03f6"]),
+        known: output(&[]),
+    };
+    cases.push((script_ref, "a nil"));
     cases
 }
 
@@ -3314,7 +3336,7 @@ fn each_record_reads_its_key_once_and_a_nil_where_its_rule_has_one() {
 #[test]
 fn a_record_with_a_key_twice_or_a_nil_where_its_rule_has_none_is_refused() {
     let cases = record_keys();
-    assert_eq!(cases.len(), 12);
+    assert_eq!(cases.len(), 15);
 
     let failed: Vec<_> = cases
         .iter()
