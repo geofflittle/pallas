@@ -1958,9 +1958,8 @@ pub struct WitnessSet<'b> {
     #[n(1)]
     pub native_script: Option<NonEmptySet<KeepRaw<'b, NativeScript>>>,
 
-    /// Possibly empty, since cardano-ledger `9df9f98c` reads an empty set here although `defs.cddl` says `nonempty_set`.
     #[n(2)]
-    pub bootstrap_witness: Option<Set<BootstrapWitness>>,
+    pub bootstrap_witness: Option<NonEmptySet<BootstrapWitness>>,
 
     #[n(3)]
     pub plutus_v1_script: Option<NonEmptySet<PlutusScript<1>>>,
