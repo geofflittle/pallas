@@ -3799,3 +3799,199 @@ fn plutus_bytes_bound_each_chunk_and_metadata_bounds_the_whole_string() {
         }
     }
 }
+
+#[test]
+fn maps_take_a_repeated_key_or_an_empty_map_as_the_ledger_does() {
+    let reward_a = format!("581de1{}", "11".repeat(28));
+    let reward_b = format!("581de1{}", "22".repeat(28));
+    let cold_a = format!("8200581c{}", "11".repeat(28));
+    let cold_b = format!("8200581c{}", "22".repeat(28));
+    let policy = format!("581c{}", "33".repeat(28));
+    let other = format!("581c{}", "44".repeat(28));
+    let address = format!("581d61{}", "11".repeat(28));
+    let legacy = |value: &str| format!("82{address}8201{value}");
+    let map_form = |value: &str| format!("a200{address}018201{value}");
+    let model = "81182a";
+    type Reader = fn(&'static [u8]) -> Result<(), minicbor::decode::Error>;
+    let dijkstra: [(&str, Reader, String, bool); 22] = [
+        (
+            "withdrawals distinct",
+            read::<GovAction>,
+            format!("8302a2{reward_a}01{reward_b}02f6"),
+            true,
+        ),
+        (
+            "withdrawals repeated",
+            read::<GovAction>,
+            format!("8302a2{reward_a}01{reward_a}02f6"),
+            false,
+        ),
+        (
+            "withdrawals empty",
+            read::<GovAction>,
+            "8302a0f6".into(),
+            true,
+        ),
+        (
+            "committee repeated",
+            read::<GovAction>,
+            format!("8504f680a2{cold_a}01{cold_a}02d81e820102"),
+            false,
+        ),
+        (
+            "committee distinct",
+            read::<GovAction>,
+            format!("8504f680a2{cold_a}01{cold_b}02d81e820102"),
+            true,
+        ),
+        (
+            "cost models repeated",
+            read::<CostModels>,
+            format!("a200{model}00{model}"),
+            false,
+        ),
+        (
+            "cost models distinct",
+            read::<CostModels>,
+            format!("a200{model}01{model}"),
+            true,
+        ),
+        (
+            "metadata map distinct",
+            read::<AuxiliaryData>,
+            "a201000200".into(),
+            true,
+        ),
+        (
+            "metadata map repeated",
+            read::<AuxiliaryData>,
+            "a201000101".into(),
+            false,
+        ),
+        (
+            "metadata map empty",
+            read::<AuxiliaryData>,
+            "a0".into(),
+            true,
+        ),
+        (
+            "metadata array repeated",
+            read::<AuxiliaryData>,
+            "82a20100010180".into(),
+            false,
+        ),
+        (
+            "metadata array empty",
+            read::<AuxiliaryData>,
+            "82a080".into(),
+            true,
+        ),
+        (
+            "metadata tag repeated",
+            read::<AuxiliaryData>,
+            "d90103a100a201000101".into(),
+            false,
+        ),
+        (
+            "metadata tag empty",
+            read::<AuxiliaryData>,
+            "d90103a100a0".into(),
+            true,
+        ),
+        (
+            "legacy value distinct",
+            read::<TransactionOutput>,
+            legacy(&format!("a2{policy}a14001{other}a14001")),
+            true,
+        ),
+        (
+            "legacy value repeated policy",
+            read::<TransactionOutput>,
+            legacy(&format!("a2{policy}a14001{policy}a1410101")),
+            false,
+        ),
+        (
+            "legacy value repeated asset",
+            read::<TransactionOutput>,
+            legacy(&format!("a1{policy}a240014002")),
+            false,
+        ),
+        (
+            "legacy value empty",
+            read::<TransactionOutput>,
+            legacy("a0"),
+            false,
+        ),
+        (
+            "legacy value empty assets",
+            read::<TransactionOutput>,
+            legacy(&format!("a1{policy}a0")),
+            false,
+        ),
+        (
+            "legacy value zero",
+            read::<TransactionOutput>,
+            legacy(&format!("a1{policy}a14000")),
+            false,
+        ),
+        (
+            "legacy value name of 33",
+            read::<TransactionOutput>,
+            legacy(&format!("a1{policy}a1{}01", bytes_of(33))),
+            false,
+        ),
+        (
+            "map form value repeated policy",
+            read::<TransactionOutput>,
+            map_form(&format!("a2{policy}a14001{policy}a1410101")),
+            false,
+        ),
+    ];
+    // The Conway ledger reads the same shared types, and takes an empty multiasset that Dijkstra refuses.
+    let conway: [(&str, Reader, String, bool); 5] = [
+        (
+            "conway legacy value empty",
+            read::<crate::conway::TransactionOutput>,
+            legacy("a0"),
+            true,
+        ),
+        (
+            "conway map form value empty",
+            read::<crate::conway::TransactionOutput>,
+            map_form("a0"),
+            true,
+        ),
+        (
+            "conway legacy value repeated policy",
+            read::<crate::conway::TransactionOutput>,
+            legacy(&format!("a2{policy}a14001{policy}a1410101")),
+            false,
+        ),
+        (
+            "conway legacy value zero",
+            read::<crate::conway::TransactionOutput>,
+            legacy(&format!("a1{policy}a14000")),
+            false,
+        ),
+        (
+            "conway map form value repeated asset",
+            read::<crate::conway::TransactionOutput>,
+            map_form(&format!("a1{policy}a240014002")),
+            false,
+        ),
+    ];
+    let wrong: Vec<_> = dijkstra
+        .into_iter()
+        .chain(conway)
+        .filter_map(|(case, read, hex, verdict)| {
+            let got = read(generated(&hex));
+            (got.is_ok() != verdict).then(|| format!("{case}: {got:?}"))
+        })
+        .collect();
+    assert!(
+        wrong.is_empty(),
+        "{} differ from the ledger:\n{}",
+        wrong.len(),
+        wrong.join("\n")
+    );
+}
