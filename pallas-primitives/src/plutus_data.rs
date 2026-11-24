@@ -2,7 +2,7 @@ use pallas_codec::tree::{
     Arity, IndexedNode, MAX_DECODE_DEPTH, TreeDecode, Visit, cmp_tree, decode_tree_with_max_depth,
     fold_tree, walk_tree,
 };
-use pallas_codec::utils::{Int, KeyValuePairs, decode_bytes_def_or_indef};
+use pallas_codec::utils::{Int, KeyValuePairs};
 use pallas_codec::{
     minicbor::{
         self, Encode,
@@ -800,7 +800,12 @@ impl<C> Encode<C> for BoundedBytes {
 
 impl<'b, C> minicbor::decode::Decode<'b, C> for BoundedBytes {
     fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
-        decode_bytes_def_or_indef(d, ctx).map(|bytes| BoundedBytes::from(bytes.into_owned()))
+        #[cfg(feature = "unstable")]
+        return pallas_codec::utils::decode_bytes_chunks_at_most::<64, _>(d, ctx)
+            .map(BoundedBytes::from);
+        #[cfg(not(feature = "unstable"))]
+        pallas_codec::utils::decode_bytes_def_or_indef(d, ctx)
+            .map(|bytes| BoundedBytes::from(bytes.into_owned()))
     }
 }
 

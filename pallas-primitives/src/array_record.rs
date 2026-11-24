@@ -146,13 +146,15 @@ mod tests {
 
     #[test]
     fn a_shared_record_holds_exactly_its_fields() {
+        let bytes = |size: usize| format!("58{size:02x}{}", "11".repeat(size));
+        let (vkey, signature) = (bytes(32), bytes(64));
         assert_holds_exactly::<ExUnits>(&["01", "02"]);
         assert_holds_exactly::<TransactionInput>(&[HASH32, "00"]);
-        assert_holds_exactly::<VrfCert>(&["4100", "4101"]);
+        assert_holds_exactly::<VrfCert>(&[&signature, &bytes(80)]);
         assert_holds_exactly::<PoolMetadata>(&["63616263", HASH32]);
-        assert_holds_exactly::<VKeyWitness>(&["4100", "4101"]);
-        assert_holds_exactly::<BootstrapWitness>(&["4100", "4101", "4102", "4103"]);
-        assert_holds_exactly::<OperationalCert>(&["4100", "01", "02", "4103"]);
+        assert_holds_exactly::<VKeyWitness>(&[&vkey, &signature]);
+        assert_holds_exactly::<BootstrapWitness>(&[&vkey, &signature, &vkey, "4103"]);
+        assert_holds_exactly::<OperationalCert>(&[&vkey, "01", "02", &signature]);
         assert_holds_exactly::<PoolVotingThresholds>(&[RATIONAL; 5]);
         assert_holds_exactly::<DRepVotingThresholds>(&[RATIONAL; 10]);
         assert_holds_exactly::<ExUnitPrices>(&[RATIONAL, RATIONAL]);
