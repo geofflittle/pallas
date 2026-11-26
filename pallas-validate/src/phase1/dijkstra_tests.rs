@@ -588,7 +588,7 @@ fn dijkstra_an_empty_guards_set_is_no_guards() {
 fn dijkstra_unsupported_fields_do_not_disappear_in_decode() {
     captured(|tx, output| {
         // Add each disallowed body key in original CBOR.
-        // Most known keys use typed synthetic mutations elsewhere; null still must reject.
+        // Most known keys use typed synthetic mutations elsewhere. A null value is refused by decoding.
         for key in [
             4, 5, 7, 9, 11, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
         ] {
@@ -597,14 +597,16 @@ fn dijkstra_unsupported_fields_do_not_disappear_in_decode() {
             let mut enc = minicbor::Encoder::new(Vec::new());
             enc.u64(key).unwrap().null().unwrap();
             raw.extend(enc.into_writer());
-            // Optional nulls decode as None. The raw whitelist must still reject.
-            let body = minicbor::decode(&raw).unwrap();
-            let mut changed = tx.clone();
-            changed.transaction_body = body;
-            error(
-                dispatch(&changed, &output, &env()),
-                "DijkstraUnsupported(\"body fields\")",
-            );
+            // A field decoded by its own function meets the null as a type mismatch.
+            let expected = if [5, 9, 14, 19, 24, 25, 26, 27].contains(&key) {
+                "unexpected type null"
+            } else {
+                "a nil where the field's rule has none"
+            };
+            let refused = minicbor::decode::<native::TransactionBody>(&raw)
+                .unwrap_err()
+                .to_string();
+            assert!(refused.contains(expected), "{key}: {refused}");
         }
         // A body or output key outside the CDDL is refused by typed decoding.
         let mut raw = tx.transaction_body.raw_cbor().to_vec();
@@ -1208,11 +1210,7 @@ fn dijkstra_output_subset_and_checked_arithmetic() {
         }
         raw[0] += 1;
         raw.extend([0x02, 0x00]);
-        changed = tx.clone();
-        changed.transaction_body = minicbor::decode(&raw).unwrap();
-        error(
-            dispatch(&changed, &output, &env()),
-            "DijkstraUnsupported(\"body fields\")",
-        );
+        let refused = minicbor::decode::<native::TransactionBody>(&raw).unwrap_err();
+        assert!(refused.to_string().contains("repeated key 2"), "{refused}");
     });
 }

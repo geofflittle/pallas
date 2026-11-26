@@ -247,13 +247,17 @@ fn dijkstra_auxiliary_array_holds_exactly_two_elements() {
             let result = check(&tx);
             assert!(result.is_ok(), "{aux}: {result:?}");
         }
-        for aux in ["81a0", "83a08000", "83a08182040000", "9fa0ff", "9fa08000ff"] {
-            set_raw_auxiliary(&mut tx, aux);
-            assert_eq!(
-                check(&tx).err().map(|e| format!("{e:?}")).as_deref(),
-                Some("DijkstraMalformed(\"metadata\")"),
-                "{aux}"
-            );
+        for (aux, reason) in [
+            ("81a0", "no element left"),
+            ("83a08000", "more elements than"),
+            ("83a08182040000", "more elements than"),
+            ("9fa0ff", "no element left"),
+            ("9fa08000ff", "more elements than"),
+        ] {
+            let refused = minicbor::decode::<n::AuxiliaryData>(&hex::decode(aux).unwrap())
+                .unwrap_err()
+                .to_string();
+            assert!(refused.contains(reason), "{aux}: {refused}");
         }
     });
 }
@@ -1562,17 +1566,35 @@ fn dijkstra_preserves_original_auxiliary_bytes() {
 }
 #[test]
 fn dijkstra_invalid_multiasset_encodings() {
-    dijkstra_tests::synthetic(|mut tx, input| {
+    dijkstra_tests::synthetic(|tx, input| {
         let coin = MultiEraOutput::from_dijkstra(&input).value().coin() - tx.transaction_body.fee;
         let address = MultiEraOutput::from_dijkstra(&input)
             .address()
             .unwrap()
             .to_vec();
-        for (name, amount, duplicate, empty) in [
-            (vec![1], 0u64, false, false),
-            (vec![1; 33], 1, false, false),
-            (vec![1], 1, true, false),
-            (vec![1], 1, false, true),
+        for (name, amount, duplicate, empty, reason) in [
+            (
+                vec![1],
+                0u64,
+                false,
+                false,
+                "zero where a positive quantity is required",
+            ),
+            (
+                vec![1; 33],
+                1,
+                false,
+                false,
+                "a string of 33 bytes where the rule allows 0 to 32",
+            ),
+            (vec![1], 1, true, false, "repeated key in a map"),
+            (
+                vec![1],
+                1,
+                false,
+                true,
+                "empty map where an entry is required",
+            ),
         ] {
             let mut e = minicbor::Encoder::new(Vec::new());
             e.array(2)
@@ -1599,20 +1621,10 @@ fn dijkstra_invalid_multiasset_encodings() {
                 }
             }
             let raw = e.into_writer();
-            let decoded: n::TransactionOutput = minicbor::decode(&raw).unwrap();
-            let n::TransactionOutput::Legacy(decoded) = decoded else {
-                panic!()
-            };
-            tx.transaction_body.outputs =
-                pallas_codec::utils::MaybeIndefArray::Def(vec![n::TransactionOutput::Legacy(
-                    decoded.to_owned(),
-                )]);
-            dijkstra_tests::sign(&mut tx);
-            let inputs = vec![(tx.transaction_body.inputs[0].clone(), input.clone())];
-            dijkstra_tests::error(
-                run(&tx, &inputs, &dijkstra_tests::env(), &CertState::default()),
-                "DijkstraMalformed(\"multi-asset value\")",
-            );
+            let refused = minicbor::decode::<n::TransactionOutput>(&raw)
+                .unwrap_err()
+                .to_string();
+            assert!(refused.contains(reason), "{refused}");
         }
     });
 }

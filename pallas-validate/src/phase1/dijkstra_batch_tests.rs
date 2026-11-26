@@ -1238,10 +1238,7 @@ fn witness_cases(body: &[u8]) -> Vec<(Vec<n::VKeyWitness>, Vec<n::BootstrapWitne
 fn dijkstra_an_empty_guards_set_in_a_sub_is_no_guards() {
     batch(|tx, input| {
         let cases = [
-            (
-                &[0xf6][..],
-                "Err(DijkstraUnsupported(\"subtransaction body fields\"))",
-            ),
+            (&[0xf6][..], "unexpected type null"),
             (&[0x80], "Ok(())"),
             (&[0x9f, 0xff], "Ok(())"),
             (&[0xd9, 0x01, 0x02, 0x80], "Ok(())"),
@@ -1253,7 +1250,16 @@ fn dijkstra_an_empty_guards_set_in_a_sub_is_no_guards() {
             raw[0] += 1;
             raw.push(14);
             raw.extend_from_slice(set);
-            sub.sub_transaction_body = minicbor::decode(&raw).unwrap();
+            sub.sub_transaction_body = match minicbor::decode(&raw) {
+                Ok(body) => body,
+                Err(refused) => {
+                    assert!(
+                        refused.to_string().contains(expected),
+                        "{set:02x?}: {refused}"
+                    );
+                    continue;
+                }
+            };
             sign_sub(&mut sub);
             let mut changed = tx.clone();
             changed.transaction_body.sub_transactions = n::NonEmptySet::from_vec(vec![sub]);
@@ -1402,7 +1408,13 @@ fn dijkstra_fields_the_node_does_not_decode_are_malformed() {
         };
         // Zero written in one byte and in two bytes are different datums.
         assert_eq!(datums(&[0x82, 0x00, 0x18, 0x00]), datums(&[0x81, 0x00]));
-        assert_eq!(datums(&[0x82, 0x00, 0x00]), malformed("duplicate datums"));
+        let refused =
+            minicbor::decode::<n::NonEmptySet<KeepRaw<n::PlutusData>>>(&[0x82, 0x00, 0x00])
+                .unwrap_err();
+        assert!(
+            refused.to_string().contains("repeated element"),
+            "{refused}"
+        );
     });
 }
 
@@ -1545,57 +1557,58 @@ fn dijkstra_batch_sub_mint_names_each_asset_once() {
     batch(|tx, input| {
         let policy = native(n::NativeScript::ScriptPubkey(guard_key()));
         let hash = policy.original_hash();
-        let minting = |duplicated: bool| {
-            let mut changed = tx.clone();
-            let mut outputs = changed.transaction_body.outputs.clone().to_vec();
-            let coin = MultiEraOutput::from_dijkstra(&outputs[0]).value().coin();
-            post_alonzo(&mut outputs[0]).value = pallas_primitives::conway::Value::Multiasset(
-                coin,
-                [(
-                    hash,
-                    [(b"token".to_vec().into(), 5.try_into().unwrap())]
-                        .into_iter()
-                        .collect(),
-                )]
-                .into_iter()
-                .collect(),
-            );
-            changed.transaction_body.outputs = MaybeIndefArray::Def(outputs);
-            resign(&mut changed, |sub| {
-                let mint: n::Multiasset<n::NonZeroInt> = [(
-                    hash,
-                    [(b"token".to_vec().into(), 5i64.try_into().unwrap())]
-                        .into_iter()
-                        .collect(),
-                )]
-                .into_iter()
-                .collect();
-                sub.sub_transaction_body.mint = Some(mint);
-                sub.transaction_witness_set.native_script =
-                    n::NonEmptySet::from_vec(vec![policy.clone()]);
-                if duplicated {
-                    // The token map `{"token": 5}` becomes `{"token": 5, "token": 5}`.
-                    let once = [&[0xa1, 0x45][..], b"token", &[0x05]].concat();
-                    let twice = [
-                        &[0xa2, 0x45][..],
-                        b"token",
-                        &[0x05, 0x45],
-                        b"token",
-                        &[0x05],
-                    ]
-                    .concat();
-                    let body = minicbor::to_vec(&sub.sub_transaction_body).unwrap();
-                    let at = body.windows(once.len()).position(|w| w == once).unwrap();
-                    let spliced = [&body[..at], &twice, &body[at + once.len()..]].concat();
-                    let raw: &'static [u8] = Box::leak(spliced.into_boxed_slice());
-                    sub.sub_transaction_body = minicbor::decode(raw).unwrap();
-                }
-            });
-            run(&changed, &input, &env())
+        let mint = |sub: &mut n::SubTransaction<'_>| {
+            let assets: n::Multiasset<n::NonZeroInt> = [(
+                hash,
+                [(b"token".to_vec().into(), 5i64.try_into().unwrap())]
+                    .into_iter()
+                    .collect(),
+            )]
+            .into_iter()
+            .collect();
+            sub.sub_transaction_body.mint = Some(assets);
+            sub.transaction_witness_set.native_script =
+                n::NonEmptySet::from_vec(vec![policy.clone()]);
         };
-        let result = minting(false);
+        let mut changed = tx.clone();
+        let mut outputs = changed.transaction_body.outputs.clone().to_vec();
+        let coin = MultiEraOutput::from_dijkstra(&outputs[0]).value().coin();
+        post_alonzo(&mut outputs[0]).value = pallas_primitives::conway::Value::Multiasset(
+            coin,
+            [(
+                hash,
+                [(b"token".to_vec().into(), 5.try_into().unwrap())]
+                    .into_iter()
+                    .collect(),
+            )]
+            .into_iter()
+            .collect(),
+        );
+        changed.transaction_body.outputs = MaybeIndefArray::Def(outputs);
+        resign(&mut changed, &mint);
+        let result = run(&changed, &input, &env());
         assert!(result.is_ok(), "{result:?}");
-        error(minting(true), "DijkstraMalformed(\"multi-asset value\")");
+
+        // The token map `{"token": 5}` becomes `{"token": 5, "token": 5}`.
+        let mut sub = tx.transaction_body.sub_transactions.as_ref().unwrap()[0].clone();
+        mint(&mut sub);
+        let once = [&[0xa1, 0x45][..], b"token", &[0x05]].concat();
+        let twice = [
+            &[0xa2, 0x45][..],
+            b"token",
+            &[0x05, 0x45],
+            b"token",
+            &[0x05],
+        ]
+        .concat();
+        let body = minicbor::to_vec(&sub.sub_transaction_body).unwrap();
+        let at = body.windows(once.len()).position(|w| w == once).unwrap();
+        let spliced = [&body[..at], &twice, &body[at + once.len()..]].concat();
+        let refused = minicbor::decode::<n::SubTransactionBody>(&spliced).unwrap_err();
+        assert!(
+            refused.to_string().contains("repeated key in a map"),
+            "{refused}"
+        );
     });
 }
 
@@ -2038,7 +2051,7 @@ fn dijkstra_batch_unused_guard_scripts_are_not_checked() {
 
 #[test]
 fn dijkstra_batch_rejects_duplicate_required_top_level_guards() {
-    batch(|tx, input| {
+    batch(|tx, _| {
         // The sub's required top-level guards hold one key with no datum. The
         // duplicate is either the same bytes or the same credential with its
         // constructor written as a two-byte integer.
@@ -2054,10 +2067,10 @@ fn dijkstra_batch_rejects_duplicate_required_top_level_guards() {
             let mut raw = minicbor::to_vec(&tx).unwrap();
             let at = raw.windows(single.len()).position(|w| w == single).unwrap();
             raw.splice(at..at + single.len(), double);
-            let patched: n::BlockTransaction = minicbor::decode(&raw).unwrap();
-            error(
-                run(&patched, &input, &env()),
-                "DijkstraMalformed(\"duplicate required top-level guards\")",
+            let refused = minicbor::decode::<n::BlockTransaction>(&raw).unwrap_err();
+            assert!(
+                refused.to_string().contains("repeated key in a map"),
+                "{refused}"
             );
         }
     });
@@ -2101,10 +2114,10 @@ fn dijkstra_batch_withdrawal_account_given_twice_is_malformed() {
             let mut raw = minicbor::to_vec(&tx).unwrap();
             let at = raw.windows(single.len()).position(|w| w == single).unwrap();
             raw.splice(at..at + single.len(), double.clone());
-            let patched: n::BlockTransaction = minicbor::decode(&raw).unwrap();
-            error(
-                run(&patched),
-                "DijkstraMalformed(\"duplicate withdrawal accounts\")",
+            let refused = minicbor::decode::<n::BlockTransaction>(&raw).unwrap_err();
+            assert!(
+                refused.to_string().contains("repeated key in a map"),
+                "{level}: {refused}"
             );
         });
     }
