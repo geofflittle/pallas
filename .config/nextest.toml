@@ -51,9 +51,6 @@ filter = '''
       | test(=the_value_checks_hold_the_blocks_that_carry_each_field)
       | test(=u5c_carries_a_sub_transaction_id_under_its_parent_only)
     ))
-  | (binary_id(pallas-primitives::dijkstra_ledger_vectors) & (
-      test(=ledger_vectors_read_as_the_ledger_reads_them)
-    ))
   | (binary_id(pallas-primitives::ledger_records) & (
       test(=pallas_decodes_what_the_ledger_writes)
     ))
