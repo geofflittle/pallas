@@ -233,7 +233,6 @@ labels! {
         Metadata => "metadata",
         MultiAssetValue => "multi-asset value",
         ProtocolParameterUpdate => "protocol parameter update",
-        ZeroDonation => "zero donation",
     }
 }
 

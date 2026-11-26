@@ -921,11 +921,8 @@ const NON_EMPTY_FIELDS: [(u64, MalformedField); 6] = [
     (26, MalformedField::EmptyAccountBalanceIntervals),
     (27, MalformedField::EmptyStartingAccountBalanceIntervals),
 ];
-/// Refuses a body field the ledger decoder refuses for its value, an empty collection or a zero donation.
+/// Refuses a body field the ledger decoder refuses as an empty collection.
 fn check_field_present(key: u64, value: &[u8]) -> ValidationResult {
-    if key == 22 && minicbor::decode::<u64>(value).is_ok_and(|x| x == 0) {
-        return Err(DijkstraMalformed(MalformedField::ZeroDonation));
-    }
     match NON_EMPTY_FIELDS.iter().find(|(k, _)| *k == key) {
         Some((_, error)) if is_empty_map(value) => Err(DijkstraMalformed(*error)),
         _ => Ok(()),
