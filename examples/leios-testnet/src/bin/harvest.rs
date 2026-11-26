@@ -118,11 +118,16 @@ fn peer_of(addr: &str) -> PeerId {
 /// The version pair in a Babbage or later header, which is the highest supported major version and the software tag for Dijkstra and the protocol version before it.
 fn version_pair(header: &MultiEraHeader) -> Option<(u64, u64)> {
     if let Some(h) = header.as_dijkstra() {
-        let info = &h.header_body.header_version_info;
-        return Some((
-            info.highest_supported_major_version.into(),
-            info.self_reported_software_tag.into(),
-        ));
+        return Some(match &h.header_body {
+            dijkstra::HeaderBody::Leios(body) => {
+                let info = &body.header_version_info;
+                (
+                    info.highest_supported_major_version.into(),
+                    info.self_reported_software_tag.into(),
+                )
+            }
+            dijkstra::HeaderBody::Praos(body) => body.protocol_version,
+        });
     }
     if let Some(h) = header.as_babbage() {
         return Some(h.header_body.protocol_version);

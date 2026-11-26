@@ -80,11 +80,11 @@ fn registration_fixtures_match_successful_network_transactions() {
         let native: dijkstra::Block = minicbor::decode(elements(&raw)[1]).unwrap();
         assert_eq!(
             Hasher::<256>::hash(parts[1]),
-            native.header.header_body.block_body_hash
+            native.header.header_body.block_body_hash()
         );
         assert_eq!(
             parts[1].len() as u64,
-            native.header.header_body.block_body_size
+            native.header.header_body.block_body_size()
         );
     }
     let cases = manifest["cases"].as_object().unwrap();
