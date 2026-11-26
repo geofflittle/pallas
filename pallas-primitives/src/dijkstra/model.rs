@@ -229,7 +229,12 @@ tag_preserving_set!(NonEmptySet, "a nonempty set", 1);
 fn decode_fraction(
     d: &mut minicbor::Decoder<'_>,
 ) -> Result<RationalNumber, minicbor::decode::Error> {
-    d.tag()?;
+    let tag = d.tag()?.as_u64();
+    if tag != 30 {
+        return Err(minicbor::decode::Error::message(format!(
+            "a fraction is tagged 30, found tag {tag}"
+        )));
+    }
 
     let mut numbers = Vec::with_capacity(2);
     for number in d.array_iter::<u64>()? {

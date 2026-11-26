@@ -4145,7 +4145,6 @@ fn an_indefinite_fraction_of_two_numbers_reads_at_each_position() {
 }
 
 #[test]
-#[ignore = "planted defect, so the ledger records test runs"]
 fn a_fraction_tagged_other_than_30_is_refused() {
     assert_each_position_reads(&["d81f820102", "d81d820102"], false, false, false);
 }
