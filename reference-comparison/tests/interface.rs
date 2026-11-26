@@ -6,8 +6,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use reference_comparison::{
-    Allowance, Allowed, Answer, ComparedLayer, Counts, Disagreement, Expected, Key, Layer,
-    LayerRun, Outcome, Owner, Records, RecordsError, Reference, Row, WholeInput, compare,
+    Allowance, Allowed, Answer, ComparedLayer, Counts, Disagreement, Expected, Key, LayerRun,
+    Outcome, Owner, Records, RecordsError, Reference, Row, WholeInput, compare,
 };
 use serde_json::Value;
 
@@ -27,7 +27,7 @@ const OWNED: Allowed = Allowed::new(
     "an owned refusal",
     Disagreement::Refuses,
     Owner::Check {
-        layer: Layer::Decode,
+        layer: "decode",
         test: "interface stand in",
     },
 );
@@ -39,7 +39,7 @@ const OWNED: Allowed = Allowed::new(
 struct StandIn;
 
 impl ComparedLayer for StandIn {
-    const LAYER: Layer = Layer::Decode;
+    const LAYER: &'static str = "decode";
     const TIME_LIMIT: Duration = Duration::from_millis(500);
     type Input = Vec<u8>;
     type Axis = u8;
@@ -575,7 +575,7 @@ fn unused_unselected_class_is_skipped() {
 struct Echo;
 
 impl ComparedLayer for Echo {
-    const LAYER: Layer = Layer::Decode;
+    const LAYER: &'static str = "decode";
     const TIME_LIMIT: Duration = Duration::from_secs(5);
     type Input = bool;
     type Axis = WholeInput;
