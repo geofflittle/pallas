@@ -1585,7 +1585,7 @@ fn dijkstra_batch_sub_mint_names_each_asset_once() {
             .collect(),
         );
         changed.transaction_body.outputs = MaybeIndefArray::Def(outputs);
-        resign(&mut changed, &mint);
+        resign(&mut changed, mint);
         let result = run(&changed, &input, &env());
         assert!(result.is_ok(), "{result:?}");
 
