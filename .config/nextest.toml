@@ -54,6 +54,15 @@ filter = '''
   | (binary_id(pallas-primitives::dijkstra_ledger_vectors) & (
       test(=ledger_vectors_read_as_the_ledger_reads_them)
     ))
+  | (binary_id(pallas-primitives::ledger_records) & (
+      test(=pallas_decodes_what_the_ledger_writes)
+    ))
+  | (binary_id(reference-comparison::interface) & (
+      test(=a_declared_class_with_no_observation_fails)
+      | test(=a_missing_record_file_is_unreadable)
+      | test(=a_run_with_no_observation_fails)
+      | test(=an_undeclared_record_class_fails)
+    ))
   | (binary_id(pallas-validate::dijkstra_ttl) & (
       test(=captured_ttl_estimation_succeeds)
       | test(=captured_ttl_phase_one_succeeds)
