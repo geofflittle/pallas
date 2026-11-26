@@ -336,9 +336,27 @@ impl ToPlutusData for i64 {
     }
 }
 
+impl ToPlutusData for u8 {
+    fn to_plutus_data(&self) -> PlutusData {
+        u64::from(*self).to_plutus_data()
+    }
+}
+
+impl ToPlutusData for u16 {
+    fn to_plutus_data(&self) -> PlutusData {
+        u64::from(*self).to_plutus_data()
+    }
+}
+
 impl ToPlutusData for u32 {
     fn to_plutus_data(&self) -> PlutusData {
         PlutusData::BigInt(BigInt::Int(Int::try_from(*self as i128).unwrap()))
+    }
+}
+
+impl ToPlutusData for std::num::NonZeroU32 {
+    fn to_plutus_data(&self) -> PlutusData {
+        self.get().to_plutus_data()
     }
 }
 
@@ -1285,11 +1303,14 @@ impl ToPlutusData for dijkstra::ProtocolParamUpdate {
         fn value<T: ToPlutusData>(x: &Option<T>) -> Option<PlutusData> {
             x.as_ref().map(ToPlutusData::to_plutus_data)
         }
-        fn rational(x: &Option<RationalNumber>) -> Option<PlutusData> {
-            x.as_ref().map(|x| WithArrayRational(x).to_plutus_data())
+        fn rational<T: Deref<Target = RationalNumber>>(x: &Option<T>) -> Option<PlutusData> {
+            x.as_ref()
+                .map(|x| WithArrayRational::<RationalNumber>(x).to_plutus_data())
         }
         let leverage = max_pledge_leverage.as_ref().map(|x| match x {
-            Nullable::Some(x) => wrap_with_constr(0, WithArrayRational(x).to_plutus_data()),
+            Nullable::Some(x) => {
+                wrap_with_constr(0, WithArrayRational::<RationalNumber>(x).to_plutus_data())
+            }
             Nullable::Null | Nullable::Undefined => empty_constr(1),
         });
         let entries = [
@@ -1400,7 +1421,7 @@ impl ToPlutusData for dijkstra::GovAction {
                     previous_action.clone(),
                     removed.to_vec().into(),
                     added.clone(),
-                    quorum.clone(),
+                    quorum.clone().into(),
                 )
                 .to_plutus_data()
             }
@@ -1451,6 +1472,27 @@ impl ToPlutusData for ExUnitPrices {
             WithArrayRational(&self.step_price).to_plutus_data(),
         ]
         .to_plutus_data()
+    }
+}
+
+#[cfg(feature = "unstable")]
+impl ToPlutusData for dijkstra::PoolVotingThresholds {
+    fn to_plutus_data(&self) -> PlutusData {
+        PoolVotingThresholds::from(self.clone()).to_plutus_data()
+    }
+}
+
+#[cfg(feature = "unstable")]
+impl ToPlutusData for dijkstra::DRepVotingThresholds {
+    fn to_plutus_data(&self) -> PlutusData {
+        DRepVotingThresholds::from(self.clone()).to_plutus_data()
+    }
+}
+
+#[cfg(feature = "unstable")]
+impl ToPlutusData for dijkstra::ExUnitPrices {
+    fn to_plutus_data(&self) -> PlutusData {
+        ExUnitPrices::from(self.clone()).to_plutus_data()
     }
 }
 
