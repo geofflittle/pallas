@@ -22,6 +22,12 @@ serde_json = { workspace = true, optional = true }
 proptest = { workspace = true, features = ["alloc"] }
 serde_json.workspace = true
 test-case = "3.3.1"
+reference-comparison = { path = "../reference-comparison" }
+serde_json.workspace = true
+
+[[test]]
+name = "ledger_records"
+required-features = ["unstable"]
 
 [features]
 json = ["serde_json"]
