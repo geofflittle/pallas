@@ -24,6 +24,7 @@ members = [
   "pallas-math",
   "pallas-validate",
   "pallas",
+  "reference-comparison",
   "examples/block-download",
   "examples/block-decode",
   "examples/crawler",
