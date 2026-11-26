@@ -31,11 +31,11 @@ const UNCREDITED: &[(&str, &str)] = &[
     ("signkey_kes", "no rule refers to it"),
     (
         "eb_references",
-        "pallas reads no value of it, see EB_AS_THE_NODE_SENDS",
+        "pallas reads no value of it, see the eb entry of differences::LIST",
     ),
     (
         "eb_reference",
-        "pallas reads no value of it, see EB_AS_THE_NODE_SENDS",
+        "pallas reads no value of it, see the eb entry of differences::LIST",
     ),
 ];
 
