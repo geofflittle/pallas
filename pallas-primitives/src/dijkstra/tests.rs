@@ -4752,7 +4752,11 @@ fn a_bootstrap_witness_repeats_when_its_key_chain_code_and_attributes_repeat() {
         )
     };
     let vkey = |key: u8, signature: u8| {
-        format!("82{}{}", filled("5820", 32, key), filled("5840", 64, signature))
+        format!(
+            "82{}{}",
+            filled("5820", 32, key),
+            filled("5840", 64, signature)
+        )
     };
     let pair = |field: u8, a: String, b: String| format!("a1{field:02x}82{a}{b}");
     let mut wrong = Vec::new();

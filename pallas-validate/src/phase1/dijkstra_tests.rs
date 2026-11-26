@@ -337,7 +337,9 @@ fn dijkstra_pool_metadata_hash_is_at_most_32_bytes() {
                     margin: native::RationalNumber {
                         numerator: 0,
                         denominator: 1,
-                    },
+                    }
+                    .try_into()
+                    .unwrap(),
                     reward_account: account.clone().into(),
                     pool_owners: vec![].into(),
                     relays: vec![],
@@ -1069,11 +1071,11 @@ fn dijkstra_capture_integrity_and_certified_original_input() {
         let native: native::Block = minicbor::decode(elements(&bytes)[1]).unwrap();
         assert_eq!(
             Hasher::<256>::hash(parts[1]),
-            native.header.header_body.block_body_hash
+            native.header.header_body.block_body_hash()
         );
         assert_eq!(
             parts[1].len() as u64,
-            native.header.header_body.block_body_size
+            native.header.header_body.block_body_size()
         );
         if slot == 1400007 {
             let tx = &native.block_body.transactions[0];

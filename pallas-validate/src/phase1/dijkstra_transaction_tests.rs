@@ -205,7 +205,7 @@ fn dijkstra_auxiliary_scripts_are_refused_only_when_malformed() {
         let check = |tx: &n::BlockTransaction<'_>| {
             run(tx, &inputs, &dijkstra_tests::env(), &CertState::default())
         };
-        let native = || Some(vec![n::NativeScript::InvalidBefore(0).into()]);
+        let native = || vec![n::NativeScript::InvalidBefore(0).into()];
         set_auxiliary(
             &mut tx,
             n::AuxiliaryData::ShelleyMa(n::ShelleyMaAuxiliaryData {
@@ -220,7 +220,7 @@ fn dijkstra_auxiliary_scripts_are_refused_only_when_malformed() {
             unreachable!()
         };
         data.plutus_v1_scripts = Some(vec![]);
-        data.native_scripts = native();
+        data.native_scripts = Some(native());
         set_auxiliary(&mut tx, n::AuxiliaryData::PostAlonzo(data));
         let result = check(&tx);
         assert!(result.is_ok(), "{result:?}");

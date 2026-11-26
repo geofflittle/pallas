@@ -620,23 +620,38 @@ fn transaction(
 }
 
 fn block(b: &dijkstra::Block) -> Value {
-    let h = &b.header.header_body;
-    let header = object(vec![
-        ("block_no", encoded(&h.block_number)),
-        ("slot", encoded(&h.slot)),
-        ("prev", encoded(&h.prev_hash)),
-        ("issuer_vk", encoded(&h.issuer_vkey)),
-        ("vrf_vk", encoded(&h.vrf_vkey)),
-        ("vrf", encoded(&h.vrf_result)),
-        ("body_size", encoded(&h.block_body_size)),
-        ("body_hash", encoded(&h.block_body_hash)),
-        ("ocert", encoded(&h.operational_cert)),
-        ("version", encoded(&h.header_version_info)),
-        ("leios_cert", json!(h.block_body_contains_leios_cert)),
-        ("eb", nullable(&h.eb_announcement, encoded)),
-        ("sig", encoded(&b.header.body_signature)),
-        ("hash", encoded(&Hasher::<256>::hash(b.header.raw_cbor()))),
-    ]);
+    let mut fields = match &b.header.header_body {
+        dijkstra::HeaderBody::Leios(h) => vec![
+            ("block_no", encoded(&h.block_number)),
+            ("slot", encoded(&h.slot)),
+            ("prev", encoded(&h.prev_hash)),
+            ("issuer_vk", encoded(&h.issuer_vkey)),
+            ("vrf_vk", encoded(&h.vrf_vkey)),
+            ("vrf", encoded(&h.vrf_result)),
+            ("body_size", encoded(&h.block_body_size)),
+            ("body_hash", encoded(&h.block_body_hash)),
+            ("ocert", encoded(&h.operational_cert)),
+            ("version", encoded(&h.header_version_info)),
+            ("leios_cert", json!(h.block_body_contains_leios_cert)),
+            ("eb", nullable(&h.eb_announcement, encoded)),
+        ],
+        // The pinned ledger's header has no Praos form, so this reading never matches its own.
+        dijkstra::HeaderBody::Praos(h) => vec![
+            ("block_no", encoded(&h.block_number)),
+            ("slot", encoded(&h.slot)),
+            ("prev", encoded(&h.prev_hash)),
+            ("issuer_vk", encoded(&h.issuer_vkey)),
+            ("vrf_vk", encoded(&h.vrf_vkey)),
+            ("vrf", encoded(&h.vrf_result)),
+            ("body_size", encoded(&h.block_body_size)),
+            ("body_hash", encoded(&h.block_body_hash)),
+            ("ocert", encoded(&h.operational_cert)),
+            ("protocol_version", encoded(&h.protocol_version)),
+        ],
+    };
+    fields.push(("sig", encoded(&b.header.body_signature)));
+    fields.push(("hash", encoded(&Hasher::<256>::hash(b.header.raw_cbor()))));
+    let header = object(fields);
     let transactions = b
         .block_body
         .transactions
