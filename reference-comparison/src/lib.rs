@@ -16,54 +16,6 @@ use thiserror::Error;
 
 pub mod tree;
 
-/// A layer of the implementation, compared with its own reference.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Layer {
-    Decode,
-    Validation,
-    Mapping,
-    Networking,
-}
-
-impl Layer {
-    /// The layer's name in a records header.
-    pub fn name(self) -> &'static str {
-        match self {
-            Layer::Decode => "decode",
-            Layer::Validation => "validation",
-            Layer::Mapping => "mapping",
-            Layer::Networking => "networking",
-        }
-    }
-
-    /// The layer a records header names.
-    pub fn from_name(name: &str) -> Option<Layer> {
-        [
-            Layer::Decode,
-            Layer::Validation,
-            Layer::Mapping,
-            Layer::Networking,
-        ]
-        .into_iter()
-        .find(|l| l.name() == name)
-    }
-
-    /// Whether every accepted row of this layer carries the reference's
-    /// encoding of the value it read.
-    pub fn encodes(self) -> bool {
-        match self {
-            Layer::Decode => true,
-            Layer::Validation | Layer::Mapping | Layer::Networking => false,
-        }
-    }
-}
-
-impl fmt::Display for Layer {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.name())
-    }
-}
-
 /// How an answer differs from the reference's.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Disagreement {
@@ -128,8 +80,11 @@ impl fmt::Display for Commit {
 /// What holds a difference a layer lets pass.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Owner {
-    /// A test of another layer.
-    Check { layer: Layer, test: &'static str },
+    /// A test of another layer, named as its records name it.
+    Check {
+        layer: &'static str,
+        test: &'static str,
+    },
     /// A commit on upstream main that accepts the difference on purpose.
     Upstream { commit: Commit },
     /// A clause of the implementation's written rules that accepts the
@@ -323,7 +278,7 @@ struct ClassCounts<A> {
 /// declare.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tally<A = WholeInput> {
-    layer: Layer,
+    layer: String,
     classes: BTreeMap<String, ClassCounts<A>>,
     undeclared: BTreeMap<String, usize>,
 }
@@ -331,9 +286,9 @@ pub struct Tally<A = WholeInput> {
 impl<A: Ord + Clone + fmt::Display> Tally<A> {
     /// An empty tally over `classes`, every one of which needs a judged
     /// observation.
-    pub fn new<S: AsRef<str>>(layer: Layer, classes: &[S]) -> Self {
+    pub fn new<S: AsRef<str>>(layer: &str, classes: &[S]) -> Self {
         Tally {
-            layer,
+            layer: layer.to_owned(),
             classes: classes
                 .iter()
                 .map(|c| {
@@ -402,7 +357,7 @@ impl<A: Ord + Clone + fmt::Display> Tally<A> {
     /// none, a disagreement, a panic, a timeout, an unpaired observation, or an
     /// input of a class the records do not declare.
     pub fn failures(&self) -> Vec<String> {
-        let layer = self.layer;
+        let layer = &self.layer;
         let mut out = Vec::new();
         if self.judged().0 == 0 {
             out.push(format!("{layer}: no observation judged"));
@@ -448,7 +403,7 @@ impl<A: Ord + Clone + fmt::Display> Tally<A> {
     /// `declared` does not name, or an entry no observation of its selected
     /// class was allowed by.
     pub fn unused(&self, listed: &[(&str, Allowed)], declared: &[String]) -> Vec<String> {
-        let layer = self.layer;
+        let layer = &self.layer;
         let mut out = Vec::new();
         let mut seen = BTreeSet::new();
         for (class, allowed) in listed {
@@ -512,10 +467,7 @@ impl<A: Ord + Clone + fmt::Display> fmt::Display for Tally<A> {
                 write!(
                     f,
                     "{:<10} {:<32} {:>6} {:>6}",
-                    self.layer.name(),
-                    key,
-                    c.inputs,
-                    c.agree
+                    self.layer, key, c.inputs, c.agree
                 )?;
                 for d in Disagreement::ALL {
                     write!(f, " {:>12}", c.disagree.get(&d).copied().unwrap_or(0))?;
@@ -536,21 +488,13 @@ impl<A: Ord + Clone + fmt::Display> fmt::Display for Tally<A> {
             }
         }
         for (class, n) in &self.undeclared {
-            writeln!(
-                f,
-                "{:<10} {:<32} {:>6} undeclared",
-                self.layer.name(),
-                class,
-                n
-            )?;
+            writeln!(f, "{:<10} {:<32} {:>6} undeclared", self.layer, class, n)?;
         }
         for (key, timeout, unpaired) in stopped {
             writeln!(
                 f,
                 "{:<10} {:<32} {:>6} timed out, {unpaired} unpaired",
-                self.layer.name(),
-                key,
-                timeout
+                self.layer, key, timeout
             )?;
         }
         Ok(())
@@ -582,8 +526,8 @@ impl<A, D> Expected<A, D> {
 /// A layer of the implementation compared with its reference, one record at
 /// a time.
 pub trait ComparedLayer: Send + Sync + 'static {
-    /// The layer the records are written for.
-    const LAYER: Layer;
+    /// The layer's name, which the header of its records names.
+    const LAYER: &'static str;
     /// The longest the implementation may take over one input.
     const TIME_LIMIT: Duration;
     /// What the implementation reads from one record.
@@ -697,8 +641,8 @@ fn selected(class: &str, kinds: &[String]) -> bool {
             .any(|k| class == k || class.split_once(' ').is_some_and(|(_, change)| change == k))
 }
 
-/// The stack each run of the implementation gets, enough for a recursive
-/// decoder over a whole block.
+/// The stack each run of the implementation gets, enough for one that recurses
+/// deeply.
 const STACK: usize = 1 << 28;
 
 /// What a run of the implementation over one input ended with.
@@ -908,13 +852,13 @@ pub struct Target {
 /// The number of inputs of each target change, over one layer's records.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Coverage {
-    layer: Layer,
+    layer: String,
     counts: BTreeMap<(String, String), usize>,
 }
 
 impl Coverage {
     /// Counts the rows that make each change `targets` names.
-    pub fn new(layer: Layer, targets: &[Target], rows: &[Row]) -> Self {
+    pub fn new(layer: &str, targets: &[Target], rows: &[Row]) -> Self {
         let mut counts: BTreeMap<(String, String), usize> = targets
             .iter()
             .flat_map(|t| t.kinds.iter().map(|k| ((t.rule.clone(), k.clone()), 0)))
@@ -924,7 +868,10 @@ impl Coverage {
                 *n += 1;
             }
         }
-        Coverage { layer, counts }
+        Coverage {
+            layer: layer.to_owned(),
+            counts,
+        }
     }
 
     /// The number of inputs that change `rule` by `kind`, if it is a target.
@@ -974,7 +921,7 @@ impl fmt::Display for Coverage {
 pub struct Records {
     pin: String,
     generator: String,
-    layer: Layer,
+    layer: String,
     classes: Vec<String>,
     targets: Vec<Target>,
     rows: Vec<Row>,
@@ -1103,8 +1050,7 @@ impl Records {
         Ok(Records {
             pin: records_pin,
             generator: field("generator")?,
-            layer: Layer::from_name(&field("layer")?)
-                .ok_or_else(|| malformed(n, "header names no known layer"))?,
+            layer: field("layer")?,
             classes,
             targets,
             rows,
@@ -1116,7 +1062,7 @@ impl Records {
     pub fn new(
         pin: String,
         generator: String,
-        layer: Layer,
+        layer: String,
         classes: Vec<String>,
         rows: Vec<Row>,
     ) -> Records {
@@ -1146,9 +1092,9 @@ impl Records {
         &self.generator
     }
 
-    /// The layer the records are for.
-    pub fn layer(&self) -> Layer {
-        self.layer
+    /// The name of the layer the records are for.
+    pub fn layer(&self) -> &str {
+        &self.layer
     }
 
     /// The input classes the records declare.
@@ -1184,14 +1130,13 @@ impl Records {
     /// Each reason the records cannot be judged as `layer` with the kinds and
     /// classes `required` names: another layer, no rows, a declared class with
     /// no row, a row of a class not declared, a kind with a target no row
-    /// makes, a required name the records lack, or an accepted row with no
-    /// encoding in a layer whose rows carry one.
-    pub fn check<S: AsRef<str>>(&self, layer: Layer, required: &[S]) -> Vec<String> {
+    /// makes, or a required name the records lack.
+    pub fn check<S: AsRef<str>>(&self, layer: &str, required: &[S]) -> Vec<String> {
         let mut out = Vec::new();
         if self.layer != layer {
             out.push(format!("the records are for {}, not {layer}", self.layer));
         }
-        let layer = self.layer;
+        let layer = &self.layer;
         if self.rows.is_empty() {
             out.push(format!("{layer}: no rows"));
         }
@@ -1225,29 +1170,8 @@ impl Records {
                 ));
             }
         }
-        if layer.encodes() {
-            let mut bare: BTreeMap<&str, usize> = BTreeMap::new();
-            for row in &self.rows {
-                if let Reference::Accepts(Accepted { encoding: None, .. }) = &row.reference {
-                    *bare.entry(row.class.as_str()).or_default() += 1;
-                }
-            }
-            for (class, n) in bare {
-                out.push(format!(
-                    "{layer}: class {class:?} has {n} accepted rows with no encoding"
-                ));
-            }
-        }
         out
     }
-}
-
-/// The 40 digit commit a vendored CDDL file names on its first line.
-pub fn cddl_pin(cddl: &str) -> Option<&str> {
-    let first = cddl.lines().next()?;
-    first
-        .split(|c: char| !c.is_ascii_hexdigit())
-        .find(|word| word.len() == 40)
 }
 
 #[cfg(test)]
@@ -1258,7 +1182,7 @@ mod tests {
         "trailing bytes",
         Disagreement::Accepts,
         Owner::Check {
-            layer: Layer::Validation,
+            layer: "validation",
             test: "phase_one_refuses_leftover",
         },
     );
@@ -1290,7 +1214,7 @@ mod tests {
         }
     }
 
-    fn tally(layer: Layer, classes: &[&str]) -> Tally {
+    fn tally(layer: &str, classes: &[&str]) -> Tally {
         Tally::new(layer, classes)
     }
 
@@ -1310,7 +1234,7 @@ mod tests {
         let answer = Answer::<(), &str>::Panics("index out of bounds".into());
         let outcome = judge(&refuses(), &answer, any_reason, Some(TRAILING));
         assert_eq!(outcome, Outcome::Panic("index out of bounds".into()));
-        let mut tally = tally(Layer::Validation, &["zero denominator"]);
+        let mut tally = tally("validation", &["zero denominator"]);
         tally.add(&whole("zero denominator"), &outcome);
         let counts = tally.counts(&whole("zero denominator")).unwrap();
         assert_eq!((counts.inputs, counts.agree, counts.panic), (1, 0, 1));
@@ -1347,7 +1271,7 @@ mod tests {
             Some(TRAILING),
         );
         assert_eq!(other, Outcome::Disagree(Disagreement::OtherReason));
-        let mut tally = tally(Layer::Decode, &["trailing"]);
+        let mut tally = tally("decode", &["trailing"]);
         tally.add(&whole("trailing"), &accepts);
         assert!(tally.failures().is_empty());
         let counts = tally.counts(&whole("trailing")).unwrap();
@@ -1367,7 +1291,7 @@ mod tests {
             any_reason,
             Some(EXTRA),
         );
-        let mut tally = tally(Layer::Validation, &["generated extra"]);
+        let mut tally = tally("validation", &["generated extra"]);
         tally.add(&whole("generated extra"), &outcome);
         assert!(tally.failures().is_empty());
         assert!(tally.to_string().contains(
@@ -1383,7 +1307,7 @@ mod tests {
 
     #[test]
     fn an_agreeing_run_has_no_failure() {
-        let mut tally = tally(Layer::Validation, &["base", "zero denominator"]);
+        let mut tally = tally("validation", &["base", "zero denominator"]);
         tally.add(&whole("base"), &Outcome::Agree);
         tally.add(&whole("zero denominator"), &Outcome::Agree);
         assert_eq!(tally.failures(), Vec::<String>::new());
@@ -1391,7 +1315,7 @@ mod tests {
 
     #[test]
     fn a_declared_class_with_no_input_fails() {
-        let mut tally = tally(Layer::Validation, &["base", "zero denominator"]);
+        let mut tally = tally("validation", &["base", "zero denominator"]);
         tally.add(&whole("base"), &Outcome::Agree);
         assert_eq!(
             tally.failures(),
@@ -1401,7 +1325,7 @@ mod tests {
 
     #[test]
     fn a_class_with_only_inputs_not_judged_fails() {
-        let mut tally = tally(Layer::Validation, &["base", "drop"]);
+        let mut tally = tally("validation", &["base", "drop"]);
         tally.add(&whole("base"), &Outcome::Agree);
         tally.not_judged("drop");
         assert_eq!(tally.not_judged_count("drop"), Some(1));
@@ -1413,7 +1337,7 @@ mod tests {
 
     #[test]
     fn an_undeclared_class_fails() {
-        let mut tally = tally(Layer::Validation, &["base"]);
+        let mut tally = tally("validation", &["base"]);
         tally.add(&whole("base"), &Outcome::Agree);
         tally.add(&whole("bese"), &Outcome::Agree);
         assert_eq!(
@@ -1430,7 +1354,7 @@ mod tests {
     #[test]
     fn records_at_the_head_pin_are_read() {
         let records = Records::read(RECORDS, "9df9f98c").unwrap();
-        assert_eq!(records.layer(), Layer::Validation);
+        assert_eq!(records.layer(), "validation");
         assert_eq!(records.classes(), ["base", "zero denominator"]);
         assert_eq!(records.rows().len(), 2);
         assert_eq!(records.rows()[1].variant.as_deref(), Some("pool margin"));
@@ -1523,12 +1447,18 @@ mod tests {
     }
 
     #[test]
-    fn records_of_an_unknown_layer_are_refused() {
+    fn records_of_any_layer_name_are_read() {
         let text = RECORDS.replace("\"validation\"", "\"valuation\"");
-        assert!(matches!(
+        let records = Records::read(&text, "9df9f98c").unwrap();
+        assert_eq!(records.layer(), "valuation");
+        let text = RECORDS.replace(r#""layer":"validation","#, "");
+        assert_eq!(
             Records::read(&text, "9df9f98c"),
-            Err(RecordsError::Malformed { line: 1, .. })
-        ));
+            Err(RecordsError::Malformed {
+                line: 1,
+                reason: "header has no layer".into()
+            })
+        );
     }
 
     const CHANGED: &str = r#"{"reference":"9df9f98c","generator":"g1","targets":[{"rule":"voter","kinds":["unknown-arm","array-short"]},{"rule":"transaction_body","kinds":["wide-heads"]}],"layer":"decode","classes":["body","body unknown-arm"]}
@@ -1612,17 +1542,6 @@ mod tests {
             coverage.to_string(),
             "decode: 3 target changes, 3 made, 0 not made\n"
         );
-    }
-
-    #[test]
-    fn the_cddl_pin_is_the_first_line_commit() {
-        let cddl =
-            "; Copied from cardano-ledger commit 9df9f98cce86c5f2195142b2c02dd9b39dd9dc7c,\n";
-        assert_eq!(
-            cddl_pin(cddl),
-            Some("9df9f98cce86c5f2195142b2c02dd9b39dd9dc7c")
-        );
-        assert_eq!(cddl_pin("; no commit here\n"), None);
     }
 
     #[test]

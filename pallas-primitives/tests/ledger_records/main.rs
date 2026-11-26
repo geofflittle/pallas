@@ -1,6 +1,7 @@
 //! Dijkstra values decoded by pallas compared leaf by leaf with the ledger's
 //! reading of them.
 
+mod cbor;
 mod differences;
 
 use std::collections::BTreeMap;
@@ -12,16 +13,18 @@ use std::time::Duration;
 use pallas_codec::minicbor;
 use pallas_codec::utils::{KeepRaw, Nullable};
 use pallas_crypto::hash::Hasher;
-use pallas_primitives::dijkstra as d;
+use pallas_primitives::dijkstra;
 use pallas_primitives::{BigInt, PlutusData, StakeCredential};
 use reference_comparison::tree::{
-    Diff, Normal, cbor, decimal, map, negative_decimal, normal, object, omap, oset, set, tagged,
+    Diff, Normal, map, normal, object, ordered_map, ordered_set, set, tagged,
 };
 use reference_comparison::{
-    Allowance, Allowed, Answer, ComparedLayer, Coverage, Disagreement, Expected, Key, Layer,
-    Outcome, Records, Reference, Row, WholeInput, catch, cddl_pin, judge, kinds_from_env,
+    Allowance, Allowed, Answer, ComparedLayer, Coverage, Disagreement, Expected, Key, Outcome,
+    Records, Reference, Row, WholeInput, catch, judge, kinds_from_env,
 };
 use serde_json::{Value, json};
+
+use cbor::{decimal, negative_decimal, read_leaf};
 
 /// The rules of `defs.cddl` no recorded value credits, with the reason none
 /// does.
@@ -39,15 +42,15 @@ const UNCREDITED: &[(&str, &str)] = &[
     ),
 ];
 
-fn enc<T: minicbor::Encode<()>>(x: &T) -> Vec<u8> {
+fn encode<T: minicbor::Encode<()>>(x: &T) -> Vec<u8> {
     minicbor::to_vec(x).expect("encode to a vec")
 }
 
-fn cb<T: minicbor::Encode<()>>(x: &T) -> Value {
-    cbor(&enc(x))
+fn encoded<T: minicbor::Encode<()>>(x: &T) -> Value {
+    cbor::leaf(&encode(x))
 }
 
-fn opt<T>(x: Option<&T>, f: impl FnOnce(&T) -> Value) -> Value {
+fn optional<T>(x: Option<&T>, f: impl FnOnce(&T) -> Value) -> Value {
     x.map(f).unwrap_or(Value::Null)
 }
 
@@ -58,23 +61,23 @@ fn nullable<T: Clone>(x: &Nullable<T>, f: impl FnOnce(&T) -> Value) -> Value {
     }
 }
 
-fn set_cb<T: minicbor::Encode<()>>(x: Option<&[T]>) -> Value {
-    set(x.unwrap_or(&[]).iter().map(cb))
+fn encoded_set<T: minicbor::Encode<()>>(x: Option<&[T]>) -> Value {
+    set(x.unwrap_or(&[]).iter().map(encoded))
 }
 
-fn map_cb<'a, K: minicbor::Encode<()> + 'a, V: minicbor::Encode<()> + 'a>(
+fn encoded_map<'a, K: minicbor::Encode<()> + 'a, V: minicbor::Encode<()> + 'a>(
     x: Option<impl IntoIterator<Item = (&'a K, &'a V)>>,
 ) -> Value {
     match x {
         None => map([]),
-        Some(it) => map(it.into_iter().map(|(k, v)| (cb(k), cb(v)))),
+        Some(it) => map(it.into_iter().map(|(k, v)| (encoded(k), encoded(v)))),
     }
 }
 
 fn data(x: &PlutusData) -> Value {
     match x {
         PlutusData::Constr(c) => {
-            let ix = match c.tag {
+            let index = match c.tag {
                 121..=127 => (c.tag - 121).to_string(),
                 1280..=1400 => (c.tag - 1280 + 7).to_string(),
                 102 => c.any_constructor.map(|i| i.to_string()).unwrap_or_default(),
@@ -83,16 +86,21 @@ fn data(x: &PlutusData) -> Value {
             tagged(
                 "constr",
                 vec![
-                    ("ix", json!(ix)),
+                    ("ix", json!(index)),
                     ("fields", Value::Array(c.fields.iter().map(data).collect())),
                 ],
             )
         }
-        PlutusData::Map(kvs) => tagged(
+        PlutusData::Map(entries) => tagged(
             "map",
             vec![(
                 "entries",
-                Value::Array(kvs.iter().map(|(k, v)| json!([data(k), data(v)])).collect()),
+                Value::Array(
+                    entries
+                        .iter()
+                        .map(|(k, v)| json!([data(k), data(v)]))
+                        .collect(),
+                ),
             )],
         ),
         PlutusData::Array(xs) => tagged(
@@ -112,98 +120,101 @@ fn data(x: &PlutusData) -> Value {
     }
 }
 
-fn native(x: &d::NativeScript) -> Value {
-    use d::NativeScript as S;
+fn native(x: &dijkstra::NativeScript) -> Value {
+    use dijkstra::NativeScript as S;
     let all = |xs: &[S]| Value::Array(xs.iter().map(native).collect());
     match x {
-        S::ScriptPubkey(h) => tagged("sig", vec![("hash", cb(h))]),
+        S::ScriptPubkey(h) => tagged("sig", vec![("hash", encoded(h))]),
         S::ScriptAll(xs) => tagged("all", vec![("scripts", all(xs))]),
         S::ScriptAny(xs) => tagged("any", vec![("scripts", all(xs))]),
         S::ScriptNOfK(m, xs) => tagged(
             "m_of",
             vec![("m", json!(m.to_string())), ("scripts", all(xs))],
         ),
-        S::InvalidBefore(s) => tagged("start", vec![("slot", cb(s))]),
-        S::InvalidHereafter(s) => tagged("expire", vec![("slot", cb(s))]),
-        S::ScriptRequireGuard(c) => tagged("guard", vec![("cred", cb(c))]),
+        S::InvalidBefore(s) => tagged("start", vec![("slot", encoded(s))]),
+        S::InvalidHereafter(s) => tagged("expire", vec![("slot", encoded(s))]),
+        S::ScriptRequireGuard(c) => tagged("guard", vec![("cred", encoded(c))]),
     }
 }
 
-fn native_script(x: &d::NativeScript) -> Value {
+fn native_script(x: &dijkstra::NativeScript) -> Value {
     tagged("native", vec![("script", native(x))])
 }
 
-fn plutus<const V: usize>(x: &d::PlutusScript<V>) -> Value {
+fn plutus<const V: usize>(x: &dijkstra::PlutusScript<V>) -> Value {
     tagged(
         &format!("plutus_v{V}"),
         vec![("bytes", json!(hex::encode(x.0.as_slice())))],
     )
 }
 
-fn plutus_hash<const V: usize>(x: &d::PlutusScript<V>) -> Value {
-    cb(&Hasher::<224>::hash_tagged(x.0.as_slice(), V as u8))
+fn plutus_hash<const V: usize>(x: &dijkstra::PlutusScript<V>) -> Value {
+    encoded(&Hasher::<224>::hash_tagged(x.0.as_slice(), V as u8))
 }
 
-fn script_ref(x: &d::ScriptRef) -> Value {
+fn script_ref(x: &dijkstra::ScriptRef) -> Value {
     match x {
-        d::ScriptRef::NativeScript(s) => native_script(s),
-        d::ScriptRef::PlutusV1Script(s) => plutus(s),
-        d::ScriptRef::PlutusV2Script(s) => plutus(s),
-        d::ScriptRef::PlutusV3Script(s) => plutus(s),
-        d::ScriptRef::PlutusV4Script(s) => plutus(s),
+        dijkstra::ScriptRef::NativeScript(s) => native_script(s),
+        dijkstra::ScriptRef::PlutusV1Script(s) => plutus(s),
+        dijkstra::ScriptRef::PlutusV2Script(s) => plutus(s),
+        dijkstra::ScriptRef::PlutusV3Script(s) => plutus(s),
+        dijkstra::ScriptRef::PlutusV4Script(s) => plutus(s),
     }
 }
 
-fn assets<A: minicbor::Encode<()>>(m: &d::Multiasset<A>) -> Value {
+fn assets<A: minicbor::Encode<()>>(m: &dijkstra::Multiasset<A>) -> Value {
     map(m
         .iter()
-        .map(|(p, names)| (cb(p), map_cb(Some(names.iter())))))
+        .map(|(p, names)| (encoded(p), encoded_map(Some(names.iter())))))
 }
 
-fn output(x: &d::TransactionOutput) -> Value {
+fn output(x: &dijkstra::TransactionOutput) -> Value {
     use pallas_primitives::{alonzo, conway};
     match x {
-        d::TransactionOutput::Legacy(o) => {
+        dijkstra::TransactionOutput::Legacy(o) => {
             let (coin, multi) = match &o.amount {
-                alonzo::Value::Coin(c) => (cb(c), map([])),
-                alonzo::Value::Multiasset(c, m) => (cb(c), assets(m)),
+                alonzo::Value::Coin(c) => (encoded(c), map([])),
+                alonzo::Value::Multiasset(c, m) => (encoded(c), assets(m)),
             };
             object(vec![
-                ("address", cb(&o.address)),
+                ("address", encoded(&o.address)),
                 ("coin", coin),
                 ("assets", multi),
                 (
                     "datum",
-                    opt(o.datum_hash.as_ref(), |h| {
-                        tagged("hash", vec![("hash", cb(h))])
+                    optional(o.datum_hash.as_ref(), |h| {
+                        tagged("hash", vec![("hash", encoded(h))])
                     }),
                 ),
                 ("script", Value::Null),
             ])
         }
-        d::TransactionOutput::PostAlonzo(o) => {
+        dijkstra::TransactionOutput::PostAlonzo(o) => {
             let (coin, multi) = match &o.value {
-                conway::Value::Coin(c) => (cb(c), map([])),
-                conway::Value::Multiasset(c, m) => (cb(c), assets(m)),
+                conway::Value::Coin(c) => (encoded(c), map([])),
+                conway::Value::Multiasset(c, m) => (encoded(c), assets(m)),
             };
-            let datum = opt(o.datum_option.as_ref(), |x| match &**x {
-                d::DatumOption::Hash(h) => tagged("hash", vec![("hash", cb(h))]),
-                d::DatumOption::Data(w) => tagged("inline", vec![("data", data(&w.0))]),
+            let datum = optional(o.datum_option.as_ref(), |x| match &**x {
+                dijkstra::DatumOption::Hash(h) => tagged("hash", vec![("hash", encoded(h))]),
+                dijkstra::DatumOption::Data(w) => tagged("inline", vec![("data", data(&w.0))]),
             });
             object(vec![
-                ("address", cb(&o.address)),
+                ("address", encoded(&o.address)),
                 ("coin", coin),
                 ("assets", multi),
                 ("datum", datum),
-                ("script", opt(o.script_ref.as_ref(), |s| script_ref(&s.0))),
+                (
+                    "script",
+                    optional(o.script_ref.as_ref(), |s| script_ref(&s.0)),
+                ),
             ])
         }
     }
 }
 
-fn cert(x: &d::Certificate) -> Value {
+fn certificate(x: &dijkstra::Certificate) -> Value {
     match x {
-        d::Certificate::PoolRegistration {
+        dijkstra::Certificate::PoolRegistration {
             operator,
             vrf_keyhash,
             bls_key,
@@ -217,120 +228,133 @@ fn cert(x: &d::Certificate) -> Value {
         } => tagged(
             "pool_reg",
             vec![
-                ("operator", cb(operator)),
-                ("vrf", cb(vrf_keyhash)),
-                ("bls", opt(bls_key.as_ref(), |k| nullable(k, cb))),
-                ("pledge", cb(pledge)),
-                ("cost", cb(cost)),
-                ("margin", cb(margin)),
-                ("account", cb(reward_account)),
-                ("owners", set(pool_owners.iter().map(cb))),
-                ("relays", Value::Array(relays.iter().map(cb).collect())),
-                ("metadata", opt(pool_metadata.as_ref(), cb)),
+                ("operator", encoded(operator)),
+                ("vrf", encoded(vrf_keyhash)),
+                ("bls", optional(bls_key.as_ref(), |k| nullable(k, encoded))),
+                ("pledge", encoded(pledge)),
+                ("cost", encoded(cost)),
+                ("margin", encoded(margin)),
+                ("account", encoded(reward_account)),
+                ("owners", set(pool_owners.iter().map(encoded))),
+                ("relays", Value::Array(relays.iter().map(encoded).collect())),
+                ("metadata", optional(pool_metadata.as_ref(), encoded)),
             ],
         ),
-        other => cb(other),
+        other => encoded(other),
     }
 }
 
-fn action(x: &d::GovAction) -> Value {
+fn action(x: &dijkstra::GovAction) -> Value {
     match x {
-        d::GovAction::TreasuryWithdrawals(ws, policy) => tagged(
+        dijkstra::GovAction::TreasuryWithdrawals(ws, policy) => tagged(
             "treasury_withdrawals",
             vec![
-                ("withdrawals", map_cb(Some(ws.iter()))),
-                ("policy", opt(policy.as_ref(), cb)),
+                ("withdrawals", encoded_map(Some(ws.iter()))),
+                ("policy", optional(policy.as_ref(), encoded)),
             ],
         ),
-        d::GovAction::UpdateCommittee(prev, remove, add, threshold) => tagged(
+        dijkstra::GovAction::UpdateCommittee(prev, remove, add, threshold) => tagged(
             "update_committee",
             vec![
-                ("prev", opt(prev.as_ref(), cb)),
-                ("remove", set(remove.iter().map(cb))),
-                ("add", map_cb(Some(add.iter()))),
-                ("threshold", cb(threshold)),
+                ("prev", optional(prev.as_ref(), encoded)),
+                ("remove", set(remove.iter().map(encoded))),
+                ("add", encoded_map(Some(add.iter()))),
+                ("threshold", encoded(threshold)),
             ],
         ),
-        other => cb(other),
+        other => encoded(other),
     }
 }
 
-fn proposal(x: &d::ProposalProcedure) -> Value {
+fn proposal(x: &dijkstra::ProposalProcedure) -> Value {
     object(vec![
-        ("deposit", cb(&x.deposit)),
-        ("account", cb(&x.reward_account)),
+        ("deposit", encoded(&x.deposit)),
+        ("account", encoded(&x.reward_account)),
         ("action", action(&x.gov_action)),
-        ("anchor", cb(&x.anchor)),
+        ("anchor", encoded(&x.anchor)),
     ])
 }
 
-fn votes(x: Option<&d::VotingProcedures>) -> Value {
+fn votes(x: Option<&dijkstra::VotingProcedures>) -> Value {
     match x {
         None => map([]),
         Some(m) => map(m
             .iter()
-            .map(|(voter, vs)| (cb(voter), map_cb(Some(vs.iter()))))),
+            .map(|(voter, vs)| (encoded(voter), encoded_map(Some(vs.iter()))))),
     }
 }
 
-fn guards(x: Option<&d::Guards>) -> Value {
+fn guards(x: Option<&dijkstra::Guards>) -> Value {
     match x {
-        None => oset([]),
-        Some(d::Guards::AddrKeyhashes(hs)) => {
-            oset(hs.iter().map(|h| cb(&StakeCredential::AddrKeyhash(*h))))
+        None => ordered_set([]),
+        Some(dijkstra::Guards::AddrKeyhashes(hashes)) => ordered_set(
+            hashes
+                .iter()
+                .map(|h| encoded(&StakeCredential::AddrKeyhash(*h))),
+        ),
+        Some(dijkstra::Guards::Credentials(credentials)) => {
+            ordered_set(credentials.iter().map(encoded))
         }
-        Some(d::Guards::Credentials(cs)) => oset(cs.iter().map(cb)),
     }
 }
 
-fn top_guards(x: Option<&d::RequiredTopLevelGuards>) -> Value {
+fn top_level_guards(x: Option<&dijkstra::RequiredTopLevelGuards>) -> Value {
     match x {
         None => map([]),
-        Some(m) => map(m.iter().map(|(c, v)| (cb(c), nullable(v, data)))),
+        Some(m) => map(m.iter().map(|(c, v)| (encoded(c), nullable(v, data)))),
     }
 }
 
-fn donation(x: Option<&d::PositiveCoin>) -> Value {
-    cb(&x.map(|coin| u64::from(*coin)).unwrap_or(0))
+fn donation(x: Option<&dijkstra::PositiveCoin>) -> Value {
+    encoded(&x.map(|coin| u64::from(*coin)).unwrap_or(0))
 }
 
 /// The fields a top level body and a sub transaction body both hold, by the
 /// ledger reading's names.
 fn shared<'a>(
-    inputs: &[d::TransactionInput],
-    reference_inputs: Option<&d::NonEmptySet<d::TransactionInput>>,
-    outputs: &[d::TransactionOutput<'a>],
-    certs: Option<&d::NonEmptySet<d::Certificate>>,
-    withdrawals: Option<&d::Withdrawals>,
+    inputs: &[dijkstra::TransactionInput],
+    reference_inputs: Option<&dijkstra::NonEmptySet<dijkstra::TransactionInput>>,
+    outputs: &[dijkstra::TransactionOutput<'a>],
+    certificates: Option<&dijkstra::NonEmptySet<dijkstra::Certificate>>,
+    withdrawals: Option<&dijkstra::Withdrawals>,
     ttl: Option<u64>,
     start: Option<u64>,
 ) -> Vec<(&'static str, Value)> {
     vec![
-        ("inputs", set(inputs.iter().map(cb))),
-        ("reference_inputs", set_cb(reference_inputs.map(|x| &x[..]))),
+        ("inputs", set(inputs.iter().map(encoded))),
+        (
+            "reference_inputs",
+            encoded_set(reference_inputs.map(|x| &x[..])),
+        ),
         (
             "outputs",
             Value::Array(outputs.iter().map(output).collect()),
         ),
         (
             "certs",
-            oset(certs.map(|x| &x[..]).unwrap_or(&[]).iter().map(cert)),
+            ordered_set(
+                certificates
+                    .map(|x| &x[..])
+                    .unwrap_or(&[])
+                    .iter()
+                    .map(certificate),
+            ),
         ),
-        ("withdrawals", map_cb(withdrawals.map(|w| w.iter()))),
-        ("ttl", opt(ttl.as_ref(), cb)),
-        ("start", opt(start.as_ref(), cb)),
+        ("withdrawals", encoded_map(withdrawals.map(|w| w.iter()))),
+        ("ttl", optional(ttl.as_ref(), encoded)),
+        ("start", optional(start.as_ref(), encoded)),
     ]
 }
 
-fn proposals(x: Option<&d::NonEmptySet<d::ProposalProcedure>>) -> Value {
-    oset(x.map(|x| &x[..]).unwrap_or(&[]).iter().map(proposal))
+fn proposals(x: Option<&dijkstra::NonEmptySet<dijkstra::ProposalProcedure>>) -> Value {
+    ordered_set(x.map(|x| &x[..]).unwrap_or(&[]).iter().map(proposal))
 }
 
-fn mint(x: Option<&d::Mint>) -> Value {
+fn mint(x: Option<&dijkstra::Mint>) -> Value {
     x.map(assets).unwrap_or_else(|| map([]))
 }
 
-fn body(b: &d::TransactionBody) -> Value {
+fn body(b: &dijkstra::TransactionBody) -> Value {
     let mut f = shared(
         &b.inputs,
         b.reference_inputs.as_ref(),
@@ -340,48 +364,60 @@ fn body(b: &d::TransactionBody) -> Value {
         b.ttl,
         b.validity_interval_start,
     );
-    let subs = b.sub_transactions.as_ref().map(|x| &x[..]).unwrap_or(&[]);
+    let sub_transactions = b.sub_transactions.as_ref().map(|x| &x[..]).unwrap_or(&[]);
     f.extend(vec![
-        ("fee", cb(&b.fee)),
-        ("collateral", set_cb(b.collateral.as_ref().map(|x| &x[..]))),
+        ("fee", encoded(&b.fee)),
+        (
+            "collateral",
+            encoded_set(b.collateral.as_ref().map(|x| &x[..])),
+        ),
         (
             "collateral_return",
-            opt(b.collateral_return.as_ref(), output),
+            optional(b.collateral_return.as_ref(), output),
         ),
-        ("total_collateral", opt(b.total_collateral.as_ref(), cb)),
+        (
+            "total_collateral",
+            optional(b.total_collateral.as_ref(), encoded),
+        ),
         ("guards", guards(b.guards.as_ref())),
         ("mint", mint(b.mint.as_ref())),
-        ("script_data_hash", opt(b.script_data_hash.as_ref(), cb)),
-        ("aux_hash", opt(b.auxiliary_data_hash.as_ref(), cb)),
-        ("network", opt(b.network_id.as_ref(), cb)),
+        (
+            "script_data_hash",
+            optional(b.script_data_hash.as_ref(), encoded),
+        ),
+        (
+            "aux_hash",
+            optional(b.auxiliary_data_hash.as_ref(), encoded),
+        ),
+        ("network", optional(b.network_id.as_ref(), encoded)),
         ("votes", votes(b.voting_procedures.as_ref())),
         ("proposals", proposals(b.proposal_procedures.as_ref())),
-        ("treasury", opt(b.treasury_value.as_ref(), cb)),
+        ("treasury", optional(b.treasury_value.as_ref(), encoded)),
         ("donation", donation(b.donation.as_ref())),
         (
             "sub_txs",
-            omap(subs.iter().map(|s| {
+            ordered_map(sub_transactions.iter().map(|s| {
                 (
-                    cb(&Hasher::<256>::hash(s.sub_transaction_body.raw_cbor())),
-                    sub_tx(s),
+                    encoded(&Hasher::<256>::hash(s.sub_transaction_body.raw_cbor())),
+                    sub_transaction(s),
                 )
             })),
         ),
         (
             "top_guards",
-            top_guards(b.required_top_level_guards.as_ref()),
+            top_level_guards(b.required_top_level_guards.as_ref()),
         ),
         (
             "deposits",
-            map_cb(b.direct_deposits.as_ref().map(|x| x.iter())),
+            encoded_map(b.direct_deposits.as_ref().map(|x| x.iter())),
         ),
         (
             "balance_intervals",
-            map_cb(b.account_balance_intervals.as_ref().map(|x| x.iter())),
+            encoded_map(b.account_balance_intervals.as_ref().map(|x| x.iter())),
         ),
         (
             "starting_balance_intervals",
-            map_cb(
+            encoded_map(
                 b.starting_account_balance_intervals
                     .as_ref()
                     .map(|x| x.iter()),
@@ -391,7 +427,7 @@ fn body(b: &d::TransactionBody) -> Value {
     object(f)
 }
 
-fn sub_body(b: &d::SubTransactionBody) -> Value {
+fn sub_transaction_body(b: &dijkstra::SubTransactionBody) -> Value {
     let mut f = shared(
         &b.inputs,
         b.reference_inputs.as_ref(),
@@ -404,34 +440,40 @@ fn sub_body(b: &d::SubTransactionBody) -> Value {
     f.extend(vec![
         ("guards", guards(b.guards.as_ref())),
         ("mint", mint(b.mint.as_ref())),
-        ("script_data_hash", opt(b.script_data_hash.as_ref(), cb)),
-        ("aux_hash", opt(b.auxiliary_data_hash.as_ref(), cb)),
-        ("network", opt(b.network_id.as_ref(), cb)),
+        (
+            "script_data_hash",
+            optional(b.script_data_hash.as_ref(), encoded),
+        ),
+        (
+            "aux_hash",
+            optional(b.auxiliary_data_hash.as_ref(), encoded),
+        ),
+        ("network", optional(b.network_id.as_ref(), encoded)),
         ("votes", votes(b.voting_procedures.as_ref())),
         ("proposals", proposals(b.proposal_procedures.as_ref())),
-        ("treasury", opt(b.treasury_value.as_ref(), cb)),
+        ("treasury", optional(b.treasury_value.as_ref(), encoded)),
         ("donation", donation(b.donation.as_ref())),
         (
             "top_guards",
-            top_guards(b.required_top_level_guards.as_ref()),
+            top_level_guards(b.required_top_level_guards.as_ref()),
         ),
         (
             "deposits",
-            map_cb(b.direct_deposits.as_ref().map(|x| x.iter())),
+            encoded_map(b.direct_deposits.as_ref().map(|x| x.iter())),
         ),
         (
             "balance_intervals",
-            map_cb(b.account_balance_intervals.as_ref().map(|x| x.iter())),
+            encoded_map(b.account_balance_intervals.as_ref().map(|x| x.iter())),
         ),
     ]);
     object(f)
 }
 
-fn wits(w: &d::WitnessSet) -> Value {
+fn witness_set(w: &dijkstra::WitnessSet) -> Value {
     let mut scripts = Vec::new();
     for s in w.native_script.as_ref().map(|x| &x[..]).unwrap_or(&[]) {
         scripts.push((
-            cb(&Hasher::<224>::hash_tagged(s.raw_cbor(), 0)),
+            encoded(&Hasher::<224>::hash_tagged(s.raw_cbor(), 0)),
             native_script(s),
         ));
     }
@@ -451,46 +493,49 @@ fn wits(w: &d::WitnessSet) -> Value {
         None => map([]),
         Some(r) => map(r.0.iter().map(|(k, v)| {
             (
-                cb(k),
-                object(vec![("data", data(&v.data)), ("units", cb(&v.ex_units))]),
+                encoded(k),
+                object(vec![
+                    ("data", data(&v.data)),
+                    ("units", encoded(&v.ex_units)),
+                ]),
             )
         })),
     };
     object(vec![
-        ("vkeys", set_cb(w.vkeywitness.as_ref().map(|x| &x[..]))),
+        ("vkeys", encoded_set(w.vkeywitness.as_ref().map(|x| &x[..]))),
         (
             "boots",
-            set_cb(w.bootstrap_witness.as_ref().map(|x| &x[..])),
+            encoded_set(w.bootstrap_witness.as_ref().map(|x| &x[..])),
         ),
         ("scripts", map(scripts)),
         (
             "datums",
             map(datums
                 .iter()
-                .map(|x| (cb(&Hasher::<256>::hash(x.raw_cbor())), data(x)))),
+                .map(|x| (encoded(&Hasher::<256>::hash(x.raw_cbor())), data(x)))),
         ),
         ("redeemers", redeemers),
     ])
 }
 
-fn metadata(m: Option<&d::Metadata>) -> Value {
-    map_cb(m.map(|x| x.iter()))
+fn metadata(m: Option<&dijkstra::Metadata>) -> Value {
+    encoded_map(m.map(|x| x.iter()))
 }
 
 /// A native script as an auxiliary data field holds it, with or without its
 /// original bytes.
 trait AsNative {
-    fn native(&self) -> &d::NativeScript;
+    fn native(&self) -> &dijkstra::NativeScript;
 }
 
-impl AsNative for d::NativeScript {
-    fn native(&self) -> &d::NativeScript {
+impl AsNative for dijkstra::NativeScript {
+    fn native(&self) -> &dijkstra::NativeScript {
         self
     }
 }
 
-impl AsNative for KeepRaw<'_, d::NativeScript> {
-    fn native(&self) -> &d::NativeScript {
+impl AsNative for KeepRaw<'_, dijkstra::NativeScript> {
+    fn native(&self) -> &dijkstra::NativeScript {
         self
     }
 }
@@ -504,21 +549,21 @@ fn natives<T: AsNative>(xs: Option<&Vec<T>>) -> Value {
     )
 }
 
-fn aux(a: &d::AuxiliaryData) -> Value {
-    let (md, ns, ps) = match a {
-        d::AuxiliaryData::Shelley(md) => (
-            metadata(Some(md)),
-            natives::<d::NativeScript>(None),
+fn auxiliary(a: &dijkstra::AuxiliaryData) -> Value {
+    let (metadata_tree, native_scripts, plutus_scripts) = match a {
+        dijkstra::AuxiliaryData::Shelley(m) => (
+            metadata(Some(m)),
+            natives::<dijkstra::NativeScript>(None),
             map([]),
         ),
-        d::AuxiliaryData::ShelleyMa(x) => (
+        dijkstra::AuxiliaryData::ShelleyMa(x) => (
             metadata(Some(&x.transaction_metadata)),
             natives(Some(&x.auxiliary_scripts)),
             map([]),
         ),
-        d::AuxiliaryData::PostAlonzo(x) => {
-            fn lang<const V: usize>(
-                xs: Option<&Vec<d::PlutusScript<V>>>,
+        dijkstra::AuxiliaryData::PostAlonzo(x) => {
+            fn language<const V: usize>(
+                xs: Option<&Vec<dijkstra::PlutusScript<V>>>,
             ) -> Option<(Value, Value)> {
                 xs.filter(|xs| !xs.is_empty()).map(|xs| {
                     (
@@ -531,69 +576,73 @@ fn aux(a: &d::AuxiliaryData) -> Value {
                     )
                 })
             }
-            let ps = [
-                lang(x.plutus_v1_scripts.as_ref()),
-                lang(x.plutus_v2_scripts.as_ref()),
-                lang(x.plutus_v3_scripts.as_ref()),
-                lang(x.plutus_v4_scripts.as_ref()),
+            let languages = [
+                language(x.plutus_v1_scripts.as_ref()),
+                language(x.plutus_v2_scripts.as_ref()),
+                language(x.plutus_v3_scripts.as_ref()),
+                language(x.plutus_v4_scripts.as_ref()),
             ];
             (
                 metadata(x.metadata.as_ref()),
                 natives(x.native_scripts.as_ref()),
-                map(ps.into_iter().flatten()),
+                map(languages.into_iter().flatten()),
             )
         }
     };
-    object(vec![("metadata", md), ("native", ns), ("plutus", ps)])
-}
-
-fn sub_tx(s: &d::SubTransaction) -> Value {
     object(vec![
-        ("body", sub_body(&s.sub_transaction_body)),
-        ("wits", wits(&s.transaction_witness_set)),
-        ("aux", nullable(&s.auxiliary_data, |a| aux(a))),
+        ("metadata", metadata_tree),
+        ("native", native_scripts),
+        ("plutus", plutus_scripts),
     ])
 }
 
-fn tx(
-    b: &KeepRaw<d::TransactionBody>,
-    w: &d::WitnessSet,
+fn sub_transaction(s: &dijkstra::SubTransaction) -> Value {
+    object(vec![
+        ("body", sub_transaction_body(&s.sub_transaction_body)),
+        ("wits", witness_set(&s.transaction_witness_set)),
+        ("aux", nullable(&s.auxiliary_data, |a| auxiliary(a))),
+    ])
+}
+
+fn transaction(
+    b: &KeepRaw<dijkstra::TransactionBody>,
+    w: &dijkstra::WitnessSet,
     valid: bool,
-    a: &Nullable<KeepRaw<d::AuxiliaryData>>,
+    a: &Nullable<KeepRaw<dijkstra::AuxiliaryData>>,
 ) -> Value {
     object(vec![
-        ("id", cb(&Hasher::<256>::hash(b.raw_cbor()))),
+        ("id", encoded(&Hasher::<256>::hash(b.raw_cbor()))),
         ("body", body(b)),
-        ("wits", wits(w)),
+        ("wits", witness_set(w)),
         ("valid", json!(valid)),
-        ("aux", nullable(a, |a| aux(a))),
+        ("aux", nullable(a, |a| auxiliary(a))),
     ])
 }
 
-fn block(b: &d::Block) -> Value {
+fn block(b: &dijkstra::Block) -> Value {
     let h = &b.header.header_body;
     let header = object(vec![
-        ("block_no", cb(&h.block_number)),
-        ("slot", cb(&h.slot)),
-        ("prev", cb(&h.prev_hash)),
-        ("issuer_vk", cb(&h.issuer_vkey)),
-        ("vrf_vk", cb(&h.vrf_vkey)),
-        ("vrf", cb(&h.vrf_result)),
-        ("body_size", cb(&h.block_body_size)),
-        ("body_hash", cb(&h.block_body_hash)),
-        ("ocert", cb(&h.operational_cert)),
-        ("version", cb(&h.header_version_info)),
+        ("block_no", encoded(&h.block_number)),
+        ("slot", encoded(&h.slot)),
+        ("prev", encoded(&h.prev_hash)),
+        ("issuer_vk", encoded(&h.issuer_vkey)),
+        ("vrf_vk", encoded(&h.vrf_vkey)),
+        ("vrf", encoded(&h.vrf_result)),
+        ("body_size", encoded(&h.block_body_size)),
+        ("body_hash", encoded(&h.block_body_hash)),
+        ("ocert", encoded(&h.operational_cert)),
+        ("version", encoded(&h.header_version_info)),
         ("leios_cert", json!(h.block_body_contains_leios_cert)),
-        ("eb", nullable(&h.eb_announcement, cb)),
-        ("sig", cb(&b.header.body_signature)),
-        ("hash", cb(&Hasher::<256>::hash(b.header.raw_cbor()))),
+        ("eb", nullable(&h.eb_announcement, encoded)),
+        ("sig", encoded(&b.header.body_signature)),
+        ("hash", encoded(&Hasher::<256>::hash(b.header.raw_cbor()))),
     ]);
-    let txs = b
+    let transactions = b
         .block_body
         .transactions
         .iter()
         .map(|t| {
-            tx(
+            transaction(
                 &t.transaction_body,
                 &t.transaction_witness_set,
                 t.success,
@@ -603,9 +652,15 @@ fn block(b: &d::Block) -> Value {
         .collect();
     object(vec![
         ("header", header),
-        ("txs", Value::Array(txs)),
-        ("leios_cert", nullable(&b.block_body.leios_certificate, cb)),
-        ("peras_cert", nullable(&b.block_body.peras_certificate, cb)),
+        ("txs", Value::Array(transactions)),
+        (
+            "leios_cert",
+            nullable(&b.block_body.leios_certificate, encoded),
+        ),
+        (
+            "peras_cert",
+            nullable(&b.block_body.peras_certificate, encoded),
+        ),
     ])
 }
 
@@ -620,56 +675,56 @@ fn item<'b, T: minicbor::Decode<'b, ()>>(bytes: &'b [u8]) -> Result<(T, usize), 
     Ok((value, bytes.len() - decoder.position()))
 }
 
-fn read_tx(bytes: &[u8]) -> Reading {
-    let (t, leftover): (d::MempoolTransaction, _) = item(bytes)?;
+fn read_transaction(bytes: &[u8]) -> Reading {
+    let (t, leftover): (dijkstra::MempoolTransaction, _) = item(bytes)?;
     // A mempool transaction that decodes is phase two valid, since the decoder
     // refuses `false`.
-    let dump = tx(
+    let dump = transaction(
         &t.transaction_body,
         &t.transaction_witness_set,
         true,
         &t.auxiliary_data,
     );
-    Ok((dump, enc(&t), leftover))
+    Ok((dump, encode(&t), leftover))
 }
 
 fn read_body(bytes: &[u8]) -> Reading {
-    let (b, leftover): (d::TransactionBody, _) = item(bytes)?;
+    let (b, leftover): (dijkstra::TransactionBody, _) = item(bytes)?;
     let mut dump = body(&b);
-    dump["id"] = cb(&Hasher::<256>::hash(&bytes[..bytes.len() - leftover]));
-    Ok((dump, enc(&b), leftover))
+    dump["id"] = encoded(&Hasher::<256>::hash(&bytes[..bytes.len() - leftover]));
+    Ok((dump, encode(&b), leftover))
 }
 
-fn read_wits(bytes: &[u8]) -> Reading {
-    let (w, leftover): (d::WitnessSet, _) = item(bytes)?;
-    Ok((wits(&w), enc(&w), leftover))
+fn read_witness_set(bytes: &[u8]) -> Reading {
+    let (w, leftover): (dijkstra::WitnessSet, _) = item(bytes)?;
+    Ok((witness_set(&w), encode(&w), leftover))
 }
 
-fn read_ppu(bytes: &[u8]) -> Reading {
-    let (u, leftover): (d::ProtocolParamUpdate, _) = item(bytes)?;
-    let again = enc(&u);
-    Ok((cbor(&again), again, leftover))
+fn read_parameter_update(bytes: &[u8]) -> Reading {
+    let (u, leftover): (dijkstra::ProtocolParamUpdate, _) = item(bytes)?;
+    let again = encode(&u);
+    Ok((cbor::leaf(&again), again, leftover))
 }
 
 fn read_block(bytes: &[u8]) -> Reading {
-    let (b, leftover): (d::Block, _) = item(bytes)?;
-    Ok((block(&b), enc(&b), leftover))
+    let (b, leftover): (dijkstra::Block, _) = item(bytes)?;
+    Ok((block(&b), encode(&b), leftover))
 }
 
-fn read_eb(bytes: &[u8]) -> Reading {
-    let (e, leftover): (d::EndorserBlock, _) = item(bytes)?;
-    let dump = omap(e.iter().map(|(h, n)| (cb(h), cb(n))));
-    Ok((dump, enc(&e), leftover))
+fn read_endorser_block(bytes: &[u8]) -> Reading {
+    let (e, leftover): (dijkstra::EndorserBlock, _) = item(bytes)?;
+    let dump = ordered_map(e.iter().map(|(h, n)| (encoded(h), encoded(n))));
+    Ok((dump, encode(&e), leftover))
 }
 
 fn reader(kind: &str) -> fn(&[u8]) -> Reading {
     match kind {
-        "tx" => read_tx,
+        "tx" => read_transaction,
         "body" => read_body,
-        "wits" => read_wits,
-        "ppu" => read_ppu,
+        "wits" => read_witness_set,
+        "ppu" => read_parameter_update,
         "block" => read_block,
-        "eb" => read_eb,
+        "eb" => read_endorser_block,
         k => panic!("the records declare class {k}, which this layer has no reader for"),
     }
 }
@@ -697,7 +752,7 @@ impl Decoded {
     /// bytes after it.
     fn of_ledger(dump: &Value) -> Decoded {
         Decoded {
-            value: normal(dump, &mut Vec::new()),
+            value: normal(dump, &read_leaf, &mut Vec::new()),
             duplicates: Vec::new(),
             reencoding: Reencoding::Same,
             leftover: 0,
@@ -710,13 +765,13 @@ fn decode(kind: &str, bytes: &[u8]) -> Result<Decoded, String> {
     let read = reader(kind);
     let (dump, again, leftover) = read(bytes)?;
     let mut duplicates = Vec::new();
-    let value = normal(&dump, &mut duplicates);
+    let value = normal(&dump, &read_leaf, &mut duplicates);
     let reread = (again != bytes[..bytes.len() - leftover]).then(|| read(&again));
     let reencoding = match reread {
         None => Reencoding::Same,
         Some(Err(e)) => Reencoding::Refused(e),
         Some(Ok((dump, _, _))) => {
-            let back = normal(&dump, &mut Vec::new());
+            let back = normal(&dump, &read_leaf, &mut Vec::new());
             let diff = Diff::between(&without_ids(&value), &without_ids(&back));
             match diff.differ.first() {
                 None => Reencoding::Same,
@@ -782,7 +837,7 @@ fn same_reason(_: &str, refusal: &Refusal) -> bool {
 struct Decoding;
 
 impl ComparedLayer for Decoding {
-    const LAYER: Layer = Layer::Decode;
+    const LAYER: &'static str = "decode";
     const TIME_LIMIT: Duration = Duration::from_secs(60);
     type Input = Encoded;
     type Axis = WholeInput;
@@ -848,7 +903,7 @@ fn without_ids(v: &Normal) -> Normal {
                 .collect(),
         ),
         Normal::List(xs) => Normal::List(xs.iter().map(without_ids).collect()),
-        Normal::OMap(xs) => Normal::OMap(
+        Normal::OrderedMap(xs) => Normal::OrderedMap(
             xs.iter()
                 .map(|(k, x)| (k.clone(), without_ids(x)))
                 .collect(),
@@ -887,6 +942,14 @@ fn difference(
             format!("{at}: the ledger refuses ({r}) and pallas accepts")
         }
     }
+}
+
+/// The 40 digit commit a vendored CDDL file names on its first line.
+fn cddl_pin(cddl: &str) -> Option<&str> {
+    let first = cddl.lines().next()?;
+    first
+        .split(|c: char| !c.is_ascii_hexdigit())
+        .find(|word| word.len() == 40)
 }
 
 /// The rule names of a CDDL text, generic rules by the name before their
@@ -971,7 +1034,7 @@ fn run() {
         .iter()
         .map(|r| format!("{r}={}", credit.get(r).copied().unwrap_or(0)))
         .collect();
-    let coverage = Coverage::new(Layer::Decode, records.targets(), records.rows());
+    let coverage = Coverage::new(Decoding::LAYER, records.targets(), records.rows());
     println!("records: {}", records.generator());
     println!("{judged}");
     print!("{coverage}");
@@ -1099,6 +1162,16 @@ fn rules_credited_or_listed_against_defs_fail() {
             "UNCREDITED names signkey_kes, which defs.cddl does not define",
         ]
     );
+}
+
+#[test]
+fn the_cddl_pin_is_the_first_line_commit() {
+    let cddl = "; Copied from cardano-ledger commit 9df9f98cce86c5f2195142b2c02dd9b39dd9dc7c,\n";
+    assert_eq!(
+        cddl_pin(cddl),
+        Some("9df9f98cce86c5f2195142b2c02dd9b39dd9dc7c")
+    );
+    assert_eq!(cddl_pin("; no commit here\n"), None);
 }
 
 #[test]

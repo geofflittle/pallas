@@ -6,18 +6,13 @@ use std::fmt;
 
 use serde_json::{Map, Value, json};
 
-/// The tree of a value's CBOR encoding, compared by the value it encodes.
-pub fn cbor(bytes: &[u8]) -> Value {
-    json!({ "cbor": hex::encode(bytes) })
-}
-
 /// The tree of a set, whose order and duplicates the value ignores.
 pub fn set(items: impl IntoIterator<Item = Value>) -> Value {
     json!({ "set": items.into_iter().collect::<Vec<_>>() })
 }
 
 /// The tree of an ordered set, whose duplicates the value ignores.
-pub fn oset(items: impl IntoIterator<Item = Value>) -> Value {
+pub fn ordered_set(items: impl IntoIterator<Item = Value>) -> Value {
     json!({ "oset": items.into_iter().collect::<Vec<_>>() })
 }
 
@@ -28,7 +23,7 @@ pub fn map(pairs: impl IntoIterator<Item = (Value, Value)>) -> Value {
 }
 
 /// The tree of an ordered map, whose first duplicate key wins.
-pub fn omap(pairs: impl IntoIterator<Item = (Value, Value)>) -> Value {
+pub fn ordered_map(pairs: impl IntoIterator<Item = (Value, Value)>) -> Value {
     json!({ "omap": pairs.into_iter().map(|(k, v)| json!([k, v])).collect::<Vec<_>>() })
 }
 
@@ -52,286 +47,86 @@ pub fn object(fields: Vec<(&str, Value)>) -> Value {
     )
 }
 
-/// The decimal digits of a big endian unsigned magnitude.
-pub fn decimal(be: &[u8]) -> String {
-    let mut n: Vec<u8> = be.iter().copied().skip_while(|b| *b == 0).collect();
-    if n.is_empty() {
-        return "0".into();
-    }
-    let mut out = Vec::new();
-    while !n.is_empty() {
-        let mut rem: u32 = 0;
-        let mut q = Vec::with_capacity(n.len());
-        for &b in &n {
-            let cur = rem * 256 + b as u32;
-            let digit = cur / 10;
-            rem = cur % 10;
-            if !(q.is_empty() && digit == 0) {
-                q.push(digit as u8);
-            }
-        }
-        out.push(b'0' + rem as u8);
-        n = q;
-    }
-    out.reverse();
-    String::from_utf8(out).expect("ascii digits")
-}
-
-/// The decimal digits of the negative integer `-1 - n` for a big endian
-/// magnitude `n`.
-pub fn negative_decimal(be: &[u8]) -> String {
-    let mut v = be.to_vec();
-    let mut i = v.len();
-    loop {
-        if i == 0 {
-            v.insert(0, 1);
-            break;
-        }
-        i -= 1;
-        if v[i] == 255 {
-            v[i] = 0;
-        } else {
-            v[i] += 1;
-            break;
-        }
-    }
-    format!("-{}", decimal(&v))
-}
-
 /// A value in the form two trees share exactly when they hold the same value.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Normal {
+    /// The absent value.
     Null,
-    Undefined,
-    Bool(bool),
-    Str(String),
-    Int(String),
+    /// A truth value.
+    Boolean(bool),
+    /// A string or number of the tree, by its text.
+    Scalar(String),
+    /// An integer, by its decimal digits.
+    Integer(String),
+    /// A rational, reduced, with a positive denominator.
     Ratio(i128, i128),
+    /// A byte string.
     Bytes(Vec<u8>),
+    /// A text string.
     Text(String),
-    Float(Vec<u8>),
-    Simple(u8),
+    /// A value under a numbered tag.
     Tag(u64, Box<Normal>),
+    /// A sequence whose order the value keeps.
     List(Vec<Normal>),
+    /// A map whose order the value ignores.
     Map(BTreeMap<Normal, Normal>),
+    /// A set whose order the value ignores.
     Set(BTreeSet<Normal>),
-    OSet(Vec<Normal>),
-    OMap(Vec<(Normal, Normal)>),
+    /// A set whose order the value keeps.
+    OrderedSet(Vec<Normal>),
+    /// A map whose order the value keeps.
+    OrderedMap(Vec<(Normal, Normal)>),
+    /// An object of named fields.
     Record(BTreeMap<String, Normal>),
+    /// A value of a kind no other variant names, by its producer's text for it.
+    Other(String),
+    /// A leaf its producer could not read, by its text.
     Unreadable(String),
 }
 
-/// A CBOR reader that ignores the encoding choices that leave the value
-/// unchanged.
-struct Cbor<'a> {
-    b: &'a [u8],
-    p: usize,
-}
+/// The reading of a tree's one key object as a leaf, given its key and value,
+/// or none when the object is a record.
+pub type Leaf<'a> = &'a dyn Fn(&str, &Value) -> Option<Normal>;
 
-impl Cbor<'_> {
-    fn byte(&mut self) -> Result<u8, String> {
-        let x = *self.b.get(self.p).ok_or("end of input")?;
-        self.p += 1;
-        Ok(x)
-    }
-
-    fn take(&mut self, n: usize) -> Result<&[u8], String> {
-        let end = self.p.checked_add(n).filter(|e| *e <= self.b.len());
-        let end = end.ok_or("end of input")?;
-        let out = &self.b[self.p..end];
-        self.p = end;
-        Ok(out)
-    }
-
-    fn arg(&mut self, info: u8) -> Result<u64, String> {
-        let n = match info {
-            0..=23 => return Ok(info as u64),
-            24 => 1,
-            25 => 2,
-            26 => 4,
-            27 => 8,
-            _ => return Err(format!("additional info {info}")),
-        };
-        Ok(self
-            .take(n)?
-            .iter()
-            .fold(0u64, |acc, b| (acc << 8) | *b as u64))
-    }
-
-    fn at_break(&self) -> bool {
-        self.b.get(self.p) == Some(&0xff)
-    }
-
-    fn count(&mut self, info: u8) -> Result<Option<u64>, String> {
-        if info == 31 {
-            Ok(None)
-        } else {
-            self.arg(info).map(Some)
-        }
-    }
-
-    fn items<T>(
-        &mut self,
-        len: Option<u64>,
-        mut one: impl FnMut(&mut Self) -> Result<T, String>,
-    ) -> Result<Vec<T>, String> {
-        let mut out = Vec::new();
-        match len {
-            Some(n) => {
-                for _ in 0..n {
-                    out.push(one(self)?);
-                }
-            }
-            None => {
-                while !self.at_break() {
-                    out.push(one(self)?);
-                }
-                self.p += 1;
-            }
-        }
-        Ok(out)
-    }
-
-    fn chunks(&mut self, major: u8, info: u8) -> Result<Vec<u8>, String> {
-        if info != 31 {
-            let n = self.arg(info)? as usize;
-            return Ok(self.take(n)?.to_vec());
-        }
-        let mut out = Vec::new();
-        while !self.at_break() {
-            let ib = self.byte()?;
-            if ib >> 5 != major || ib & 31 == 31 {
-                return Err("bad string chunk".into());
-            }
-            let n = self.arg(ib & 31)? as usize;
-            out.extend_from_slice(self.take(n)?);
-        }
-        self.p += 1;
-        Ok(out)
-    }
-
-    fn item(&mut self) -> Result<Normal, String> {
-        let ib = self.byte()?;
-        let (major, info) = (ib >> 5, ib & 31);
-        Ok(match major {
-            0 => Normal::Int(self.arg(info)?.to_string()),
-            1 => Normal::Int((-1 - self.arg(info)? as i128).to_string()),
-            2 => Normal::Bytes(self.chunks(2, info)?),
-            3 => Normal::Text(String::from_utf8_lossy(&self.chunks(3, info)?).into_owned()),
-            4 => {
-                let len = self.count(info)?;
-                Normal::List(self.items(len, |r| r.item())?)
-            }
-            5 => {
-                let len = self.count(info)?;
-                Normal::Map(
-                    self.items(len, |r| Ok((r.item()?, r.item()?)))?
-                        .into_iter()
-                        .collect(),
-                )
-            }
-            6 => {
-                let tag = self.arg(info)?;
-                tagged_value(tag, self.item()?)
-            }
-            _ => match info {
-                20 => Normal::Bool(false),
-                21 => Normal::Bool(true),
-                22 => Normal::Null,
-                23 => Normal::Undefined,
-                25 => Normal::Float(self.take(2)?.to_vec()),
-                26 => Normal::Float(self.take(4)?.to_vec()),
-                27 => Normal::Float(self.take(8)?.to_vec()),
-                _ => Normal::Simple(self.arg(info)? as u8),
-            },
-        })
-    }
-}
-
-fn gcd(a: u128, b: u128) -> u128 {
-    if b == 0 { a } else { gcd(b, a % b) }
-}
-
-/// The value of a tagged item, with set tags dropped, bignums as integers and
-/// rationals reduced.
-fn tagged_value(tag: u64, inner: Normal) -> Normal {
-    match (tag, inner) {
-        (258, inner) => inner,
-        (2, Normal::Bytes(b)) => Normal::Int(decimal(&b)),
-        (3, Normal::Bytes(b)) => Normal::Int(negative_decimal(&b)),
-        (30, Normal::List(xs)) if xs.len() == 2 => {
-            let parsed: Vec<Option<i128>> = xs
-                .iter()
-                .map(|x| match x {
-                    Normal::Int(s) => s.parse().ok(),
-                    _ => None,
-                })
-                .collect();
-            match parsed[..] {
-                [Some(n), Some(d)] if d != 0 => {
-                    let g = gcd(n.unsigned_abs(), d.unsigned_abs()).max(1) as i128;
-                    let sign = if d < 0 { -1 } else { 1 };
-                    Normal::Ratio(sign * n / g, sign * d / g)
-                }
-                _ => Normal::Tag(30, Box::new(Normal::List(xs))),
-            }
-        }
-        (tag, inner) => Normal::Tag(tag, Box::new(inner)),
-    }
-}
-
-fn cbor_hex(hexstr: &str) -> Normal {
-    let Ok(bytes) = hex::decode(hexstr) else {
-        return Normal::Unreadable(hexstr.to_string());
-    };
-    let mut r = Cbor { b: &bytes, p: 0 };
-    match r.item() {
-        Ok(v) if r.p == bytes.len() => v,
-        _ => Normal::Unreadable(hexstr.to_string()),
-    }
-}
-
-/// The normal form of `tree`, pushing to `duplicates` the path of each
+/// The normal form of `tree`, reading each one key object the tree's own forms
+/// do not name with `leaf` and pushing to `duplicates` the path of each
 /// duplicate a set or map removes.
-pub fn normal(tree: &Value, duplicates: &mut Vec<String>) -> Normal {
-    normal_at(tree, "", duplicates)
+pub fn normal(tree: &Value, leaf: Leaf, duplicates: &mut Vec<String>) -> Normal {
+    normal_at(tree, "", leaf, duplicates)
 }
 
-fn normal_at(v: &Value, path: &str, dups: &mut Vec<String>) -> Normal {
+fn normal_at(v: &Value, path: &str, leaf: Leaf, duplicates: &mut Vec<String>) -> Normal {
     match v {
-        Value::Object(m) if m.len() == 1 && m.contains_key("cbor") => {
-            cbor_hex(m["cbor"].as_str().unwrap_or_default())
-        }
         Value::Object(m) if m.len() == 1 && m.contains_key("set") => {
-            let items = elements(&m["set"], path, dups);
+            let items = elements(&m["set"], path, leaf, duplicates);
             let n = items.len();
             let out: BTreeSet<Normal> = items.into_iter().collect();
             if out.len() != n {
-                dups.push(path.to_string());
+                duplicates.push(path.to_string());
             }
             Normal::Set(out)
         }
         Value::Object(m) if m.len() == 1 && m.contains_key("oset") => {
             let mut out: Vec<Normal> = Vec::new();
-            for x in elements(&m["oset"], path, dups) {
+            for x in elements(&m["oset"], path, leaf, duplicates) {
                 if out.contains(&x) {
-                    dups.push(path.to_string());
+                    duplicates.push(path.to_string());
                 } else {
                     out.push(x);
                 }
             }
-            Normal::OSet(out)
+            Normal::OrderedSet(out)
         }
         Value::Object(m) if m.len() == 1 && (m.contains_key("map") || m.contains_key("omap")) => {
             let ordered = m.contains_key("omap");
             let pairs = m.values().next().and_then(Value::as_array);
             let mut out: Vec<(Normal, Normal)> = Vec::new();
             for pair in pairs.into_iter().flatten() {
-                let k = normal_at(&pair[0], path, dups);
-                let v = normal_at(&pair[1], path, dups);
+                let k = normal_at(&pair[0], path, leaf, duplicates);
+                let v = normal_at(&pair[1], path, leaf, duplicates);
                 match out.iter().position(|(x, _)| *x == k) {
                     Some(at) => {
-                        dups.push(path.to_string());
+                        duplicates.push(path.to_string());
                         if !ordered {
                             out[at].1 = v;
                         }
@@ -340,33 +135,44 @@ fn normal_at(v: &Value, path: &str, dups: &mut Vec<String>) -> Normal {
                 }
             }
             if ordered {
-                Normal::OMap(out)
+                Normal::OrderedMap(out)
             } else {
                 Normal::Map(out.into_iter().collect())
             }
         }
-        Value::Object(m) => Normal::Record(
-            m.iter()
-                .map(|(k, x)| (k.clone(), normal_at(x, &format!("{path}.{k}"), dups)))
-                .collect(),
-        ),
+        Value::Object(m) => {
+            let read = match m.iter().next() {
+                Some((key, value)) if m.len() == 1 => leaf(key, value),
+                _ => None,
+            };
+            read.unwrap_or_else(|| {
+                Normal::Record(
+                    m.iter()
+                        .map(|(k, x)| {
+                            let at = format!("{path}.{k}");
+                            (k.clone(), normal_at(x, &at, leaf, duplicates))
+                        })
+                        .collect(),
+                )
+            })
+        }
         Value::Array(xs) => Normal::List(
             xs.iter()
-                .map(|x| normal_at(x, &format!("{path}[]"), dups))
+                .map(|x| normal_at(x, &format!("{path}[]"), leaf, duplicates))
                 .collect(),
         ),
-        Value::String(s) => Normal::Str(s.clone()),
-        Value::Bool(b) => Normal::Bool(*b),
+        Value::String(s) => Normal::Scalar(s.clone()),
+        Value::Bool(b) => Normal::Boolean(*b),
         Value::Null => Normal::Null,
-        Value::Number(n) => Normal::Str(n.to_string()),
+        Value::Number(n) => Normal::Scalar(n.to_string()),
     }
 }
 
-fn elements(v: &Value, path: &str, dups: &mut Vec<String>) -> Vec<Normal> {
+fn elements(v: &Value, path: &str, leaf: Leaf, duplicates: &mut Vec<String>) -> Vec<Normal> {
     v.as_array()
         .into_iter()
         .flatten()
-        .map(|x| normal_at(x, &format!("{path}[]"), dups))
+        .map(|x| normal_at(x, &format!("{path}[]"), leaf, duplicates))
         .collect()
 }
 
@@ -408,10 +214,10 @@ impl Diff {
 
 fn leaves(v: &Normal) -> usize {
     let sum = match v {
-        Normal::List(xs) | Normal::OSet(xs) => xs.iter().map(leaves).sum(),
+        Normal::List(xs) | Normal::OrderedSet(xs) => xs.iter().map(leaves).sum(),
         Normal::Set(xs) => xs.iter().map(leaves).sum(),
         Normal::Map(m) => m.iter().map(|(k, x)| leaves(k) + leaves(x)).sum(),
-        Normal::OMap(m) => m.iter().map(|(k, x)| leaves(k) + leaves(x)).sum(),
+        Normal::OrderedMap(m) => m.iter().map(|(k, x)| leaves(k) + leaves(x)).sum(),
         Normal::Record(m) => m.values().map(leaves).sum(),
         Normal::Tag(_, x) => leaves(x),
         _ => 1,
@@ -432,7 +238,7 @@ fn short(v: &Normal) -> String {
 /// value, anything else by a short hash.
 fn segment(k: &Normal) -> String {
     match k {
-        Normal::Int(s) if s.len() < 4 => format!("<{s}>"),
+        Normal::Integer(s) if s.len() < 4 => format!("<{s}>"),
         _ => {
             use std::hash::{DefaultHasher, Hash, Hasher};
             let mut h = DefaultHasher::new();
@@ -452,7 +258,7 @@ fn compare(reference: Option<&Normal>, produced: Option<&Normal>, path: &str, ou
             }
         }
         (Some(Normal::List(a)), Some(Normal::List(b)))
-        | (Some(Normal::OSet(a)), Some(Normal::OSet(b))) => {
+        | (Some(Normal::OrderedSet(a)), Some(Normal::OrderedSet(b))) => {
             for i in 0..a.len().max(b.len()) {
                 compare(a.get(i), b.get(i), &format!("{path}[{i}]"), out);
             }
@@ -469,7 +275,7 @@ fn compare(reference: Option<&Normal>, produced: Option<&Normal>, path: &str, ou
                 compare(a.get(k), b.get(k), &format!("{path}{}", segment(k)), out);
             }
         }
-        (Some(Normal::OMap(a)), Some(Normal::OMap(b))) => {
+        (Some(Normal::OrderedMap(a)), Some(Normal::OrderedMap(b))) => {
             let order =
                 |m: &[(Normal, Normal)]| m.iter().map(|(k, _)| k.clone()).collect::<Vec<_>>();
             if order(a) != order(b) {
@@ -502,59 +308,62 @@ fn compare(reference: Option<&Normal>, produced: Option<&Normal>, path: &str, ou
 mod tests {
     use super::*;
 
+    /// The normal form of `tree` read with no leaf of its own.
+    fn plain(tree: &Value) -> Normal {
+        normal(tree, &|_, _| None, &mut Vec::new())
+    }
+
     #[test]
-    fn equal_values_in_other_encodings_agree() {
-        let pairs = [
-            ("d9010282 0102", "820102"),
-            ("a2 0102 0304", "a2 0304 0102"),
-            ("d81e82 0204", "d81e82 0102"),
-            ("c241 05", "05"),
-            ("c341 05", "25"),
-            ("5f 4101 4102 ff", "42 0102"),
-        ];
-        for (a, b) in pairs {
-            let (a, b) = (a.replace(' ', ""), b.replace(' ', ""));
-            let diff = Diff::between(&cbor_hex(&a), &cbor_hex(&b));
-            assert!(diff.differ.is_empty(), "{a} and {b}: {:?}", diff.differ);
-        }
-        let set_a = json!({ "set": [{ "cbor": "01" }, { "cbor": "02" }] });
-        let set_b = json!({ "set": [{ "cbor": "02" }, { "cbor": "01" }] });
-        let (a, b) = (normal(&set_a, &mut vec![]), normal(&set_b, &mut vec![]));
+    fn sets_in_another_order_agree() {
+        let a = plain(&json!({ "set": ["x", "y"] }));
+        let b = plain(&json!({ "set": ["y", "x"] }));
         assert!(Diff::between(&a, &b).differ.is_empty());
     }
 
     #[test]
-    fn different_values_differ() {
-        let pairs = [
-            ("820102", "820201", Difference::Differs),
-            ("a10102", "a10103", Difference::Differs),
-            ("a2 0102 0304", "a1 0102", Difference::Lacks),
-            ("82 01 02", "83 01 02 03", Difference::Extra),
-            ("d81e82 0102", "d81e82 0103", Difference::Differs),
-            ("c241 05", "06", Difference::Differs),
-            ("41 00", "40", Difference::Differs),
-        ];
-        for (a, b, class) in pairs {
-            let (a, b) = (a.replace(' ', ""), b.replace(' ', ""));
-            let diff = Diff::between(&cbor_hex(&a), &cbor_hex(&b));
-            assert!(
-                diff.differ.iter().any(|(c, _, _)| *c == class),
-                "{a} and {b}: {:?}",
-                diff.differ
-            );
-        }
-        let ordered_a = json!({ "omap": [[{ "cbor": "01" }, { "cbor": "02" }], [{ "cbor": "03" }, { "cbor": "04" }]] });
-        let ordered_b = json!({ "omap": [[{ "cbor": "03" }, { "cbor": "04" }], [{ "cbor": "01" }, { "cbor": "02" }]] });
-        let (a, b) = (
-            normal(&ordered_a, &mut vec![]),
-            normal(&ordered_b, &mut vec![]),
-        );
-        assert_eq!(Diff::between(&a, &b).differ.len(), 1);
-        let mut dups = Vec::new();
+    fn ordered_maps_in_another_order_differ() {
+        let a = plain(&json!({ "omap": [["x", 1], ["y", 2]] }));
+        let b = plain(&json!({ "omap": [["y", 2], ["x", 1]] }));
+        let differ = Diff::between(&a, &b).differ;
+        assert_eq!(differ.len(), 1, "{differ:?}");
+        assert_eq!(differ[0].1, ".order");
+    }
+
+    #[test]
+    fn a_duplicate_in_a_set_is_counted_at_its_path() {
+        let mut duplicates = Vec::new();
         normal(
-            &json!({ "set": [{ "cbor": "01" }, { "cbor": "01" }] }),
-            &mut dups,
+            &json!({ "items": { "set": ["x", "x"] } }),
+            &|_, _| None,
+            &mut duplicates,
         );
-        assert_eq!(dups.len(), 1);
+        assert_eq!(duplicates, [".items"]);
+    }
+
+    #[test]
+    fn a_one_key_object_is_a_leaf_only_when_its_reader_says() {
+        let tree = json!({ "inner": { "count": "7" } });
+        let as_record = plain(&tree);
+        assert_eq!(
+            as_record,
+            Normal::Record(BTreeMap::from([(
+                "inner".to_owned(),
+                Normal::Record(BTreeMap::from([(
+                    "count".to_owned(),
+                    Normal::Scalar("7".into())
+                )]))
+            )]))
+        );
+        let count = |key: &str, value: &Value| {
+            (key == "count").then(|| Normal::Integer(value.as_str().unwrap_or_default().into()))
+        };
+        let as_leaf = normal(&tree, &count, &mut Vec::new());
+        assert_eq!(
+            as_leaf,
+            Normal::Record(BTreeMap::from([(
+                "inner".to_owned(),
+                Normal::Integer("7".into())
+            )]))
+        );
     }
 }

@@ -1,7 +1,7 @@
 //! The classes where pallas's reading differs from the ledger's, each with
 //! what holds the difference.
 
-use reference_comparison::{Allowance, Allowed, Answer, Disagreement, Layer, Owner};
+use reference_comparison::{Allowance, Allowed, Answer, Disagreement, Owner};
 
 use super::{Decoded, Refusal};
 
@@ -18,7 +18,7 @@ pub const LIST: &[Entry] = &[(
             "endorser block references as the node sends them",
             Disagreement::Refuses,
             Owner::Check {
-                layer: Layer::Networking,
+                layer: "networking",
                 test: "pallas-primitives dijkstra::tests::endorser_block_isomorphic_decoding_encoding",
             },
         ),
