@@ -104,6 +104,24 @@ where
     }
 }
 
+/// Asserts that `T` decodes `full` and refuses `short`, whose definite array header names fewer elements than `T` reads.
+#[cfg(test)]
+pub(crate) fn assert_short_header_refused<T>(short: &str, full: &str)
+where
+    T: minicbor::Decode<'static, ()> + std::fmt::Debug,
+{
+    let full: &'static [u8] = Box::leak(hex::decode(full).unwrap().into_boxed_slice());
+    decode_all::<T>(full);
+    let short_bytes: &'static [u8] = Box::leak(hex::decode(short).unwrap().into_boxed_slice());
+    match minicbor::decode::<T>(short_bytes) {
+        Ok(value) => panic!("{short} must be refused, read as {value:?}"),
+        Err(error) => assert!(
+            error.to_string().contains("shorter than the"),
+            "{short} was refused for some other reason: {error}"
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::assert_reads_either_length_form;
@@ -121,13 +139,14 @@ mod tests {
     }
 
     #[test]
-    fn a_credential_with_extra_elements_reads_to_the_end_of_its_array() {
+    fn a_credential_with_extra_elements_is_refused() {
         for bytes in [format!("8300{HASH}00"), format!("9f00{HASH}9f00ff00ff")] {
-            let bytes = hex::decode(&bytes).unwrap();
-            let mut d = minicbor::Decoder::new(&bytes);
-            let credential: StakeCredential = d.decode().unwrap();
-            assert!(matches!(credential, StakeCredential::AddrKeyhash(_)));
-            assert_eq!(d.position(), bytes.len());
+            let error = minicbor::decode::<StakeCredential>(&hex::decode(&bytes).unwrap())
+                .expect_err("an extra element must not decode");
+            assert!(
+                error.to_string().contains("more elements than"),
+                "{bytes} was refused for some other reason: {error}"
+            );
         }
     }
 

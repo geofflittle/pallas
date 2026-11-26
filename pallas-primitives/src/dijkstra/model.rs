@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use pallas_codec::minicbor::{self, Decode, Encode};
-use pallas_codec::utils::decode_array;
+use pallas_codec::utils::{CborWrap, decode_array};
 
 pub use pallas_codec::codec_by_datatype;
 
@@ -13,9 +13,9 @@ pub use crate::{
     AddrKeyhash, AssetName, Bytes, Coin, CostModel, DnsName, Epoch, ExUnits, GenesisDelegateHash,
     Genesishash, Hash, IPv4, IPv6, KeepRaw, MaybeIndefArray, Metadata, Metadatum, MetadatumLabel,
     NetworkId, NonZeroInt, Nonce, NonceVariant, Nullable, PlutusScript, PolicyId, PoolKeyhash,
-    PoolMetadata, PoolMetadataHash, Port, PositiveCoin, PositiveInterval, ProtocolVersion,
-    RationalNumber, Relay, RewardAccount, ScriptHash, StakeCredential, TransactionInput,
-    UnitInterval, VrfCert, VrfKeyhash, plutus_data::*,
+    PoolMetadata, PoolMetadataHash, Port, PositiveCoin, ProtocolVersion, RationalNumber, Relay,
+    RewardAccount, ScriptHash, StakeCredential, TransactionInput, VrfCert, VrfKeyhash,
+    plutus_data::*,
 };
 
 use crate::{BTreeMap, KeyValuePairs};
@@ -38,6 +38,19 @@ fn at_least(len: usize, minimum: usize, rule: &str) -> Result<(), minicbor::deco
         return Err(minicbor::decode::Error::message(format!(
             "too few elements for {rule}: {len} of at least {minimum}"
         )));
+    }
+
+    Ok(())
+}
+
+/// Refuses a set whose elements are not pairwise distinct.
+fn distinct<T: PartialEq>(items: &[T], rule: &str) -> Result<(), minicbor::decode::Error> {
+    for (i, item) in items.iter().enumerate() {
+        if items[..i].contains(item) {
+            return Err(minicbor::decode::Error::message(format!(
+                "repeated element in {rule} at index {i}"
+            )));
+        }
     }
 
     Ok(())
@@ -86,13 +99,12 @@ macro_rules! tag_preserving_set {
             }
         }
 
-        impl<'b, C, T> minicbor::decode::Decode<'b, C> for $name<T>
-        where
-            T: Decode<'b, C>,
-        {
-            fn decode(
+        impl<T: PartialEq> $name<T> {
+            /// Decodes the set, reading each element with the item decoder.
+            pub(crate) fn decode_by<'b, C>(
                 d: &mut minicbor::Decoder<'b>,
                 ctx: &mut C,
+                item: impl Fn(&mut minicbor::Decoder<'b>, &mut C) -> Result<T, minicbor::decode::Error>,
             ) -> Result<Self, minicbor::decode::Error> {
                 let arm = if d.datatype()? == minicbor::data::Type::Tag {
                     let found = d.tag()?;
@@ -107,10 +119,29 @@ macro_rules! tag_preserving_set {
                     SetArm::Bare
                 };
 
-                let items: Vec<T> = d.decode_with(ctx)?;
+                let items = pallas_codec::utils::decode_array(d, |a| {
+                    let mut items = Vec::new();
+                    while a.datatype()? != minicbor::data::Type::Break {
+                        items.push(a.decode_by(ctx, &item)?);
+                    }
+                    Ok(items)
+                })?;
                 at_least(items.len(), $minimum, $rule)?;
+                distinct(&items, $rule)?;
 
                 Ok(Self { arm, items })
+            }
+        }
+
+        impl<'b, C, T> minicbor::decode::Decode<'b, C> for $name<T>
+        where
+            T: Decode<'b, C> + PartialEq,
+        {
+            fn decode(
+                d: &mut minicbor::Decoder<'b>,
+                ctx: &mut C,
+            ) -> Result<Self, minicbor::decode::Error> {
+                Self::decode_by(d, ctx, |d, ctx| d.decode_with(ctx))
             }
         }
 
@@ -194,10 +225,123 @@ impl<T> TryFrom<Vec<T>> for NonEmptySet<T> {
 
 tag_preserving_set!(NonEmptySet, "a nonempty set", 1);
 
+/// Reads `#6.30([n, d])` in either length form.
+fn decode_fraction(
+    d: &mut minicbor::Decoder<'_>,
+) -> Result<RationalNumber, minicbor::decode::Error> {
+    let tag = d.tag()?.as_u64();
+    if tag != 30 {
+        return Err(minicbor::decode::Error::message(format!(
+            "a fraction is tagged 30, found tag {tag}"
+        )));
+    }
+
+    let mut numbers = Vec::with_capacity(2);
+    for number in d.array_iter::<u64>()? {
+        numbers.push(number?);
+        if numbers.len() > 2 {
+            break;
+        }
+    }
+
+    match numbers[..] {
+        [numerator, denominator] => Ok(RationalNumber {
+            numerator,
+            denominator,
+        }),
+        _ => Err(minicbor::decode::Error::message(
+            "a fraction holds exactly two numbers",
+        )),
+    }
+}
+
+/// Implements the conversions and codec of a fraction type whose interval holds the numerator and denominator pairs `$holds` admits.
+macro_rules! bounded_fraction {
+    ($name:ident, $holds:expr) => {
+        impl TryFrom<RationalNumber> for $name {
+            type Error = RationalNumber;
+
+            fn try_from(value: RationalNumber) -> Result<Self, Self::Error> {
+                let holds: fn(u64, u64) -> bool = $holds;
+                if value.denominator != 0 && holds(value.numerator, value.denominator) {
+                    Ok(Self(value))
+                } else {
+                    Err(value)
+                }
+            }
+        }
+
+        impl From<$name> for RationalNumber {
+            fn from(value: $name) -> Self {
+                value.0
+            }
+        }
+
+        impl std::ops::Deref for $name {
+            type Target = RationalNumber;
+
+            fn deref(&self) -> &RationalNumber {
+                &self.0
+            }
+        }
+
+        impl<'b, C> minicbor::Decode<'b, C> for $name {
+            fn decode(
+                d: &mut minicbor::Decoder<'b>,
+                _ctx: &mut C,
+            ) -> Result<Self, minicbor::decode::Error> {
+                Self::try_from(decode_fraction(d)?).map_err(|value| {
+                    minicbor::decode::Error::message(format!(
+                        "decoding {}/{} as {}",
+                        value.numerator,
+                        value.denominator,
+                        stringify!($name)
+                    ))
+                })
+            }
+        }
+
+        impl<C> minicbor::Encode<C> for $name {
+            fn encode<W: minicbor::encode::Write>(
+                &self,
+                e: &mut minicbor::Encoder<W>,
+                ctx: &mut C,
+            ) -> Result<(), minicbor::encode::Error<W::Error>> {
+                self.0.encode(e, ctx)
+            }
+        }
+    };
+}
+
+/// `unit_interval = #6.30([uint, uint])` (`defs.cddl`), a fraction from zero to one.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[serde(transparent)]
+pub struct UnitInterval(RationalNumber);
+
+bounded_fraction!(UnitInterval, |numerator, denominator| {
+    numerator <= denominator
+});
+
+/// `nonnegative_interval = #6.30([uint, positive_int])` (`defs.cddl`), a fraction of zero or more.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[serde(transparent)]
+pub struct NonNegativeInterval(RationalNumber);
+
+bounded_fraction!(NonNegativeInterval, |_, _| true);
+
+/// `positive_interval = #6.30([positive_int, positive_int])` (`defs.cddl`), a fraction of at least one in ten to the nineteenth.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[serde(transparent)]
+pub struct PositiveInterval(RationalNumber);
+
+bounded_fraction!(PositiveInterval, |numerator, denominator| {
+    u128::from(numerator) * 10u128.pow(19) >= u128::from(denominator)
+});
+
 pub use crate::babbage::OperationalCert;
 
 /// `header_version_info = [highest_supported_major_version : uint .size 4, self_reported_software_tag : uint .size 4]` (`defs.cddl`).
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct HeaderVersionInfo {
     #[n(0)]
     pub highest_supported_major_version: u32,
@@ -206,10 +350,15 @@ pub struct HeaderVersionInfo {
     pub self_reported_software_tag: u32,
 }
 
+crate::array_record::decode_array_record!(HeaderVersionInfo {
+    highest_supported_major_version,
+    self_reported_software_tag
+});
+
 pub use crate::babbage::HeaderBody as PraosHeaderBody;
 
 /// `header_body` (`defs.cddl`) has `header_version_info` where Conway's has `protocol_version`, and appends `block_body_contains_leios_cert` and `eb_references_announcement`.
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct LeiosHeaderBody {
     #[n(0)]
     pub block_number: u64,
@@ -230,7 +379,7 @@ pub struct LeiosHeaderBody {
     pub vrf_result: VrfCert,
 
     #[n(6)]
-    pub block_body_size: u64,
+    pub block_body_size: u32,
 
     #[n(7)]
     pub block_body_hash: Hash<32>,
@@ -247,6 +396,43 @@ pub struct LeiosHeaderBody {
 
     #[n(11)]
     pub eb_announcement: Nullable<EbAnnouncement>,
+}
+
+crate::array_record::decode_array_record!(LeiosHeaderBody {
+    block_number,
+    slot,
+    prev_hash,
+    issuer_vkey: pallas_codec::utils::decode_bytes_sized::<32, 32, _>,
+    vrf_vkey: pallas_codec::utils::decode_bytes_sized::<32, 32, _>,
+    vrf_result: decode_vrf_cert,
+    block_body_size,
+    block_body_hash,
+    operational_cert,
+    header_version_info,
+    block_body_contains_leios_cert,
+    eb_announcement
+});
+
+// The Dijkstra ledger bounds the VRF output and the chain code, which the Conway ledger reads at any size.
+crate::array_record::decode_array_record!(fn decode_vrf_cert for VrfCert(
+    output: pallas_codec::utils::decode_bytes_sized::<64, 64, _>,
+    proof: pallas_codec::utils::decode_bytes_sized::<80, 80, _>,
+));
+
+crate::array_record::decode_array_record!(fn decode_bootstrap_witness for BootstrapWitness {
+    public_key: pallas_codec::utils::decode_bytes_sized::<32, 32, _>,
+    signature: pallas_codec::utils::decode_bytes_sized::<64, 64, _>,
+    chain_code: pallas_codec::utils::decode_bytes_sized::<32, 32, _>,
+    attributes
+});
+
+/// Decodes the bootstrap witnesses of a witness set.
+fn decode_bootstrap_witnesses<'b, Ctx>(
+    d: &mut minicbor::Decoder<'b>,
+    ctx: &mut Ctx,
+) -> Result<Option<NonEmptySet<BootstrapWitness>>, minicbor::decode::Error> {
+    crate::map_record::refuse_nil(d)?;
+    NonEmptySet::decode_by(d, ctx, decode_bootstrap_witness).map(Some)
 }
 
 impl LeiosHeaderBody {
@@ -348,7 +534,7 @@ impl HeaderBody {
     pub fn block_body_size(&self) -> u64 {
         match self {
             HeaderBody::Praos(x) => x.block_body_size,
-            HeaderBody::Leios(x) => x.block_body_size,
+            HeaderBody::Leios(x) => u64::from(x.block_body_size),
         }
     }
 
@@ -375,7 +561,7 @@ impl HeaderBody {
 }
 
 /// `header = [header_body, body_signature]` (`defs.cddl`).
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct Header {
     #[n(0)]
     pub header_body: HeaderBody,
@@ -383,6 +569,11 @@ pub struct Header {
     #[n(1)]
     pub body_signature: Bytes,
 }
+
+crate::array_record::decode_array_record!(Header {
+    header_body,
+    body_signature: pallas_codec::utils::decode_bytes_sized::<448, 448, _>
+});
 
 pub use crate::conway::Multiasset;
 
@@ -414,11 +605,118 @@ pub use crate::conway::Anchor;
 
 pub use crate::conway::GovActionId;
 
-pub use crate::conway::PoolVotingThresholds;
+/// `pool_voting_thresholds` (`defs.cddl`).
+#[derive(Encode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+pub struct PoolVotingThresholds {
+    #[n(0)]
+    pub motion_no_confidence: UnitInterval,
+    #[n(1)]
+    pub committee_normal: UnitInterval,
+    #[n(2)]
+    pub committee_no_confidence: UnitInterval,
+    #[n(3)]
+    pub hard_fork_initiation: UnitInterval,
+    #[n(4)]
+    pub security_voting_threshold: UnitInterval,
+}
 
-pub use crate::conway::DRepVotingThresholds;
+crate::array_record::decode_array_record!(PoolVotingThresholds {
+    motion_no_confidence,
+    committee_normal,
+    committee_no_confidence,
+    hard_fork_initiation,
+    security_voting_threshold
+});
 
-pub use crate::conway::ExUnitPrices;
+impl From<PoolVotingThresholds> for crate::conway::PoolVotingThresholds {
+    fn from(value: PoolVotingThresholds) -> Self {
+        Self {
+            motion_no_confidence: value.motion_no_confidence.into(),
+            committee_normal: value.committee_normal.into(),
+            committee_no_confidence: value.committee_no_confidence.into(),
+            hard_fork_initiation: value.hard_fork_initiation.into(),
+            security_voting_threshold: value.security_voting_threshold.into(),
+        }
+    }
+}
+
+/// `drep_voting_thresholds` (`defs.cddl`).
+#[derive(Encode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+pub struct DRepVotingThresholds {
+    #[n(0)]
+    pub motion_no_confidence: UnitInterval,
+    #[n(1)]
+    pub committee_normal: UnitInterval,
+    #[n(2)]
+    pub committee_no_confidence: UnitInterval,
+    #[n(3)]
+    pub update_constitution: UnitInterval,
+    #[n(4)]
+    pub hard_fork_initiation: UnitInterval,
+    #[n(5)]
+    pub pp_network_group: UnitInterval,
+    #[n(6)]
+    pub pp_economic_group: UnitInterval,
+    #[n(7)]
+    pub pp_technical_group: UnitInterval,
+    #[n(8)]
+    pub pp_governance_group: UnitInterval,
+    #[n(9)]
+    pub treasury_withdrawal: UnitInterval,
+}
+
+crate::array_record::decode_array_record!(DRepVotingThresholds {
+    motion_no_confidence,
+    committee_normal,
+    committee_no_confidence,
+    update_constitution,
+    hard_fork_initiation,
+    pp_network_group,
+    pp_economic_group,
+    pp_technical_group,
+    pp_governance_group,
+    treasury_withdrawal
+});
+
+impl From<DRepVotingThresholds> for crate::conway::DRepVotingThresholds {
+    fn from(value: DRepVotingThresholds) -> Self {
+        Self {
+            motion_no_confidence: value.motion_no_confidence.into(),
+            committee_normal: value.committee_normal.into(),
+            committee_no_confidence: value.committee_no_confidence.into(),
+            update_constitution: value.update_constitution.into(),
+            hard_fork_initiation: value.hard_fork_initiation.into(),
+            pp_network_group: value.pp_network_group.into(),
+            pp_economic_group: value.pp_economic_group.into(),
+            pp_technical_group: value.pp_technical_group.into(),
+            pp_governance_group: value.pp_governance_group.into(),
+            treasury_withdrawal: value.treasury_withdrawal.into(),
+        }
+    }
+}
+
+/// `ex_unit_prices` (`defs.cddl`).
+#[derive(Encode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+pub struct ExUnitPrices {
+    #[n(0)]
+    pub mem_price: NonNegativeInterval,
+    #[n(1)]
+    pub step_price: NonNegativeInterval,
+}
+
+crate::array_record::decode_array_record!(ExUnitPrices {
+    mem_price,
+    step_price
+});
+
+impl From<ExUnitPrices> for crate::conway::ExUnitPrices {
+    fn from(value: ExUnitPrices) -> Self {
+        Self {
+            mem_price: value.mem_price.into(),
+            step_price: value.step_price.into(),
+        }
+    }
+}
 
 pub use crate::conway::VKeyWitness;
 
@@ -431,7 +729,7 @@ pub use crate::conway::DatumOption;
 pub use crate::conway::LegacyTransactionOutput;
 
 /// `eb_references_announcement = [eb_hash : hash32, eb_size : uint .size 4]` (`defs.cddl`).
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct EbAnnouncement {
     #[n(0)]
     pub eb_hash: Hash<32>,
@@ -440,13 +738,15 @@ pub struct EbAnnouncement {
     pub eb_size: u32,
 }
 
+crate::array_record::decode_array_record!(EbAnnouncement { eb_hash, eb_size });
+
 /// `endorser_block = { + base.hash => base.word32 }`
 /// (leios-fetch `messages.cddl`), each key the blake2b-256 of a transaction's
 /// `block_transaction` encoding and each value the size of that encoding.
 pub type EndorserBlock = KeyValuePairs<Hash<32>, u32>;
 
 /// `bls_key = [bls_pubkey : bytes .size 96, bls_possession_proof : bytes .size 48]` (`defs.cddl`).
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct BlsKey {
     #[n(0)]
     pub bls_pubkey: Bytes,
@@ -455,11 +755,16 @@ pub struct BlsKey {
     pub bls_possession_proof: Bytes,
 }
 
+crate::array_record::decode_array_record!(BlsKey {
+    bls_pubkey: pallas_codec::utils::decode_bytes_sized::<96, 96, _>,
+    bls_possession_proof: pallas_codec::utils::decode_bytes_sized::<48, 48, _>
+});
+
 /// `leios_signature = bytes .size 48` (`defs.cddl`).
 pub type LeiosSignature = Bytes;
 
 /// `leios_certificate = [signers : bytes .size (0 .. 8192), signature : leios_signature]` (`defs.cddl`).
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct LeiosCertificate {
     /// Bitfield naming the signers.
     #[n(0)]
@@ -468,6 +773,11 @@ pub struct LeiosCertificate {
     #[n(1)]
     pub signature: LeiosSignature,
 }
+
+crate::array_record::decode_array_record!(LeiosCertificate {
+    signers: pallas_codec::utils::decode_bytes_sized::<0, 8192, _>,
+    signature: pallas_codec::utils::decode_bytes_sized::<48, 48, _>
+});
 
 /// `peras_certificate = bytes` (`defs.cddl`).
 pub type PerasCertificate = Bytes;
@@ -773,17 +1083,17 @@ pub struct CostModels {
     pub plutus_v4: Option<CostModel>,
 
     /// Cost models under the keys the CDDL wildcard permits, 4 to 255.
-    pub unknown: BTreeMap<u64, CostModel>,
+    pub unknown: BTreeMap<u8, CostModel>,
 }
 
 impl CostModels {
     /// Every key to write, ascending, a named field before the wildcard.
-    fn entries(&self) -> BTreeMap<u64, &CostModel> {
-        let mut entries: BTreeMap<u64, &CostModel> =
+    fn entries(&self) -> BTreeMap<u8, &CostModel> {
+        let mut entries: BTreeMap<u8, &CostModel> =
             self.unknown.iter().map(|(k, v)| (*k, v)).collect();
 
         let named = [
-            (0u64, &self.plutus_v1),
+            (0u8, &self.plutus_v1),
             (1, &self.plutus_v2),
             (2, &self.plutus_v3),
             (3, &self.plutus_v4),
@@ -809,7 +1119,7 @@ impl<C> minicbor::Encode<C> for CostModels {
 
         e.map(entries.len() as u64)?;
         for (key, model) in entries {
-            e.u64(key)?;
+            e.u8(key)?;
             e.encode_with(model, ctx)?;
         }
 
@@ -819,13 +1129,13 @@ impl<C> minicbor::Encode<C> for CostModels {
 
 impl<'b, C> minicbor::Decode<'b, C> for CostModels {
     fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
-        let models: BTreeMap<u64, CostModel> = d.decode_with(ctx)?;
+        let models: BTreeMap<u8, CostModel> = crate::distinct_map::decode(d, ctx)?;
 
         let mut plutus_v1 = None;
         let mut plutus_v2 = None;
         let mut plutus_v3 = None;
         let mut plutus_v4 = None;
-        let mut unknown: Vec<(u64, CostModel)> = Vec::new();
+        let mut unknown: Vec<(u8, CostModel)> = Vec::new();
 
         for (k, v) in models.iter() {
             match k {
@@ -858,9 +1168,8 @@ where
     Nullable::decode(d, ctx).map(Some)
 }
 
-/// `protocol_param_update` (`defs.cddl`) gains keys 34 through 56. A derived
-/// map decoder drops a key it has no field for, so the tail is modelled.
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+/// `protocol_param_update` (`defs.cddl`) gains keys 34 through 56.
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 #[cbor(map)]
 pub struct ProtocolParamUpdate {
     #[n(0)]
@@ -868,21 +1177,21 @@ pub struct ProtocolParamUpdate {
     #[n(1)]
     pub minfee_b: Option<u64>,
     #[n(2)]
-    pub max_block_body_size: Option<u64>,
+    pub max_block_body_size: Option<u32>,
     #[n(3)]
-    pub max_transaction_size: Option<u64>,
+    pub max_transaction_size: Option<u32>,
     #[n(4)]
-    pub max_block_header_size: Option<u64>,
+    pub max_block_header_size: Option<u16>,
     #[n(5)]
     pub key_deposit: Option<Coin>,
     #[n(6)]
     pub pool_deposit: Option<Coin>,
     #[n(7)]
-    pub maximum_epoch: Option<Epoch>,
+    pub maximum_epoch: Option<u32>,
     #[n(8)]
-    pub desired_number_of_stake_pools: Option<u64>,
+    pub desired_number_of_stake_pools: Option<u16>,
     #[n(9)]
-    pub pool_pledge_influence: Option<RationalNumber>,
+    pub pool_pledge_influence: Option<NonNegativeInterval>,
     #[n(10)]
     pub expansion_rate: Option<UnitInterval>,
     #[n(11)]
@@ -901,76 +1210,76 @@ pub struct ProtocolParamUpdate {
     #[n(21)]
     pub max_block_ex_units: Option<ExUnits>,
     #[n(22)]
-    pub max_value_size: Option<u64>,
+    pub max_value_size: Option<u32>,
     #[n(23)]
-    pub collateral_percentage: Option<u64>,
+    pub collateral_percentage: Option<u16>,
     #[n(24)]
-    pub max_collateral_inputs: Option<u64>,
+    pub max_collateral_inputs: Option<u16>,
 
     #[n(25)]
     pub pool_voting_thresholds: Option<PoolVotingThresholds>,
     #[n(26)]
     pub drep_voting_thresholds: Option<DRepVotingThresholds>,
     #[n(27)]
-    pub min_committee_size: Option<u64>,
+    pub min_committee_size: Option<u16>,
     #[n(28)]
-    pub committee_term_limit: Option<Epoch>,
+    pub committee_term_limit: Option<u32>,
     #[n(29)]
-    pub governance_action_validity_period: Option<Epoch>,
+    pub governance_action_validity_period: Option<u32>,
     #[n(30)]
     pub governance_action_deposit: Option<Coin>,
     #[n(31)]
     pub drep_deposit: Option<Coin>,
     #[n(32)]
-    pub drep_inactivity_period: Option<Epoch>,
+    pub drep_inactivity_period: Option<u32>,
     #[n(33)]
-    pub minfee_refscript_cost_per_byte: Option<UnitInterval>,
+    pub minfee_refscript_cost_per_byte: Option<NonNegativeInterval>,
 
     // -- NEW IN DIJKSTRA
     #[n(34)]
-    pub max_ref_script_size_per_block: Option<u64>,
+    pub max_ref_script_size_per_block: Option<u32>,
     #[n(35)]
-    pub max_ref_script_size_per_tx: Option<u64>,
+    pub max_ref_script_size_per_tx: Option<u32>,
     #[n(36)]
-    pub ref_script_cost_stride: Option<u64>,
+    pub ref_script_cost_stride: Option<std::num::NonZeroU32>,
     #[n(37)]
     pub ref_script_cost_multiplier: Option<PositiveInterval>,
 
     /// `max_pledge_leverage = nonnegative_interval/ nil` (`defs.cddl`), so an explicit nil differs from an absent key.
-    #[cbor(n(38), decode_with = "decode_nullable_value")]
-    pub max_pledge_leverage: Option<Nullable<RationalNumber>>,
+    #[n(38)]
+    pub max_pledge_leverage: Option<Nullable<NonNegativeInterval>>,
     #[n(39)]
     pub min_pool_margin: Option<UnitInterval>,
     #[n(40)]
-    pub leios_announcement_period_length: Option<u64>,
+    pub leios_announcement_period_length: Option<u32>,
     #[n(41)]
-    pub leios_vote_period_length: Option<u64>,
+    pub leios_vote_period_length: Option<u32>,
     #[n(42)]
-    pub leios_diffusion_period_length: Option<u64>,
+    pub leios_diffusion_period_length: Option<u32>,
     #[n(43)]
-    pub leios_committee_size: Option<u64>,
+    pub leios_committee_size: Option<u16>,
     #[n(44)]
     pub leios_quorum_stake_threshold: Option<UnitInterval>,
     #[n(45)]
-    pub max_endorser_block_references_size: Option<u64>,
+    pub max_endorser_block_references_size: Option<u32>,
     #[n(46)]
-    pub max_endorser_block_txs_size: Option<u64>,
+    pub max_endorser_block_txs_size: Option<u32>,
     #[n(47)]
     pub max_endorser_block_execution_units: Option<ExUnits>,
     #[n(48)]
-    pub max_ref_script_size_per_endorser_block: Option<u64>,
+    pub max_ref_script_size_per_endorser_block: Option<u32>,
     #[n(49)]
-    pub peras_min_candidate_block_age: Option<u64>,
+    pub peras_min_candidate_block_age: Option<u32>,
     #[n(50)]
     pub peras_healing_factor: Option<PositiveInterval>,
     #[n(51)]
-    pub peras_cert_boost: Option<u64>,
+    pub peras_cert_boost: Option<u16>,
     #[n(52)]
-    pub peras_target_committee_size: Option<u64>,
+    pub peras_target_committee_size: Option<u16>,
 
     /// `? 53 : nil/ uint .size 4` (`defs.cddl`), so an explicit nil differs from an absent key.
-    #[cbor(n(53), decode_with = "decode_nullable_value")]
-    pub peras_bootstrap_round: Option<Nullable<u64>>,
+    #[n(53)]
+    pub peras_bootstrap_round: Option<Nullable<u32>>,
     #[n(54)]
     pub peras_quorum_threshold_safety_margin: Option<UnitInterval>,
     #[n(55)]
@@ -979,8 +1288,64 @@ pub struct ProtocolParamUpdate {
     pub ref_inputs_cost_per_datum_byte: Option<Coin>,
 }
 
+crate::map_record::decode_map_record!(ProtocolParamUpdate,
+    0 => minfee_a,
+    1 => minfee_b,
+    2 => max_block_body_size,
+    3 => max_transaction_size,
+    4 => max_block_header_size,
+    5 => key_deposit,
+    6 => pool_deposit,
+    7 => maximum_epoch,
+    8 => desired_number_of_stake_pools,
+    9 => pool_pledge_influence,
+    10 => expansion_rate,
+    11 => treasury_growth_rate,
+    16 => min_pool_cost,
+    17 => ada_per_utxo_byte,
+    18 => cost_models_for_script_languages,
+    19 => execution_costs,
+    20 => max_tx_ex_units,
+    21 => max_block_ex_units,
+    22 => max_value_size,
+    23 => collateral_percentage,
+    24 => max_collateral_inputs,
+    25 => pool_voting_thresholds,
+    26 => drep_voting_thresholds,
+    27 => min_committee_size,
+    28 => committee_term_limit,
+    29 => governance_action_validity_period,
+    30 => governance_action_deposit,
+    31 => drep_deposit,
+    32 => drep_inactivity_period,
+    33 => minfee_refscript_cost_per_byte,
+    34 => max_ref_script_size_per_block,
+    35 => max_ref_script_size_per_tx,
+    36 => ref_script_cost_stride,
+    37 => ref_script_cost_multiplier,
+    38 => max_pledge_leverage: decode_nullable_value,
+    39 => min_pool_margin,
+    40 => leios_announcement_period_length,
+    41 => leios_vote_period_length,
+    42 => leios_diffusion_period_length,
+    43 => leios_committee_size,
+    44 => leios_quorum_stake_threshold,
+    45 => max_endorser_block_references_size,
+    46 => max_endorser_block_txs_size,
+    47 => max_endorser_block_execution_units,
+    48 => max_ref_script_size_per_endorser_block,
+    49 => peras_min_candidate_block_age,
+    50 => peras_healing_factor,
+    51 => peras_cert_boost,
+    52 => peras_target_committee_size,
+    53 => peras_bootstrap_round: decode_nullable_value,
+    54 => peras_quorum_threshold_safety_margin,
+    55 => ref_inputs_cost_per_multi_asset_policy,
+    56 => ref_inputs_cost_per_datum_byte,
+);
+
 /// No CDDL rule answers to this type. It mirrors [`crate::conway::Update`] over this era's `protocol_param_update`.
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct Update {
     #[n(0)]
     pub proposed_protocol_parameter_updates: BTreeMap<Genesishash, ProtocolParamUpdate>,
@@ -989,8 +1354,13 @@ pub struct Update {
     pub epoch: Epoch,
 }
 
+crate::array_record::decode_array_record!(Update {
+    proposed_protocol_parameter_updates,
+    epoch
+});
+
 /// `proposal_procedure = [deposit : coin, reward_account, gov_action, anchor]` (`defs.cddl`).
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct ProposalProcedure {
     #[n(0)]
     pub deposit: Coin,
@@ -1004,6 +1374,13 @@ pub struct ProposalProcedure {
     #[n(3)]
     pub anchor: Anchor,
 }
+
+crate::array_record::decode_array_record!(ProposalProcedure {
+    deposit,
+    reward_account,
+    gov_action,
+    anchor
+});
 
 /// `gov_action` (`defs.cddl`). Its `parameter_change_action` arm reaches this era's `protocol_param_update`.
 #[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
@@ -1046,9 +1423,9 @@ pub enum GovAction {
 crate::flat_enum::decode_flat_enum!(GovAction,
     0 => ParameterChange(previous, update, policy),
     1 => HardForkInitiation(previous, version: crate::protocol_version::decode),
-    2 => TreasuryWithdrawals(withdrawals, policy),
+    2 => TreasuryWithdrawals(withdrawals: crate::distinct_map::decode, policy),
     3 => NoConfidence(previous),
-    4 => UpdateCommittee(previous, removed, added, threshold),
+    4 => UpdateCommittee(previous, removed, added: crate::distinct_map::decode, threshold),
     5 => NewConstitution(previous, constitution),
     6 => Information,
 );
@@ -1114,31 +1491,135 @@ impl<C> minicbor::Encode<C> for Guards {
 
 /// Decoders for a body's optional [`Guards`] field, where an empty set is no guards.
 pub(crate) mod guards_field {
-    use super::Guards;
-    use pallas_codec::minicbor::{self, data::Type, decode::Error};
+    use super::{Guards, Set};
+    use pallas_codec::minicbor::{self, decode::Error};
+    use pallas_codec::utils::AnyCbor;
 
-    /// Decodes a body's guards, reading null or an empty set as `None`.
+    /// Decodes a body's guards, reading an empty set as `None`.
     pub fn decode_option<Ctx>(
         d: &mut minicbor::Decoder<'_>,
         ctx: &mut Ctx,
     ) -> Result<Option<Guards>, Error> {
-        let mut probe = minicbor::Decoder::new(&d.input()[d.position()..]);
-        if probe.datatype()? == Type::Null {
-            d.skip()?;
-            return Ok(None);
-        }
-        if probe.datatype()? == Type::Tag {
-            probe.tag()?;
-        }
-        let empty = match probe.array()? {
-            Some(len) => len == 0,
-            None => probe.datatype()? == Type::Break,
-        };
-        if empty {
+        let set: Set<AnyCbor> = d.probe().decode_with(ctx)?;
+        if set.is_empty() {
             d.skip()?;
             return Ok(None);
         }
         d.decode_with(ctx).map(Some)
+    }
+}
+
+/// Decoders for the maps the ledger reads with at least one entry.
+pub(crate) mod nonempty_map {
+    use super::{BTreeMap, KeepRaw, LegacyTransactionOutput, Multiasset, Value};
+    use crate::distinct_map::{decode_by_key, decode_multiasset, refuse_empty};
+    use pallas_codec::minicbor::{Decode, Decoder, decode::Error};
+
+    /// A map whose values are maps.
+    type Nested<K, J, V> = BTreeMap<K, BTreeMap<J, V>>;
+
+    /// Decodes a map of at least one entry and no repeated key, reading each value with `value`.
+    fn decode_by<'b, Ctx, K, V>(
+        d: &mut Decoder<'b>,
+        ctx: &mut Ctx,
+        value: fn(&mut Decoder<'b>, &mut Ctx) -> Result<V, Error>,
+    ) -> Result<BTreeMap<K, V>, Error>
+    where
+        K: Decode<'b, Ctx> + Ord,
+    {
+        let at = d.position();
+        let map = decode_by_key(d, ctx, |d, ctx| d.decode_with(ctx), value)?;
+        refuse_empty(&map, at)?;
+        Ok(map)
+    }
+
+    /// Decodes a map of at least one entry in which a repeated key keeps its last value.
+    pub fn decode_keeping_last<'b, Ctx, K, V>(
+        d: &mut Decoder<'b>,
+        ctx: &mut Ctx,
+    ) -> Result<BTreeMap<K, V>, Error>
+    where
+        K: Decode<'b, Ctx> + Ord,
+        V: Decode<'b, Ctx>,
+    {
+        let at = d.position();
+        let map = d.decode_with(ctx)?;
+        refuse_empty(&map, at)?;
+        Ok(map)
+    }
+
+    /// Decodes a map of at least one entry and no repeated key.
+    pub fn decode<'b, Ctx, K, V>(
+        d: &mut Decoder<'b>,
+        ctx: &mut Ctx,
+    ) -> Result<BTreeMap<K, V>, Error>
+    where
+        K: Decode<'b, Ctx> + Ord,
+        V: Decode<'b, Ctx>,
+    {
+        decode_by(d, ctx, |d, ctx| d.decode_with(ctx))
+    }
+
+    /// Decodes an optional field holding a map of at least one entry.
+    pub fn decode_option<'b, Ctx, K, V>(
+        d: &mut Decoder<'b>,
+        ctx: &mut Ctx,
+    ) -> Result<Option<BTreeMap<K, V>>, Error>
+    where
+        K: Decode<'b, Ctx> + Ord,
+        V: Decode<'b, Ctx>,
+    {
+        decode(d, ctx).map(Some)
+    }
+
+    /// Decodes an optional field holding a map of maps, each of at least one entry.
+    pub fn decode_nested_option<'b, Ctx, K, J, V>(
+        d: &mut Decoder<'b>,
+        ctx: &mut Ctx,
+    ) -> Result<Option<Nested<K, J, V>>, Error>
+    where
+        K: Decode<'b, Ctx> + Ord,
+        J: Decode<'b, Ctx> + Ord,
+        V: Decode<'b, Ctx>,
+    {
+        decode_by(d, ctx, decode).map(Some)
+    }
+
+    /// Decodes an optional field holding a multiasset of at least one policy.
+    pub fn decode_multiasset_option<'b, Ctx, V>(
+        d: &mut Decoder<'b>,
+        ctx: &mut Ctx,
+    ) -> Result<Option<Multiasset<V>>, Error>
+    where
+        V: Decode<'b, Ctx>,
+    {
+        let at = d.position();
+        let multiasset = decode_multiasset(d, ctx, |d, ctx| d.decode_with(ctx))?;
+        refuse_empty(&multiasset, at)?;
+        Ok(Some(multiasset))
+    }
+
+    /// Decodes a value whose multiasset holds at least one policy.
+    pub fn decode_value<'b, Ctx>(d: &mut Decoder<'b>, ctx: &mut Ctx) -> Result<Value, Error> {
+        let at = d.position();
+        let value = d.decode_with(ctx)?;
+        if let Value::Multiasset(_, multiasset) = &value {
+            refuse_empty(multiasset, at)?;
+        }
+        Ok(value)
+    }
+
+    /// Decodes a legacy output whose multiasset holds at least one policy.
+    pub fn decode_legacy_output<'b, Ctx>(
+        d: &mut Decoder<'b>,
+        ctx: &mut Ctx,
+    ) -> Result<KeepRaw<'b, LegacyTransactionOutput>, Error> {
+        let at = d.position();
+        let output: KeepRaw<'b, LegacyTransactionOutput> = d.decode_with(ctx)?;
+        if let crate::alonzo::Value::Multiasset(_, multiasset) = &output.amount {
+            refuse_empty(multiasset, at)?;
+        }
+        Ok(output)
     }
 }
 
@@ -1250,7 +1731,7 @@ impl<C> minicbor::Encode<C> for AccountBalanceInterval {
 
 /// `sub_transaction_body` (`defs.cddl`), Conway's body minus the keys a sub
 /// transaction cannot carry, such as the fee and the collateral.
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Clone)]
 #[cbor(map)]
 pub struct SubTransactionBody<'a> {
     #[n(0)]
@@ -1281,7 +1762,6 @@ pub struct SubTransactionBody<'a> {
     pub script_data_hash: Option<Hash<32>>,
 
     #[n(14)]
-    #[cbor(decode_with = "guards_field::decode_option")]
     pub guards: Option<Guards>,
 
     #[n(15)]
@@ -1312,8 +1792,30 @@ pub struct SubTransactionBody<'a> {
     pub account_balance_intervals: Option<AccountBalanceIntervals>,
 }
 
+crate::map_record::decode_map_record!(SubTransactionBody<'a>,
+    0 => inputs,
+    1 => outputs,
+    3 => ttl,
+    4 => certificates,
+    5 => withdrawals: nonempty_map::decode_option,
+    7 => auxiliary_data_hash,
+    8 => validity_interval_start,
+    9 => mint: nonempty_map::decode_multiasset_option,
+    11 => script_data_hash,
+    14 => guards: guards_field::decode_option,
+    15 => network_id,
+    18 => reference_inputs,
+    19 => voting_procedures: nonempty_map::decode_nested_option,
+    20 => proposal_procedures,
+    21 => treasury_value,
+    22 => donation,
+    24 => required_top_level_guards: nonempty_map::decode_option,
+    25 => direct_deposits: nonempty_map::decode_option,
+    26 => account_balance_intervals: nonempty_map::decode_option,
+);
+
 /// `sub_transaction = [sub_transaction_body, transaction_witness_set, auxiliary_data/ nil]` (`defs.cddl`).
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Clone)]
 pub struct SubTransaction<'b> {
     #[b(0)]
     pub sub_transaction_body: KeepRaw<'b, SubTransactionBody<'b>>,
@@ -1325,11 +1827,17 @@ pub struct SubTransaction<'b> {
     pub auxiliary_data: Nullable<KeepRaw<'b, AuxiliaryData<'b>>>,
 }
 
+crate::array_record::decode_array_record!(SubTransaction<'b> {
+    sub_transaction_body,
+    transaction_witness_set,
+    auxiliary_data
+});
+
 /// `sub_transactions = nonempty_oset<sub_transaction>` (`defs.cddl`).
 pub type SubTransactions<'b> = NonEmptySet<SubTransaction<'b>>;
 
 /// `transaction_body` (`defs.cddl`). Key 14 is `guards`, not Conway's `required_signers`.
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Clone)]
 #[cbor(map)]
 pub struct TransactionBody<'a> {
     #[n(0)]
@@ -1366,7 +1874,6 @@ pub struct TransactionBody<'a> {
     pub collateral: Option<NonEmptySet<TransactionInput>>,
 
     #[n(14)]
-    #[cbor(decode_with = "guards_field::decode_option")]
     pub guards: Option<Guards>,
 
     #[n(15)]
@@ -1410,17 +1917,94 @@ pub struct TransactionBody<'a> {
     pub starting_account_balance_intervals: Option<StartingAccountBalanceIntervals>,
 }
 
-pub type PostAlonzoTransactionOutput<'b> =
-    babbage::GenPostAlonzoTransactionOutput<'b, Value, ScriptRef<'b>>;
+crate::map_record::decode_map_record!(TransactionBody<'a>,
+    0 => inputs,
+    1 => outputs,
+    2 => fee,
+    3 => ttl,
+    4 => certificates,
+    5 => withdrawals: nonempty_map::decode_option,
+    7 => auxiliary_data_hash,
+    8 => validity_interval_start,
+    9 => mint: nonempty_map::decode_multiasset_option,
+    11 => script_data_hash,
+    13 => collateral,
+    14 => guards: guards_field::decode_option,
+    15 => network_id,
+    16 => collateral_return,
+    17 => total_collateral,
+    18 => reference_inputs,
+    19 => voting_procedures: nonempty_map::decode_nested_option,
+    20 => proposal_procedures,
+    21 => treasury_value,
+    22 => donation,
+    23 => sub_transactions,
+    24 => required_top_level_guards: nonempty_map::decode_option,
+    25 => direct_deposits: nonempty_map::decode_option,
+    26 => account_balance_intervals: nonempty_map::decode_option,
+    27 => starting_account_balance_intervals: nonempty_map::decode_option,
+);
+
+/// `babbage_transaction_output` (`defs.cddl`), the map form of an output.
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
+#[cbor(map)]
+pub struct PostAlonzoTransactionOutput<'b> {
+    #[n(0)]
+    pub address: Bytes,
+
+    #[n(1)]
+    pub value: Value,
+
+    #[b(2)]
+    pub datum_option: Option<KeepRaw<'b, DatumOption<'b>>>,
+
+    #[n(3)]
+    pub script_ref: Option<CborWrap<ScriptRef<'b>>>,
+}
+
+crate::map_record::decode_map_record!(PostAlonzoTransactionOutput<'b>,
+    0 => address,
+    1 => value: nonempty_map::decode_value,
+    2 => datum_option,
+    3 => script_ref: decode_script_ref,
+);
+
+/// Decodes `script_ref`, whose rule has no nil.
+fn decode_script_ref<'b, Ctx>(
+    d: &mut minicbor::Decoder<'b>,
+    ctx: &mut Ctx,
+) -> Result<Option<CborWrap<ScriptRef<'b>>>, minicbor::decode::Error> {
+    crate::map_record::refuse_nil(d)?;
+    babbage::decode_script_ref(d, ctx)
+}
 
 pub type TransactionOutput<'b> = babbage::GenTransactionOutput<'b, PostAlonzoTransactionOutput<'b>>;
 
-// FIXME: Repeated since macro does not handle type generics yet.
-codec_by_datatype! {
-    TransactionOutput<'b>,
-    Array | ArrayIndef => Legacy,
-    Map | MapIndef => PostAlonzo,
-    ()
+impl<'b, C> minicbor::Decode<'b, C> for TransactionOutput<'b> {
+    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+        use minicbor::data::Type;
+        match d.datatype()? {
+            Type::Array | Type::ArrayIndef => {
+                nonempty_map::decode_legacy_output(d, ctx).map(Self::Legacy)
+            }
+            Type::Map | Type::MapIndef => d.decode_with(ctx).map(Self::PostAlonzo),
+            other => Err(minicbor::decode::Error::type_mismatch(other)),
+        }
+    }
+}
+
+impl<C> minicbor::Encode<C> for TransactionOutput<'_> {
+    fn encode<W: minicbor::encode::Write>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>> {
+        match self {
+            Self::Legacy(output) => e.encode_with(output, ctx)?,
+            Self::PostAlonzo(output) => e.encode_with(output, ctx)?,
+        };
+        Ok(())
+    }
 }
 
 /// `native_script` gains `script_require_guard = (6, credential)` (`defs.cddl`).
@@ -1469,7 +2053,7 @@ pub enum RedeemerTag {
     Guarding,
 }
 
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct RedeemersKey {
     #[n(0)]
     pub tag: RedeemerTag,
@@ -1477,7 +2061,9 @@ pub struct RedeemersKey {
     pub index: u32,
 }
 
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+crate::array_record::decode_array_record!(RedeemersKey { tag, index });
+
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 pub struct RedeemersValue {
     #[n(0)]
     pub data: PlutusData,
@@ -1485,11 +2071,22 @@ pub struct RedeemersValue {
     pub ex_units: ExUnits,
 }
 
+crate::array_record::decode_array_record!(RedeemersValue { data, ex_units });
+
 /// `redeemers` is map only in Dijkstra (`defs.cddl`). Conway's array arm and
 /// the `redeemer` rule behind it were deleted.
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
 #[cbor(transparent)]
 pub struct Redeemers(pub BTreeMap<RedeemersKey, RedeemersValue>);
+
+impl<'b, Ctx> minicbor::Decode<'b, Ctx> for Redeemers {
+    fn decode(
+        d: &mut minicbor::Decoder<'b>,
+        ctx: &mut Ctx,
+    ) -> Result<Self, minicbor::decode::Error> {
+        nonempty_map::decode_keeping_last(d, ctx).map(Redeemers)
+    }
+}
 
 impl From<BTreeMap<RedeemersKey, RedeemersValue>> for Redeemers {
     fn from(value: BTreeMap<RedeemersKey, RedeemersValue>) -> Self {
@@ -1508,7 +2105,7 @@ impl std::ops::Deref for Redeemers {
 /// `transaction_witness_set` (`defs.cddl`) with cardano-ledger `9df9f98c`'s
 /// `? 8 : nonempty_set<plutus_v4_script>`. Keys 0 to 7 are Conway's, but the
 /// `native_script` and `redeemers` they reach both changed.
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Clone)]
 #[cbor(map)]
 pub struct WitnessSet<'b> {
     #[n(0)]
@@ -1517,9 +2114,8 @@ pub struct WitnessSet<'b> {
     #[n(1)]
     pub native_script: Option<NonEmptySet<KeepRaw<'b, NativeScript>>>,
 
-    /// Possibly empty, since cardano-ledger `9df9f98c` reads an empty set here although `defs.cddl` says `nonempty_set`.
     #[n(2)]
-    pub bootstrap_witness: Option<Set<BootstrapWitness>>,
+    pub bootstrap_witness: Option<NonEmptySet<BootstrapWitness>>,
 
     #[n(3)]
     pub plutus_v1_script: Option<NonEmptySet<PlutusScript<1>>>,
@@ -1540,8 +2136,20 @@ pub struct WitnessSet<'b> {
     pub plutus_v4_script: Option<NonEmptySet<PlutusScript<4>>>,
 }
 
+crate::map_record::decode_map_record!(WitnessSet<'b>,
+    0 => vkeywitness,
+    1 => native_script,
+    2 => bootstrap_witness: decode_bootstrap_witnesses,
+    3 => plutus_v1_script,
+    4 => plutus_data,
+    5 => redeemer,
+    6 => plutus_v2_script,
+    7 => plutus_v3_script,
+    8 => plutus_v4_script,
+);
+
 /// `auxiliary_data_map` gains `? 5 : [* plutus_v4_script]` (`defs.cddl`).
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Clone, Eq)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Clone, Eq)]
 #[cbor(map, tag(259))]
 pub struct PostAlonzoAuxiliaryData<'b> {
     #[n(0)]
@@ -1564,16 +2172,30 @@ pub struct PostAlonzoAuxiliaryData<'b> {
     pub plutus_v4_scripts: Option<Vec<PlutusScript<4>>>,
 }
 
+crate::map_record::decode_map_record!(PostAlonzoAuxiliaryData<'b>, tag 259,
+    0 => metadata: crate::distinct_map::decode_option,
+    1 => native_scripts,
+    2 => plutus_v1_scripts,
+    3 => plutus_v2_scripts,
+    4 => plutus_v3_scripts,
+    5 => plutus_v4_scripts,
+);
+
 /// `auxiliary_data_array` (`defs.cddl`), whose second element is
 /// `auxiliary_scripts = [* native_script]`, this era's.
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Clone, Eq)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Clone, Eq)]
 pub struct ShelleyMaAuxiliaryData<'b> {
     #[n(0)]
     pub transaction_metadata: Metadata,
 
     #[b(1)]
-    pub auxiliary_scripts: Option<Vec<KeepRaw<'b, NativeScript>>>,
+    pub auxiliary_scripts: Vec<KeepRaw<'b, NativeScript>>,
 }
+
+crate::array_record::decode_array_record!(ShelleyMaAuxiliaryData<'b> {
+    transaction_metadata: crate::distinct_map::decode,
+    auxiliary_scripts
+});
 
 /// `auxiliary_data` (`defs.cddl`).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Eq)]
@@ -1583,12 +2205,31 @@ pub enum AuxiliaryData<'b> {
     PostAlonzo(PostAlonzoAuxiliaryData<'b>),
 }
 
-codec_by_datatype! {
-    AuxiliaryData<'b>,
-    Map | MapIndef => Shelley,
-    Array | ArrayIndef => ShelleyMa,
-    Tag => PostAlonzo,
-    ()
+impl<'b, C> minicbor::Decode<'b, C> for AuxiliaryData<'b> {
+    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+        use minicbor::data::Type;
+        match d.datatype()? {
+            Type::Map | Type::MapIndef => crate::distinct_map::decode(d, ctx).map(Self::Shelley),
+            Type::Array | Type::ArrayIndef => d.decode_with(ctx).map(Self::ShelleyMa),
+            Type::Tag => d.decode_with(ctx).map(Self::PostAlonzo),
+            other => Err(minicbor::decode::Error::type_mismatch(other)),
+        }
+    }
+}
+
+impl<C> minicbor::Encode<C> for AuxiliaryData<'_> {
+    fn encode<W: minicbor::encode::Write>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        ctx: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>> {
+        match self {
+            Self::Shelley(metadata) => e.encode_with(metadata, ctx)?,
+            Self::ShelleyMa(data) => e.encode_with(data, ctx)?,
+            Self::PostAlonzo(data) => e.encode_with(data, ctx)?,
+        };
+        Ok(())
+    }
 }
 
 /// `script` gains `// 4, plutus_v4_script` (`defs.cddl`), reached through
@@ -1629,7 +2270,7 @@ crate::babbage::decode_joined_script_ref!(
 /// `block_body` (`defs.cddl`). Dijkstra replaces Conway's segregated witness
 /// layout with complete inline transactions, and drops `invalid_transactions`
 /// and `transaction_index` because each transaction carries its own flag.
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Clone)]
 pub struct BlockBody<'b> {
     #[b(0)]
     pub transactions: MaybeIndefArray<BlockTransaction<'b>>,
@@ -1641,8 +2282,14 @@ pub struct BlockBody<'b> {
     pub peras_certificate: Nullable<PerasCertificate>,
 }
 
+crate::array_record::decode_array_record!(BlockBody<'b> {
+    transactions,
+    leios_certificate,
+    peras_certificate
+});
+
 /// `block = [header, block_body]` (`defs.cddl`).
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Clone)]
 pub struct Block<'b> {
     #[n(0)]
     pub header: KeepRaw<'b, Header>,
@@ -1651,10 +2298,12 @@ pub struct Block<'b> {
     pub block_body: BlockBody<'b>,
 }
 
+crate::array_record::decode_array_record!(Block<'b> { header, block_body });
+
 /// `block_transaction = [transaction_body, transaction_witness_set, auxiliary_data/ nil, bool]`
 /// (`defs.cddl`), the four element form a ranking block carries. Conway puts
 /// the flag at position 2, here it is last and is named `success` as in Conway.
-#[derive(Clone, Serialize, Deserialize, Encode, Decode, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Encode, Debug, PartialEq)]
 pub struct BlockTransaction<'b> {
     #[b(0)]
     pub transaction_body: KeepRaw<'b, TransactionBody<'b>>,
@@ -1669,6 +2318,13 @@ pub struct BlockTransaction<'b> {
     #[n(3)]
     pub success: bool,
 }
+
+crate::array_record::decode_array_record!(BlockTransaction<'b> {
+    transaction_body,
+    transaction_witness_set,
+    auxiliary_data,
+    success
+});
 
 impl Eq for BlockTransaction<'_> {}
 

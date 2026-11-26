@@ -45,7 +45,7 @@ codec_by_datatype! {
 }
 
 #[cfg(feature = "unstable")]
-crate::alonzo::value_codec!(Value);
+crate::alonzo::value_codec!(Value, |d, ctx| d.decode_with(ctx));
 
 pub use crate::alonzo::TransactionOutput as LegacyTransactionOutput;
 
@@ -286,7 +286,8 @@ pub struct Update {
     pub epoch: Epoch,
 }
 
-#[derive(Encode, Decode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Encode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(not(feature = "unstable"), derive(Decode))]
 pub struct PoolVotingThresholds {
     #[n(0)]
     pub motion_no_confidence: UnitInterval,
@@ -300,7 +301,17 @@ pub struct PoolVotingThresholds {
     pub security_voting_threshold: UnitInterval,
 }
 
-#[derive(Encode, Decode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[cfg(feature = "unstable")]
+crate::array_record::decode_array_record!(PoolVotingThresholds {
+    motion_no_confidence,
+    committee_normal,
+    committee_no_confidence,
+    hard_fork_initiation,
+    security_voting_threshold
+});
+
+#[derive(Encode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(not(feature = "unstable"), derive(Decode))]
 pub struct DRepVotingThresholds {
     #[n(0)]
     pub motion_no_confidence: UnitInterval,
@@ -323,6 +334,20 @@ pub struct DRepVotingThresholds {
     #[n(9)]
     pub treasury_withdrawal: UnitInterval,
 }
+
+#[cfg(feature = "unstable")]
+crate::array_record::decode_array_record!(DRepVotingThresholds {
+    motion_no_confidence,
+    committee_normal,
+    committee_no_confidence,
+    update_constitution,
+    hard_fork_initiation,
+    pp_network_group,
+    pp_economic_group,
+    pp_technical_group,
+    pp_governance_group,
+    treasury_withdrawal
+});
 
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Clone)]
 #[cbor(map)]
@@ -405,7 +430,8 @@ pub enum Vote {
 
 pub type VotingProcedures = BTreeMap<Voter, BTreeMap<GovActionId, VotingProcedure>>;
 
-#[derive(Encode, Decode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Encode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(not(feature = "unstable"), derive(Decode))]
 pub struct VotingProcedure {
     #[n(0)]
     pub vote: Vote,
@@ -419,6 +445,9 @@ pub struct VotingProcedure {
     )]
     pub anchor: Option<Anchor>,
 }
+
+#[cfg(feature = "unstable")]
+crate::array_record::decode_array_record!(VotingProcedure { vote, anchor });
 
 #[derive(Encode, Decode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct ProposalProcedure {
@@ -463,7 +492,8 @@ pub enum GovAction {
     Information,
 }
 
-#[derive(Encode, Decode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Encode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(not(feature = "unstable"), derive(Decode))]
 pub struct Constitution {
     #[n(0)]
     pub anchor: Anchor,
@@ -477,6 +507,12 @@ pub struct Constitution {
     )]
     pub guardrail_script: Option<ScriptHash>,
 }
+
+#[cfg(feature = "unstable")]
+crate::array_record::decode_array_record!(Constitution {
+    anchor,
+    guardrail_script
+});
 
 #[derive(Encode, Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Ord, Clone)]
 #[cfg_attr(not(feature = "unstable"), derive(Decode))]
@@ -503,7 +539,8 @@ crate::flat_enum::decode_flat_enum!(Voter,
     4 => StakePoolKey(hash),
 );
 
-#[derive(Encode, Decode, Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Ord, Clone)]
+#[derive(Encode, Serialize, Deserialize, Debug, PartialEq, PartialOrd, Eq, Ord, Clone)]
+#[cfg_attr(not(feature = "unstable"), derive(Decode))]
 pub struct Anchor {
     #[n(0)]
     #[cbor(decode_with = "pallas_codec::utils::decode_text_def_or_indef")]
@@ -512,13 +549,26 @@ pub struct Anchor {
     pub content_hash: Hash<32>,
 }
 
-#[derive(Encode, Decode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
+#[cfg(feature = "unstable")]
+crate::array_record::decode_array_record!(Anchor {
+    url: pallas_codec::utils::decode_text_sized::<0, 128, _>,
+    content_hash
+});
+
+#[derive(Encode, Serialize, Deserialize, Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
+#[cfg_attr(not(feature = "unstable"), derive(Decode))]
 pub struct GovActionId {
     #[n(0)]
     pub transaction_id: Hash<32>,
     #[n(1)]
     pub action_index: u32,
 }
+
+#[cfg(feature = "unstable")]
+crate::array_record::decode_array_record!(GovActionId {
+    transaction_id,
+    action_index: crate::decode_word16
+});
 
 pub type PostAlonzoTransactionOutput<'b> =
     babbage::GenPostAlonzoTransactionOutput<'b, Value, ScriptRef<'b>>;
@@ -546,7 +596,8 @@ pub use crate::alonzo::VKeyWitness;
 
 pub use crate::alonzo::NativeScript;
 
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(not(feature = "unstable"), derive(Decode))]
 pub struct ExUnitPrices {
     #[n(0)]
     pub mem_price: RationalNumber,
@@ -554,6 +605,12 @@ pub struct ExUnitPrices {
     #[n(1)]
     pub step_price: RationalNumber,
 }
+
+#[cfg(feature = "unstable")]
+crate::array_record::decode_array_record!(ExUnitPrices {
+    mem_price,
+    step_price
+});
 
 #[derive(
     Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord,
@@ -792,13 +849,39 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_vrf_output_or_chain_code_of_any_size_is_read_as_the_conway_ledger_does() {
+        let bytes = |size: usize| format!("58{size:02x}{}", "11".repeat(size));
+        for output in [23, 63, 64] {
+            let raw = hex::decode(format!("82{}{}", bytes(output), bytes(80))).unwrap();
+            let cert: Result<crate::VrfCert, _> = minicbor::decode(&raw);
+            assert!(cert.is_ok(), "a VRF output of {output} bytes: {cert:?}");
+        }
+        for chain_code in [31, 32] {
+            let raw = hex::decode(format!(
+                "84{}{}{}40",
+                bytes(32),
+                bytes(64),
+                bytes(chain_code)
+            ))
+            .unwrap();
+            let witness: Result<super::BootstrapWitness, _> = minicbor::decode(&raw);
+            assert!(
+                witness.is_ok(),
+                "a chain code of {chain_code} bytes: {witness:?}"
+            );
+        }
+    }
+
     #[cfg(feature = "unstable")]
     mod unstable_build {
         use super::super::{
             Certificate, Constitution, DRep, DatumOption, GovAction, RationalNumber, Relay,
             StakeCredential, TransactionBody, TransactionOutput, Value, Vote, Voter,
         };
-        use crate::flat_enum::{assert_reads_either_length_form, decode_all};
+        use crate::flat_enum::{
+            assert_reads_either_length_form, assert_short_header_refused, decode_all,
+        };
         use pallas_codec::minicbor;
         use pallas_codec::utils::CborWrap;
 
@@ -810,14 +893,34 @@ mod tests {
             let definite = format!("8201{multi}");
             assert_reads_either_length_form::<Value>(std::slice::from_ref(&definite));
 
-            let expected: Value = decode_all(&hex::decode(&definite).unwrap());
-            let extra: Value = decode_all(&hex::decode(format!("8301{multi}00")).unwrap());
-            assert_eq!(extra, expected);
+            let extra = hex::decode(format!("8301{multi}00")).unwrap();
+            let error =
+                minicbor::decode::<Value>(&extra).expect_err("an extra element must not decode");
+            assert!(error.to_string().contains("more elements than"), "{error}");
         }
 
         #[test]
         fn a_value_in_an_indefinite_array_short_of_its_fields_is_refused() {
             assert!(minicbor::decode::<Value>(&hex::decode("9f01ff").unwrap()).is_err());
+        }
+
+        #[test]
+        fn a_value_with_a_definite_header_short_of_its_fields_is_refused() {
+            let multi = format!("a1{HASH}a1416101");
+            let (short, full) = (format!("8101{multi}"), format!("8201{multi}"));
+            assert_short_header_refused::<Value>(&short, &full);
+            assert_short_header_refused::<crate::alonzo::Value>(&short, &full);
+        }
+
+        #[test]
+        fn a_relay_with_a_definite_header_short_of_its_fields_is_refused() {
+            assert_short_header_refused::<Relay>("8201f6627231", "8301f6627231");
+            assert_short_header_refused::<Relay>("8102627231", "8202627231");
+        }
+
+        #[test]
+        fn a_rational_with_a_definite_header_short_of_its_fields_is_refused() {
+            assert_short_header_refused::<RationalNumber>("d81e810102", "d81e820102");
         }
 
         #[test]

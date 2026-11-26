@@ -19,7 +19,7 @@ use crate::{
 };
 
 #[cfg(feature = "unstable")]
-use crate::probe;
+use crate::{probe, support::decode_whole};
 
 impl<'b> MultiEraTx<'b> {
     pub fn from_byron(tx: &'b byron::TxPayload<'b>) -> Self {
@@ -93,13 +93,13 @@ impl<'b> MultiEraTx<'b> {
             #[cfg(feature = "unstable")]
             Era::Dijkstra => match probe::tx_shape(cbor) {
                 probe::TxShape::DijkstraMempool | probe::TxShape::ValidityThird => {
-                    let tx: dijkstra::MempoolTransaction = minicbor::decode(cbor)?;
+                    let tx: dijkstra::MempoolTransaction = decode_whole(cbor)?;
                     Ok(MultiEraTx::Dijkstra(Box::new(Cow::Owned(
                         dijkstra::BlockTransaction::from(tx),
                     ))))
                 }
                 probe::TxShape::DijkstraBlock | probe::TxShape::Other => {
-                    let tx = minicbor::decode(cbor)?;
+                    let tx = decode_whole(cbor)?;
                     let tx = Box::new(Cow::Owned(tx));
                     Ok(MultiEraTx::Dijkstra(tx))
                 }
@@ -1234,6 +1234,59 @@ mod tests {
         );
         assert_eq!(tx.inputs().len(), 1);
         assert_eq!(tx.fee(), Some(1_000));
+    }
+
+    #[test]
+    fn a_dijkstra_transaction_with_bytes_after_it_is_refused() {
+        let mempool = testing::dijkstra_mempool_tx(
+            &testing::minimal_body(),
+            &testing::empty_witness_set(),
+            None,
+        );
+        let block = chain_sub_transaction_tx();
+
+        for (form, cbor) in [("mempool", mempool), ("block", block)] {
+            MultiEraTx::decode_for_era(Era::Dijkstra, &cbor)
+                .unwrap_or_else(|err| panic!("the {form} form was refused: {err}"));
+
+            let mut trailing = cbor.clone();
+            trailing.push(0x00);
+            match MultiEraTx::decode_for_era(Era::Dijkstra, &trailing) {
+                Err(err) if err.to_string().contains("bytes left") => {}
+                Err(err) => panic!("the {form} form was refused for another reason: {err}"),
+                Ok(_) => panic!("the {form} form with a byte after it was read"),
+            }
+        }
+    }
+
+    #[test]
+    fn a_dijkstra_output_or_script_reference_with_bytes_after_it_is_refused() {
+        let output = hex::decode(format!("82581d61{}01", "11".repeat(28))).unwrap();
+        let script = testing::script_ref_plutus_v4(&[0x01]);
+        type Decode = fn(&[u8]) -> Result<(), String>;
+        let cases: [(&str, Vec<u8>, Decode); 2] = [
+            ("output", output, |cbor| {
+                crate::MultiEraOutput::decode(Era::Dijkstra, cbor)
+                    .map(|_| ())
+                    .map_err(|err| err.to_string())
+            }),
+            ("script reference", script, |cbor| {
+                crate::MultiEraScriptRef::decode(Era::Dijkstra, cbor)
+                    .map(|_| ())
+                    .map_err(|err| err.to_string())
+            }),
+        ];
+        for (entry, cbor, decode) in cases {
+            decode(&cbor).unwrap_or_else(|err| panic!("the {entry} was refused: {err}"));
+
+            let mut trailing = cbor.clone();
+            trailing.push(0x00);
+            match decode(&trailing) {
+                Err(err) if err.contains("bytes left") => {}
+                Err(err) => panic!("the {entry} was refused for another reason: {err}"),
+                Ok(()) => panic!("the {entry} with a byte after it was read"),
+            }
+        }
     }
 
     #[test]

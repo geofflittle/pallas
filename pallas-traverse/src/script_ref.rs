@@ -142,7 +142,9 @@ impl<'b> MultiEraScriptRef<'b> {
     pub fn decode(era: Era, cbor: &'b [u8]) -> Result<Self, minicbor::decode::Error> {
         match era {
             #[cfg(feature = "unstable")]
-            Era::Dijkstra => Ok(Self::Dijkstra(Cow::Owned(minicbor::decode(cbor)?))),
+            Era::Dijkstra => Ok(Self::Dijkstra(Cow::Owned(crate::support::decode_whole(
+                cbor,
+            )?))),
             Era::Babbage | Era::Conway => Ok(Self::Conway(Cow::Owned(minicbor::decode(cbor)?))),
             Era::Byron | Era::Shelley | Era::Allegra | Era::Mary | Era::Alonzo => Err(
                 minicbor::decode::Error::message(format!("{era} has no reference script rule")),

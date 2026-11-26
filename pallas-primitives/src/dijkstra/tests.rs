@@ -1084,7 +1084,7 @@ fn every_leios_fetch_citation_matches_the_leios_fetch_messages() {
 }
 
 #[test]
-fn an_eleven_field_header_body_is_refused() {
+fn a_header_body_of_eleven_or_thirteen_fields_is_refused() {
     let header = header_of("dijkstra1");
     let body = leios(&header);
 
@@ -1130,7 +1130,35 @@ fn an_eleven_field_header_body_is_refused() {
     let decoded: Result<Header, _> = minicbor::decode(&raw);
     let err = decoded.expect_err("an eleven field header body must not decode");
     assert!(
-        err.to_string().contains("missing value at index 11"),
+        err.to_string()
+            .contains("array has no element left for a required field"),
+        "refused for another reason: {err}"
+    );
+
+    let mut long = minicbor::Encoder::new(Vec::new());
+    long.array(2).unwrap();
+    long.array(13).unwrap();
+    long.encode(body.block_number).unwrap();
+    long.encode(body.slot).unwrap();
+    long.encode(body.prev_hash).unwrap();
+    long.encode(&body.issuer_vkey).unwrap();
+    long.encode(&body.vrf_vkey).unwrap();
+    long.encode(&body.vrf_result).unwrap();
+    long.encode(body.block_body_size).unwrap();
+    long.encode(body.block_body_hash).unwrap();
+    long.encode(&body.operational_cert).unwrap();
+    long.encode(&body.header_version_info).unwrap();
+    long.encode(body.block_body_contains_leios_cert).unwrap();
+    long.encode(&body.eb_announcement).unwrap();
+    long.null().unwrap();
+    long.encode(&header.body_signature).unwrap();
+    let long = long.into_writer();
+
+    let decoded: Result<Header, _> = minicbor::decode(&long);
+    let err = decoded.expect_err("a thirteen field header body must not decode");
+    assert!(
+        err.to_string()
+            .contains("array of length 13 has more elements than the 12 fields read"),
         "refused for another reason: {err}"
     );
 }
@@ -1332,6 +1360,21 @@ fn a_pool_registration_re_encodes_each_bls_key_state() {
     );
 }
 
+#[test]
+fn a_pool_registration_with_a_relay_header_short_of_its_fields_is_refused() {
+    let pool = format!(
+        "8a03581c{}5820{}0000d81e820102581de0{}d9010281581c{}",
+        "11".repeat(28),
+        "22".repeat(32),
+        "33".repeat(28),
+        "44".repeat(28)
+    );
+    crate::flat_enum::assert_short_header_refused::<Certificate>(
+        &format!("{pool}828300f6f6f68202627231f6"),
+        &format!("{pool}828400f6f6f68202627231f6"),
+    );
+}
+
 /// No fixture carries either shape, so without this the encoder's four
 /// element branch and the decoder's refusal of `false` run nowhere.
 #[test]
@@ -1426,12 +1469,34 @@ fn an_empty_guards_set_in_either_body_reads_as_no_guards() {
 }
 
 #[test]
+fn a_body_without_guards_reads_as_no_guards() {
+    let top: TransactionBody = decode_all(generated("a3008001800200"));
+    assert_eq!(top.guards, None);
+    let sub: SubTransactionBody = decode_all(generated("a200800180"));
+    assert_eq!(sub.guards, None);
+}
+
+#[test]
 fn a_guards_set_with_a_key_in_either_body_reads_as_that_key() {
-    let one = format!("0ed9010281581c{}", "06".repeat(28));
-    let top: TransactionBody = decode_all(body_ending(true, &one));
-    assert!(matches!(top.guards, Some(Guards::AddrKeyhashes(_))));
-    let sub: SubTransactionBody = decode_all(body_ending(false, &one));
-    assert!(matches!(sub.guards, Some(Guards::AddrKeyhashes(_))));
+    let key = format!("581c{}", "06".repeat(28));
+    for set in [
+        format!("81{key}"),
+        format!("d9010281{key}"),
+        format!("9f{key}ff"),
+        format!("d901029f{key}ff"),
+    ] {
+        let one = format!("0e{set}");
+        let top: TransactionBody = decode_all(body_ending(true, &one));
+        assert!(
+            matches!(top.guards, Some(Guards::AddrKeyhashes(_))),
+            "{set}"
+        );
+        let sub: SubTransactionBody = decode_all(body_ending(false, &one));
+        assert!(
+            matches!(sub.guards, Some(Guards::AddrKeyhashes(_))),
+            "{set}"
+        );
+    }
 }
 
 #[test]
@@ -1440,6 +1505,40 @@ fn a_guards_value_that_is_not_a_set_is_refused_in_either_body() {
     assert!(top.is_err());
     let sub: Result<SubTransactionBody, _> = minicbor::decode(body_ending(false, "0e01"));
     assert!(sub.is_err());
+}
+
+/// The error each body gives for the given hex keys at its end.
+fn refusals_in_either_body(rest: &str) -> [String; 2] {
+    let top = minicbor::decode::<TransactionBody>(body_ending(true, rest)).map(|b| b.guards);
+    let sub = minicbor::decode::<SubTransactionBody>(body_ending(false, rest)).map(|b| b.guards);
+    [top, sub].map(|decoded| match decoded {
+        Ok(guards) => panic!("{rest} decoded with guards {guards:?}"),
+        Err(error) => error.to_string(),
+    })
+}
+
+#[test]
+fn an_empty_guards_set_under_a_tag_other_than_258_is_refused_in_either_body() {
+    for rest in ["0ed680", "0ed69fff"] {
+        for error in refusals_in_either_body(rest) {
+            assert!(error.contains("Tag(22)"), "{rest}: {error}");
+        }
+    }
+}
+
+#[test]
+fn a_guards_set_with_a_key_under_a_tag_other_than_258_is_refused_in_either_body() {
+    let rest = format!("0ed681581c{}", "06".repeat(28));
+    for error in refusals_in_either_body(&rest) {
+        assert!(error.contains("Tag(22)"), "{error}");
+    }
+}
+
+#[test]
+fn a_null_guards_value_is_refused_in_either_body() {
+    for error in refusals_in_either_body("0ef6") {
+        assert!(error.contains("null"), "{error}");
+    }
 }
 
 /// A type reaching Alonzo's native script from here would refuse a whole
@@ -1458,10 +1557,7 @@ fn the_array_form_of_auxiliary_data_carries_this_eras_native_scripts() {
     let AuxiliaryData::ShelleyMa(inner) = &decoded else {
         panic!("an array must decode as the ShelleyMa arm, found {decoded:?}");
     };
-    let scripts = inner
-        .auxiliary_scripts
-        .as_ref()
-        .expect("a guard clause must not make the whole auxiliary scripts field read as absent");
+    let scripts = &inner.auxiliary_scripts;
     assert_eq!(scripts.len(), 1);
     assert!(
         matches!(*scripts[0], NativeScript::ScriptRequireGuard(_)),
@@ -1992,7 +2088,7 @@ fn the_array_form_still_carries_a_clause_every_era_has() {
     let AuxiliaryData::ShelleyMa(inner) = &decoded else {
         panic!("an array must decode as the ShelleyMa arm")
     };
-    let scripts = inner.auxiliary_scripts.as_ref().expect("readable");
+    let scripts = &inner.auxiliary_scripts;
     assert_eq!(scripts.len(), 1);
     assert!(matches!(*scripts[0], NativeScript::ScriptPubkey(_)));
 
@@ -2044,6 +2140,38 @@ fn an_empty_array_is_not_a_nonempty_set() {
 }
 
 #[test]
+fn a_set_holding_an_element_twice_is_refused() {
+    let distinct: &[(&str, &[u8])] = &[
+        ("tagged", &[0xd9, 0x01, 0x02, 0x82, 0x01, 0x02]),
+        ("bare indefinite", &[0x9f, 0x01, 0x02, 0xff]),
+    ];
+    for (arm, bytes) in distinct {
+        let set: Set<u64> = decode_all(bytes);
+        assert_eq!(set.len(), 2, "the {arm} set of distinct elements");
+        let set: NonEmptySet<u64> = decode_all(bytes);
+        assert_eq!(set.len(), 2, "the {arm} nonempty set of distinct elements");
+    }
+
+    let repeated: &[(&str, &[u8])] = &[
+        ("tagged", &[0xd9, 0x01, 0x02, 0x82, 0x01, 0x01]),
+        ("bare indefinite", &[0x9f, 0x02, 0x01, 0x02, 0xff]),
+        ("non shortest", &[0x82, 0x01, 0x18, 0x01]),
+    ];
+    for (arm, bytes) in repeated {
+        for err in [
+            minicbor::decode::<Set<u64>>(bytes).map(drop),
+            minicbor::decode::<NonEmptySet<u64>>(bytes).map(drop),
+        ] {
+            let err = err.expect_err("a set with a repeated element must not decode");
+            assert!(
+                err.to_string().contains("repeated element"),
+                "the {arm} set was refused for some other reason: {err}"
+            );
+        }
+    }
+}
+
+#[test]
 fn a_body_field_typed_nonempty_refuses_an_empty_array() {
     let top: &[u8] = &[0xa3, 0x00, 0x80, 0x01, 0x80, 0x02, 0x00];
     let sub: &[u8] = &[0xa2, 0x00, 0x80, 0x01, 0x80];
@@ -2082,17 +2210,6 @@ fn an_empty_script_set_in_a_witness_set_is_refused() {
         err.to_string().contains("a nonempty set"),
         "the empty script set was refused for some other reason: {err}"
     );
-}
-
-#[test]
-fn an_empty_bootstrap_witness_set_is_read_as_written() {
-    let bytes = [0xa1, 0x02, 0xd9, 0x01, 0x02, 0x80];
-    let witnesses: WitnessSet = decode_all(&bytes);
-    assert_eq!(
-        witnesses.bootstrap_witness.as_deref().map(Vec::len),
-        Some(0)
-    );
-    assert_eq!(minicbor::to_vec(&witnesses).unwrap(), bytes);
 }
 
 #[test]
@@ -2693,5 +2810,1972 @@ fn generated_native_scripts_in_indefinite_arrays_decode() {
                     .unwrap()
             )),
         ]
+    );
+}
+
+/// Decodes the bytes as one value that ends exactly where they do.
+fn read<T: minicbor::Decode<'static, ()>>(
+    bytes: &'static [u8],
+) -> Result<(), minicbor::decode::Error> {
+    let mut d = minicbor::Decoder::new(bytes);
+    d.decode::<T>()?;
+    match d.position() == bytes.len() {
+        true => Ok(()),
+        false => Err(minicbor::decode::Error::message(
+            "bytes left after the value",
+        )),
+    }
+}
+
+/// A record the ledger refuses, beside the same record with one choice or key changed to one it reads.
+struct Refusal {
+    class: &'static str,
+    read: fn(&'static [u8]) -> Result<(), minicbor::decode::Error>,
+    refused: String,
+    known: String,
+}
+
+/// The hex of a body with one input, no outputs and, at the top, a zero fee, followed by the given entries.
+fn body_with(top: bool, entries: &[&str]) -> String {
+    let input = format!("d9010281825820{}00", "03".repeat(32));
+    let (fee, count) = if top { ("0200", 3) } else { ("", 2) };
+    format!(
+        "{:02x}00{input}0180{fee}{}",
+        0xa0 + count + entries.len(),
+        entries.concat()
+    )
+}
+
+/// The hex of a map form output with an address and a zero coin, followed by the given entries.
+fn output_with(entries: &[&str]) -> String {
+    format!(
+        "{:02x}00581d61{}0100{}",
+        0xa2 + entries.len(),
+        "11".repeat(28),
+        entries.concat()
+    )
+}
+
+/// Every optional field whose value holds a choice, with the ledger refusing an unknown arm.
+fn unknown_arms() -> Vec<Refusal> {
+    let arms = |entry: String, refused: &str, known: &str| {
+        (entry.replace("ARM", refused), entry.replace("ARM", known))
+    };
+    let body_fields = [
+        (
+            "certificates",
+            arms(format!("048183098200{HASH}81ARM"), "05", "02"),
+        ),
+        ("guards", arms(format!("0e8182ARM{HASH}"), "02", "00")),
+        ("network_id", arms("0fARM".to_string(), "05", "01")),
+        (
+            "voting_procedures",
+            arms(format!("13a18200{HASH}a182{HASH32}0082ARMf6"), "05", "01"),
+        ),
+        (
+            "proposal_procedures",
+            arms(format!("14818400{REWARD}81ARM8260{HASH32}"), "09", "06"),
+        ),
+        (
+            "required_top_level_guards",
+            arms("1818a1ARMf6".to_string(), "8102", &format!("8200{HASH}")),
+        ),
+    ];
+    let mut cases = Vec::new();
+
+    for (top, record, read) in [
+        (
+            true,
+            "transaction_body",
+            read::<TransactionBody> as fn(_) -> _,
+        ),
+        (false, "sub_transaction_body", read::<SubTransactionBody>),
+    ] {
+        for (field, (refused, known)) in &body_fields {
+            cases.push(Refusal {
+                class: Box::leak(format!("{record}.{field}").into_boxed_str()),
+                read,
+                refused: body_with(top, &[refused]),
+                known: body_with(top, &[known]),
+            });
+        }
+    }
+
+    let (refused_return, known_return) = arms(
+        format!("10{}", output_with(&[&format!("0282ARM{HASH32}")])),
+        "05",
+        "00",
+    );
+    let sub_transactions = |arm: &str| {
+        let sub_body = body_with(false, &[&format!("0e8182{arm}{HASH}")]);
+        format!("178183{sub_body}a0f6")
+    };
+    cases.extend([
+        Refusal {
+            class: "transaction_body.collateral_return",
+            read: read::<TransactionBody>,
+            refused: body_with(true, &[&refused_return]),
+            known: body_with(true, &[&known_return]),
+        },
+        Refusal {
+            class: "transaction_body.sub_transactions",
+            read: read::<TransactionBody>,
+            refused: body_with(true, &[&sub_transactions("02")]),
+            known: body_with(true, &[&sub_transactions("00")]),
+        },
+        Refusal {
+            class: "transaction_witness_set.native_script",
+            read: read::<WitnessSet>,
+            refused: "a10181820900".to_string(),
+            known: "a10181820400".to_string(),
+        },
+        Refusal {
+            class: "transaction_witness_set.redeemers",
+            read: read::<WitnessSet>,
+            refused: "a105a181098200820000".to_string(),
+            known: "a105a18200008200820000".to_string(),
+        },
+        Refusal {
+            class: "auxiliary_data_map.native_scripts",
+            read: read::<AuxiliaryData>,
+            refused: "d90103a10181820900".to_string(),
+            known: "d90103a10181820400".to_string(),
+        },
+        Refusal {
+            class: "auxiliary_data_array.auxiliary_scripts",
+            read: read::<AuxiliaryData>,
+            refused: "82a081820900".to_string(),
+            known: "82a081820400".to_string(),
+        },
+        Refusal {
+            class: "transaction_output.datum_option",
+            read: read::<TransactionOutput>,
+            refused: output_with(&[&format!("028205{HASH32}")]),
+            known: output_with(&[&format!("028200{HASH32}")]),
+        },
+        Refusal {
+            class: "transaction_output.script_ref",
+            read: read::<TransactionOutput>,
+            refused: output_with(&["03d81843820900"]),
+            known: output_with(&["03d818458200820400"]),
+        },
+    ]);
+
+    cases
+}
+
+/// Every map record, with a key its rule lacks: inside the range of its keys, past the last, below zero, and for a sub transaction body each key only the top body holds.
+fn unknown_keys() -> Vec<Refusal> {
+    let mut cases = Vec::new();
+    let mut add = |class: &'static str,
+                   read: fn(&'static [u8]) -> Result<(), minicbor::decode::Error>,
+                   record: &dyn Fn(&str) -> String,
+                   refused: &[&str],
+                   known: &str| {
+        for key in refused {
+            cases.push(Refusal {
+                class,
+                read,
+                refused: record(key),
+                known: record(known),
+            });
+        }
+    };
+
+    let top = |entry: &str| body_with(true, &[entry]);
+    add(
+        "transaction_body inside",
+        read::<TransactionBody>,
+        &top,
+        &["0600", "0a00", "0c00"],
+        "0300",
+    );
+    add(
+        "transaction_body past",
+        read::<TransactionBody>,
+        &top,
+        &["181c00"],
+        "0300",
+    );
+    add(
+        "transaction_body below",
+        read::<TransactionBody>,
+        &top,
+        &["2000"],
+        "0300",
+    );
+
+    let sub = |entry: &str| body_with(false, &[entry]);
+    add(
+        "sub_transaction_body inside",
+        read::<SubTransactionBody>,
+        &sub,
+        &["0600", "0a00", "0c00"],
+        "0300",
+    );
+    add(
+        "sub_transaction_body past",
+        read::<SubTransactionBody>,
+        &sub,
+        &["181c00"],
+        "0300",
+    );
+    add(
+        "sub_transaction_body below",
+        read::<SubTransactionBody>,
+        &sub,
+        &["2000"],
+        "0300",
+    );
+    add(
+        "sub_transaction_body top only",
+        read::<SubTransactionBody>,
+        &sub,
+        &["0200", "0d00", "1000", "1100", "1700", "181b00"],
+        "0300",
+    );
+
+    let witnesses = |key: &str| format!("a1{key}814100");
+    add(
+        "transaction_witness_set past",
+        read::<WitnessSet>,
+        &witnesses,
+        &["09"],
+        "03",
+    );
+    add(
+        "transaction_witness_set below",
+        read::<WitnessSet>,
+        &witnesses,
+        &["20"],
+        "03",
+    );
+
+    let auxiliary = |key: &str| format!("d90103a1{key}80");
+    add(
+        "auxiliary_data_map past",
+        read::<AuxiliaryData>,
+        &auxiliary,
+        &["06"],
+        "02",
+    );
+    add(
+        "auxiliary_data_map below",
+        read::<AuxiliaryData>,
+        &auxiliary,
+        &["20"],
+        "02",
+    );
+
+    let output = |key: &str| output_with(&[&format!("{key}8200{HASH32}")]);
+    add(
+        "transaction_output past",
+        read::<TransactionOutput>,
+        &output,
+        &["04"],
+        "02",
+    );
+    add(
+        "transaction_output below",
+        read::<TransactionOutput>,
+        &output,
+        &["20"],
+        "02",
+    );
+
+    let update = |entry: &str| format!("a1{entry}");
+    add(
+        "protocol_param_update inside",
+        read::<ProtocolParamUpdate>,
+        &update,
+        &["0c00", "0f00"],
+        "0000",
+    );
+    add(
+        "protocol_param_update past",
+        read::<ProtocolParamUpdate>,
+        &update,
+        &["183900"],
+        "0000",
+    );
+    add(
+        "protocol_param_update below",
+        read::<ProtocolParamUpdate>,
+        &update,
+        &["2000"],
+        "0000",
+    );
+
+    cases
+}
+
+/// Every map the ledger reads with at least one entry and no repeated key, each empty, with a key twice and with a zero quantity, beside the same map with one entry, paired with the reason the refusal gives.
+fn map_values() -> Vec<(Refusal, &'static str)> {
+    let voter = format!("8200{HASH}");
+    let action = format!("82{HASH32}00");
+    let vote = format!("{action}8201f6");
+    let one_asset = format!("{HASH}a14001");
+    let maps = [
+        (
+            "withdrawals",
+            "05",
+            format!("a1{REWARD}00"),
+            vec![
+                ("empty", "a0".to_string()),
+                ("repeated", format!("a2{REWARD}00{REWARD}01")),
+            ],
+        ),
+        (
+            "mint",
+            "09",
+            format!("a1{one_asset}"),
+            vec![
+                ("empty", "a0".to_string()),
+                ("inner empty", format!("a1{HASH}a0")),
+                ("repeated", format!("a2{one_asset}{one_asset}")),
+                ("inner repeated", format!("a1{HASH}a240014002")),
+            ],
+        ),
+        (
+            "voting_procedures",
+            "13",
+            format!("a1{voter}a1{vote}"),
+            vec![
+                ("empty", "a0".to_string()),
+                ("inner empty", format!("a1{voter}a0")),
+                ("repeated", format!("a2{voter}a1{vote}{voter}a1{vote}")),
+                ("inner repeated", format!("a1{voter}a2{vote}{vote}")),
+            ],
+        ),
+        (
+            "required_top_level_guards",
+            "1818",
+            format!("a1{voter}f6"),
+            vec![
+                ("empty", "a0".to_string()),
+                ("repeated", format!("a2{voter}f6{voter}f6")),
+            ],
+        ),
+        (
+            "direct_deposits",
+            "1819",
+            format!("a1{REWARD}00"),
+            vec![
+                ("empty", "a0".to_string()),
+                ("repeated", format!("a2{REWARD}00{REWARD}01")),
+            ],
+        ),
+        (
+            "account_balance_intervals",
+            "181a",
+            format!("a1{REWARD}8200f6"),
+            vec![
+                ("empty", "a0".to_string()),
+                ("repeated", format!("a2{REWARD}8200f6{REWARD}8201f6")),
+            ],
+        ),
+        (
+            "starting_account_balance_intervals",
+            "181b",
+            format!("a1{REWARD}8200f6"),
+            vec![
+                ("empty", "a0".to_string()),
+                ("repeated", format!("a2{REWARD}8200f6{REWARD}8201f6")),
+            ],
+        ),
+        (
+            "donation",
+            "16",
+            "01".to_string(),
+            vec![("zero", "00".to_string())],
+        ),
+    ];
+    let reason = |variant: &str| match variant {
+        "empty" | "inner empty" => "empty map",
+        "repeated" | "inner repeated" => "repeated key",
+        _ => "zero",
+    };
+    let mut cases = Vec::new();
+
+    for (top, record, read) in [
+        (
+            true,
+            "transaction_body",
+            read::<TransactionBody> as fn(_) -> _,
+        ),
+        (false, "sub_transaction_body", read::<SubTransactionBody>),
+    ] {
+        for (field, key, known, refused) in &maps {
+            if !top && *field == "starting_account_balance_intervals" {
+                continue;
+            }
+            for (variant, map) in refused {
+                cases.push((
+                    Refusal {
+                        class: Box::leak(format!("{record}.{field} {variant}").into_boxed_str()),
+                        read,
+                        refused: body_with(top, &[&format!("{key}{map}")]),
+                        known: body_with(top, &[&format!("{key}{known}")]),
+                    },
+                    reason(variant),
+                ));
+            }
+        }
+    }
+
+    let output = |value: &str| format!("a200581d61{}01{value}", "11".repeat(28));
+    for (variant, multiasset) in [
+        ("empty", "a0".to_string()),
+        ("inner empty", format!("a1{HASH}a0")),
+        ("repeated", format!("a2{one_asset}{one_asset}")),
+        ("inner repeated", format!("a1{HASH}a240014002")),
+        ("zero", format!("a1{HASH}a14000")),
+    ] {
+        cases.push((
+            Refusal {
+                class: Box::leak(format!("transaction_output.value {variant}").into_boxed_str()),
+                read: read::<TransactionOutput>,
+                refused: output(&format!("8200{multiasset}")),
+                known: output(&format!("8200a1{one_asset}")),
+            },
+            reason(variant),
+        ));
+    }
+
+    cases
+}
+
+#[test]
+fn an_embedded_item_needs_tag_24_and_ends_with_its_bytes() {
+    let cases = [
+        (
+            "script_ref",
+            "03d818458200820400",
+            "03d819458200820400",
+            "expected tag 24",
+        ),
+        (
+            "script_ref",
+            "03d818458200820400",
+            "03d81846820082040000",
+            "bytes left",
+        ),
+        (
+            "inline datum",
+            "028201d8184100",
+            "028201d8194100",
+            "expected tag 24",
+        ),
+        (
+            "inline datum",
+            "028201d8184100",
+            "028201d818420000",
+            "bytes left",
+        ),
+    ];
+    for (field, known, refused, reason) in cases {
+        read::<TransactionOutput>(generated(&output_with(&[known])))
+            .unwrap_or_else(|err| panic!("the {field} with one item was refused: {err}"));
+        match read::<TransactionOutput>(generated(&output_with(&[refused]))) {
+            Err(err) if err.to_string().contains(reason) => {}
+            Err(err) => panic!("the {field} {refused} was refused for another reason: {err}"),
+            Ok(()) => panic!("the {field} {refused} was read"),
+        }
+    }
+}
+
+const MAP_VALUE_CLASSES: &[&str] = &[
+    "transaction_body.withdrawals empty",
+    "transaction_body.withdrawals repeated",
+    "transaction_body.mint empty",
+    "transaction_body.mint inner empty",
+    "transaction_body.mint repeated",
+    "transaction_body.mint inner repeated",
+    "transaction_body.voting_procedures empty",
+    "transaction_body.voting_procedures inner empty",
+    "transaction_body.voting_procedures repeated",
+    "transaction_body.voting_procedures inner repeated",
+    "transaction_body.required_top_level_guards empty",
+    "transaction_body.required_top_level_guards repeated",
+    "transaction_body.direct_deposits empty",
+    "transaction_body.direct_deposits repeated",
+    "transaction_body.account_balance_intervals empty",
+    "transaction_body.account_balance_intervals repeated",
+    "transaction_body.starting_account_balance_intervals empty",
+    "transaction_body.starting_account_balance_intervals repeated",
+    "transaction_body.donation zero",
+    "sub_transaction_body.withdrawals empty",
+    "sub_transaction_body.withdrawals repeated",
+    "sub_transaction_body.mint empty",
+    "sub_transaction_body.mint inner empty",
+    "sub_transaction_body.mint repeated",
+    "sub_transaction_body.mint inner repeated",
+    "sub_transaction_body.voting_procedures empty",
+    "sub_transaction_body.voting_procedures inner empty",
+    "sub_transaction_body.voting_procedures repeated",
+    "sub_transaction_body.voting_procedures inner repeated",
+    "sub_transaction_body.required_top_level_guards empty",
+    "sub_transaction_body.required_top_level_guards repeated",
+    "sub_transaction_body.direct_deposits empty",
+    "sub_transaction_body.direct_deposits repeated",
+    "sub_transaction_body.account_balance_intervals empty",
+    "sub_transaction_body.account_balance_intervals repeated",
+    "sub_transaction_body.donation zero",
+    "transaction_output.value empty",
+    "transaction_output.value inner empty",
+    "transaction_output.value repeated",
+    "transaction_output.value inner repeated",
+    "transaction_output.value zero",
+];
+
+#[test]
+fn each_map_reads_with_one_entry() {
+    let cases: Vec<Refusal> = map_values().into_iter().map(|(case, _)| case).collect();
+    assert_classes(&cases, MAP_VALUE_CLASSES);
+
+    let failed: Vec<_> = cases
+        .iter()
+        .filter_map(|case| {
+            (case.read)(generated(&case.known))
+                .err()
+                .map(|err| format!("{} {}: {err}", case.class, case.known))
+        })
+        .collect();
+    assert!(
+        failed.is_empty(),
+        "{} refused:\n{}",
+        failed.len(),
+        failed.join("\n")
+    );
+}
+
+#[test]
+fn an_empty_map_a_repeated_key_or_a_zero_quantity_is_refused() {
+    let cases = map_values();
+
+    let failed: Vec<_> = cases
+        .iter()
+        .filter_map(
+            |(case, reason)| match (case.read)(generated(&case.refused)) {
+                Err(err) if err.to_string().contains(reason) => None,
+                Err(err) => Some(format!("{} refused for another reason: {err}", case.class)),
+                Ok(()) => Some(format!("{} read", case.class)),
+            },
+        )
+        .collect();
+    assert!(
+        failed.is_empty(),
+        "{} of {} not refused for their reason:\n{}",
+        failed.len(),
+        cases.len(),
+        failed.join("\n")
+    );
+}
+
+/// Asserts that the cases hold at least one case of each expected class and of no other class.
+fn assert_classes(cases: &[Refusal], expected: &[&str]) {
+    let mut counts = std::collections::BTreeMap::new();
+    for case in cases {
+        *counts.entry(case.class).or_insert(0) += 1;
+    }
+    let found: Vec<_> = counts.keys().copied().collect();
+    let mut expected = expected.to_vec();
+    expected.sort();
+    assert_eq!(found, expected, "case counts per class: {counts:?}");
+}
+
+const UNKNOWN_ARM_CLASSES: &[&str] = &[
+    "transaction_body.certificates",
+    "transaction_body.guards",
+    "transaction_body.network_id",
+    "transaction_body.collateral_return",
+    "transaction_body.voting_procedures",
+    "transaction_body.proposal_procedures",
+    "transaction_body.sub_transactions",
+    "transaction_body.required_top_level_guards",
+    "sub_transaction_body.certificates",
+    "sub_transaction_body.guards",
+    "sub_transaction_body.network_id",
+    "sub_transaction_body.voting_procedures",
+    "sub_transaction_body.proposal_procedures",
+    "sub_transaction_body.required_top_level_guards",
+    "transaction_witness_set.native_script",
+    "transaction_witness_set.redeemers",
+    "auxiliary_data_map.native_scripts",
+    "auxiliary_data_array.auxiliary_scripts",
+    "transaction_output.datum_option",
+    "transaction_output.script_ref",
+];
+
+const UNKNOWN_KEY_CLASSES: &[&str] = &[
+    "transaction_body inside",
+    "transaction_body past",
+    "transaction_body below",
+    "sub_transaction_body inside",
+    "sub_transaction_body past",
+    "sub_transaction_body below",
+    "sub_transaction_body top only",
+    "transaction_witness_set past",
+    "transaction_witness_set below",
+    "auxiliary_data_map past",
+    "auxiliary_data_map below",
+    "transaction_output past",
+    "transaction_output below",
+    "protocol_param_update inside",
+    "protocol_param_update past",
+    "protocol_param_update below",
+];
+
+#[test]
+fn each_record_reads_with_a_known_arm_or_key_in_place_of_the_refused_one() {
+    let cases: Vec<_> = unknown_arms().into_iter().chain(unknown_keys()).collect();
+    assert_classes(&unknown_arms(), UNKNOWN_ARM_CLASSES);
+    assert_classes(&unknown_keys(), UNKNOWN_KEY_CLASSES);
+
+    let failed: Vec<_> = cases
+        .iter()
+        .filter_map(|case| {
+            (case.read)(generated(&case.known))
+                .err()
+                .map(|err| format!("{} {}: {err}", case.class, case.known))
+        })
+        .collect();
+    assert!(
+        failed.is_empty(),
+        "{} of {} refused:\n{}",
+        failed.len(),
+        cases.len(),
+        failed.join("\n")
+    );
+}
+
+#[test]
+fn an_unknown_arm_in_an_optional_field_is_refused() {
+    let cases = unknown_arms();
+    assert_classes(&cases, UNKNOWN_ARM_CLASSES);
+
+    let failed: Vec<_> = cases
+        .iter()
+        .filter_map(|case| match (case.read)(generated(&case.refused)) {
+            Err(err) if err.is_unknown_variant() => None,
+            Err(err) => Some(format!("{} refused for another reason: {err}", case.class)),
+            Ok(()) => Some(format!("{} read", case.class)),
+        })
+        .collect();
+    assert!(
+        failed.is_empty(),
+        "{} of {} not refused as an unknown arm:\n{}",
+        failed.len(),
+        cases.len(),
+        failed.join("\n")
+    );
+}
+
+#[test]
+fn an_unknown_map_key_is_refused() {
+    let cases = unknown_keys();
+    assert_classes(&cases, UNKNOWN_KEY_CLASSES);
+
+    let failed: Vec<_> = cases
+        .iter()
+        .filter_map(|case| match (case.read)(generated(&case.refused)) {
+            Err(err) if err.to_string().contains("unknown key") => None,
+            Err(err) => Some(format!(
+                "{} {} refused for another reason: {err}",
+                case.class, case.refused
+            )),
+            Ok(()) => Some(format!("{} {} read", case.class, case.refused)),
+        })
+        .collect();
+    assert!(
+        failed.is_empty(),
+        "{} of {} not refused as an unknown key:\n{}",
+        failed.len(),
+        cases.len(),
+        failed.join("\n")
+    );
+}
+
+/// A redeemers entry for spending input 0 with the integer datum 0 and no budget.
+const REDEEMER: &str = "8200008200820000";
+
+/// Each map record with a key written twice and with a nil at a key whose rule has none, and an empty redeemers map, beside the readable form, paired with the reason the refusal gives.
+fn record_keys() -> Vec<(Refusal, &'static str)> {
+    type Read = fn(&'static [u8]) -> Result<(), minicbor::decode::Error>;
+    type Record<'a> = &'a dyn Fn(&[&str]) -> String;
+    let map = |entries: &[&str]| format!("{:02x}{}", 0xa0 + entries.len(), entries.concat());
+    let auxiliary = |entries: &[&str]| format!("d90103{}", map(entries));
+    let top = |entries: &[&str]| body_with(true, entries);
+    let sub = |entries: &[&str]| body_with(false, entries);
+    let output = |entries: &[&str]| output_with(entries);
+    let output_entry = format!("028200{HASH32}");
+    let records: [(&'static str, Read, Record, &str, &str); 6] = [
+        (
+            "transaction_body",
+            read::<TransactionBody>,
+            &top,
+            "0300",
+            "03f6",
+        ),
+        (
+            "sub_transaction_body",
+            read::<SubTransactionBody>,
+            &sub,
+            "0300",
+            "03f6",
+        ),
+        (
+            "transaction_witness_set",
+            read::<WitnessSet>,
+            &map,
+            "03814100",
+            "03f6",
+        ),
+        (
+            "auxiliary_data_map",
+            read::<AuxiliaryData>,
+            &auxiliary,
+            "0280",
+            "02f6",
+        ),
+        (
+            "transaction_output",
+            read::<TransactionOutput>,
+            &output,
+            &output_entry,
+            "02f6",
+        ),
+        (
+            "protocol_param_update",
+            read::<ProtocolParamUpdate>,
+            &map,
+            "0000",
+            "00f6",
+        ),
+    ];
+
+    let mut cases = Vec::new();
+    for (class, read, record, entry, nil) in records {
+        let known = record(&[entry]);
+        let twice = Refusal {
+            class,
+            read,
+            refused: record(&[entry, entry]),
+            known: known.clone(),
+        };
+        let nil = Refusal {
+            class,
+            read,
+            refused: record(&[nil]),
+            known,
+        };
+        cases.push((twice, "repeated key"));
+        cases.push((nil, "a nil"));
+    }
+
+    let redeemers = Refusal {
+        class: "redeemers",
+        read: read::<WitnessSet>,
+        refused: "a105a0".to_string(),
+        known: format!("a105a1{REDEEMER}"),
+    };
+    cases.push((redeemers, "empty map"));
+    let script_ref = Refusal {
+        class: "transaction_output script_ref",
+        read: read::<TransactionOutput>,
+        refused: output(&["03f6"]),
+        known: output(&[]),
+    };
+    cases.push((script_ref, "a nil"));
+    cases
+}
+
+#[test]
+fn each_record_reads_the_forms_the_ledger_reads() {
+    for update in ["a11826f6", "a11835f6"] {
+        assert!(
+            read::<ProtocolParamUpdate>(generated(update)).is_ok(),
+            "{update}"
+        );
+    }
+    let twice = format!("a105a2{REDEEMER}{REDEEMER}");
+    let read = read::<WitnessSet>(generated(&twice));
+    assert!(read.is_ok(), "redeemers with a key twice: {read:?}");
+    for (case, _) in record_keys() {
+        let read = (case.read)(generated(&case.known));
+        assert!(read.is_ok(), "{} {}: {read:?}", case.class, case.known);
+    }
+}
+
+#[test]
+fn a_record_with_a_key_twice_or_a_nil_where_its_rule_has_none_is_refused() {
+    let cases = record_keys();
+    assert_eq!(cases.len(), 14);
+
+    let failed: Vec<_> = cases
+        .iter()
+        .filter_map(
+            |(case, reason)| match (case.read)(generated(&case.refused)) {
+                Err(err) if err.to_string().contains(reason) => None,
+                Err(err) => Some(format!(
+                    "{} {} refused for another reason: {err}",
+                    case.class, case.refused
+                )),
+                Ok(()) => Some(format!("{} {} read", case.class, case.refused)),
+            },
+        )
+        .collect();
+    assert!(
+        failed.is_empty(),
+        "{} of {} not refused:\n{}",
+        failed.len(),
+        cases.len(),
+        failed.join("\n")
+    );
+}
+
+/// Asserts with [`crate::array_record::assert_holds_exactly`] on the array of the given hex elements.
+fn assert_holds_exactly_hex<T>(elements: &[&str])
+where
+    T: minicbor::Decode<'static, ()> + std::fmt::Debug,
+{
+    let mut e = minicbor::Encoder::new(Vec::new());
+    e.array(elements.len() as u64).unwrap();
+    for element in elements {
+        e.writer_mut()
+            .extend_from_slice(&hex::decode(element).unwrap());
+    }
+    crate::array_record::assert_holds_exactly::<T>(Box::leak(e.into_writer().into_boxed_slice()));
+}
+
+/// Asserts with [`crate::array_record::assert_holds_exactly`] on the encoding of `value`.
+fn assert_encoding_holds_exactly<T>(value: &impl minicbor::Encode<()>)
+where
+    T: minicbor::Decode<'static, ()> + std::fmt::Debug,
+{
+    let bytes: &'static [u8] = Box::leak(minicbor::to_vec(value).unwrap().into_boxed_slice());
+    crate::array_record::assert_holds_exactly::<T>(bytes);
+}
+
+#[test]
+fn a_dijkstra_record_holds_exactly_its_fields() {
+    const HASH32: &str = "58201111111111111111111111111111111111111111111111111111111111111111";
+    const ANCHOR: &str =
+        "826361626358201111111111111111111111111111111111111111111111111111111111111111";
+    let bls_pubkey = format!("5860{}", "00".repeat(96));
+    let bls_signature = format!("5830{}", "00".repeat(48));
+    let reward_account = format!("581de0{}", "11".repeat(28));
+
+    assert_holds_exactly_hex::<super::HeaderVersionInfo>(&["01", "02"]);
+    assert_holds_exactly_hex::<super::EbAnnouncement>(&[HASH32, "01"]);
+    assert_holds_exactly_hex::<super::BlsKey>(&[&bls_pubkey, &bls_signature]);
+    assert_holds_exactly_hex::<super::LeiosCertificate>(&["40", &bls_signature]);
+    assert_holds_exactly_hex::<super::Update>(&["a0", "01"]);
+    assert_holds_exactly_hex::<ProposalProcedure>(&["00", &reward_account, "8106", ANCHOR]);
+    assert_holds_exactly_hex::<super::RedeemersKey>(&["00", "00"]);
+    assert_holds_exactly_hex::<super::RedeemersValue>(&["00", "820102"]);
+
+    let block = block_of(TEST_BLOCKS[WITH_TRANSACTIONS].0);
+    let header = header_of(TEST_BLOCKS[WITH_TRANSACTIONS].0);
+    assert_encoding_holds_exactly::<Block>(&block);
+    assert_encoding_holds_exactly::<super::BlockBody>(&block.block_body);
+    assert_encoding_holds_exactly::<BlockTransaction>(&block.block_body.transactions[0]);
+    assert_encoding_holds_exactly::<Header>(&header);
+    assert_encoding_holds_exactly::<super::HeaderBody>(&header.header_body);
+
+    let bytes: &'static [u8] =
+        Box::leak(hex::decode(V4_WITNESS_TXS[1].1).unwrap().into_boxed_slice());
+    let tx: BlockTransaction = minicbor::decode(bytes).unwrap();
+    let sub = tx
+        .transaction_body
+        .sub_transactions
+        .iter()
+        .flat_map(|subs| subs.iter())
+        .next()
+        .expect("a sub transaction");
+    assert_encoding_holds_exactly::<super::SubTransaction>(sub);
+}
+
+/// The hex of the CBOR head of a major type and its argument.
+fn head(major: u8, n: usize) -> String {
+    let m = major << 5;
+    match n {
+        0..24 => format!("{:02x}", m | n as u8),
+        24..256 => format!("{:02x}{n:02x}", m | 24),
+        256..65536 => format!("{:02x}{n:04x}", m | 25),
+        _ => format!("{:02x}{n:08x}", m | 26),
+    }
+}
+
+/// The hex of a byte string of `size` bytes.
+fn bytes_of(size: usize) -> String {
+    format!("{}{}", head(2, size), "11".repeat(size))
+}
+
+/// The hex of a text string of `size` bytes.
+fn text_of(size: usize) -> String {
+    format!("{}{}", head(3, size), "61".repeat(size))
+}
+
+/// A string field the CDDL bounds, as a record whose `F` is the field.
+struct Bounded {
+    field: &'static str,
+    read: fn(&'static [u8]) -> Result<(), minicbor::decode::Error>,
+    record: String,
+    string: fn(usize) -> String,
+    min: usize,
+    max: usize,
+}
+
+impl Bounded {
+    /// Whether the record holds a BLS key or signature, whose 0x11 filled bytes the ledger refuses as a point and pallas reads.
+    fn holds_a_bls_point(&self) -> bool {
+        self.field.starts_with("bls_key") || self.field.starts_with("leios_certificate")
+    }
+}
+
+/// Every string field the Dijkstra CDDL gives a size, other than an address or a reward account.
+fn bounded_strings() -> Vec<Bounded> {
+    let b = |n| bytes_of(n);
+    let (vkey, sig, vrf) = (b(32), b(64), format!("82{}{}", b(64), b(80)));
+    let opcert = format!("84{}0000{}", b(32), b(64));
+    let header_body = |f: [&str; 4]| {
+        format!(
+            "8c0000f6{}{}{}00{HASH32}{}{VERSION_INFO}f4f6",
+            f[0], f[1], f[2], f[3]
+        )
+    };
+    type Read = fn(&'static [u8]) -> Result<(), minicbor::decode::Error>;
+    let bounded =
+        |field, read: Read, record: String, string: fn(usize) -> String, min, max| Bounded {
+            field,
+            read,
+            record,
+            string,
+            min,
+            max,
+        };
+    vec![
+        bounded(
+            "vkeywitness vkey",
+            read::<super::VKeyWitness>,
+            format!("82F{sig}"),
+            bytes_of,
+            32,
+            32,
+        ),
+        bounded(
+            "vkeywitness signature",
+            read::<super::VKeyWitness>,
+            format!("82{vkey}F"),
+            bytes_of,
+            64,
+            64,
+        ),
+        bounded(
+            "bootstrap_witness public_key",
+            read::<super::BootstrapWitness>,
+            format!("84F{sig}{vkey}40"),
+            bytes_of,
+            32,
+            32,
+        ),
+        bounded(
+            "bootstrap_witness signature",
+            read::<super::BootstrapWitness>,
+            format!("84{vkey}F{vkey}40"),
+            bytes_of,
+            64,
+            64,
+        ),
+        bounded(
+            "bootstrap_witness chain_code",
+            read::<super::WitnessSet<'static>>,
+            format!("a1028184{vkey}{sig}F40"),
+            bytes_of,
+            32,
+            32,
+        ),
+        bounded(
+            "operational_cert hot_vkey",
+            read::<super::OperationalCert>,
+            format!("84F0000{sig}"),
+            bytes_of,
+            32,
+            32,
+        ),
+        bounded(
+            "operational_cert sigma",
+            read::<super::OperationalCert>,
+            format!("84{vkey}0000F"),
+            bytes_of,
+            64,
+            64,
+        ),
+        bounded(
+            "vrf_cert output",
+            read::<super::HeaderBody>,
+            header_body([&vkey, &vkey, &format!("82F{}", b(80)), &opcert]),
+            bytes_of,
+            64,
+            64,
+        ),
+        bounded(
+            "vrf_cert proof",
+            read::<super::HeaderBody>,
+            header_body([&vkey, &vkey, &format!("82{}F", b(64)), &opcert]),
+            bytes_of,
+            80,
+            80,
+        ),
+        bounded(
+            "header_body issuer_vkey",
+            read::<super::HeaderBody>,
+            header_body(["F", &vkey, &vrf, &opcert]),
+            bytes_of,
+            32,
+            32,
+        ),
+        bounded(
+            "header_body vrf_vkey",
+            read::<super::HeaderBody>,
+            header_body([&vkey, "F", &vrf, &opcert]),
+            bytes_of,
+            32,
+            32,
+        ),
+        bounded(
+            "header body_signature",
+            read::<Header>,
+            format!("82{}F", header_body([&vkey, &vkey, &vrf, &opcert])),
+            bytes_of,
+            448,
+            448,
+        ),
+        bounded(
+            "bls_key bls_pubkey",
+            read::<super::BlsKey>,
+            format!("82F{}", b(48)),
+            bytes_of,
+            96,
+            96,
+        ),
+        bounded(
+            "bls_key bls_possession_proof",
+            read::<super::BlsKey>,
+            format!("82{}F", b(96)),
+            bytes_of,
+            48,
+            48,
+        ),
+        bounded(
+            "leios_certificate signers",
+            read::<super::LeiosCertificate>,
+            format!("82F{}", b(48)),
+            bytes_of,
+            0,
+            8192,
+        ),
+        bounded(
+            "leios_certificate signature",
+            read::<super::LeiosCertificate>,
+            "8240F".to_string(),
+            bytes_of,
+            48,
+            48,
+        ),
+        bounded(
+            "relay ipv4",
+            read::<Relay>,
+            "8400f6Ff6".to_string(),
+            bytes_of,
+            4,
+            4,
+        ),
+        bounded(
+            "relay ipv6",
+            read::<Relay>,
+            "8400f6f6F".to_string(),
+            bytes_of,
+            16,
+            16,
+        ),
+        bounded(
+            "relay single_host_name dns_name",
+            read::<Relay>,
+            "8301f6F".to_string(),
+            text_of,
+            0,
+            128,
+        ),
+        bounded(
+            "relay multi_host_name dns_name",
+            read::<Relay>,
+            "8202F".to_string(),
+            text_of,
+            0,
+            128,
+        ),
+        bounded(
+            "pool_metadata url",
+            read::<super::PoolMetadata>,
+            format!("82F{HASH32}"),
+            text_of,
+            0,
+            128,
+        ),
+        bounded(
+            "anchor url",
+            read::<super::Anchor>,
+            format!("82F{HASH32}"),
+            text_of,
+            0,
+            128,
+        ),
+        bounded(
+            "value asset_name",
+            read::<TransactionOutput>,
+            format!("a200581d61{}018200a1{HASH}a1F01", "11".repeat(28)),
+            bytes_of,
+            0,
+            32,
+        ),
+        bounded(
+            "mint asset_name",
+            read::<TransactionBody>,
+            body_with(true, &[&format!("09a1{HASH}a1F01")]),
+            bytes_of,
+            0,
+            32,
+        ),
+        bounded(
+            "metadatum bytes",
+            read::<super::Metadatum>,
+            "F".to_string(),
+            bytes_of,
+            0,
+            64,
+        ),
+        bounded(
+            "metadatum text",
+            read::<super::Metadatum>,
+            "F".to_string(),
+            text_of,
+            0,
+            64,
+        ),
+        bounded(
+            "plutus_data bytes",
+            read::<PlutusData>,
+            "F".to_string(),
+            bytes_of,
+            0,
+            64,
+        ),
+        bounded(
+            "plutus_data big_uint",
+            read::<PlutusData>,
+            "c2F".to_string(),
+            bytes_of,
+            0,
+            64,
+        ),
+    ]
+}
+
+#[test]
+fn each_bounded_string_reads_at_its_bounds() {
+    let failed: Vec<_> = bounded_strings()
+        .iter()
+        .filter(|c| !c.holds_a_bls_point())
+        .flat_map(|c| [c.min, c.max].map(|size| (c, size)))
+        .filter_map(|(c, size)| {
+            (c.read)(generated(&c.record.replace("F", &(c.string)(size))))
+                .err()
+                .map(|err| format!("{} of {size}: {err}", c.field))
+        })
+        .collect();
+    assert!(
+        failed.is_empty(),
+        "{} refused:\n{}",
+        failed.len(),
+        failed.join("\n")
+    );
+}
+
+#[test]
+fn a_bounded_string_outside_its_size_is_refused() {
+    let failed: Vec<_> = bounded_strings()
+        .iter()
+        .flat_map(|c| {
+            let below = c.min.checked_sub(1);
+            [below, Some(c.max + 1)]
+                .into_iter()
+                .flatten()
+                .map(move |size| (c, size))
+        })
+        .filter_map(|(c, size)| {
+            match (c.read)(generated(&c.record.replace("F", &(c.string)(size)))) {
+                Err(err) if err.to_string().contains("where the rule allows") => None,
+                Err(err) => Some(format!(
+                    "{} of {size} refused for another reason: {err}",
+                    c.field
+                )),
+                Ok(()) => Some(format!("{} of {size} read", c.field)),
+            }
+        })
+        .collect();
+    assert!(
+        failed.is_empty(),
+        "{} not refused for their size:\n{}",
+        failed.len(),
+        failed.join("\n")
+    );
+}
+
+#[test]
+fn plutus_bytes_bound_each_chunk_and_metadata_bounds_the_whole_string() {
+    let indefinite = |chunks: &[usize]| {
+        format!(
+            "5f{}ff",
+            chunks.iter().map(|&n| bytes_of(n)).collect::<String>()
+        )
+    };
+    for (read, hex, verdict) in [
+        (read::<PlutusData> as fn(_) -> _, indefinite(&[64, 1]), true),
+        (read::<PlutusData>, indefinite(&[40, 40]), true),
+        (
+            read::<PlutusData>,
+            format!("c2{}", indefinite(&[40, 40])),
+            true,
+        ),
+        (read::<PlutusData>, indefinite(&[65]), false),
+        (
+            read::<PlutusData>,
+            format!("c2{}", indefinite(&[65])),
+            false,
+        ),
+        (read::<super::Metadatum>, indefinite(&[40, 40]), false),
+        (read::<super::Metadatum>, indefinite(&[64, 1]), false),
+        (
+            read::<super::Metadatum>,
+            format!("7f{}{}ff", text_of(40), text_of(40)),
+            false,
+        ),
+        (read::<super::Metadatum>, indefinite(&[32, 32]), true),
+    ] {
+        let got = read(generated(&hex));
+        assert_eq!(got.is_ok(), verdict, "{hex}: {got:?}");
+        if let Err(err) = got {
+            assert!(
+                err.to_string().contains("where the rule allows"),
+                "{hex}: {err}"
+            );
+        }
+    }
+}
+
+#[test]
+fn maps_take_a_repeated_key_or_an_empty_map_as_the_ledger_does() {
+    let reward_a = format!("581de1{}", "11".repeat(28));
+    let reward_b = format!("581de1{}", "22".repeat(28));
+    let cold_a = format!("8200581c{}", "11".repeat(28));
+    let cold_b = format!("8200581c{}", "22".repeat(28));
+    let policy = format!("581c{}", "33".repeat(28));
+    let other = format!("581c{}", "44".repeat(28));
+    let address = format!("581d61{}", "11".repeat(28));
+    let legacy = |value: &str| format!("82{address}8201{value}");
+    let map_form = |value: &str| format!("a200{address}018201{value}");
+    let model = "81182a";
+    type Reader = fn(&'static [u8]) -> Result<(), minicbor::decode::Error>;
+    let dijkstra: [(&str, Reader, String, bool); 22] = [
+        (
+            "withdrawals distinct",
+            read::<GovAction>,
+            format!("8302a2{reward_a}01{reward_b}02f6"),
+            true,
+        ),
+        (
+            "withdrawals repeated",
+            read::<GovAction>,
+            format!("8302a2{reward_a}01{reward_a}02f6"),
+            false,
+        ),
+        (
+            "withdrawals empty",
+            read::<GovAction>,
+            "8302a0f6".into(),
+            true,
+        ),
+        (
+            "committee repeated",
+            read::<GovAction>,
+            format!("8504f680a2{cold_a}01{cold_a}02d81e820102"),
+            false,
+        ),
+        (
+            "committee distinct",
+            read::<GovAction>,
+            format!("8504f680a2{cold_a}01{cold_b}02d81e820102"),
+            true,
+        ),
+        (
+            "cost models repeated",
+            read::<CostModels>,
+            format!("a200{model}00{model}"),
+            false,
+        ),
+        (
+            "cost models distinct",
+            read::<CostModels>,
+            format!("a200{model}01{model}"),
+            true,
+        ),
+        (
+            "metadata map distinct",
+            read::<AuxiliaryData>,
+            "a201000200".into(),
+            true,
+        ),
+        (
+            "metadata map repeated",
+            read::<AuxiliaryData>,
+            "a201000101".into(),
+            false,
+        ),
+        (
+            "metadata map empty",
+            read::<AuxiliaryData>,
+            "a0".into(),
+            true,
+        ),
+        (
+            "metadata array repeated",
+            read::<AuxiliaryData>,
+            "82a20100010180".into(),
+            false,
+        ),
+        (
+            "metadata array empty",
+            read::<AuxiliaryData>,
+            "82a080".into(),
+            true,
+        ),
+        (
+            "metadata tag repeated",
+            read::<AuxiliaryData>,
+            "d90103a100a201000101".into(),
+            false,
+        ),
+        (
+            "metadata tag empty",
+            read::<AuxiliaryData>,
+            "d90103a100a0".into(),
+            true,
+        ),
+        (
+            "legacy value distinct",
+            read::<TransactionOutput>,
+            legacy(&format!("a2{policy}a14001{other}a14001")),
+            true,
+        ),
+        (
+            "legacy value repeated policy",
+            read::<TransactionOutput>,
+            legacy(&format!("a2{policy}a14001{policy}a1410101")),
+            false,
+        ),
+        (
+            "legacy value repeated asset",
+            read::<TransactionOutput>,
+            legacy(&format!("a1{policy}a240014002")),
+            false,
+        ),
+        (
+            "legacy value empty",
+            read::<TransactionOutput>,
+            legacy("a0"),
+            false,
+        ),
+        (
+            "legacy value empty assets",
+            read::<TransactionOutput>,
+            legacy(&format!("a1{policy}a0")),
+            false,
+        ),
+        (
+            "legacy value zero",
+            read::<TransactionOutput>,
+            legacy(&format!("a1{policy}a14000")),
+            false,
+        ),
+        (
+            "legacy value name of 33",
+            read::<TransactionOutput>,
+            legacy(&format!("a1{policy}a1{}01", bytes_of(33))),
+            false,
+        ),
+        (
+            "map form value repeated policy",
+            read::<TransactionOutput>,
+            map_form(&format!("a2{policy}a14001{policy}a1410101")),
+            false,
+        ),
+    ];
+    // The Conway ledger reads the same shared types, and takes an empty multiasset that Dijkstra refuses.
+    let conway: [(&str, Reader, String, bool); 5] = [
+        (
+            "conway legacy value empty",
+            read::<crate::conway::TransactionOutput>,
+            legacy("a0"),
+            true,
+        ),
+        (
+            "conway map form value empty",
+            read::<crate::conway::TransactionOutput>,
+            map_form("a0"),
+            true,
+        ),
+        (
+            "conway legacy value repeated policy",
+            read::<crate::conway::TransactionOutput>,
+            legacy(&format!("a2{policy}a14001{policy}a1410101")),
+            false,
+        ),
+        (
+            "conway legacy value zero",
+            read::<crate::conway::TransactionOutput>,
+            legacy(&format!("a1{policy}a14000")),
+            false,
+        ),
+        (
+            "conway map form value repeated asset",
+            read::<crate::conway::TransactionOutput>,
+            map_form(&format!("a1{policy}a240014002")),
+            false,
+        ),
+    ];
+    let wrong: Vec<_> = dijkstra
+        .into_iter()
+        .chain(conway)
+        .filter_map(|(case, read, hex, verdict)| {
+            let got = read(generated(&hex));
+            (got.is_ok() != verdict).then(|| format!("{case}: {got:?}"))
+        })
+        .collect();
+    assert!(
+        wrong.is_empty(),
+        "{} differ from the ledger:\n{}",
+        wrong.len(),
+        wrong.join("\n")
+    );
+}
+
+/// The interval `defs.cddl` gives a fraction.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum FractionKind {
+    Unit,
+    NonNegative,
+    Positive,
+}
+
+/// The type a fraction position is read through.
+#[derive(Clone, Copy)]
+enum FractionHolder {
+    Update,
+    Certificate,
+    GovAction,
+}
+
+/// A place that holds a fraction, with `R` in its hex standing for the fraction.
+struct FractionPosition {
+    name: String,
+    kind: FractionKind,
+    holder: FractionHolder,
+    template: String,
+}
+
+const HALF: &str = "d81e820102";
+
+/// Every fraction position of this era, with the interval `defs.cddl` gives it.
+fn fraction_positions() -> Vec<FractionPosition> {
+    use FractionKind::*;
+
+    let update = |key: u64, kind: FractionKind, value: String| FractionPosition {
+        name: format!("parameter update key {key}"),
+        kind,
+        holder: FractionHolder::Update,
+        template: match key {
+            0..=23 => format!("a1{key:02x}{value}"),
+            _ => format!("a118{key:02x}{value}"),
+        },
+    };
+
+    let mut positions = vec![
+        FractionPosition {
+            name: "pool registration margin".to_string(),
+            kind: Unit,
+            holder: FractionHolder::Certificate,
+            template: format!("8a03{HASH}{HASH32}0101R{REWARD}8080f6"),
+        },
+        FractionPosition {
+            name: "committee update threshold".to_string(),
+            kind: Unit,
+            holder: FractionHolder::GovAction,
+            template: "8504f680a0R".to_string(),
+        },
+    ];
+
+    for (key, kind) in [
+        (9, NonNegative),
+        (10, Unit),
+        (11, Unit),
+        (33, NonNegative),
+        (37, Positive),
+        (38, NonNegative),
+        (39, Unit),
+        (44, Unit),
+        (50, Positive),
+        (54, Unit),
+    ] {
+        positions.push(update(key, kind, "R".to_string()));
+    }
+
+    // Keys 19, 25 and 26 hold arrays of fractions, so each element is a position.
+    for (key, kind, len) in [(19, NonNegative, 2), (25, Unit, 5), (26, Unit, 10)] {
+        for index in 0..len {
+            let elements: String = (0..len)
+                .map(|i| if i == index { "R" } else { HALF })
+                .collect();
+            let mut position = update(key, kind, format!("{:02x}{elements}", 0x80 + len));
+            position.name = format!("{} element {index}", position.name);
+            positions.push(position);
+        }
+    }
+
+    positions
+}
+
+/// Whether the holder reads the bytes to their last byte.
+fn reads_whole(holder: FractionHolder, bytes: &[u8]) -> bool {
+    fn whole<'b, T: minicbor::Decode<'b, ()>>(bytes: &'b [u8]) -> bool {
+        let mut d = minicbor::Decoder::new(bytes);
+        d.decode::<T>().is_ok() && d.position() == bytes.len()
+    }
+
+    match holder {
+        FractionHolder::Update => whole::<ProtocolParamUpdate>(bytes),
+        FractionHolder::Certificate => whole::<Certificate>(bytes),
+        FractionHolder::GovAction => whole::<GovAction>(bytes),
+    }
+}
+
+/// Asserts that every fraction position reads each fraction exactly when the ledger's interval of its kind holds it.
+fn assert_each_position_reads(fractions: &[&str], unit: bool, nonnegative: bool, positive: bool) {
+    let mut counts = std::collections::BTreeMap::new();
+    let mut wrong = Vec::new();
+
+    for position in fraction_positions() {
+        let control = hex::decode(position.template.replace('R', HALF)).unwrap();
+        assert!(
+            reads_whole(position.holder, &control),
+            "{} must read one half, so a refusal below is about the fraction",
+            position.name
+        );
+
+        let expected = match position.kind {
+            FractionKind::Unit => unit,
+            FractionKind::NonNegative => nonnegative,
+            FractionKind::Positive => positive,
+        };
+        for fraction in fractions {
+            let bytes = hex::decode(position.template.replace('R', fraction)).unwrap();
+            if reads_whole(position.holder, &bytes) != expected {
+                wrong.push(format!(
+                    "{} ({:?}) {}: {fraction}",
+                    position.name,
+                    position.kind,
+                    if expected { "refused" } else { "read" },
+                ));
+            }
+        }
+        *counts.entry(position.kind).or_insert(0) += 1;
+    }
+
+    assert_eq!(
+        counts,
+        std::collections::BTreeMap::from([
+            (FractionKind::Unit, 22),
+            (FractionKind::NonNegative, 5),
+            (FractionKind::Positive, 2),
+        ])
+    );
+    assert_eq!(wrong, Vec::<String>::new());
+}
+
+#[test]
+fn a_fraction_inside_every_interval_reads_at_each_position() {
+    assert_each_position_reads(
+        &[
+            HALF,
+            "d81e820101",
+            "d81e821bffffffffffffffff1bffffffffffffffff",
+            "d81e82011b8ac7230489e80000",
+        ],
+        true,
+        true,
+        true,
+    );
+}
+
+#[test]
+fn an_indefinite_fraction_of_two_numbers_reads_at_each_position() {
+    assert_each_position_reads(&["d81e9f0102ff"], true, true, true);
+}
+
+#[test]
+fn a_fraction_tagged_other_than_30_is_refused() {
+    assert_each_position_reads(&["d81f820102", "d81d820102"], false, false, false);
+}
+
+#[test]
+fn an_untagged_fraction_is_refused() {
+    assert_each_position_reads(&["820102"], false, false, false);
+}
+
+#[test]
+fn a_fraction_of_three_numbers_is_refused() {
+    assert_each_position_reads(&["d81e83010203"], false, false, false);
+}
+
+#[test]
+fn a_fraction_of_one_number_is_refused() {
+    assert_each_position_reads(&["d81e8101"], false, false, false);
+}
+
+#[test]
+fn an_empty_fraction_is_refused() {
+    assert_each_position_reads(&["d81e80"], false, false, false);
+}
+
+#[test]
+fn an_indefinite_fraction_of_other_than_two_numbers_is_refused() {
+    assert_each_position_reads(
+        &["d81e9f010203ff", "d81e9f01ff", "d81e9fff"],
+        false,
+        false,
+        false,
+    );
+}
+
+#[test]
+fn a_zero_denominator_is_refused() {
+    assert_each_position_reads(&["d81e820100", "d81e820000"], false, false, false);
+}
+
+#[test]
+fn a_negative_number_is_refused() {
+    assert_each_position_reads(&["d81e822002", "d81e820121"], false, false, false);
+}
+
+#[test]
+fn a_fraction_above_one_is_refused_only_as_a_unit_interval() {
+    assert_each_position_reads(
+        &[
+            "d81e820302",
+            "d81e821bffffffffffffffff01",
+            "d81e821bffffffffffffffff1bfffffffffffffffe",
+        ],
+        false,
+        true,
+        true,
+    );
+}
+
+#[test]
+fn a_zero_fraction_is_refused_only_as_a_positive_interval() {
+    assert_each_position_reads(
+        &["d81e820001", "d81e82001bffffffffffffffff"],
+        true,
+        true,
+        false,
+    );
+}
+
+#[test]
+fn a_fraction_below_the_positive_minimum_is_refused_only_as_a_positive_interval() {
+    assert_each_position_reads(
+        &["d81e82011b8ac7230489e80001", "d81e82011bffffffffffffffff"],
+        true,
+        true,
+        false,
+    );
+}
+
+#[test]
+fn integers_read_only_within_the_width_the_ledger_reads() {
+    let key = |k: u64| match k {
+        0..=23 => format!("{k:02x}"),
+        _ => format!("18{k:02x}"),
+    };
+    type Reader = fn(&'static [u8]) -> Result<(), minicbor::decode::Error>;
+    let mut cases: Vec<(String, Reader, String, bool)> = Vec::new();
+    for k in [4, 8, 23, 24, 27, 43, 51, 52] {
+        for (value, verdict) in [("19ffff", true), ("1a00010000", false)] {
+            cases.push((
+                format!("update key {k} {value}"),
+                read::<ProtocolParamUpdate>,
+                format!("a1{}{value}", key(k)),
+                verdict,
+            ));
+        }
+    }
+    for k in [
+        2, 3, 7, 22, 28, 29, 32, 34, 35, 36, 40, 41, 42, 45, 46, 48, 49, 53,
+    ] {
+        for (value, verdict) in [("1affffffff", true), ("1b0000000100000000", false)] {
+            cases.push((
+                format!("update key {k} {value}"),
+                read::<ProtocolParamUpdate>,
+                format!("a1{}{value}", key(k)),
+                verdict,
+            ));
+        }
+    }
+    for (case, reader, hex, verdict) in [
+        (
+            "update key 53 null",
+            read::<ProtocolParamUpdate> as Reader,
+            "a11835f6",
+            true,
+        ),
+        (
+            "update key 36 zero",
+            read::<ProtocolParamUpdate>,
+            "a1182400",
+            false,
+        ),
+        ("cost models language 4", read::<CostModels>, "a10480", true),
+        (
+            "cost models language 255",
+            read::<CostModels>,
+            "a118ff80",
+            true,
+        ),
+        (
+            "cost models language 256",
+            read::<CostModels>,
+            "a119010080",
+            false,
+        ),
+        ("relay port 65535", read::<Relay>, "830119ffff6161", true),
+        (
+            "relay port 65536",
+            read::<Relay>,
+            "83011a000100006161",
+            false,
+        ),
+        (
+            "single host addr port 65536",
+            read::<Relay>,
+            "84001a00010000f6f6",
+            false,
+        ),
+    ] {
+        cases.push((case.into(), reader, hex.into(), verdict));
+    }
+
+    let filled = |n: usize| match n {
+        0..=23 => format!("{:02x}{}", 0x40 + n, "11".repeat(n)),
+        _ => format!("58{n:02x}{}", "11".repeat(n)),
+    };
+    let header_body = |body_size: &str| {
+        format!(
+            "8c0000f6{}{}82{}{}{body_size}{}84{}0000{}820000f4f6",
+            filled(32),
+            filled(32),
+            filled(64),
+            filled(80),
+            filled(32),
+            filled(32),
+            filled(64),
+        )
+    };
+    let id = filled(32);
+    for (case, reader, hex, verdict) in [
+        (
+            "transaction_input index 65535",
+            read::<super::TransactionInput> as Reader,
+            format!("82{id}19ffff"),
+            true,
+        ),
+        (
+            "transaction_input index 65536",
+            read::<super::TransactionInput>,
+            format!("82{id}1a00010000"),
+            false,
+        ),
+        (
+            "gov_action_id index 65535",
+            read::<super::GovActionId>,
+            format!("82{id}19ffff"),
+            true,
+        ),
+        (
+            "gov_action_id index 65536",
+            read::<super::GovActionId>,
+            format!("82{id}1a00010000"),
+            false,
+        ),
+        (
+            "hard fork protocol_version minor 4294967295",
+            read::<GovAction>,
+            "8301f6820d1affffffff".into(),
+            true,
+        ),
+        (
+            "hard fork protocol_version minor 4294967296",
+            read::<GovAction>,
+            "8301f6820d1b0000000100000000".into(),
+            false,
+        ),
+        (
+            "hard fork protocol_version major 14",
+            read::<GovAction>,
+            "8301f6820e00".into(),
+            false,
+        ),
+        (
+            "ex_units mem max_int64",
+            read::<super::ExUnits>,
+            "821b7fffffffffffffff00".into(),
+            true,
+        ),
+        (
+            "ex_units mem max_int64 plus one",
+            read::<super::ExUnits>,
+            "821b800000000000000000".into(),
+            false,
+        ),
+        (
+            "ex_units steps max_int64 plus one",
+            read::<super::ExUnits>,
+            "82001b8000000000000000".into(),
+            false,
+        ),
+        (
+            "eb_references_announcement size 4294967296",
+            read::<super::EbAnnouncement>,
+            format!("82{id}1b0000000100000000"),
+            false,
+        ),
+        (
+            "header_version_info major 4294967296",
+            read::<super::HeaderVersionInfo>,
+            "821b000000010000000000".into(),
+            false,
+        ),
+        (
+            "header_body block_body_size 4294967295",
+            read::<super::HeaderBody>,
+            header_body("1affffffff"),
+            true,
+        ),
+        (
+            "header_body block_body_size 4294967296",
+            read::<super::HeaderBody>,
+            header_body("1b0000000100000000"),
+            false,
+        ),
+        (
+            "redeemers index 4294967296",
+            read::<super::Redeemers>,
+            "a182001b00000001000000008200820000".into(),
+            false,
+        ),
+    ] {
+        cases.push((case.into(), reader, hex, verdict));
+    }
+
+    let wrong: Vec<String> = cases
+        .into_iter()
+        .filter_map(|(case, read, hex, verdict)| {
+            let got = read(generated(&hex));
+            (got.is_ok() != verdict).then(|| format!("{case}: {got:?}"))
+        })
+        .collect();
+    assert!(
+        wrong.is_empty(),
+        "{} differ from the ledger:\n{}",
+        wrong.len(),
+        wrong.join("\n")
+    );
+}
+
+#[test]
+fn a_witness_set_refuses_an_empty_bootstrap_set_as_a_transaction_does() {
+    let filled = |head: &str, n: usize| format!("{head}{}", "11".repeat(n));
+    let witness = format!(
+        "84{}{}{}40",
+        filled("5820", 32),
+        filled("5840", 64),
+        filled("5820", 32)
+    );
+    let mut wrong = Vec::new();
+    for (case, hex, verdict) in [
+        ("one bootstrap witness", format!("a10281{witness}"), true),
+        ("empty bootstrap set", "a10280".to_string(), false),
+        (
+            "empty tagged bootstrap set",
+            "a102d9010280".to_string(),
+            false,
+        ),
+    ] {
+        let got = read::<WitnessSet>(generated(&hex));
+        if got.is_ok() != verdict {
+            wrong.push(format!("{case}: {got:?}"));
+        }
+    }
+    assert_eq!(wrong, Vec::<String>::new());
+}
+
+#[test]
+fn auxiliary_data_as_an_array_refuses_null_scripts() {
+    assert_eq!(read::<AuxiliaryData>(generated("82a080")).ok(), Some(()));
+    assert!(read::<AuxiliaryData>(generated("82a0f6")).is_err());
+}
+
+#[test]
+fn threshold_and_price_arrays_read_only_at_their_cddl_length() {
+    type Reader = fn(&'static [u8]) -> Result<(), minicbor::decode::Error>;
+    let fractions = |n: usize| format!("{:02x}{}", 0x80 + n, HALF.repeat(n));
+    let cases: [(&str, Reader, usize); 3] = [
+        (
+            "pool_voting_thresholds",
+            read::<super::PoolVotingThresholds>,
+            5,
+        ),
+        (
+            "drep_voting_thresholds",
+            read::<super::DRepVotingThresholds>,
+            10,
+        ),
+        ("ex_unit_prices", read::<super::ExUnitPrices>, 2),
+    ];
+
+    let mut wrong = Vec::new();
+    for (rule, read, len) in cases {
+        for (items, verdict) in [(len, true), (len + 1, false), (len - 1, false)] {
+            let got = read(generated(&fractions(items)));
+            if got.is_ok() != verdict {
+                wrong.push(format!("{rule} of {items} items: {got:?}"));
+            }
+        }
+    }
+    assert!(
+        wrong.is_empty(),
+        "{} differ from the ledger:\n{}",
+        wrong.len(),
+        wrong.join("\n")
     );
 }

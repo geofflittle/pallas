@@ -96,10 +96,10 @@ codec_by_datatype! {
     (coin, multi => Multiasset)
 }
 
-/// Implements the codec of a value enum, reading its `Multiasset` variant from an array of either length form.
+/// Implements the codec of a value enum, reading its `Multiasset` variant from an array of either length form and each amount with `$amount`.
 #[cfg(feature = "unstable")]
 macro_rules! value_codec {
-    ($name:ident) => {
+    ($name:ident, $amount:expr) => {
         impl<'b, C> pallas_codec::minicbor::Decode<'b, C> for $name {
             fn decode(
                 d: &mut pallas_codec::minicbor::Decoder<'b>,
@@ -109,8 +109,11 @@ macro_rules! value_codec {
                 match d.datatype()? {
                     Type::Array | Type::ArrayIndef => {
                         let len = d.array()?;
-                        let value = $name::Multiasset(d.decode_with(ctx)?, d.decode_with(ctx)?);
-                        pallas_codec::utils::skip_array_rest(d, len, 2)?;
+                        let value = $name::Multiasset(
+                            d.decode_with(ctx)?,
+                            crate::distinct_map::decode_multiasset(d, ctx, $amount)?,
+                        );
+                        pallas_codec::utils::end_array(d, len, 2)?;
                         Ok(value)
                     }
                     Type::U8 | Type::U16 | Type::U32 | Type::U64 => {
@@ -148,9 +151,10 @@ macro_rules! value_codec {
 pub(crate) use value_codec;
 
 #[cfg(feature = "unstable")]
-value_codec!(Value);
+value_codec!(Value, crate::distinct_map::decode_positive_amount);
 
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(not(feature = "unstable"), derive(Decode))]
 pub struct TransactionOutput {
     #[n(0)]
     pub address: Bytes,
@@ -161,6 +165,14 @@ pub struct TransactionOutput {
     #[n(2)]
     pub datum_hash: Option<DatumHash>,
 }
+
+#[cfg(feature = "unstable")]
+crate::array_record::decode_array_record!(TransactionOutput {
+    address,
+    amount,
+    #[optional]
+    datum_hash
+});
 
 /* move_instantaneous_reward = [ 0 / 1, { * stake_credential => delta_coin } / coin ]
 ; The first field determines where the funds are drawn from.
@@ -373,7 +385,8 @@ pub struct TransactionBody {
     pub network_id: Option<NetworkId>,
 }
 
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(not(feature = "unstable"), derive(Decode))]
 pub struct VKeyWitness {
     #[n(0)]
     pub vkey: Bytes,
@@ -381,6 +394,12 @@ pub struct VKeyWitness {
     #[n(1)]
     pub signature: Bytes,
 }
+
+#[cfg(feature = "unstable")]
+crate::array_record::decode_array_record!(VKeyWitness {
+    vkey: pallas_codec::utils::decode_bytes_sized::<32, 32, _>,
+    signature: pallas_codec::utils::decode_bytes_sized::<64, 64, _>
+});
 
 /// A native script tree with stack-safe CBOR, clone, equality and drop operations.
 ///
@@ -444,7 +463,8 @@ pub struct RedeemerPointer {
 , attributes : bytes
 ] */
 
-#[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Encode, Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(not(feature = "unstable"), derive(Decode))]
 pub struct BootstrapWitness {
     #[n(0)]
     pub public_key: Bytes,
@@ -458,6 +478,14 @@ pub struct BootstrapWitness {
     #[n(3)]
     pub attributes: Bytes,
 }
+
+#[cfg(feature = "unstable")]
+crate::array_record::decode_array_record!(BootstrapWitness {
+    public_key: pallas_codec::utils::decode_bytes_sized::<32, 32, _>,
+    signature: pallas_codec::utils::decode_bytes_sized::<64, 64, _>,
+    chain_code,
+    attributes
+});
 
 #[derive(Serialize, Deserialize, Encode, Decode, Debug, PartialEq, Clone)]
 #[cbor(map)]
@@ -592,18 +620,14 @@ mod tests {
 
     #[cfg(feature = "unstable")]
     #[test]
-    fn a_native_script_with_extra_elements_reads_to_the_end_of_its_array() {
-        for (bytes, expected) in [
-            ("83050100", NativeScript::InvalidHereafter(1)),
-            ("9f05019f00ff00ff", NativeScript::InvalidHereafter(1)),
-            ("83018000", NativeScript::ScriptAll(vec![])),
-            ("9f019fff00ff", NativeScript::ScriptAll(vec![])),
-        ] {
-            let bytes = hex::decode(bytes).unwrap();
-            let mut d = minicbor::Decoder::new(&bytes);
-            let script: NativeScript = d.decode().unwrap();
-            assert_eq!(script, expected);
-            assert_eq!(d.position(), bytes.len());
+    fn a_native_script_with_extra_elements_is_refused() {
+        for bytes in ["83050100", "9f05019f00ff00ff", "83018000", "9f019fff00ff"] {
+            let error = minicbor::decode::<NativeScript>(&hex::decode(bytes).unwrap())
+                .expect_err("an extra element must not decode");
+            assert!(
+                error.to_string().contains("more elements than"),
+                "{bytes} was refused for some other reason: {error}"
+            );
         }
     }
 

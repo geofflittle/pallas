@@ -38,7 +38,7 @@ impl<'b> MultiEraHeader<'b> {
             }
             #[cfg(feature = "unstable")]
             7 => {
-                let header = minicbor::decode(cbor).map_err(Error::invalid_cbor)?;
+                let header = crate::support::decode_whole(cbor).map_err(Error::invalid_cbor)?;
                 Ok(MultiEraHeader::Dijkstra(Cow::Owned(header)))
             }
             #[cfg(feature = "unstable")]
@@ -271,6 +271,18 @@ mod tests {
             None,
             "only Dijkstra's header body has the field"
         );
+    }
+
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn a_dijkstra_header_with_bytes_after_it_is_refused() {
+        let mut raw = dijkstra_header_bytes();
+        raw.push(0x00);
+        match MultiEraHeader::decode(7, None, &raw) {
+            Err(err) if err.to_string().contains("bytes left") => {}
+            Err(err) => panic!("the header was refused for another reason: {err}"),
+            Ok(_) => panic!("the header with a byte after it was read"),
+        }
     }
 
     #[cfg(feature = "unstable")]

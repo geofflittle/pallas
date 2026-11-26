@@ -2,6 +2,22 @@
 
 use pallas_primitives::{alonzo, babbage, byron, conway};
 
+/// Decodes the bytes as one value that ends where they end.
+#[cfg(feature = "unstable")]
+pub(crate) fn decode_whole<'b, T: pallas_codec::minicbor::Decode<'b, ()>>(
+    cbor: &'b [u8],
+) -> Result<T, pallas_codec::minicbor::decode::Error> {
+    let mut d = pallas_codec::minicbor::Decoder::new(cbor);
+    let value = d.decode()?;
+    if d.position() != cbor.len() {
+        return Err(
+            pallas_codec::minicbor::decode::Error::message("bytes left after the item")
+                .at(d.position()),
+        );
+    }
+    Ok(value)
+}
+
 macro_rules! clone_tx_fn {
     ($fn_name:ident, $era:tt) => {
         fn $fn_name<'b>(block: &'b $era::Block, index: usize) -> Option<$era::Tx<'b>> {

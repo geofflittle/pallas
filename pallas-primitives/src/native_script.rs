@@ -115,7 +115,13 @@ impl<'b, C, S: NativeScript> TreeDecode<'b, C> for Node<S> {
         d: &mut Decoder<'b>,
         _: &mut C,
     ) -> Result<Node<S>, minicbor::decode::Error> {
-        pallas_codec::utils::skip_array_rest(d, builder.len, builder.required)?;
+        if cfg!(feature = "unstable") {
+            pallas_codec::utils::end_array(d, builder.len, builder.required)?;
+        } else {
+            for _ in builder.required..builder.len.unwrap_or(builder.required) {
+                d.skip()?;
+            }
+        }
         Ok(Node(builder.script))
     }
 }
