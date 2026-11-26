@@ -1,3 +1,4 @@
 test_data/file-injection/** -text
+reference-comparison/tests/records/** -text
 pallas-math/tests/data/golden_tests.txt -text
 pallas-math/tests/data/golden_tests_result.txt -text
